@@ -5,10 +5,10 @@ on:
       examples:
         description: Declarative examples
         type: choice
-        options: [flashlight, blue-dog, both]
-        default: flashlight
+        options: [flashlight, notation-fixtures, blue-dog, both, all]
+        default: all
       blue_dog_revision:
-        description: Exact 40-character sv-blue-dog commit (required for blue-dog/both)
+        description: Exact 40-character sv-blue-dog commit (required for blue-dog/both/all)
         type: string
         default: ''
       publish:
@@ -51,7 +51,8 @@ jobs:
           python - <<'PY'
           import json, os, re
           from pathlib import Path
-          examples = ['flashlight', 'blue-dog'] if os.environ['EXAMPLES'] == 'both' else [os.environ['EXAMPLES']]
+          selection = os.environ['EXAMPLES']
+          examples = ['flashlight', 'notation-fixtures', 'blue-dog'] if selection == 'all' else ['flashlight', 'blue-dog'] if selection == 'both' else [selection]
           pins = {json.loads(Path(f'examples/{name}/project.json').read_text())['nativeToolRevision'] for name in examples}
           if len(pins) != 1 or not re.fullmatch('[0-9a-f]{40}', next(iter(pins))):
               raise SystemExit('Examples must share one exact native source pin')
@@ -79,7 +80,7 @@ jobs:
           ref: ${{ steps.pins.outputs.native }}
           path: viewer/.tools/opensysml
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        if: inputs.examples != 'flashlight'
+        if: inputs.examples == 'blue-dog' || inputs.examples == 'both' || inputs.examples == 'all'
         with:
           repository: DavidIngraham/sv-blue-dog
           ref: ${{ inputs.blue_dog_revision }}
@@ -115,7 +116,9 @@ jobs:
           HISTORY_EXISTS: ${{ steps.history.outputs.exists }}
         run: |
           args=(--output build/site --work build/ci)
-          if [ "$EXAMPLES" = both ]; then
+          if [ "$EXAMPLES" = all ]; then
+            args+=(--example examples/flashlight --example examples/notation-fixtures --example examples/blue-dog)
+          elif [ "$EXAMPLES" = both ]; then
             args+=(--example examples/flashlight --example examples/blue-dog)
           else
             args+=(--example "examples/$EXAMPLES")

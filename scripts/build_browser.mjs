@@ -18,7 +18,7 @@ await build({entryPoints:['src/app.mjs'],bundle:true,format:'esm',target:['es202
   sourcemap:true,metafile:true}).then(async result=>{
     await writeFile(join(output,'build-inputs.json'),JSON.stringify(result.metafile,null,2));
   });
-for(const [from,to] of [['index.html','index.html'],['src/styles.css','styles.css'],['src/notation.css','notation.css']]) await copyFile(from,join(output,to));
+for(const [from,to] of [['LICENSE','LICENSE'],['index.html','index.html'],['src/styles.css','styles.css'],['src/notation.css','notation.css']]) await copyFile(from,join(output,to));
 const revision=execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const dirty=!!execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim();
 const lock=await readFile(join(editor,'package-lock.json'));
@@ -31,7 +31,7 @@ const viewerRevision=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).
 const viewerDirty=!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();
 const assets={};
 async function noticeFiles(directory,prefix='notices'){const result=[];for(const entry of await readdir(directory,{withFileTypes:true})){const name=prefix+'/'+entry.name;if(entry.isDirectory())result.push(...await noticeFiles(join(directory,entry.name),name));else if(entry.isFile())result.push(name);else throw Error('Unexpected notice asset type');}return result;}
-for(const name of ['index.html','app.js','app.js.map','styles.css','notation.css','build-inputs.json','renderer-provenance.json',...await noticeFiles(join(output,'notices'))]) {
+for(const name of ['LICENSE','index.html','app.js','app.js.map','styles.css','notation.css','build-inputs.json','renderer-provenance.json',...await noticeFiles(join(output,'notices'))]) {
   assets[name]=createHash('sha256').update(await readFile(join(output,name))).digest('hex');
 }
 await writeFile(join(output,'viewer-provenance.json'),JSON.stringify({revision:viewerRevision,dirty:viewerDirty,assets},null,2));

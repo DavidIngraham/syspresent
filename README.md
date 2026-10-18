@@ -34,4 +34,8 @@ python3 -m unittest discover -s tests
 OPENSYSML_SOURCE=/path/to/pinned/OpenSysML node --test tests/*.test.mjs
 ```
 
-The first implementation uses a reviewed local integration candidate. Release requires a clean dependency pin, complete publication checks and the outstanding repository license decision. Native conversion is experimental, so exported coverage and unavailable targets remain explicit. A passing software test is not evidence that a vessel or a reader has passed acceptance.
+The implementation pins a reviewed commit in David’s OpenSysML fork. Publication runs the build and snapshot checks; reader acceptance remains separate. Native conversion is experimental, so exported coverage and unavailable targets remain explicit. A passing software test is not evidence that a vessel or a reader has passed acceptance.
+
+## License
+
+Syspresent is licensed under [Apache 2.0](LICENSE), matching OpenSysML. Third-party components retain their own terms; see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES). Frozen browser snapshots include this license and the dependency notices.
