@@ -1,0 +1,144 @@
+package BlueDogConfigurations {
+    private import ScalarValues::*;
+    part reference : MarineDesign::Design {
+        metadata rationale : ModelingMetadata::Rationale { text = "Starting geometry only; all represented dimensions remain free in sizing."; }
+        attribute :>> length_m = 2;
+        attribute :>> beam_m = 0.60443680369999997;
+        attribute :>> bottom_depth_m = 0.052643588900000003;
+        attribute :>> deck_height_m = 0.16320739109999999;
+        attribute :>> sail_m2 = 1.1782673035;
+        attribute :>> sail_AR = 5.2091181580999999;
+        attribute :>> camber_scale = 1;
+        attribute :>> wing_thickness_scale = 1;
+        attribute :>> mast_fraction = 0.5;
+        attribute :>> mast_x_fraction = -0.017302668;
+        attribute :>> keel_m2 = 0.14177613859999999;
+        attribute :>> keel_span_m = 0.71481970699999997;
+        attribute :>> rudder_m2 = 0.0120845842;
+        attribute :>> rudder_span_m = 0.12816840779999999;
+        attribute :>> rudder_arm_fraction = 0.5;
+        attribute :>> ballast_kg = 11.6735943;
+        attribute :>> battery_Wh = 207.46827300000001;
+        attribute :>> panel_m2 = 0.23102358200000001;
+        attribute :>> wing_torque_Nm = 0.80857334999999997;
+        attribute :>> rudder_torque_Nm = 0.80857334999999997;
+        attribute :>> hull_glass_kg_m2 = 0.59999999999999998;
+        attribute :>> wing_glass_kg_m2 = 0.40000000000000002;
+        attribute :>> keel_glass_kg_m2 = 4.7999999999999998;
+        attribute :>> rudder_glass_kg_m2 = 0.40000000000000002;
+        attribute :>> hull_rib_pitch_m = 0.029750749999999999;
+        attribute :>> foil_rib_pitch_m = 0.040000000000000001;
+        attribute :>> battery_x_fraction = 0;
+        attribute :>> battery_z_fraction = 0.10000000000000001;
+        attribute :>> hull_fullness_exponent = 1.8;
+    }
+    part assumptions : MarineDesign::Parameters {
+        metadata rationale : ModelingMetadata::Rationale { text = "Provisional physical and component allocations; uncertainty cases and evidence limitations remain separate from a numerical pass."; }
+        attribute :>> resinGlassRatio = 1;
+        attribute :>> gearboxEfficiency = 0.40000000000000002;
+        attribute :>> motorEfficiency = 0.80000000000000004;
+        attribute :>> wingNoLoadW = 1;
+        attribute :>> wingControllerW = 0.10000000000000001;
+        attribute :>> wingMotorHoldingW = 0;
+        attribute :>> wingMoveFraction = 0.02;
+        attribute :>> wingHoldingFraction = 0.97999999999999998;
+        attribute :>> rudderHoldingWPerNm = 0.5;
+        attribute :>> rudderMoveFraction = 0.050000000000000003;
+        attribute :>> electronicsW = 4.5 + BlueDogWindEquipment::challenge.busPowerW;
+        attribute :>> solarResourceFactor = 0.59999999999999998;
+        attribute :>> batteryWhKg = 140;
+        attribute :>> laminateKnockdown = 1;
+        attribute :>> profileCd = BlueDogAerodynamicPolicy::sizing.profileCd;
+        attribute :>> wingClLimit = BlueDogAerodynamicPolicy::sizing.clLimit;
+        attribute :>> wingLiftScale = BlueDogAerodynamicPolicy::sizing.liftScale;
+        attribute :>> wingDragScale = BlueDogAerodynamicPolicy::sizing.dragScale;
+        attribute :>> wingRateRadS = 0.25;
+        attribute :>> rudderRateRadS = 0.59999999999999998;
+        attribute :>> driveKgPerNm = 0.14999999999999999;
+        attribute :>> wingDriveBaseKg = 0.20000000000000001;
+        // Base equipment excludes the separately located wind-sensing installation.
+        attribute :>> fixedEquipmentKg = 2.5;
+        attribute :>> elevatedEquipmentKg = BlueDogWindEquipment::challenge.installedMassKg;
+        attribute :>> elevatedEquipmentXFraction = BlueDogWindEquipment::challenge.xFraction;
+        attribute :>> elevatedEquipmentAboveDeckM = BlueDogWindEquipment::challenge.aboveDeckM;
+        attribute :>> attachmentKg = 0.59999999999999998;
+        attribute :>> residuaryResistanceFactor = 1;
+        attribute :>> viscousFormFactor = 1.1499999999999999;
+        attribute :>> foilClLimit = 0.80000000000000004;
+        attribute :>> foilEfficiency = 0.69999999999999996;
+        attribute :>> foilCd = 0.012;
+        attribute :>> airNu = 1.5e-05;
+        attribute :>> waterNu = 9.9999999999999995e-07;
+        attribute :>> waterDensity = 1000;
+        attribute :>> airDensity = 1.2250000000000001;
+        attribute :>> ballastDensity = 7800;
+        attribute :>> gravity = 9.8066499999999994;
+        attribute :>> loadFactor = 1.5;
+        attribute :>> assemblyLimitKg = 15;
+        attribute :>> panelCoverage = 0.59999999999999998;
+    }
+    part lowerBracket : MarineDesign::Design {
+        doc /* Numerical and physical-model domain bracket, not a vessel requirement or selected dimension. */
+        attribute :>> length_m = 0.8;
+        attribute :>> beam_m = 0.2;
+        attribute :>> bottom_depth_m = 0.02;
+        attribute :>> deck_height_m = 0.05;
+        attribute :>> sail_m2 = 0.2;
+        attribute :>> sail_AR = 2;
+        attribute :>> camber_scale = 0.5;
+        attribute :>> wing_thickness_scale = 0.5;
+        attribute :>> mast_fraction = 0.1;
+        attribute :>> mast_x_fraction = -0.4;
+        attribute :>> keel_m2 = 0.02;
+        attribute :>> keel_span_m = 0.15;
+        attribute :>> rudder_m2 = 0.005;
+        attribute :>> rudder_span_m = 0.08;
+        attribute :>> rudder_arm_fraction = 0.25;
+        attribute :>> ballast_kg = 0.5;
+        attribute :>> battery_Wh = 50;
+        attribute :>> panel_m2 = 0.05;
+        attribute :>> wing_torque_Nm = 0.05;
+        attribute :>> rudder_torque_Nm = 0.05;
+        attribute :>> hull_glass_kg_m2 = 0.2;
+        attribute :>> wing_glass_kg_m2 = 0.2;
+        attribute :>> keel_glass_kg_m2 = 0.2;
+        attribute :>> rudder_glass_kg_m2 = 0.2;
+        attribute :>> hull_rib_pitch_m = 0.01;
+        attribute :>> foil_rib_pitch_m = 0.01;
+        attribute :>> battery_x_fraction = -0.35;
+        attribute :>> battery_z_fraction = 0.05;
+        attribute :>> hull_fullness_exponent = 1.0;
+    }
+    part upperBracket : MarineDesign::Design {
+        doc /* Numerical and physical-model domain bracket, not a vessel requirement or selected dimension. */
+        attribute :>> length_m = 4;
+        attribute :>> beam_m = 1.2;
+        attribute :>> bottom_depth_m = 0.3;
+        attribute :>> deck_height_m = 0.5;
+        attribute :>> sail_m2 = 4;
+        attribute :>> sail_AR = 8;
+        attribute :>> camber_scale = 1.5;
+        attribute :>> wing_thickness_scale = 2;
+        attribute :>> mast_fraction = 0.9;
+        attribute :>> mast_x_fraction = 0.4;
+        attribute :>> keel_m2 = 0.5;
+        attribute :>> keel_span_m = 1.1;
+        attribute :>> rudder_m2 = 0.2;
+        attribute :>> rudder_span_m = 0.6;
+        attribute :>> rudder_arm_fraction = 0.65;
+        attribute :>> ballast_kg = 14.5;
+        attribute :>> battery_Wh = 1000;
+        attribute :>> panel_m2 = 1;
+        attribute :>> wing_torque_Nm = 20;
+        attribute :>> rudder_torque_Nm = 10;
+        attribute :>> hull_glass_kg_m2 = 4;
+        attribute :>> wing_glass_kg_m2 = 4;
+        attribute :>> keel_glass_kg_m2 = 8;
+        attribute :>> rudder_glass_kg_m2 = 4;
+        attribute :>> hull_rib_pitch_m = 0.23;
+        attribute :>> foil_rib_pitch_m = 0.23;
+        attribute :>> battery_x_fraction = 0.35;
+        attribute :>> battery_z_fraction = 0.9;
+        attribute :>> hull_fullness_exponent = 2.0;
+    }
+}
