@@ -3,7 +3,7 @@
   "sources": [
     "model.sysml"
   ],
-  "nativeToolRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
+  "nativeToolRevision": "af37bbf155aea785b8ac494a14afe659244bbcdf",
   "libraryScopes": [
     "ISQ::MassValue",
     "SI::kg",

@@ -1,14 +1,33 @@
 {
   "title": "Native notation preservation fixtures",
-  "sources": ["model.sysml"],
-  "nativeToolRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
-  "libraryScopes": ["VerificationCases::VerdictKind"],
-  "views": [
-    {"id":"actions","native":"#action:DeskFan::StartCycle"},
-    {"id":"states","native":"#state:DeskFan::operating"},
-    {"id":"sequence","native":"#sequence:DeskFan::StartupExchange"},
-    {"id":"matrix","native":"#matrix:DeskFan"}
+  "sources": [
+    "model.sysml"
   ],
-  "exploration":{"contextLimit":24,"entryPoint":"DeskFan__fan"},
-  "values":[]
+  "nativeToolRevision": "af37bbf155aea785b8ac494a14afe659244bbcdf",
+  "libraryScopes": [
+    "VerificationCases::VerdictKind"
+  ],
+  "views": [
+    {
+      "id": "actions",
+      "native": "#action:DeskFan::StartCycle"
+    },
+    {
+      "id": "states",
+      "native": "#state:DeskFan::operating"
+    },
+    {
+      "id": "sequence",
+      "native": "#sequence:DeskFan::StartupExchange"
+    },
+    {
+      "id": "matrix",
+      "native": "#matrix:DeskFan"
+    }
+  ],
+  "exploration": {
+    "contextLimit": 24,
+    "entryPoint": "DeskFan__fan"
+  },
+  "values": []
 }

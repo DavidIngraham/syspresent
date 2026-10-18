@@ -2,7 +2,7 @@
 
 This original desk-fan model tests notation that the simpler flashlight story does not cover. It is a teaching fixture, not a product design or execution trace. Imports are standard `ScalarValues` and OMG `RequirementDerivation`; the verification verdict uses standard `VerificationCases`.
 
-`project.json` targets base revision `23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2`. Its native pseudo-views are:
+`project.json` targets reviewed fork revision `af37bbf155aea785b8ac494a14afe659244bbcdf`. The captures below retain the earlier base revision as historical evidence. Its native pseudo-views are:
 
 | ID | Native target | Meaning to preserve |
 | --- | --- | --- |
