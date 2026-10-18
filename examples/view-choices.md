@@ -2,7 +2,7 @@
 
 Each stop chooses a representation for its question. A small node count does not by itself make a diagram useful. Requirements are read in tables; relationships, behavior and shared causes retain their appropriate native notation. Per-stop compartment visibility is presentation data, not a model claim.
 
-The requirement tables use native `DocumentQueries::Project` queries with ID, Requirement and Statement columns. The pinned native `GridView`/`asElementTable` rendering has fixed structural columns and does not include requirement text. These are therefore native query tables, not a claim of a new standard requirement-view definition. Query row identity is retained for exploration. Blue Dog selects requirement definitions because its usages carry neither the identifier nor the documentation; its definitions carry S-001 and S-101.
+The requirement tables use native `DocumentQueries::Project` queries with ID, Requirement and Statement columns. The pinned native `GridView`/`asElementTable` rendering has fixed structural columns and does not include requirement text. These are therefore native query tables, not a claim of a new standard requirement-view definition. Query row identity is retained for exploration. Blue Dog selects requirement definitions because its usages carry neither the identifier nor the documentation. Relationship matrices use the corresponding usages to retain the actual trace endpoints.
 
 | Example / section | Default | Reason |
 | --- | --- | --- |
@@ -18,7 +18,15 @@ The requirement tables use native `DocumentQueries::Project` queries with ID, Re
 | Desk fan: startup messages | Sequence diagram | Event order, participants and self-message carry the meaning. |
 | Desk fan: requirements and responsibilities | Relationship matrix | Compare derivation, satisfaction, verification and allocation without confusing their direction. |
 | Desk fan: checking the diagrams | Prose closing | Summarize the inspection task without duplicating a diagram. |
-| Blue Dog: traffic obligations | Requirement table | Read S-001 and S-101 in full; select native rows for definitions and the adjacent semantic links for usages and their traces. |
+| Blue Dog: Gorge obligations | Requirement table | Read C-006/C-007/C-009/C-012/C-013 before the selected vehicle allocation. |
+| Blue Dog: traffic and signals derivation | Native relationship matrix | Two explicit original-to-derived links; retain the distinction between a selected trace and full challenge coverage. |
+| Blue Dog: traffic response and signals | Requirement table | Read S-001 and S-004 in full before acceptance decomposition. |
+| Blue Dog: traffic acceptance derivations | Native relationship matrix | One parent and four leaf outcomes, without the unbounded requirement-graph neighborhood. |
+| Blue Dog: traffic timing | Detailed requirement table | Full S-101 through S-104 statements, with verification and physical evidence limits in the prose. |
+| Blue Dog: recovery obligations | Requirement table | Read S-003/R-001/R-002 together before inspecting their design basis. |
+| Blue Dog: recovery design basis | Native dependency matrix | Preserve specific-to-motivating direction and generic dependency semantics; do not relabel as derivation. |
+| Blue Dog: recovery acceptance | Native relationship matrix | Five selected S-003 derivations; explicitly identify the omitted shared outcomes. |
+| Blue Dog: recovery timing | Detailed requirement table | Read the selected timing and isolation conditions, separate from physical verification. |
 | Blue Dog: sailing, avoidance and recovery | Action diagram | The supervisor's branches and abort behavior are the subject. |
 | Blue Dog: shared power and computing failures | Fault tree | Repeated/shared causes and gate connections must remain explicit. |
 | Blue Dog: sensing, decisions and maneuver failures | Scoped primary-response fault tree | Decompose one credited path without repeating the whole system tree. |
@@ -32,4 +40,10 @@ Behavioral labels, guards, state boundaries and fault-gate meaning must not be s
 
 ## Native checks
 
-The pinned native CLI returned exactly two rows for each new requirement query. Flashlight returned FL-01/portable and FL-02/controllable with their full statements. Blue Dog returned S-001/TrafficSafety and S-101/TrafficTracking with their full statements. The native flashlight structure rendering retained its seven part/definition nodes and six ownership/typing relationships. The native mass-input query returned Flashlight::Battery = 0.08 [kg] and Flashlight::light = 0.22 [kg], retaining native units. Browser inspection established that structural nodes contain no native detail/text payload, so no expanded attribute-compartment claim remains.
+The pinned native CLI returned exactly two rows for the flashlight requirement query. Flashlight returned FL-01/portable and FL-02/controllable with their full statements. The current Blue Dog system requirement query returns S-001/TrafficSafety and S-004/NavigationConspicuity with their full statements; the added queries and matrices are summarized below. The native flashlight structure rendering retained its seven part/definition nodes and six ownership/typing relationships. The native mass-input query returned Flashlight::Battery = 0.08 [kg] and Flashlight::light = 0.22 [kg], retaining native units. Browser inspection established that structural nodes contain no native detail/text payload, so no expanded attribute-compartment claim remains.
+
+## Requirements derivation extension
+
+The Blue Dog story alternates readable requirement records with compact native relationship matrices. The pinned native GeneralView requirement rendering expands a connected requirement neighborhood even with explicit exposures (287 nodes in the tested traffic selection). Exposing only connections instead produces a containment tree of connection internals. Neither is a useful scoped derivation diagram, so the example uses native GridView matrices rather than filtering or rebuilding native semantics in the browser.
+
+Native CLI checks returned four matrices: challenge derivation 2 by 2; traffic acceptance 1 by 4; recovery design dependencies 3 by 3; selected recovery acceptance 1 by 5. Native record queries returned 5 challenge, 2 system traffic, 4 detailed traffic, 3 recovery and 5 detailed recovery records with IDs and statements. Recovery basis dependencies run specific to motivating requirement; true derivations run original to derived requirement. The linked verification definitions retain inconclusive verdicts.

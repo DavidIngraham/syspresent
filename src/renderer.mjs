@@ -46,8 +46,20 @@ export function presentationPayload(native, showCompartments = true) {
   }
   return result;
 }
+const generalTargetKinds = new Set(['typing','specialization']);
+/** Layout constraints run general→specific; drawing retains native specific→general arrows. */
 export function layoutPayload(native) {
-  return layoutOnlyTreeKinds.has(native.kind) ? {...native,kind:'tree'} : native;
+  if(native.kind!=='tree'&&!layoutOnlyTreeKinds.has(native.kind))return native;
+  return {...native,kind:'tree',edges:(native.edges??[]).map(edge=>generalTargetKinds.has(edge.kind)
+    ? {...edge,from:edge.to,to:edge.from,fromPort:edge.toPort,toPort:edge.fromPort}
+    : edge)};
+}
+/** Native routes are indexed by edge; restore source-first order after layout-only reversal. */
+export async function presentationLayout(native) {
+  const input=layoutPayload(native),auto=await autoLayout(input);
+  if(!auto||input===native)return auto;
+  return {...auto,routes:new Map([...auto.routes].map(([index,points])=>[index,
+    input.edges[index].from!==native.edges[index].from?[...points].reverse():points]))};
 }
 export function boundedZoom(value) { return Math.max(Number.MIN_VALUE,Math.min(4,value)); }
 /** Keep the content point under the starting midpoint under the moving midpoint. */
@@ -81,7 +93,7 @@ export function installDiagramGestures(viewport, frame, applyScale, onInteract=(
 async function cachedLayout(source, native, compact) {
   let variants=layouts.get(source);if(!variants){variants=new Map();layouts.set(source,variants);}
   const key=compact?'compact':'full';
-  if(!variants.has(key))variants.set(key,autoLayout(layoutPayload(native)));
+  if(!variants.has(key))variants.set(key,presentationLayout(native));
   return variants.get(key);
 }
 function frameFor(source, options) {
@@ -126,6 +138,17 @@ function expandable(container, fragment, frame, title, options) {
   });
 }
 
+/** Short labels are presentation only; complete native names remain accessible. */
+function readableMatrixLabels(table) {
+  const cells=[...table.querySelectorAll('thead th')].slice(1).concat([...table.querySelectorAll('tbody tr')].map(row=>row.querySelector('td')).filter(Boolean));
+  const byTail=new Map();
+  for(const cell of cells){const full=cell.textContent,tail=full.split('::').at(-1);if(!byTail.has(tail))byTail.set(tail,new Set());byTail.get(tail).add(full);}
+  for(const cell of cells){
+    const full=cell.textContent,tail=full.split('::').at(-1);
+    if(full.includes('::')){cell.title=full;cell.setAttribute('aria-label',full);if(tail&&byTail.get(tail).size===1)cell.textContent=tail;}
+  }
+}
+
 export async function renderView(container, view, options={}) {
   container.closeExpanded?.();
   const selectSemantic=id=>{container.closeExpanded?.();options.onSelect?.(id);};
@@ -137,6 +160,7 @@ export async function renderView(container, view, options={}) {
   const fragment=document.createElement('div');fragment.className='native-view';
   if(native.kind==='table'||native.kind==='matrix') {
     const table=tableOf(native);table.setAttribute('aria-label',view.title??view.id);
+    if(native.kind==='matrix')readableMatrixLabels(table);
     const represented=new Set();
     for(const row of table.querySelectorAll('tr[data-opensysml-row]')) {
       const semantic=view.rowToElement?.[row.dataset.opensysmlRow];

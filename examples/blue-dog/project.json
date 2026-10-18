@@ -27,6 +27,22 @@
     {
       "id": "scanner-failure",
       "native": "BlueDogFailureViews::ScannerTreeView"
+    },
+    {
+      "id": "challenge-derivation",
+      "native": "SyspresentBlueDogViews::ChallengeDerivation"
+    },
+    {
+      "id": "traffic-acceptance",
+      "native": "SyspresentBlueDogViews::TrafficAcceptance"
+    },
+    {
+      "id": "recovery-basis",
+      "native": "SyspresentBlueDogViews::RecoveryDerivation"
+    },
+    {
+      "id": "recovery-acceptance",
+      "native": "SyspresentBlueDogViews::RecoveryAcceptance"
     }
   ],
   "exploration": {
@@ -103,6 +119,26 @@
       "id": "dfmea-dispositions",
       "native": "BlueDogReliabilityDocuments::Dispositions",
       "asset": "dfmea-dispositions.json"
+    },
+    {
+      "id": "challenge-requirements",
+      "native": "SyspresentBlueDogViews::ChallengeRequirements",
+      "asset": "challenge-requirements.json"
+    },
+    {
+      "id": "traffic-details",
+      "native": "SyspresentBlueDogViews::TrafficDetails",
+      "asset": "traffic-details.json"
+    },
+    {
+      "id": "recovery-requirements",
+      "native": "SyspresentBlueDogViews::RecoveryRequirements",
+      "asset": "recovery-requirements.json"
+    },
+    {
+      "id": "recovery-details",
+      "native": "SyspresentBlueDogViews::RecoveryDetails",
+      "asset": "recovery-details.json"
     }
   ],
   "preparedAssets": [

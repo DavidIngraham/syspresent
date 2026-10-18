@@ -62,6 +62,7 @@ package SyspresentVerification {
             verify SyspresentRequirements::Views::crossViewIdentity;
             verify SyspresentRequirements::Views::traceVersusPossibility;
             verify SyspresentRequirements::Views::comparisonViews;
+            verify SyspresentRequirements::Views::generalToSpecific;
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }

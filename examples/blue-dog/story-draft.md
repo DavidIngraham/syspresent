@@ -3,14 +3,72 @@
 I want to build a small autonomous sailboat for a round trip on the Columbia River. Completing that course is only useful if the boat can coexist with other river users and deal with a failed attempt. This story follows one engineering argument: observation has to arrive early enough to support a real response, and recovery has to remain useful when the primary response fails.
 
 ```syspresent
-{"type":"stop","id":"obligation","title":"Detection and clearance requirements for river traffic","view":"avoidance-requirements","focus":"BlueDogRequirements__TrafficSafety","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogClassDetection__policy"]}
+{"type":"stop","id":"challenge-obligations","title":"Gorge traffic, intervention and recovery obligations","view":"challenge-requirements","modelRefs":["GorgeChallenge__trafficCoexistence","GorgeChallenge__navigationRules","GorgeChallenge__safetyCapabilityAbort","GorgeChallenge__autonomousShoreRecovery"],"focus":"GorgeChallenge__TrafficCoexistence"}
 ```
 
-The table gives the identifier, name and full statement of the traffic-safety and traffic-tracking requirement definitions. Select either row to inspect its definition. Satisfaction and derivation links attach to the corresponding [traffic-safety usage](model:BlueDogRequirements::trafficSafety) and [traffic-tracking usage](model:BlueDogRequirements::trafficTracking); follow these links to trace the allocated obligations.
+The Gorge course is shared river space. Commercial traffic, recreational craft and people in the water make coexistence a central part of the challenge, with more frequent close encounters than an open-ocean passage. Completing the route does not excuse a collision or a navigation-rule breach.
 
-Avoiding collision and interference is the obligation. A sensor's catalogue range does not establish that the boat can meet it. I need a timely usable track, a feasible decision and enough achieved motion to preserve separation.
+These five challenge requirements establish the traffic and recovery obligations followed here. Collision avoidance, navigation-rule compliance, emergency intervention, loss of qualification and autonomous shore recovery are distinct outcomes. The table is a selected part of the challenge, not its complete entry criteria.
 
-The current allocation distinguishes target classes and conditions. Occupied kayaks, stand-up paddleboards, people in the water and unoccupied craft need distinct evidence. Clearance and consequences matter alongside relative motion, but a presumed mild contact cannot shorten the physical maneuver. Accepted numerical class allocations remain unresolved.
+The record tables show requirement definitions, where the source model stores identifiers and full statements. The relationship matrices use the corresponding requirement usages, where the source model attaches traces. A definition describes the obligation; a usage applies it in this model.
+
+```syspresent
+{"type":"stop","id":"challenge-derivation","title":"Deriving traffic response and navigation signals","view":"challenge-derivation","modelRefs":["BlueDogRequirements__challengeTrafficResponse","BlueDogRequirements__challengeNavigationSignals"],"focus":"GorgeChallenge__trafficCoexistence"}
+```
+
+Read each marked cell from its row to its column. The model derives Blue Dog's traffic-safety requirement from the challenge's collision-free-course obligation, and navigation conspicuity from navigation-rule compliance. These are explicit derivation connections in the source model.
+
+This small matrix shows two selected derivations. It does not say that signals alone cover navigation rules, or that the rest of the challenge has been fully allocated. A trace records the engineering argument to review; it is not evidence that the boat satisfies either obligation.
+
+```syspresent
+{"type":"stop","id":"obligation","title":"Blue Dog traffic response and navigation signals","view":"avoidance-requirements","focus":"BlueDogRequirements__TrafficSafety","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__navigationConspicuity","BlueDogClassDetection__policy"]}
+```
+
+S-001 turns collision avoidance into a vehicle obligation: assess traffic and respond within reviewed class-specific envelopes. S-004 separately requires the signals appropriate to the operating mode. Both remain open; neither a catalogue sensor range nor a light fitted to the hull establishes compliance.
+
+For S-001, I need a timely usable track, a feasible decision and enough achieved motion to preserve separation. The allocation distinguishes target classes and conditions, including occupied kayaks, stand-up paddleboards, people in the water and unoccupied craft. Consequences and clearance matter alongside relative motion, but a presumed mild contact cannot shorten the physical maneuver. Accepted numerical class allocations remain unresolved.
+
+```syspresent
+{"type":"stop","id":"traffic-derivation","title":"Four acceptance outcomes derived from traffic safety","view":"traffic-acceptance","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogRequirements__collisionAssessmentCadence","BlueDogRequirements__avoidanceCommandDeadline","BlueDogRequirements__trafficAwarenessFault"],"focus":"BlueDogRequirements__trafficSafety"}
+```
+
+S-001 supplies the common encounter conditions. Its four derivation links separate tracking, risk-update cadence, command timing and fault reporting into outcomes that can be assessed individually. The row is the original requirement; each column is a derived requirement. These links do not allocate a particular sensor or autopilot.
+
+```syspresent
+{"type":"stop","id":"traffic-details","title":"Tracking, assessment and command timing requirements","view":"traffic-details","modelRefs":["BlueDogRequirementVerification__TrafficSafetyVerification","BlueDogClassDetection__policy"],"focus":"BlueDogRequirements__TrafficTracking"}
+```
+
+The detailed records distinguish three kinds of timing. Collision-risk estimates update at least once per second. An avoiding-action command follows a risk trigger within two seconds. A traffic-awareness fault is logged within one second after assessment has been invalid for more than five seconds. Tracking performance still depends on the reviewed class and condition envelope.
+
+Those deadlines do not establish achieved clearance: a timely command can still arrive too late for the boat's maneuver capability. [TrafficSafetyVerification](model:BlueDogRequirementVerification::TrafficSafetyVerification) names the parent and these four outcomes, but its verdict is inconclusive. Installed observation, physical response and representative encounter evidence are still required.
+
+```syspresent
+{"type":"stop","id":"recovery-requirements","title":"Controlled recovery, propulsion and protected energy","view":"recovery-requirements","modelRefs":["BlueDogRequirements__safeRecovery","BlueDogRequirements__recoveryPropulsion","BlueDogRequirements__recoveryEnergy"],"focus":"BlueDogRequirements__SafeRecovery"}
+```
+
+The traffic response needs a recovery branch when continuing the attempt is no longer supportable. S-003 covers controlled intervention and powered recovery. R-001 requires reaching a suitable retrieval location from declared course cases. R-002 protects the energy for a viable route, including its uncertainty allowance.
+
+Recovery remains a maneuver in shared water. A motor and an energy reserve do not demonstrate safe movement after sensing is lost. C-012 and C-013 govern abort and autonomous recovery, but the selected vehicle dependency chain below starts from the challenge's emergency-intervention provision. It is not a complete derivation of those autonomous recovery obligations.
+
+```syspresent
+{"type":"stop","id":"recovery-basis","title":"Design reasons for powered recovery and its reserve","view":"recovery-basis","modelRefs":["BlueDogRequirements__deriveSafeRecovery","BlueDogRequirements__deriveRecoveryPropulsion","BlueDogRequirements__deriveRecoveryEnergy"],"focus":"BlueDogRequirements__safeRecovery"}
+```
+
+Here the relationship is deliberately different. Each cell is a dependency from a more specific design requirement in the row to its motivating requirement in the column: controlled intervention motivates powered recovery, which motivates a protected reserve. The source model calls these design motivations, not formal satisfaction implications. The names beginning with “derive” do not change their relationship type.
+
+```syspresent
+{"type":"stop","id":"recovery-acceptance","title":"Derived checks for abort, telemetry and motor isolation","view":"recovery-acceptance","modelRefs":["BlueDogRequirements__safeRecovery","BlueDogRequirementVerification__SafeRecoveryVerification"],"focus":"BlueDogRequirements__safeRecovery"}
+```
+
+These are formal derivation links again: S-003 is the original requirement in the row and the selected detailed outcomes are columns. This matrix concentrates on the abort latch, recovery telemetry, local isolation, restart inhibition and loss of manual control. Other S-003 outcomes and shared recording and energy obligations remain outside this selected view.
+
+```syspresent
+{"type":"stop","id":"recovery-details","title":"Emergency recovery timing and shutdown requirements","view":"recovery-details","modelRefs":["BlueDogRequirementVerification__SafeRecoveryVerification"],"focus":"BlueDogRequirements__AbortLatchDeadline"}
+```
+
+The records make the distinctions concrete. Latching a disqualification is separate from reporting position. Local isolation removes motor power and blocks restart until deliberate local reset. Loss of the manual command link has its own zero-thrust deadline; that condition must not be mistaken for a general instruction to wait for communications before autonomous recovery.
+
+[SafeRecoveryVerification](model:BlueDogRequirementVerification::SafeRecoveryVerification) references these outcomes and additional shared requirements. Its verdict is also inconclusive. A matrix cell establishes a modeled relationship, not a passing test or a demonstrated recovery route.
 
 ```syspresent
 {"type":"stop","id":"response","title":"Choosing between sailing, avoidance and recovery","view":"supervisor","focus":"BlueDogMissionLogic__SupervisoryCycle","modelRefs":["BlueDogMissionLogic__SupervisoryCycle","BlueDogMissionLogic__FallbackPolicy"]}

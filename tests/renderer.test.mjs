@@ -15,7 +15,7 @@ const temporary=await mkdtemp(join(tmpdir(),'syspresent-renderer-test-'));
 after(()=>rm(temporary,{recursive:true,force:true}));
 const output=join(temporary,'renderer.mjs');
 await build({entryPoints:[fileURLToPath(new URL('../src/renderer.mjs',import.meta.url))],outfile:output,bundle:true,format:'esm',platform:'node',alias:Object.fromEntries(['canvas','layout','autolayout','table'].map(k=>['@opensysml/'+k,join(editor,'src/webview',k+'.ts')]))});
-const {renderView,presentationPayload,layoutPayload,pinchFrame,installDiagramGestures}=await import(pathToFileURL(output).href);
+const {renderView,presentationPayload,layoutPayload,presentationLayout,pinchFrame,installDiagramGestures}=await import(pathToFileURL(output).href);
 function fixture(){return {id:'requirements',native:{kind:'requirement',form:'mermaid',nodes:[
   {id:'local-a',semanticId:'semantic-a',kind:'requirement',name:'AND',detail:'A long statement '.repeat(30)},
   {id:'local-b',semanticId:'semantic-b',kind:'requirement',name:'Child',detail:'Child requirement'}],edges:[{from:'local-a',to:'local-b',kind:'derivation',label:'derive'}]}};}
@@ -241,5 +241,49 @@ test('opposite scene compartment defaults stay isolated and reset to their own a
  await renderView(container,view,{...collapsed,resetFrame:true});fitted(container);assert.ok(container.textContent.includes('Show compartments'));
  await renderView(container,view,expanded);assert.ok(container.textContent.includes('Show compartments'));
  await renderView(container,view,{...expanded,resetFrame:true});fitted(container);assert.ok(container.textContent.includes('Hide compartments'));
+ d.window.close();
+});
+
+
+test('general definitions sit above typed usages and specialization chains without reversing semantic arrows',async()=>{
+ const native={kind:'tree',nodes:[{id:'usage',kind:'part',name:'Top'},{id:'specific',kind:'part def',name:'Middle'},{id:'general',kind:'part def',name:'Bottom'}],edges:[{from:'usage',to:'specific',kind:'typing'},{from:'specific',to:'general',kind:'specialization'}]};
+ const before=JSON.stringify(native),auto=await presentationLayout(presentationPayload(native));
+ assert.ok(auto.nodes.get('general').y<auto.nodes.get('specific').y);
+ assert.ok(auto.nodes.get('specific').y<auto.nodes.get('usage').y);
+ for(const [index,points] of auto.routes){assert.ok(points[0].y>points.at(-1).y,'semantic arrow points from specific up to general');}
+ const d=dom();await renderView(document.getElementById('a'),{id:'general',native});
+ for(const edge of document.querySelectorAll('.opensysml-edge polyline'))assert.ok(edge.getAttribute('marker-end').includes('triangle-hollow'));
+ assert.equal(JSON.stringify(native),before);d.window.close();
+});
+test('ownership stays owner-first and behavior, fault trees and port interconnections retain native layout input',async()=>{
+ const native={kind:'tree',nodes:[{id:'owner',kind:'part def',name:'Owner'},{id:'part',kind:'part',name:'Part'},{id:'type',kind:'part def',name:'Type'}],edges:[{from:'owner',to:'part',kind:'composition'},{from:'part',to:'type',kind:'typing'}]};
+ const input=layoutPayload(native);assert.deepEqual(input.edges[0],native.edges[0]);
+ const auto=await presentationLayout(presentationPayload(native));
+ assert.ok(auto.nodes.get('owner').y<auto.nodes.get('part').y);assert.ok(auto.nodes.get('type').y<auto.nodes.get('part').y);
+ for(const kind of ['action','state','sequence','fault-tree','interconnection']){const other={...native,kind};assert.equal(layoutPayload(other),other);}
+});
+
+test('general-first layout preserves nested ownership and explicit author placement',async()=>{
+ const native=presentationPayload({kind:'tree',nodes:[{id:'owner',kind:'part',name:'Assembly'},{id:'part',parent:'owner',kind:'part',name:'Component'},{id:'type',kind:'part def',name:'ComponentType'}],edges:[{from:'part',to:'type',kind:'typing'}]});
+ const auto=await presentationLayout(native),owner=auto.nodes.get('owner'),part=auto.nodes.get('part'),type=auto.nodes.get('type');
+ assert.ok(type.y<part.y);assert.ok(owner.y<part.y);assert.ok(owner.y+owner.height>=part.y+part.height);
+ const placed={...native,nodes:native.nodes.map(n=>n.id==='type'?{...n,x:800,y:900}:n)};
+ const authored=await presentationLayout(placed);assert.equal(authored.nodes.get('type').x,800);assert.equal(authored.nodes.get('type').y,900);
+ const portEdge={kind:'typing',from:'usage',to:'definition',fromPort:'usage-port',toPort:'definition-port'};
+ assert.deepEqual(layoutPayload({kind:'tree',edges:[portEdge]}).edges[0],{...portEdge,from:'definition',to:'usage',fromPort:'definition-port',toPort:'usage-port'});
+});
+
+
+test('matrix labels shorten only unambiguous names and retain accessible full names and native row selection',async()=>{
+ const d=dom(),container=document.getElementById('a'),selected=[];
+ const view={id:'trace',rowToElement:{0:'source-id',1:'collision-id',2:'plain-id'},native:{kind:'matrix',columns:['Source / Target','Requirements::safe','A::same','Requirements::shared','plain'],rows:[{cells:['Design::boat','Requirements::safe','derive','satisfy','']},{cells:['B::same','','','','']},{cells:['Requirements::shared','','','','']}]}};
+ const before=JSON.stringify(view);await renderView(container,view,{onSelect:id=>selected.push(id)});
+ const headers=container.querySelectorAll('th'),rows=container.querySelectorAll('tbody tr');
+ assert.equal(headers[0].textContent,'Source / Target');assert.equal(headers[1].textContent,'safe');assert.equal(headers[1].title,'Requirements::safe');assert.equal(headers[1].getAttribute('aria-label'),'Requirements::safe');
+ assert.equal(headers[2].textContent,'A::same');assert.equal(rows[1].querySelector('td').textContent,'Select B::same');
+ assert.equal(headers[3].textContent,'shared');assert.equal(rows[2].querySelector('td').textContent,'Select shared','repeated identical full names are unambiguous');
+ assert.equal(rows[0].querySelector('td').getAttribute('aria-label'),'Design::boat');assert.equal(rows[0].children[1].textContent,'Requirements::safe','relationship cell text stays native');
+ rows[0].querySelector('button').click();assert.deepEqual(selected,['source-id']);assert.equal(rows[0].dataset.semanticId,'source-id');assert.equal(JSON.stringify(view),before);
+ await renderView(container,{...view,native:{...view.native,kind:'table'}});assert.equal(container.querySelectorAll('th')[1].textContent,'Requirements::safe');assert.equal(container.querySelector('tbody tr').children[1].textContent,'Requirements::safe');
  d.window.close();
 });

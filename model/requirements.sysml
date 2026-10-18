@@ -163,6 +163,10 @@ package SyspresentRequirements {
             doc /* Traceability questions shall be expressible as native tables or matrices as well as node-link paths. Prepared comparison views shall allow simultaneous inspection rather than requiring animation or visual memory alone. */
             comment scope /* First release */
         }
+        requirement <'SP-055'> generalToSpecific {
+            doc /* General structural views shall place general classifiers above their specializations and typed usages by default. The layout shall preserve native relationship directions and shall not change behavioral ordering. Explicit authored placement may override the default. */
+            comment scope /* First release */
+        }
     }
     package Reuse {
         requirement <'SP-060'> declarativeReuse {
