@@ -3,6 +3,20 @@ export function initialState(focus, config = {}) {
   return {focus, view: null, expanded: [], pinned: [], nodeTypes: [...(config.defaultNodeTypes ?? [])], relationshipTypes: [...(config.defaultRelationshipTypes ?? [])], budget: config.contextLimit ?? 24};
 }
 
+// Native API plumbing remains available through explicit relationship filters.
+export function engineeringEdge(edge, index) {
+  if (edge.authority !== 'native-api-property') return true;
+  if (edge.kind === 'type') return /Usage$/.test(index.get(edge.source)?.kind ?? '') || index.get(edge.source)?.kind === 'Feature';
+  return edge.kind === 'ownedMember' && ['ConstraintUsage', 'ConstraintDefinition', 'AssertConstraintUsage'].includes(index.get(edge.target)?.kind);
+}
+
+export function requirementUsages(bundle, ids) {
+  const index = new Map(bundle.elements.map(e => [e.id, e]));
+  const definitions = new Set(ids.filter(id => index.get(id)?.kind === 'RequirementDefinition'));
+  return [...new Set(bundle.relationships.filter(e => e.kind === 'type' && definitions.has(e.target)
+    && index.get(e.source)?.kind === 'RequirementUsage').map(e => e.source))];
+}
+
 export function context(bundle, state) {
   const index = new Map(bundle.elements.map(element => [element.id, element]));
   if (!index.has(state.focus)) throw new Error(`Unknown focus: ${state.focus}`);
@@ -10,14 +24,14 @@ export function context(bundle, state) {
   const wanted = new Set(roots);
   const omissions = [];
   const allowedNode = id => !state.nodeTypes.length || state.nodeTypes.includes(index.get(id)?.kind);
-  const allowedEdge = edge => !state.relationshipTypes.length || state.relationshipTypes.includes(edge.kind);
-  const pending = new Set([state.focus, ...state.expanded]);
+  const allowedEdge = edge => state.relationshipTypes.length ? state.relationshipTypes.includes(edge.kind) : engineeringEdge(edge, index);
+  const pending = new Set([state.focus, ...state.expanded, ...requirementUsages(bundle, [state.focus, ...state.expanded])]);
   const visited = new Set();
   for (;;) {
     const id = [...pending].find(candidate => wanted.has(candidate) && !visited.has(candidate));
     if (id === undefined) break;
     visited.add(id);
-    for (const edge of bundle.relationships.filter(edge => edge.source === id || edge.target === id)) {
+    for (const edge of bundle.relationships.filter(edge => edge.source === id || edge.target === id).sort((a,b) => Number(b.authority === 'native-render-view') - Number(a.authority === 'native-render-view'))) {
       const other = edge.source === id ? edge.target : edge.source;
       let reason;
       if (!index.has(other)) reason = 'unavailable';
@@ -30,7 +44,7 @@ export function context(bundle, state) {
   }
   return {
     elements: [...wanted].map(id => index.get(id)).filter(Boolean),
-    relationships: bundle.relationships.filter(edge => wanted.has(edge.source) && wanted.has(edge.target) && allowedEdge(edge)),
+    relationships: [...new Map(bundle.relationships.filter(edge => wanted.has(edge.source) && wanted.has(edge.target) && allowedEdge(edge)).map(edge => [JSON.stringify([edge.source, edge.target, edge.kind, edge.label]), edge])).values()],
     omissions,
     filters: {nodeTypes: state.nodeTypes, relationshipTypes: state.relationshipTypes},
   };

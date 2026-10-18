@@ -64,18 +64,6 @@
   ],
   "exploration": {
     "contextLimit": 24,
-    "defaultRelationshipTypes": [
-      "satisfy",
-      "verify",
-      "composition",
-      "reference",
-      "typing",
-      "causation",
-      "derivation",
-      "allocation",
-      "type",
-      "owner"
-    ],
     "entryPoints": [
       {
         "id": "BlueDogRequirements__trafficSafety",

@@ -114,7 +114,7 @@ package SyspresentRequirements {
     }
     package Exploration {
         requirement <'SP-040'> localContext {
-            doc /* The explorer shall start from a focused element or authored view and allow search and selective relationship-directed expansion instead of requiring a full-model overview. */
+            doc /* The explorer shall start from a focused element or authored view and allow search and selective relationship-directed expansion instead of requiring a full-model overview. Requirement exploration shall default to engineering relationships, including explicit definition-to-usage context and modeled constraints, while retaining documentation and ownership internals as opt-in context. */
             comment scope /* First release */
         }
         requirement <'SP-041'> typedFilters {

@@ -123,3 +123,20 @@ test('shared scene retains explicit compartment choices and rejects unbounded pr
   assert.throws(()=>restoreState(rawState({...initialState('r'),view:'requirements',sceneOptions:{presentationPreferences}}),'frozen',sceneBundle));
  }
 });
+
+
+test('requirement definitions open usage context without ownership plumbing or invented edges', () => {
+  const elements = [{id:'definition',kind:'RequirementDefinition'}, {id:'usage',kind:'RequirementUsage'},
+    {id:'derived',kind:'RequirementUsage'}, {id:'constraint',kind:'ConstraintUsage'}, {id:'doc',kind:'Documentation'}, {id:'typing-record',kind:'FeatureTyping'}];
+  const api = (id,source,target,kind) => ({id,source,target,kind,authority:'native-api-property'});
+  const derive = {id:'derive',source:'derived',target:'usage',kind:'derive',authority:'native-render-view'};
+  const graph = {elements,relationships:[api('doc','definition','doc','ownedMember'),
+    api('typing','usage','definition','type'),api('type-record','typing-record','definition','type'),api('constraint','definition','constraint','ownedMember'),derive,{...derive,id:'duplicate-view'}]};
+  const result = context(graph,initialState('definition'));
+  assert.deepEqual(new Set(result.elements.map(e=>e.id)),new Set(['definition','usage','derived','constraint']));
+  assert.equal(result.relationships.filter(e=>e.kind==='derive').length,1);
+  assert.equal(result.relationships.find(e=>e.kind==='derive').source,'derived');
+  assert.ok(result.omissions.some(e=>e.target==='doc'&&e.reason==='relationship-filter'));
+  assert.equal(context(graph,{...initialState('definition'),budget:2}).elements.length,2);
+  assert.ok(context(graph,{...initialState('definition'),relationshipTypes:['ownedMember']}).elements.some(e=>e.id==='doc'));
+});

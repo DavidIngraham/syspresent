@@ -247,6 +247,10 @@ def export(config, root):
             view["relationshipScope"] = spec["relationshipScope"]
         views.append(view)
         relationships.extend(edges)
+        if "relationshipScope" in spec:
+            # Authored scope limits the scene, not the explorable native model.
+            _, context_edges = adapt_view("context:" + spec["id"], original_payload)
+            relationships.extend(context_edges)
     for spec in config.get("queries", []):
         views.append(query_view(spec, model.run_document_query(spec["native"]), elements))
     try:

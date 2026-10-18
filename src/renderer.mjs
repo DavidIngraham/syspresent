@@ -46,7 +46,7 @@ export function presentationPayload(native, showCompartments = true) {
   }
   return result;
 }
-const generalTargetKinds = new Set(['typing','specialization','derive']);
+const generalTargetKinds = new Set(['typing','type','specialization','derive']);
 /** Layout constraints run general→specific; drawing retains native specific→general arrows. */
 export function layoutPayload(native) {
   if(native.kind!=='tree'&&!layoutOnlyTreeKinds.has(native.kind))return native;
