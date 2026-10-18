@@ -22,7 +22,7 @@ Earlier desktop/mobile inspections drove fixes to scale, inline scene ownership,
 
 The coordinator reports 330 native renderer TypeScript tests passing and 16 app tests within the Node aggregate. Mobile browser recheck confirms 375-pixel document/client width equality and inline zoom 100% → 125% → Resume 100%; real-renderer regression covers compartment reset and independent inline/main camera state.
 
-A broader native suite is currently ongoing. No final result for that running suite is claimed here. Reviewers have identified and corrected issues in code other than their own; some contributors also authored components they assessed, so this is not a blanket independent-review claim.
+The broader native suite has completed. Its aggregate result was nonzero because of worktree VCS metadata, concurrent intermediate row-field edits and a stale renderer-list assertion. The corresponding final checks passed, including VCS tests in a regular checkout. The broad migration/model/WASM tail passed. See [native-validation.md](native-validation.md) for scope and limitations; no all-green aggregate run is claimed. Reviewers have identified and corrected issues in code other than their own; some contributors also authored components they assessed, so this is not a blanket independent-review claim.
 
 ## CI and publication
 
