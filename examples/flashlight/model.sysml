@@ -62,9 +62,17 @@ package Flashlight {
 
 package FlashlightViews {
     private import StandardViewDefinitions::*;
-    view requirements : GeneralView {
-        filter @SysML::RequirementUsage;
-        expose Flashlight::**;
+    private import DocumentQueries::*;
+    calc def Requirements :> Query {
+        Project(source = Named(qualifiedName = ("Flashlight::portable", "Flashlight::controllable")), columns = (
+            Column(name = "ID", path = "shortName"),
+            Column(name = "Requirement", path = "name"),
+            Column(name = "Statement", path = "documentation")))
+    }
+    calc def MassInputs :> Query {
+        Project(source = Named(qualifiedName = ("Flashlight::Battery", "Flashlight::light")), columns = (
+            Column(name = "Element", path = "qualifiedName"),
+            Column(name = "Mass input", path = "mass")))
     }
     view structure : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;

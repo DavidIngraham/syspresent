@@ -3,10 +3,10 @@
 I want to build a small autonomous sailboat for a round trip on the Columbia River. Completing that course is only useful if the boat can coexist with other river users and deal with a failed attempt. This story follows one engineering argument: observation has to arrive early enough to support a real response, and recovery has to remain useful when the primary response fails.
 
 ```syspresent
-{"type":"stop","id":"obligation","title":"Detection and clearance requirements for river traffic","view":"avoidance-requirements","focus":"BlueDogRequirements__trafficSafety","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogClassDetection__policy"]}
+{"type":"stop","id":"obligation","title":"Detection and clearance requirements for river traffic","view":"avoidance-requirements","focus":"BlueDogRequirements__TrafficSafety","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogClassDetection__policy"]}
 ```
 
-The opening view isolates two requirements: traffic safety and timely traffic tracking. Explore either requirement to follow its relationships to the rest of the model.
+The table gives the identifier, name and full statement of the traffic-safety and traffic-tracking requirement definitions. Select either row to inspect its definition. Satisfaction and derivation links attach to the corresponding [traffic-safety usage](model:BlueDogRequirements::trafficSafety) and [traffic-tracking usage](model:BlueDogRequirements::trafficTracking); follow these links to trace the allocated obligations.
 
 Avoiding collision and interference is the obligation. A sensor's catalogue range does not establish that the boat can meet it. I need a timely usable track, a feasible decision and enough achieved motion to preserve separation.
 
@@ -44,12 +44,10 @@ A proposed detection method or recommended test is an action to take, not an imp
 The action table is generated from the model's starter review rows. Select a row to explore the same review element in the graph. An action description records work that remains to be done; it is not a completed test or an accepted result.
 
 ```syspresent
-{"type":"table","id":"action-table","title":"Proposed investigations for design failure modes","asset":"dfmea-actions.json","fullWidth":true,"caption":"Native query output for the current starter review scope. Read proposed work separately from evidence and disposition.","provenance":{"source":"BlueDogReliabilityDocuments::Actions","context":"Model source b12b079855002466a8a95b54a5dba88e8ffc0611; starterReviewRows; proposed investigations"}}
+{"type":"stop","id":"review-dispositions","title":"Evidence and status of the design failure investigations","view":"dfmea-dispositions","modelRefs":["BlueDogDFMEA__starter"]}
 ```
 
-```syspresent
-{"type":"table","id":"disposition-table","title":"Evidence and status of the design failure investigations","asset":"dfmea-dispositions.json","fullWidth":true,"caption":"The matching native rows retain open or unassessed dispositions. Publishing this table does not close the actions.","provenance":{"source":"BlueDogReliabilityDocuments::Dispositions","context":"Same frozen starterReviewRows and source revision as the action table"}}
-```
+The disposition table separates the proposed work from its evidence and current status. An open or unassessed row remains unresolved when the story is published. Compare the review identifier with the action table in the previous section to follow the same failure mode.
 
 ```syspresent
 {"type":"stop","id":"righting","title":"Capsize recovery and challenge qualification","view":"capsize","focus":"BlueDogMissionLogic__CapsizeDisposition","modelRefs":["BlueDogMissionLogic__CapsizeDisposition","BlueDogRequirements__capsizeQualificationRetention","GorgeChallenge__autonomousShoreRecovery"]}

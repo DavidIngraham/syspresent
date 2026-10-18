@@ -9,10 +9,6 @@
   "libraryScopes": [],
   "views": [
     {
-      "id": "avoidance-requirements",
-      "native": "SyspresentBlueDogViews::avoidanceRequirements"
-    },
-    {
       "id": "supervisor",
       "native": "#action:BlueDogMissionLogic::SupervisoryCycle"
     },
@@ -78,6 +74,11 @@
     }
   },
   "queries": [
+    {
+      "id": "avoidance-requirements",
+      "native": "SyspresentBlueDogViews::AvoidanceRequirements",
+      "asset": "avoidance-requirements.json"
+    },
     {
       "id": "functional-review",
       "native": "BlueDogAvoidanceDocuments::functionalRows",

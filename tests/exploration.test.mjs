@@ -112,3 +112,14 @@ test('valid null and empty scene options preserve existing exploration links',()
   }
   assert.equal(restoreState(shareState('frozen','intro'),'frozen',bundle).exploration,null);
 });
+
+test('shared scene retains explicit compartment choices and rejects unbounded preferences',()=>{
+ for(const showCompartments of [true,false]){
+  const state={...initialState('r'),view:'requirements',sceneOptions:{presentationPreferences:{showCompartments}}};
+  assert.deepEqual(restoreState(shareState('frozen','intro',state),'frozen',sceneBundle).exploration,state);
+  assert.throws(()=>shareState('frozen','intro',{...state,view:null}),/require a native view/);
+ }
+ for(const presentationPreferences of [null,[],{showCompartments:'true'},{showCompartments:1},{defaultZoom:2},{unknown:true}]){
+  assert.throws(()=>restoreState(rawState({...initialState('r'),view:'requirements',sceneOptions:{presentationPreferences}}),'frozen',sceneBundle));
+ }
+});

@@ -86,8 +86,8 @@ async function cachedLayout(source, native, compact) {
 }
 function frameFor(source, options) {
   let variants=frames.get(source);if(!variants){variants=new Map();frames.set(source,variants);}
-  const key=JSON.stringify({surface:options.frameScope??"main",camera:options.camera??null,placements:options.placements??[]});
   const preferences=options.presentationPreferences??{};
+  const key=JSON.stringify({surface:options.frameScope??"main",camera:options.camera??null,placements:options.placements??[],showCompartments:preferences.showCompartments===true});
   const preferredZoom=Number.isFinite(preferences.defaultZoom)&&preferences.defaultZoom>=.1&&preferences.defaultZoom<=4?preferences.defaultZoom:1;
   if(options.resetFrame||!variants.has(key))variants.set(key,{zoom:boundedZoom(options.camera?.zoom??preferredZoom),left:0,top:0,positioned:false,showCompartments:preferences.showCompartments===true});
   return variants.get(key);

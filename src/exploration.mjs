@@ -81,7 +81,11 @@ function coordinate(value) {
 }
 function validateScene(scene, view, bundle) {
   if (scene === undefined || scene === null) return;
-  keys(scene, ['annotations', 'placements', 'camera']);
+  keys(scene, ['annotations', 'placements', 'camera', 'presentationPreferences']);
+  if (scene.presentationPreferences !== undefined) {
+    keys(scene.presentationPreferences, ['showCompartments']);
+    if (typeof scene.presentationPreferences.showCompartments !== 'boolean') throw new Error('Invalid scene compartment preference');
+  }
   const populated = Object.values(scene).some(value => value !== undefined);
   if (populated && view === null) throw new Error('Scene options require a native view');
   const members = bundle && view !== null ? new Set(bundle.views.find(item => item.id === view).elementIds) : null;

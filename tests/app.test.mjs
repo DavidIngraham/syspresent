@@ -42,6 +42,7 @@ function harness(hash='',renderer=null) {
     for(const e of bundle.elements)elements.set(e.id,e);for(const v of bundle.views)views.set(v.id,v);
     selected='a';nav=new Navigation(initialState('a'));
     globalThis.api={evidence,bindNavigationControls,configure:configuration=>{bundle.configuration=configuration;configureNavigation();},addView:view=>{bundle.views.push(view);views.set(view.id,view);},markdown,setStore:value=>{store=value;},draw,buildStory,activate,restoreLocation,exploreStop,update,choose,pause,dockExplorer,
+      setStopPreferences:(id,value)=>{story.blocks.find(block=>block.id===id).presentationPreferences=value;},
       state:()=>({selected,paused,stop:activeStop?.id,saved:savedStory,nav:nav.state})};
   `;
   w.eval(source);
@@ -332,5 +333,22 @@ test('explorer exposes its view identity and shares exploration without leaving 
  const shared=exploration.restoreState(h.w.location.hash,'one',{elements:[{id:'a'},{id:'b'}],relationships:[],views:[{id:'v'}]});
  assert.equal(shared.exploration.focus,'b');
  assert.equal(h.w.document.getElementById('mobile-explorer').open,true);
+ h.dom.window.close();
+});
+
+test('authored compartment override merges bundle defaults and survives exploration and resume',async()=>{
+ const h=harness();h.api.configure({presentationPreferences:{showCompartments:true,defaultZoom:.8}});
+ h.api.setStopPreferences('first',{showCompartments:false});
+ await h.api.buildStory();h.api.bindNavigationControls();h.api.activate('first');await new Promise(setImmediate);
+ const first=h.renders.find(r=>r.options.frameScope==='inline:first');
+ assert.equal(first.options.presentationPreferences.showCompartments,false);
+ assert.equal(first.options.presentationPreferences.defaultZoom,.8);
+ assert.equal(h.renders.find(r=>r.options.frameScope==='inline:second').options.presentationPreferences.showCompartments,true);
+ h.api.exploreStop('first');await new Promise(setImmediate);
+ assert.equal(h.api.state().nav.sceneOptions.presentationPreferences.showCompartments,false);
+ assert.equal(h.renders.at(-1).options.presentationPreferences.showCompartments,false);
+ h.w.document.getElementById('return-story').click();await new Promise(setImmediate);
+ assert.equal(h.renders.at(-1).options.presentationPreferences.showCompartments,false);
+ assert.equal(h.renders.at(-1).options.resetFrame,true);
  h.dom.window.close();
 });

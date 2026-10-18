@@ -8,7 +8,7 @@ A flashlight gives us a small engineering question: what would make this design 
 
 The [portability requirement](model:Flashlight::portable) sets a maximum assembled mass. The control requirement says the user must be able to switch the light on and off. These are statements about the finished system. They leave room for different batteries, lamps and switches.
 
-A requirement identifier makes the obligation easy to refer to elsewhere. The shape, colors and placement you see are this tool's presentation of the native model; they are not a claim that the standard mandates this particular page layout.
+The table puts the identifier, name and full statement together so you can read each obligation before following its traces. These columns are selected by a native model query; their layout is a presentation choice, not a layout mandated by SysML.
 
 ```syspresent
 {"type":"stop","id":"parts","title":"The battery, lamp and switch assembly","view":"structure","focus":"Flashlight__light","annotations":[{"target":"Flashlight__light","text":"The proposed assembly owns its battery, lamp and switch."}],"modelRefs":["Flashlight__light","Flashlight__Battery","Flashlight__teachingAssumption"]}
@@ -16,7 +16,11 @@ A requirement identifier makes the obligation easy to refer to elsewhere. The sh
 
 `Battery` is a part definition: it describes a kind of component. The battery inside `light` is a part usage: a particular role in this assembly, typed by that definition. Containment tells us which assembly owns the part. It does not, by itself, tell us how electricity flows or how long the light will run.
 
-The model expresses mass using the standard International System of Quantities (ISQ) and SI units. A mass value has a physical quantity kind and a unit, rather than being an unexplained decimal. The small numerical inputs here are teaching assumptions. No assembled specimen has been weighed, and the battery model does not calculate endurance.
+```syspresent
+{"type":"stop","id":"mass-inputs","title":"Battery and assembled mass inputs","view":"mass-inputs","focus":"Flashlight__light","modelRefs":["Flashlight__Battery","Flashlight__light","Flashlight__teachingAssumption"]}
+```
+
+The table shows the declared mass inputs for the battery definition and the assembly. The assembly value is a separate design input, not a calculated sum of component masses. The model expresses mass using the standard International System of Quantities (ISQ) and SI units. A mass value has a physical quantity kind and a unit, rather than being an unexplained decimal. The small numerical inputs here are teaching assumptions. No assembled specimen has been weighed, and the battery model does not calculate endurance.
 
 ```syspresent
 {"type":"stop","id":"claims","title":"Requirement coverage and the inconclusive mass check","view":"matrix","modelRefs":["Flashlight__light","Flashlight__portable","Flashlight__massCheck","Flashlight__teachingAssumption"]}

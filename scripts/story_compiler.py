@@ -325,7 +325,7 @@ def compile_story(markdown, bundle, asset_root, source="story.md"):
             fail(line, "syspresent block must be an object")
         kind = data.get("type")
         common = {"type", "id", "title"}
-        fields = {"stop": {"view", "focus", "annotations", "camera", "placements", "speakerNotes", "modelRefs"},
+        fields = {"stop": {"view", "focus", "annotations", "camera", "placements", "speakerNotes", "modelRefs", "presentationPreferences"},
                   "figure": {"asset", "alt", "caption", "provenance", "fullWidth", "evidence"},
                   "table": {"asset", "caption", "provenance", "fullWidth", "evidence"},
                   "closing": {"supports", "open", "next", "modelRefs"}}
@@ -348,6 +348,11 @@ def compile_story(markdown, bundle, asset_root, source="story.md"):
                     fail(line, "missing native view")
                 result["view"] = data["view"]
                 view = views[data["view"]]
+            if "presentationPreferences" in data:
+                preferences = data["presentationPreferences"]
+                if view is None or not isinstance(preferences, dict) or set(preferences) != {"showCompartments"} or type(preferences["showCompartments"]) is not bool:
+                    fail(line, "presentationPreferences requires a view and boolean showCompartments")
+                result["presentationPreferences"] = dict(preferences)
             if "focus" in data:
                 result["focus"] = semantic(data["focus"], line, view)
             for field in ("annotations", "placements"):

@@ -8,6 +8,11 @@ import os
 import subprocess
 from pathlib import Path
 
+try:
+    from opensysml.values import Quantity
+except ImportError:  # Pure adapter tests can run without the optional native client.
+    Quantity = ()
+
 SCHEMA = "syspresent.bundle.v1"
 
 
@@ -107,6 +112,8 @@ def adapt_view(view_id, payload):
 
 
 def typed_value(value):
+    if isinstance(value, Quantity):
+        return {"nativeType": "Quantity", "magnitude": typed_value(value.magnitude), "unit": typed_value(value.unit)}
     if is_dataclass(value):
         return {"nativeType": type(value).__name__, **{key: typed_value(item) for key, item in asdict(value).items()}}
     if isinstance(value, dict): return {key: typed_value(item) for key, item in value.items()}

@@ -63,6 +63,20 @@ class StoryCompilerTests(unittest.TestCase):
         self.assertEqual(result['substitutions'][0]['context'], 'run-a')
         self.assertEqual(self.bundle, original)
 
+    def test_scene_compartments_are_explicit_boolean_presentation_data(self):
+        for value in (True, False):
+            self.stop["presentationPreferences"] = {"showCompartments": value}
+            result = self.compile()
+            self.assertEqual(result["blocks"][0]["presentationPreferences"], {"showCompartments": value})
+        for value in (None, {}, {"showCompartments": "true"}, {"showCompartments": 1},
+                      {"showCompartments": True, "script": "run()"}):
+            self.stop["presentationPreferences"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(StoryError, "presentationPreferences"):
+                self.compile()
+        self.stop = {"type": "stop", "id": "text", "title": "Text", "presentationPreferences": {"showCompartments": True}}
+        with self.assertRaisesRegex(StoryError, "requires a view"):
+            self.compile()
+
     def test_unknown_and_unassessed_remain_distinct(self):
         for status in ('unknown', 'unassessed'):
             with self.subTest(status=status):

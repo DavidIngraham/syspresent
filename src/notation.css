@@ -16,7 +16,8 @@
 .opensysml-canvas [role=button] {cursor:pointer}
 .opensysml-canvas [role=button]:focus {outline:3px solid #cf6a16;outline-offset:3px}
 .opensysml-canvas .handles {display:none}
-.opensysml-table {border-collapse:collapse;min-width:100%}
+.opensysml-table {border-collapse:collapse;min-width:max(100%,36rem)}
+.opensysml-table td>button{display:block;margin-bottom:.25rem}
 .opensysml-table th,.opensysml-table td {padding:.6rem;text-align:left;border-bottom:1px solid #d3dfe5;vertical-align:top}
 .render-notice {font-size:.9rem;border-left:3px solid #007d82;padding-left:.7rem}
 

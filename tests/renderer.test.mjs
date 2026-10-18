@@ -110,7 +110,7 @@ test('new frames fit despite zoom preferences or authored camera, while user zoo
   const d=dom(),container=document.getElementById('a'),view=fixture();
   await renderView(container,view,{presentationPreferences:{defaultZoom:.8,showCompartments:true}});fitted(container);assert.ok(container.textContent.includes('Hide compartments'));
   container.querySelector('[aria-label="Zoom in"]').click();const manual=container.querySelector('output').textContent;
-  await renderView(container,view,{presentationPreferences:{defaultZoom:.5}});assert.equal(container.querySelector('output').textContent,manual);
+  await renderView(container,view,{presentationPreferences:{defaultZoom:.5,showCompartments:true}});assert.equal(container.querySelector('output').textContent,manual);
   await renderView(container,view,{camera:{zoom:1.5},presentationPreferences:{defaultZoom:.8}});fitted(container);d.window.close();
 });
 test('manual camera controls pause story; programmatic restoration does not',async()=>{
@@ -221,4 +221,25 @@ test('touch tap preserves automatic fit until a real pan or pinch changes the fr
  touch('touchstart',[[20,20]]);touch('touchend',[]);assert.equal(frame.fitted,true);
  touch('touchstart',[[20,20],[120,20]]);assert.equal(frame.fitted,true);
  touch('touchmove',[[20,20],[70,20]]);assert.equal(frame.fitted,false);assert.equal(frame.zoom,.005);d.window.close();
+});
+
+test('opposite scene compartment defaults stay isolated and reset to their own authored choice',async()=>{
+ const d=dom(),container=document.getElementById('a'),view=fixture();
+ const expanded={presentationPreferences:{showCompartments:true}},collapsed={presentationPreferences:{showCompartments:false}};
+ await renderView(container,view,expanded);fitted(container);
+ assert.ok(container.textContent.includes('Hide compartments'));
+ await renderView(container,view,collapsed);fitted(container);
+ assert.ok(container.textContent.includes('Show compartments'));
+ [...container.querySelectorAll('button')].find(b=>b.textContent==='Show compartments').click();
+ for(let i=0;i<100&&!container.textContent.includes('Hide compartments');i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.ok(container.textContent.includes('Hide compartments'));
+ await renderView(container,view,expanded);
+ [...container.querySelectorAll('button')].find(b=>b.textContent==='Hide compartments').click();
+ for(let i=0;i<100&&!container.textContent.includes('Show compartments');i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.ok(container.textContent.includes('Show compartments'));
+ await renderView(container,view,collapsed);assert.ok(container.textContent.includes('Hide compartments'));
+ await renderView(container,view,{...collapsed,resetFrame:true});fitted(container);assert.ok(container.textContent.includes('Show compartments'));
+ await renderView(container,view,expanded);assert.ok(container.textContent.includes('Show compartments'));
+ await renderView(container,view,{...expanded,resetFrame:true});fitted(container);assert.ok(container.textContent.includes('Hide compartments'));
+ d.window.close();
 });

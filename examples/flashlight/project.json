@@ -11,10 +11,6 @@
   ],
   "views": [
     {
-      "id": "requirements",
-      "native": "FlashlightViews::requirements"
-    },
-    {
       "id": "structure",
       "native": "FlashlightViews::structure"
     },
@@ -39,6 +35,18 @@
     {
       "ref": "Flashlight::light::mass",
       "context": "illustrative-design-inputs"
+    }
+  ],
+  "queries": [
+    {
+      "id": "requirements",
+      "native": "FlashlightViews::Requirements",
+      "asset": "requirements.json"
+    },
+    {
+      "id": "mass-inputs",
+      "native": "FlashlightViews::MassInputs",
+      "asset": "mass-inputs.json"
     }
   ]
 }
