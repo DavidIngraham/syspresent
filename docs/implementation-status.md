@@ -26,10 +26,12 @@ A broader native suite is currently ongoing. No final result for that running su
 
 ## CI and publication
 
-`.github/workflows/build.yml` and `scripts/build_ci.py` now provide noninteractive native export, browser build, immutable packaging and history preservation. The workflow builds both the CLI for specification validation and the gRPC service for Python export. Notice archive metadata is normalized to improve repeatability. No successful deployed CI execution is claimed.
+`.github/workflows/build.yml` and `scripts/build_ci.py` now provide noninteractive native export, browser build, immutable packaging and history preservation. The workflow builds both the CLI for specification validation and the gRPC service for Python export. Notice archive metadata is normalized to improve repeatability. The noninteractive command completed from clean viewer commit `cc61dab` and native pin `af37bbf155aea785b8ac494a14afe659244bbcdf`, exporting and packaging all three examples into a verified static catalog. This is local execution of the CI command; no hosted GitHub Actions or Pages deployment is claimed.
 
 Publication still requires reviewed clean source pins, corresponding binaries and viewer provenance, required license/notice files, and successful end-to-end CI. The native changes are now committed and pushed only to David's fork at `af37bbf155aea785b8ac494a14afe659244bbcdf`; all three examples pin that exact revision. Fresh CLI/service builds identify that commit. Earlier dirty development snapshots remain historical evidence, not release artifacts. No upstream pull request is authorized by this work.
 
 ## Outstanding acceptance
 
 Complete final browser/keyboard acceptance; verify the clean CI build and deployed immutable URLs. Declarative mode restrictions, shared-state authored-scene exceptions and distinct entry points sharing an identity have been corrected and reviewed. Keep recorded-execution metadata distinct from actual execution and physical verification. The representative-reader study in [reader-study.md](reader-study.md) has not been conducted, and sample/acceptance thresholds remain unresolved. SP-025 evolution timeline and presenter-mode delivery remain follow-on scope.
+
+Clean local snapshots: flashlight `f0f3188b4b1f25e690c660d829eaeaeed25fcacdea6742c150ac27d794950819`, notation `b82fb049ba95736776f288925a311f333c0567bfb661ca57db59be3b2d0251fb`, Blue Dog `a7a0f33a8f59b7190d2e3a42805ba30f3d608e15f62cab8de8408c07c50dadea`. The native specification and notation payload assertion commands also passed using the clean pinned CLI.
