@@ -23,3 +23,7 @@ Validate specification changes with the native compiler. Product tests must cove
 ## Example writing
 
 Use concrete section headings that name the system, component, behavior, requirement or engineering question covered. Avoid generic reading instructions such as “Start with the job” or “Follow the meaning,” and abstract conclusions that could head any example. A reader scanning the outline should be able to predict each section’s content.
+
+## Interface simplicity
+
+Keep the initial experience focused on reading and the model across all screen sizes. Expose exploration tools on request, avoid repeating titles across panes, and give diagrams substantial space. Do not solve general interaction clutter only with device-specific patches.

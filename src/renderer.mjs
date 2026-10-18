@@ -204,7 +204,7 @@ export async function renderView(container, view, options={}) {
     const scaleLabel=document.createElement('output');scaleLabel.setAttribute('aria-live','polite');
     const applyScale=()=>{svg.style.width=`${layout.width*frame.zoom}px`;svg.style.height=`${layout.height*frame.zoom}px`;scaleLabel.textContent=`${Math.round(frame.zoom*100)}%`;};
     const scaleTo=value=>{const previous=frame.zoom;frame.zoom=boundedZoom(value);applyScale();viewport.scrollLeft=(viewport.scrollLeft+viewport.clientWidth/2)*frame.zoom/previous-viewport.clientWidth/2;viewport.scrollTop=(viewport.scrollTop+viewport.clientHeight/2)*frame.zoom/previous-viewport.clientHeight/2;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;};
-    const control=(name,action)=>{const b=document.createElement('button');b.type='button';b.textContent=name;b.addEventListener('click',()=>{options.onInteract?.();action();});controls.append(b);};
+    const control=(name,action)=>{const b=document.createElement('button');b.type='button';b.textContent=name;if(name==='Fit')b.dataset.readingControl='fit';b.addEventListener('click',()=>{options.onInteract?.();action();});controls.append(b);};
     control('−',()=>scaleTo(frame.zoom/1.25));controls.lastElementChild.setAttribute('aria-label','Zoom out');
     control('+',()=>scaleTo(frame.zoom*1.25));controls.lastElementChild.setAttribute('aria-label','Zoom in');
     control('100%',()=>scaleTo(1));

@@ -283,13 +283,15 @@ test('inline touch interaction does not launch a modal',async()=>{
  await new Promise(setImmediate);h.dom.window.close();
 });
 
-test('desktop transition restores authored navigation and releases modal state',async()=>{
+test('viewport transition preserves explicit exploration until Back to story',async()=>{
  const h=harness();h.setMobile(true);await h.api.buildStory();h.api.activate('first');h.api.bindNavigationControls();
  h.api.exploreStop('first');await new Promise(setImmediate);h.api.update({focus:'b',view:null});await new Promise(setImmediate);
  h.setMobile(false);h.api.dockExplorer();await new Promise(setImmediate);
- assert.equal(h.api.state().paused,false);assert.equal(h.api.state().nav.view,'v');
- assert.equal(h.api.state().nav.focus,'a');assert.equal(h.w.document.getElementById('mobile-explorer').open,false);
- assert.equal(h.w.document.getElementById('panel-details').hidden,false);
+ assert.equal(h.api.state().paused,true);assert.equal(h.api.state().nav.view,null);
+ assert.equal(h.api.state().nav.focus,'b');assert.equal(h.w.document.getElementById('mobile-explorer').open,true);
+ assert.equal(h.w.document.getElementById('panel-details').hidden,true);
+ await h.w.document.getElementById('return-story').onclick();
+ assert.equal(h.api.state().nav.view,'v');assert.equal(h.api.state().paused,false);
  h.dom.window.close();
 });
 
@@ -300,5 +302,31 @@ test('late selection render cannot override a newer mobile tab choice',async()=>
  h.api.choose('b');h.w.document.getElementById('tab-find').click();
  resolveLoad({unavailable:[]});await new Promise(setImmediate);
  assert.equal(h.w.document.getElementById('panel-find').hidden,false);
+ h.dom.window.close();
+});
+
+test('wide reading opens the same bounded explorer only on request',async()=>{
+ const h=harness();await h.api.buildStory();h.api.activate('first');h.api.bindNavigationControls();await new Promise(setImmediate);
+ assert.equal(h.w.document.getElementById('mobile-explorer').open,false);
+ h.renders.at(-1).options.onInteract();assert.equal(h.api.state().paused,false);
+ h.w.document.getElementById('open-explorer').click();await new Promise(setImmediate);
+ assert.equal(h.w.document.getElementById('mobile-explorer').open,true);
+ assert.equal(h.w.document.getElementById('panel-find').hidden,true);
+ h.w.document.getElementById('tab-find').click();
+ assert.equal(h.w.document.getElementById('panel-model').hidden,true);
+ await h.w.document.getElementById('return-story').onclick();
+ assert.equal(h.api.state().paused,false);
+ h.dom.window.close();
+});
+
+test('explorer exposes its view identity and shares exploration without leaving it',async()=>{
+ const h=harness();await h.api.buildStory();h.api.activate('first');h.api.bindNavigationControls();
+ h.w.document.getElementById('open-explorer').click();await new Promise(setImmediate);
+ assert.equal(h.w.document.getElementById('explorer-title').textContent,'v');
+ h.api.update({focus:'b',view:null});await new Promise(setImmediate);
+ await h.w.document.getElementById('share-exploration').onclick();
+ const shared=exploration.restoreState(h.w.location.hash,'one',{elements:[{id:'a'},{id:'b'}],relationships:[],views:[{id:'v'}]});
+ assert.equal(shared.exploration.focus,'b');
+ assert.equal(h.w.document.getElementById('mobile-explorer').open,true);
  h.dom.window.close();
 });

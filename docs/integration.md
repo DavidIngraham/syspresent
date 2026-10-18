@@ -38,3 +38,7 @@ The Markdown grammar and replacement syntax are not yet fixed. Engineering alter
 7. Run independent technical review, browser checks and a formative reader study; then integrate immutable snapshot publication and lifecycle catalog into CI and GitHub Pages.
 
 Live presenter UI and the authored evolution timeline follow. WASM execution, offline bundles and visual authoring remain deferred. The first release uses prepared evidence and build-time exports.
+
+## Default reading controls
+
+At every screen size, reading shows the narrative and model with Fit and Explore. Contents and review metadata use disclosures. Explicit exploration opens the same tabbed workspace on phone, tablet and desktop; search, filters, history and element details stay there. The explorer shows its current view name once, supports sharing without leaving it, and returns to the authored story. Wide layouts allocate more width to the model and avoid repeating the section title beside the prose.

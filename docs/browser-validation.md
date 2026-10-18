@@ -37,3 +37,11 @@ Final checks: 53 JavaScript tests and 73 Python tests passed; browser bundle and
 ## Concrete example headings — 2026-10-17
 
 Replaced story, section, figure and closing headings across all three examples with their actual engineering subjects; aligned catalog titles. Independent editorial review checked headings against section content and corrected two desk-fan headings to distinguish motor power from logging and requirements from controller allocation. All three story packages validated against existing native exports; 73 Python tests passed. The rendered Blue Dog outline and section headings were checked in the browser. No model semantics changed.
+
+## Reading-first layout — 2026-10-18
+
+Default reading now exposes Fit and Explore rather than the full inspector on every screen size. Contents and review metadata are collapsed. Wide layouts allocate three fifths of reading-band width to the model; the repeated inspector title is hidden. Explicit exploration uses the shared full-screen tabbed workspace on desktop, tablet and phone. Independent review identified inaccessible sharing within the modal and missing view identity; a Share action and one current-view title now appear in its header. Native warnings remain rendered, and scene qualification is available under About this review.
+
+Rendered checks at 1180×820 and 1024×768 confirmed the simplified initial screen and no horizontal page overflow. At 1024×768, the model viewport measured approximately 538×432 pixels. Opening Explore, switching to Find, resizing to 390×844 and returning to the story preserved the active panel and released modal state. These are browser viewport checks, not physical iPad tests.
+
+Final desktop check at 1440×900 showed only Fit and Explore as visible inspector controls, with no horizontal overflow. 55 JavaScript tests and 73 Python tests passed; the native specification compiler and browser build passed. Share feedback is mirrored into the dialog status region.
