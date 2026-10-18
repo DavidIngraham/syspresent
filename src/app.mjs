@@ -75,7 +75,7 @@ const mobileLayout=()=>window.matchMedia?.('(max-width: 720px)').matches??false;
 function dockExplorer(){const disclosure=$('explorer-disclosure');if(!disclosure)return;if(mobileLayout()){document.querySelector('.workspace').append(disclosure);if(!paused)disclosure.open=false;}else{const band=activeStop&&$(activeStop.id)?.closest('.reading-band');(band||document.querySelector('.reading-band')||document.querySelector('.workspace')).append(disclosure);disclosure.open=true;}}
 function activate(id,scroll=false){const stop=stops.get(id);if(!stop)return;if(paused&&!scroll)return;activeStop=stop;resetAuthoredFrame=true;selected=stop.focus||stop.modelRefs?.[0]||selected;nav=new Navigation({...initialState(selected||bundle.elements[0]?.id,(bundle.configuration||bundle.config)),view:stop.view||null,sceneOptions:authoredOptions(stop)});for(const a of $('outline').querySelectorAll('a'))a.setAttribute('aria-current',String(a.dataset.stop===id));dockExplorer();if(scroll)$(id).scrollIntoView({behavior:'instant',block:'start'});draw();}
 // Inline scenes own their story anchor even when another scene was being explored.
-function exploreStop(id, target){const reading=window.scrollY;paused=false;activate(id);savedStory={stop:id,scroll:reading};paused=true;$('resume').hidden=false;if(target&&elements.has(target))selected=target;draw();}
+function exploreStop(id, target){const reading=window.scrollY;paused=false;activate(id);pause();savedStory={stop:id,scroll:reading};if(target&&elements.has(target))selected=target;draw();}
 async function restoreLocation(){
   if(!location.hash)return;
   try{

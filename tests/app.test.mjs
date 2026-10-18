@@ -250,3 +250,16 @@ test('Resume restores real native inline zoom and compartments after mobile expl
     assert.equal(h.api.state().paused,false);
   }finally{h?.dom.window.close();globalThis.document=previousDocument;await rm(directory,{recursive:true,force:true});}
 });
+
+test('mobile Explore opens the disclosure before scrolling to its visible inspector',async()=>{
+ const h=harness();h.setMobile(true);await h.api.buildStory();h.api.activate('second');
+ const d=h.w.document,disclosure=d.getElementById('explorer-disclosure'),inspector=d.getElementById('inspector');
+ assert.equal(disclosure.open,false);let scrolledOpen=false;
+ inspector.scrollIntoView=()=>{scrolledOpen=disclosure.open;};
+ d.querySelector('#first .inline-view > button').click();
+ assert.equal(disclosure.open,true);assert.equal(scrolledOpen,true);
+ assert.equal(h.api.state().paused,true);assert.equal(h.api.state().stop,'first');
+ assert.equal(h.api.state().saved.stop,'first');assert.equal(d.getElementById('resume').hidden,false);
+ assert.match(d.getElementById('scene-status').textContent,/Exploration paused/);
+ await new Promise(setImmediate);h.dom.window.close();
+});

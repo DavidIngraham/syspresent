@@ -19,3 +19,7 @@ A subsequent 390 × 844 mobile pass found that Resume did not reset the inline s
 Action stop `guarded-work` now uses semantic placement overrides to separate its complementary guard branches. Snapshot `e4a1d88a8b4c0fa50766e7d1c3e7dfedc85729c6e91f00e92c64c7c4f4c494b2` visibly keeps guardEnabled on the vertical decision-to-fork edge and not guardEnabled on the separate right-hand refusal branch. Native relationships and synthetic start/done nodes remain unchanged.
 
 The clean noninteractive catalog at viewer commit `cc61dab`, native pin `af37bbf155aea785b8ac494a14afe659244bbcdf`, was loaded after all three exports completed. All three catalog links are present. Clean Blue Dog snapshot `a7a0f33a8f59b7190d2e3a42805ba30f3d608e15f62cab8de8408c07c50dadea` loads its draft metadata and native requirement scene in the browser. This is local hosting, not GitHub Pages deployment.
+
+## Mobile Explore disclosure correction
+
+A user reported that Explore this view did nothing on iOS. The handler activated its owning stop, which closed the mobile disclosure, then set paused directly without reopening it. It now uses the shared pause transition before scrolling. A regression asserts the disclosure is open at scroll time, the owning stop is retained and Resume is available. All 17 app tests pass. A 390 × 844 browser check confirmed open=true and inspector top approximately zero after clicking; this was not a physical iOS-device test. Independent read-only review found no material issue.
