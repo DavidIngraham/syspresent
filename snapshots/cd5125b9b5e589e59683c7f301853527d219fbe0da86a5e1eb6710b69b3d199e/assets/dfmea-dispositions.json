@@ -1,0 +1,100 @@
+{
+  "columns": [
+    "ID",
+    "Safety-critical",
+    "Disposition accepted",
+    "Action evidence accepted",
+    "Evidence"
+  ],
+  "rows": [
+    [
+      "FM-001",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-002",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-003",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-004",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-005",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-006",
+      "false",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-007",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-008",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-009",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-010",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-011",
+      "false",
+      "false",
+      "false",
+      "Not yet available"
+    ],
+    [
+      "FM-012",
+      "true",
+      "false",
+      "false",
+      "Not yet available"
+    ]
+  ],
+  "provenance": {
+    "nativeQuery": "BlueDogReliabilityDocuments::Dispositions",
+    "viewId": "dfmea-dispositions",
+    "nativeToolRevision": "af37bbf155aea785b8ac494a14afe659244bbcdf"
+  }
+}
