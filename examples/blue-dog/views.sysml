@@ -32,30 +32,22 @@ package SyspresentBlueDogViews {
             Column(name = "Requirement", path = "name"),
             Column(name = "Statement", path = "documentation")))
     }
-    view ChallengeDerivation : GridView {
-        filter @SysML::ConnectionUsage;
-        expose BlueDogRequirements::challengeTrafficResponse;
-        expose BlueDogRequirements::challengeNavigationSignals;
+    view RequirementGraph : GeneralView {
+        filter @SysML::RequirementUsage;
+        expose GorgeChallenge::trafficCoexistence;
+        expose GorgeChallenge::navigationRules;
+        expose GorgeChallenge::emergencyIntervention;
+        expose BlueDogRequirements::trafficSafety;
+        expose BlueDogRequirements::navigationConspicuity;
+        expose BlueDogRequirements::safeRecovery;
+        expose BlueDogRequirements::recoveryPropulsion;
+        expose BlueDogRequirements::recoveryEnergy;
     }
     view RecoveryDerivation : GridView {
-        filter @SysML::ConnectionUsage or @SysML::Dependency;
+        filter @SysML::Dependency;
         expose BlueDogRequirements::deriveSafeRecovery;
         expose BlueDogRequirements::deriveRecoveryPropulsion;
         expose BlueDogRequirements::deriveRecoveryEnergy;
     }
-    view RecoveryAcceptance : GridView {
-        filter @SysML::ConnectionUsage or @SysML::Dependency;
-        expose BlueDogRequirements::decomposeAbortLatchDeadline;
-        expose BlueDogRequirements::decomposeRecoveryTelemetryCadence;
-        expose BlueDogRequirements::decomposeMotorIsolationDeadline;
-        expose BlueDogRequirements::decomposeIsolationRestartInhibition;
-        expose BlueDogRequirements::decomposeManualControlLossShutdown;
-    }
-    view TrafficAcceptance : GridView {
-        filter @SysML::ConnectionUsage;
-        expose BlueDogRequirements::decomposeTrafficTracking;
-        expose BlueDogRequirements::decomposeCollisionAssessmentCadence;
-        expose BlueDogRequirements::decomposeAvoidanceCommandDeadline;
-        expose BlueDogRequirements::decomposeTrafficAwarenessFault;
-    }
+
 }

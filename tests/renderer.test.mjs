@@ -287,3 +287,12 @@ test('matrix labels shorten only unambiguous names and retain accessible full na
  await renderView(container,{...view,native:{...view.native,kind:'table'}});assert.equal(container.querySelectorAll('th')[1].textContent,'Requirements::safe');assert.equal(container.querySelector('tbody tr').children[1].textContent,'Requirements::safe');
  d.window.close();
 });
+
+
+test('native derivation blocks put original requirements above derived ones while arrows retain native direction',async()=>{
+ const native=presentationPayload({kind:'requirement',nodes:[{id:'original',kind:'requirement',name:'Original'},{id:'derived',kind:'requirement',name:'Derived'}],edges:[{from:'derived',to:'original',kind:'derive',label:'derive'}]});
+ const auto=await presentationLayout(native);
+ assert.ok(auto.nodes.get('original').y<auto.nodes.get('derived').y);
+ const points=auto.routes.get(0);assert.ok(points[0].y>points.at(-1).y);
+ assert.equal(native.edges[0].from,'derived');assert.equal(native.edges[0].to,'original');
+});

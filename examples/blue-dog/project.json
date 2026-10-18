@@ -30,11 +30,21 @@
     },
     {
       "id": "challenge-derivation",
-      "native": "SyspresentBlueDogViews::ChallengeDerivation"
+      "native": "SyspresentBlueDogViews::RequirementGraph",
+      "relationshipScope": [
+        "BlueDogRequirements::challengeTrafficResponse",
+        "BlueDogRequirements::challengeNavigationSignals"
+      ]
     },
     {
       "id": "traffic-acceptance",
-      "native": "SyspresentBlueDogViews::TrafficAcceptance"
+      "native": "SyspresentBlueDogViews::RequirementGraph",
+      "relationshipScope": [
+        "BlueDogRequirements::decomposeTrafficTracking",
+        "BlueDogRequirements::decomposeCollisionAssessmentCadence",
+        "BlueDogRequirements::decomposeAvoidanceCommandDeadline",
+        "BlueDogRequirements::decomposeTrafficAwarenessFault"
+      ]
     },
     {
       "id": "recovery-basis",
@@ -42,7 +52,14 @@
     },
     {
       "id": "recovery-acceptance",
-      "native": "SyspresentBlueDogViews::RecoveryAcceptance"
+      "native": "SyspresentBlueDogViews::RequirementGraph",
+      "relationshipScope": [
+        "BlueDogRequirements::decomposeAbortLatchDeadline",
+        "BlueDogRequirements::decomposeRecoveryTelemetryCadence",
+        "BlueDogRequirements::decomposeMotorIsolationDeadline",
+        "BlueDogRequirements::decomposeIsolationRestartInhibition",
+        "BlueDogRequirements::decomposeManualControlLossShutdown"
+      ]
     }
   ],
   "exploration": {

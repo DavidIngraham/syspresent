@@ -10,15 +10,15 @@ The Gorge course is shared river space. Commercial traffic, recreational craft a
 
 These five challenge requirements establish the traffic and recovery obligations followed here. Collision avoidance, navigation-rule compliance, emergency intervention, loss of qualification and autonomous shore recovery are distinct outcomes. The table is a selected part of the challenge, not its complete entry criteria.
 
-The record tables show requirement definitions, where the source model stores identifiers and full statements. The relationship matrices use the corresponding requirement usages, where the source model attaches traces. A definition describes the obligation; a usage applies it in this model.
+The record tables show requirement definitions, where the source model stores identifiers and full statements. The relationship views use the corresponding requirement usages, where the source model attaches traces. A definition describes the obligation; a usage applies it in this model.
 
 ```syspresent
 {"type":"stop","id":"challenge-derivation","title":"Deriving traffic response and navigation signals","view":"challenge-derivation","modelRefs":["BlueDogRequirements__challengeTrafficResponse","BlueDogRequirements__challengeNavigationSignals"],"focus":"GorgeChallenge__trafficCoexistence"}
 ```
 
-Read each marked cell from its row to its column. The model derives Blue Dog's traffic-safety requirement from the challenge's collision-free-course obligation, and navigation conspicuity from navigation-rule compliance. These are explicit derivation connections in the source model.
+Read from the upper challenge requirements to the lower vehicle requirements. Native derivation arrowheads point back toward the original requirement. The model derives Blue Dog's traffic-safety requirement from the challenge's collision-free-course obligation, and navigation conspicuity from navigation-rule compliance. These are explicit derivation connections in the source model.
 
-This small matrix shows two selected derivations. It does not say that signals alone cover navigation rules, or that the rest of the challenge has been fully allocated. A trace records the engineering argument to review; it is not evidence that the boat satisfies either obligation.
+This block diagram shows two selected derivations. It does not say that signals alone cover navigation rules, or that the rest of the challenge has been fully allocated. A trace records the engineering argument to review; it is not evidence that the boat satisfies either obligation.
 
 ```syspresent
 {"type":"stop","id":"obligation","title":"Blue Dog traffic response and navigation signals","view":"avoidance-requirements","focus":"BlueDogRequirements__TrafficSafety","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__navigationConspicuity","BlueDogClassDetection__policy"]}
@@ -32,7 +32,7 @@ For S-001, I need a timely usable track, a feasible decision and enough achieved
 {"type":"stop","id":"traffic-derivation","title":"Four acceptance outcomes derived from traffic safety","view":"traffic-acceptance","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogRequirements__collisionAssessmentCadence","BlueDogRequirements__avoidanceCommandDeadline","BlueDogRequirements__trafficAwarenessFault"],"focus":"BlueDogRequirements__trafficSafety"}
 ```
 
-S-001 supplies the common encounter conditions. Its four derivation links separate tracking, risk-update cadence, command timing and fault reporting into outcomes that can be assessed individually. The row is the original requirement; each column is a derived requirement. These links do not allocate a particular sensor or autopilot.
+S-001 supplies the common encounter conditions. Its four derivation links separate tracking, risk-update cadence, command timing and fault reporting into outcomes that can be assessed individually. The original requirement is at the top; its derived requirements are below it. These links do not allocate a particular sensor or autopilot.
 
 ```syspresent
 {"type":"stop","id":"traffic-details","title":"Tracking, assessment and command timing requirements","view":"traffic-details","modelRefs":["BlueDogRequirementVerification__TrafficSafetyVerification","BlueDogClassDetection__policy"],"focus":"BlueDogRequirements__TrafficTracking"}
@@ -60,7 +60,7 @@ Here the relationship is deliberately different. Each cell is a dependency from 
 {"type":"stop","id":"recovery-acceptance","title":"Derived checks for abort, telemetry and motor isolation","view":"recovery-acceptance","modelRefs":["BlueDogRequirements__safeRecovery","BlueDogRequirementVerification__SafeRecoveryVerification"],"focus":"BlueDogRequirements__safeRecovery"}
 ```
 
-These are formal derivation links again: S-003 is the original requirement in the row and the selected detailed outcomes are columns. This matrix concentrates on the abort latch, recovery telemetry, local isolation, restart inhibition and loss of manual control. Other S-003 outcomes and shared recording and energy obligations remain outside this selected view.
+These are formal derivation links again: S-003 is the original requirement at the top and the selected detailed outcomes are below it. This diagram concentrates on the abort latch, recovery telemetry, local isolation, restart inhibition and loss of manual control. Other S-003 outcomes and shared recording and energy obligations remain outside this selected view.
 
 ```syspresent
 {"type":"stop","id":"recovery-details","title":"Emergency recovery timing and shutdown requirements","view":"recovery-details","modelRefs":["BlueDogRequirementVerification__SafeRecoveryVerification"],"focus":"BlueDogRequirements__AbortLatchDeadline"}
@@ -68,7 +68,7 @@ These are formal derivation links again: S-003 is the original requirement in th
 
 The records make the distinctions concrete. Latching a disqualification is separate from reporting position. Local isolation removes motor power and blocks restart until deliberate local reset. Loss of the manual command link has its own zero-thrust deadline; that condition must not be mistaken for a general instruction to wait for communications before autonomous recovery.
 
-[SafeRecoveryVerification](model:BlueDogRequirementVerification::SafeRecoveryVerification) references these outcomes and additional shared requirements. Its verdict is also inconclusive. A matrix cell establishes a modeled relationship, not a passing test or a demonstrated recovery route.
+[SafeRecoveryVerification](model:BlueDogRequirementVerification::SafeRecoveryVerification) references these outcomes and additional shared requirements. Its verdict is also inconclusive. A derivation arrow establishes a modeled relationship, not a passing test or a demonstrated recovery route.
 
 ```syspresent
 {"type":"stop","id":"response","title":"Choosing between sailing, avoidance and recovery","view":"supervisor","focus":"BlueDogMissionLogic__SupervisoryCycle","modelRefs":["BlueDogMissionLogic__SupervisoryCycle","BlueDogMissionLogic__FallbackPolicy"]}

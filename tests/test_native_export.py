@@ -17,6 +17,23 @@ class NativeIndexTests(unittest.TestCase):
         self.assertEqual(encoded["unit"]["factors"][0]["unit_id"], "SI::kg")
         self.assertTrue(encoded["unit"]["reduction_given"])
 
+    def test_relationship_scope_preserves_native_edges_and_rejects_missing_identity(self):
+        from copy import deepcopy
+        from scripts.native_export import scope_relationships
+        payload = {"kind": "requirement", "nodes": [{"id": "a", "semantic_id": "original"}, {"id": "b", "semantic_id": "derived"}, {"id": "c"}], "edges": [
+            {"qualified_name": "M::trace", "from_id": "a", "to_id": "b", "kind": "derive"},
+            {"qualified_name": "M::other", "from_id": "b", "to_id": "c", "kind": "satisfy"}]}
+        before = deepcopy(payload)
+        selected = scope_relationships(payload, ["M::trace"])
+        self.assertEqual(selected["edges"], [payload["edges"][0]])
+        self.assertEqual([n["semantic_id"] for n in selected["nodes"]], ["original", "derived"])
+        self.assertEqual(payload, before)
+        self.assertIn("outside this diagram", selected["notices"][-1])
+        with self.assertRaisesRegex(ValueError, "absent"):
+            scope_relationships(payload, ["M::missing"])
+        with self.assertRaisesRegex(ValueError, "unique"):
+            scope_relationships(payload, ["M::trace", "M::trace"])
+
     def test_native_reference_direction_and_unknown_target(self):
         raw=[{"@id":"a","@type":"PartUsage","declaredName":"misleading satisfy label","type":[{"@id":"lib"}],"owner":{"@id":"missing"}}]
         query=[{"id":"Library::Type","type":"PartDefinition","properties":{"elementId":"lib","name":"Type"}}]

@@ -1,6 +1,6 @@
 # Blue Dog story source inventory
 
-The inventory below records the initial integration planning. Current executable view declarations and scopes are in `examples/blue-dog/views.sysml` and `project.json`; current stop choices are documented in `examples/view-choices.md`. The 18 October requirements revision adds native challenge/system/detail record tables and scoped derivation/dependency matrices. It preserves the same Blue Dog source revision and does not change engineering requirements.
+The inventory below records the initial integration planning. Current executable view declarations and scopes are in `examples/blue-dog/views.sysml` and `project.json`; current stop choices are documented in `examples/view-choices.md`. The 18 October requirements revision adds native challenge/system/detail record tables and scoped derivation block diagrams and a design-dependency matrix. It preserves the same Blue Dog source revision and does not change engineering requirements.
 
 Read-only inventory on 17 October 2026 of `/home/david/repos/sv-blue-dog-editorial`, HEAD `b12b079855002466a8a95b54a5dba88e8ffc0611`. The checkout reported a modified `AGENTS.md`; no engineering source was modified during this inventory. These are verified source declarations and paths, not a claim that Syspresent has rendered or accepted them. Resolve semantic IDs through the native exporter before compiling the draft.
 

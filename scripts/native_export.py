@@ -111,6 +111,28 @@ def adapt_view(view_id, payload):
         "rowToElement": row_mappings, "nodeToElement": mappings, "identityCoverage": identity_coverage, "native": payload, "behaviorEvidence": "modeled-possibility"}, edges
 
 
+def scope_relationships(payload, names):
+    """Select exact native relationships and endpoints; never reconstruct topology."""
+    if not isinstance(names, list) or not names or any(not isinstance(n, str) or not n for n in names) or len(set(names)) != len(names):
+        raise ValueError("relationshipScope requires unique native qualified relationship names")
+    if payload.get("kind") not in {"requirement", "definition", "tree", "mixed"}:
+        raise ValueError("relationshipScope requires a native structural graph")
+    if payload.get("notes"):
+        raise ValueError("relationshipScope cannot omit native diagram notes")
+    edges = [e for e in payload.get("edges", []) if e.get("qualified_name") in names]
+    missing = set(names) - {e.get("qualified_name") for e in edges}
+    if missing:
+        raise ValueError(f"Native relationships absent from view: {sorted(missing)}")
+    endpoints = {e[k] for e in edges for k in ("from_id", "to_id")}
+    nodes = [n for n in payload.get("nodes", []) if n["id"] in endpoints]
+    if endpoints != {n["id"] for n in nodes}:
+        raise ValueError("Scoped native relationship has an unavailable endpoint")
+    if any(n.get("parent") and n["parent"] not in endpoints for n in nodes):
+        raise ValueError("Scoped native graph would omit a containing node")
+    return {**payload, "nodes": nodes, "edges": edges, "notes": [],
+        "notices": [*payload.get("notices", []), "Selected relationship scope; other model relationships are outside this diagram."]}
+
+
 def typed_value(value):
     if isinstance(value, Quantity):
         return {"nativeType": "Quantity", "magnitude": typed_value(value.magnitude), "unit": typed_value(value.unit)}
@@ -210,12 +232,19 @@ def export(config, root):
     raw = list(by_id.values())
     elements, relationships, unavailable = build_index(raw, queried, library_ids, project_ids)
     views = []
+    native_views = {}
     for spec in config["views"]:
         # This additive native option is required. Older clients fail explicitly.
-        payload = asdict(model.render_view(spec["native"], include_semantic_identity=True))
+        if spec["native"] not in native_views:
+            native_views[spec["native"]] = asdict(model.render_view(spec["native"], include_semantic_identity=True))
+        original_payload = native_views[spec["native"]]
+        payload = scope_relationships(original_payload, spec["relationshipScope"]) if "relationshipScope" in spec else original_payload
         view, edges = adapt_view(spec["id"], payload)
         if view["identityCoverage"]["unmappedNodes"]:
             raise ValueError(f"View {spec['id']} has unmapped model nodes: {view['identityCoverage']['unmappedNodes']}")
+        if "relationshipScope" in spec:
+            view["sourceNative"] = original_payload
+            view["relationshipScope"] = spec["relationshipScope"]
         views.append(view)
         relationships.extend(edges)
     for spec in config.get("queries", []):
