@@ -1,0 +1,29 @@
+name: Validate specification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Fetch pinned native compiler source from David's fork
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: DavidIngraham/OpenSysML
+          ref: 23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2
+          path: .tools/opensysml
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.25.11'
+          cache: false
+      - name: Build native compiler
+        working-directory: .tools/opensysml
+        run: go build -o ../sysml ./cmd/sysml
+      - name: Validate product specification
+        run: python3 scripts/validate_spec.py --sysml "$PWD/.tools/sysml"
