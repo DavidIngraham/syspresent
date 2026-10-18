@@ -23,3 +23,13 @@ The clean noninteractive catalog at viewer commit `cc61dab`, native pin `af37bbf
 ## Mobile Explore disclosure correction
 
 A user reported that Explore this view did nothing on iOS. The handler activated its owning stop, which closed the mobile disclosure, then set paused directly without reopening it. It now uses the shared pause transition before scrolling. A regression asserts the disclosure is open at scroll time, the owning stop is retained and Resume is available. All 17 app tests pass. A 390 × 844 browser check confirmed open=true and inspector top approximately zero after clicking; this was not a physical iOS-device test. Independent read-only review found no material issue.
+
+## Mobile workspace revision — 2026-10-17
+
+The explorer now opens as a full-screen mobile dialog with persistent Back to story and Model, Details, Find and Filters tabs. Inline previews retain normal story tracking. A shared return path restores the owning stop, reading position and focus; responsive transition restores the authored scene. Compact controls and touch gesture handling preserve native semantic identity.
+
+Rendered browser checks at 390×844 on the flashlight story exercised Explore, semantic node inspection, Find/search-result navigation and Back to story. The dialog remained bounded; selection opened Details and return released the modal/scroll lock and restored the invoking button. This is a desktop browser at phone dimensions, not physical iOS or WebKit gesture validation.
+
+Independent read-only review identified stranded inline pause state, hidden-canvas restoration, breakpoint restoration, stale selection and late asynchronous tab switching. These were corrected: inline interaction does not pause mobile reading, selection renders while Model is visible before opening Details, all exits restore the story, and late tab switches are guarded. Automated tests cover these paths plus native gesture math and accidental selection suppression. Human reader acceptance remains open.
+
+Final checks: 53 JavaScript tests and 73 Python tests passed; browser bundle and frozen flashlight package built successfully. Final rendered node selection updated native highlighting after returning from Details. Desktop breakpoint transition closed the modal, released the scroll lock and restored the authored scene. Physical iPhone testing remains outstanding.

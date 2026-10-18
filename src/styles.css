@@ -25,3 +25,29 @@
 
 /* Snapshot hashes must wrap inside a narrow header; diagrams keep their own pan surfaces. */
 header #snapshot{min-width:0;overflow-wrap:anywhere}
+
+/* Mobile exploration is a separate, bounded workspace with a persistent exit. */
+#mobile-explorer{padding:0;border:0;max-width:none;max-height:none;width:100%;height:100vh;height:100dvh;background:#fff;color:var(--ink)}
+#mobile-explorer[open]{display:flex;flex-direction:column}
+.mobile-top{display:flex;align-items:center;gap:1rem;padding:calc(.5rem + env(safe-area-inset-top)) .75rem .5rem;border-bottom:1px solid var(--line)}
+.mobile-top span{font-size:.85rem;font-weight:650}
+#mobile-tabs{display:flex;padding:.4rem .5rem;gap:.3rem;border-bottom:1px solid var(--line)}
+#mobile-tabs button{flex:1}
+#mobile-tabs [aria-selected=true]{background:#d5eee5;border-color:var(--accent)}
+#mobile-host{flex:1;min-height:0;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
+body.explorer-open{overflow:hidden}
+[hidden]{display:none!important}
+@media(max-width:720px){
+ button{min-height:44px}
+ #explorer-disclosure{display:none}
+ #mobile-host #inspector{border:0;padding:.75rem;max-height:none}
+ #mobile-host #resume,.explorer-open .explorer-head .eyebrow{display:none}
+ #mobile-host .explorer-head h2{font-size:1rem}
+ #mobile-host #details{border:0;margin:0}
+ #mobile-host #canvas{min-height:0}
+ #mobile-host .native-scroll{max-height:58dvh}
+ #mobile-host .results{max-height:none}
+ #mobile-host input[type=search]{font-size:16px}
+ .inline-view>button{width:100%;margin-top:.5rem;background:#e4eeea}
+ header #snapshot{font-size:.7rem}
+}

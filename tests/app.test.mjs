@@ -24,6 +24,8 @@ function harness(hash='',renderer=null) {
   w.matchMedia=()=>({matches:mobile,addEventListener(){}});
   w.HTMLElement.prototype.scrollIntoView=function(){this.dataset.scrolled='true';};
   w.scrollTo=()=>{};
+  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
+  w.HTMLDialogElement.prototype.close=function(){this.open=false;};
   // Execute production functions in their actual lexical scope, omitting only
   // imports (injected above) and the network-startup call. No algorithms copied.
   let source=app.replace(/^import .*;\r?\n/gm,'');
@@ -241,7 +243,7 @@ test('Resume restores real native inline zoom and compartments after mobile expl
     [...inline.querySelectorAll('button')].find(b=>b.textContent==='Show compartments').click();
     for(let attempt=0;attempt<100&&!([...inline.querySelectorAll('button')].some(b=>b.textContent==='Hide compartments'));attempt++)await new Promise(resolve=>setTimeout(resolve,10));
     inline.querySelector('button[aria-label="Zoom in"]').click();
-    assert.equal(h.api.state().paused,true);
+    assert.equal(h.api.state().paused,false);
     assert.equal(inline.querySelector('output').textContent,'250%');
     assert.ok([...inline.querySelectorAll('button')].some(b=>b.textContent==='Hide compartments'));
     await h.w.document.getElementById('resume').onclick();await h.api.draw();
@@ -251,15 +253,52 @@ test('Resume restores real native inline zoom and compartments after mobile expl
   }finally{h?.dom.window.close();globalThis.document=previousDocument;await rm(directory,{recursive:true,force:true});}
 });
 
-test('mobile Explore opens the disclosure before scrolling to its visible inspector',async()=>{
+test('mobile exploration uses bounded panels and restores the story on cancel',async()=>{
+ const h=harness();h.setMobile(true);await h.api.buildStory();h.api.activate('second');h.api.bindNavigationControls();
+ const d=h.w.document;let scroll;
+ h.w.scrollTo=value=>{scroll=value.top;};Object.defineProperty(h.w,'scrollY',{value:640});
+ const trigger=d.querySelector('#first .inline-view > button');trigger.focus();trigger.click();
+ assert.equal(d.getElementById('mobile-explorer').open,true);
+ assert.equal(d.getElementById('inspector').parentElement.id,'mobile-host');
+ assert.equal(h.api.state().saved.scroll,640);assert.equal(h.api.state().stop,'first');
+ assert.equal(d.getElementById('panel-model').hidden,false);
+ await new Promise(setImmediate);
+ const before=h.renders.length;
+ d.getElementById('tab-find').click();d.getElementById('tab-model').click();
+ assert.equal(h.renders.length,before,'tabs preserve the rendered camera surface');
+ h.api.choose('b');await new Promise(setImmediate);
+ assert.equal(d.getElementById('panel-details').hidden,false);
+ d.getElementById('mobile-explorer').dispatchEvent(new h.w.Event('cancel',{cancelable:true}));
+ await new Promise(setImmediate);
+ assert.equal(d.getElementById('mobile-explorer').open,false);
+ assert.equal(d.body.classList.contains('explorer-open'),false);
+ assert.equal(h.api.state().paused,false);assert.equal(scroll,640);assert.equal(d.activeElement,trigger);
+ h.dom.window.close();
+});
+
+test('inline touch interaction does not launch a modal',async()=>{
  const h=harness();h.setMobile(true);await h.api.buildStory();h.api.activate('second');
- const d=h.w.document,disclosure=d.getElementById('explorer-disclosure'),inspector=d.getElementById('inspector');
- assert.equal(disclosure.open,false);let scrolledOpen=false;
- inspector.scrollIntoView=()=>{scrolledOpen=disclosure.open;};
- d.querySelector('#first .inline-view > button').click();
- assert.equal(disclosure.open,true);assert.equal(scrolledOpen,true);
- assert.equal(h.api.state().paused,true);assert.equal(h.api.state().stop,'first');
- assert.equal(h.api.state().saved.stop,'first');assert.equal(d.getElementById('resume').hidden,false);
- assert.match(d.getElementById('scene-status').textContent,/Exploration paused/);
+ h.renders.find(r=>r.options.frameScope==='inline:first').options.onInteract();
+ assert.equal(h.w.document.getElementById('mobile-explorer').open,false);assert.equal(h.api.state().paused,false);
  await new Promise(setImmediate);h.dom.window.close();
+});
+
+test('desktop transition restores authored navigation and releases modal state',async()=>{
+ const h=harness();h.setMobile(true);await h.api.buildStory();h.api.activate('first');h.api.bindNavigationControls();
+ h.api.exploreStop('first');await new Promise(setImmediate);h.api.update({focus:'b',view:null});await new Promise(setImmediate);
+ h.setMobile(false);h.api.dockExplorer();await new Promise(setImmediate);
+ assert.equal(h.api.state().paused,false);assert.equal(h.api.state().nav.view,'v');
+ assert.equal(h.api.state().nav.focus,'a');assert.equal(h.w.document.getElementById('mobile-explorer').open,false);
+ assert.equal(h.w.document.getElementById('panel-details').hidden,false);
+ h.dom.window.close();
+});
+
+test('late selection render cannot override a newer mobile tab choice',async()=>{
+ const h=harness();h.setMobile(true);await h.api.buildStory();h.api.activate('first');h.api.bindNavigationControls();
+ h.api.exploreStop('first');await new Promise(setImmediate);
+ let resolveLoad;h.api.setStore({ensureNeighborhood:()=>new Promise(resolve=>{resolveLoad=resolve;})});
+ h.api.choose('b');h.w.document.getElementById('tab-find').click();
+ resolveLoad({unavailable:[]});await new Promise(setImmediate);
+ assert.equal(h.w.document.getElementById('panel-find').hidden,false);
+ h.dom.window.close();
 });

@@ -40,3 +40,10 @@
 @media(max-width:720px){.native-dialog{width:100vw;height:100dvh;border-radius:0}.native-dialog-body{padding:.5rem}.native-dialog-header{padding:.6rem}.native-dialog-header h2{font-size:1rem}}
 
 .native-dialog .native-expand{display:none}
+
+/* One-finger scrolling remains native; the renderer handles two-finger zoom. */
+.native-scroll{touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch}
+.native-more{position:relative;margin-left:auto}
+.native-more summary{cursor:pointer;padding:.6rem;min-height:44px}
+.native-more[open]{display:flex;flex-wrap:wrap;gap:.4rem}
+@media(pointer:coarse){.native-toolbar button,.native-toolbar summary{min-width:44px;min-height:44px}.native-scroll{user-select:none;-webkit-user-select:none}}

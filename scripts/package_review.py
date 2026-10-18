@@ -236,13 +236,13 @@ def validate_evidence(name, data, kind):
 
 def catalog_home(entries):
     lines = []
-    for entry in entries:
+    for entry in reversed(entries):
         title = html.escape(entry.get("title", entry["reviewId"]))
         status = html.escape(entry["status"])
         reason = html.escape(entry.get("reason", ""))
-        lines.append(f'<li><a href="snapshots/{entry["snapshotId"]}/">{title}</a> — {status}' + (f" · {reason}" if reason else "") + "</li>")
+        lines.append(f'<li><a href="snapshots/{entry["snapshotId"]}/">{title}</a> — {status}' + (f" · {reason}" if reason else "") + f'<br><small>Build: {html.escape(entry["reviewId"])}</small></li>')
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Syspresent reviews</title><main><h1>Engineering reviews</h1><p>Each link opens its frozen model and evidence snapshot. Lifecycle status does not imply approval.</p><ul>'
+            '<title>Syspresent reviews</title><main><h1>Engineering reviews</h1><p>Newest builds appear first. Each link opens its frozen model and evidence snapshot; older links retain their original viewer. Lifecycle status does not imply approval.</p><ul>'
             + "".join(lines) + "</ul></main></html>")
 
 

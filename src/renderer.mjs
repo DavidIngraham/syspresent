@@ -50,6 +50,34 @@ export function layoutPayload(native) {
   return layoutOnlyTreeKinds.has(native.kind) ? {...native,kind:'tree'} : native;
 }
 export function boundedZoom(value) { return Math.max(.05,Math.min(4,value)); }
+/** Keep the content point under the starting midpoint under the moving midpoint. */
+export function pinchFrame(start, midpoint, distance) {
+  const zoom=boundedZoom(start.zoom*distance/Math.max(1,start.distance));
+  return {zoom,left:Math.max(0,(start.left+start.midpoint.x)*zoom/start.zoom-midpoint.x),top:Math.max(0,(start.top+start.midpoint.y)*zoom/start.zoom-midpoint.y)};
+}
+export function installDiagramGestures(viewport, frame, applyScale, onInteract=()=>{}) {
+  let pinch=null,origin=null,touchOrigin=null,active=false,suppressUntil=0;
+  const suppress=()=>{suppressUntil=Date.now()+500;};
+  const pair=touches=>{const box=viewport.getBoundingClientRect(),a=touches[0],b=touches[1];return {midpoint:{x:(a.clientX+b.clientX)/2-box.left,y:(a.clientY+b.clientY)/2-box.top},distance:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)};};
+  viewport.addEventListener('touchstart',event=>{
+    active=true;onInteract();
+    if(event.touches.length===1)touchOrigin={x:event.touches[0].clientX,y:event.touches[0].clientY};
+    if(event.touches.length===2){pinch={...pair(event.touches),zoom:frame.zoom,left:viewport.scrollLeft,top:viewport.scrollTop};suppress();}
+  },{passive:true});
+  viewport.addEventListener('touchmove',event=>{
+    if(event.touches.length===1&&touchOrigin&&Math.hypot(event.touches[0].clientX-touchOrigin.x,event.touches[0].clientY-touchOrigin.y)>8)suppress();
+    if(event.touches.length!==2||!pinch)return;
+    event.preventDefault();suppress();
+    const current=pair(event.touches);Object.assign(frame,pinchFrame(pinch,current.midpoint,current.distance));applyScale();viewport.scrollLeft=frame.left;viewport.scrollTop=frame.top;frame.positioned=true;
+  },{passive:false});
+  const end=event=>{if(pinch)suppress();if(event.touches.length<2)pinch=null;active=event.touches.length>0;};
+  viewport.addEventListener('touchend',end,{passive:true});viewport.addEventListener('touchcancel',end,{passive:true});
+  viewport.addEventListener('pointerdown',event=>{origin={x:event.clientX,y:event.clientY};active=true;},{passive:true});
+  viewport.addEventListener('pointermove',event=>{if(origin&&Math.hypot(event.clientX-origin.x,event.clientY-origin.y)>8)suppress();},{passive:true});
+  for(const type of ['pointerup','pointercancel'])viewport.addEventListener(type,()=>{origin=null;active=false;},{passive:true});
+  viewport.addEventListener('scroll',()=>{if(active)suppress();},{passive:true});
+  viewport.addEventListener('click',event=>{if(event.detail!==0&&Date.now()<suppressUntil){event.preventDefault();event.stopImmediatePropagation();}},true);
+}
 async function cachedLayout(source, native, compact) {
   let variants=layouts.get(source);if(!variants){variants=new Map();layouts.set(source,variants);}
   const key=compact?'compact':'full';
@@ -183,16 +211,24 @@ export async function renderView(container, view, options={}) {
     control('Fit',()=>scaleTo(Math.min((viewport.clientWidth||400)/layout.width,(viewport.clientHeight||300)/layout.height)));
     controls.append(scaleLabel);
     if(structuralKinds.has(native.kind))control(frame.showCompartments?'Hide compartments':'Show compartments',()=>{container.closeExpanded?.();frame.showCompartments=!frame.showCompartments;frame.positioned=false;renderView(container,view,options).catch(error=>message(container,error.message));});
+    if(options.compactControls){
+      const more=document.createElement('details');more.className='native-more';const summary=document.createElement('summary');summary.textContent='More';more.append(summary);
+      for(const control of [...controls.querySelectorAll('button')])if(control.textContent==='100%'||control.textContent.includes('compartments'))more.append(control);
+      controls.append(more);
+    }
+    installDiagramGestures(viewport,frame,applyScale,()=>options.onInteract?.());
     fragment.restoreScale=applyScale;applyScale();viewport.append(svg);fragment.append(controls,viewport);
-    message(fragment,'Pan with scroll or arrow keys. Fit shows the whole view.');
-    if(structuralKinds.has(native.kind)&&!frame.showCompartments)message(fragment,'Compartments hidden; select a node for details.');
+    if(!options.compactControls)message(fragment,'Drag with one finger to pan; pinch with two to zoom. Scroll or arrow keys also pan. Fit shows the whole view.');
+    if(!options.compactControls&&structuralKinds.has(native.kind)&&!frame.showCompartments)message(fragment,'Compartments hidden; select a node for details.');
     const selectedNode=native.nodes.find(node=>(view.nodeToElement?.[node.id]??node.semanticId)===options.selectedId);
     if(selectedNode?.detail){const detail=document.createElement('details'),summary=document.createElement('summary'),body=document.createElement('pre');summary.textContent='Selected element: native detail';body.textContent=selectedNode.detail;detail.append(summary,body);fragment.append(detail);}
     // Intent events distinguish manual panning from asynchronous programmatic scroll events.
     for(const type of ['wheel','pointerdown'])viewport.addEventListener(type,()=>options.onInteract?.(),{passive:true});
     viewport.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))options.onInteract?.();});
-    viewport.addEventListener('scroll',()=>{frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;frame.positioned=true;},{passive:true});
+    viewport.addEventListener('scroll',()=>{if(!viewport.clientWidth||!viewport.clientHeight)return;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;frame.positioned=true;},{passive:true});
     fragment.restoreFrame=()=>{
+      if(!viewport.clientWidth||!viewport.clientHeight)return;
+      if(!frame.positioned&&options.fitInitial&&!options.camera&&viewport.clientWidth&&viewport.clientHeight){frame.zoom=boundedZoom(Math.min(viewport.clientWidth/layout.width,viewport.clientHeight/layout.height));applyScale();}
       if(!frame.positioned&&options.camera){const local=native.nodes.find(node=>(view.nodeToElement?.[node.id]??node.semanticId)===options.camera.target);const box=local&&layout.nodes.get(local.id)?.box;if(box){frame.left=Math.max(0,(box.x+box.width/2-layout.origin.x)*frame.zoom-viewport.clientWidth/2);frame.top=Math.max(0,(box.y+box.height/2-layout.origin.y)*frame.zoom-viewport.clientHeight/2);}}
       viewport.scrollLeft=frame.left;viewport.scrollTop=frame.top;frame.positioned=true;
     };
@@ -202,6 +238,6 @@ export async function renderView(container, view, options={}) {
   for(const notice of native.notices) message(fragment,notice);
   for(const note of native.notes??[]) message(fragment,note.text);
   for(const annotation of options.annotations??[]) message(fragment,annotation.text);
-  expandable(container,fragment,frame,view.title??view.id,options);
+  if(options.allowExpand!==false)expandable(container,fragment,frame,view.title??view.id,options);
   if(container.renderToken===token){container.replaceChildren(fragment);fragment.restoreFrame?.();}
 }

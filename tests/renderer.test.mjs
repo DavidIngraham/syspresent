@@ -15,11 +15,11 @@ const temporary=await mkdtemp(join(tmpdir(),'syspresent-renderer-test-'));
 after(()=>rm(temporary,{recursive:true,force:true}));
 const output=join(temporary,'renderer.mjs');
 await build({entryPoints:[fileURLToPath(new URL('../src/renderer.mjs',import.meta.url))],outfile:output,bundle:true,format:'esm',platform:'node',alias:Object.fromEntries(['canvas','layout','autolayout','table'].map(k=>['@opensysml/'+k,join(editor,'src/webview',k+'.ts')]))});
-const {renderView,presentationPayload,layoutPayload}=await import(pathToFileURL(output).href);
+const {renderView,presentationPayload,layoutPayload,pinchFrame,installDiagramGestures}=await import(pathToFileURL(output).href);
 function fixture(){return {id:'requirements',native:{kind:'requirement',form:'mermaid',nodes:[
   {id:'local-a',semanticId:'semantic-a',kind:'requirement',name:'AND',detail:'A long statement '.repeat(30)},
   {id:'local-b',semanticId:'semantic-b',kind:'requirement',name:'Child',detail:'Child requirement'}],edges:[{from:'local-a',to:'local-b',kind:'derivation',label:'derive'}]}};}
-function dom(){const d=new JSDOM('<!doctype html><body><div id="a"></div><div id="b"></div></body>');globalThis.document=d.window.document;return d;}
+function dom(){const d=new JSDOM('<!doctype html><body><div id="a"></div><div id="b"></div></body>');globalThis.document=d.window.document;for(const [name,size] of [['clientWidth',400],['clientHeight',300]])Object.defineProperty(d.window.HTMLElement.prototype,name,{configurable:true,get(){return this.classList.contains('native-scroll')&&this.isConnected&&!this.closest('[hidden]')?size:0;}});return d;}
 
 test('native source is immutable; only layout dispatch changes structural kind',async()=>{
   const d=dom(),view=fixture(),before=JSON.stringify(view.native);
@@ -146,4 +146,40 @@ test('inline and explorer surfaces retain independent manual frames for one nati
  assert.equal(b.querySelector('output').textContent,'80%');assert.ok(b.textContent.includes('Show compartments'));
  await renderView(a,view,{frameScope:'inline:one',camera:{zoom:.8},resetFrame:true});
  assert.equal(a.querySelector('output').textContent,'80%');assert.ok(a.textContent.includes('Show compartments'));d.window.close();
+});
+
+test('pinch scales around moving midpoint and bounds zoom',()=>{
+ const start={zoom:1,left:100,top:50,distance:100,midpoint:{x:80,y:60}};
+ assert.deepEqual(pinchFrame(start,{x:100,y:70},200),{zoom:2,left:260,top:150});
+ assert.equal(pinchFrame(start,{x:80,y:60},10000).zoom,4);
+});
+test('touch gesture leaves one finger native, handles pinch and suppresses accidental selection',()=>{
+ const d=dom(),viewport=document.getElementById('a'),node=document.createElement('button');viewport.append(node);
+ const frame={zoom:1,left:0,top:0},scales=[];let selected=0;node.onclick=()=>selected++;
+ installDiagramGestures(viewport,frame,()=>scales.push(frame.zoom));
+ const touch=(type,points)=>{const event=new d.window.Event(type,{bubbles:true,cancelable:true});Object.defineProperty(event,'touches',{value:points.map(([clientX,clientY])=>({clientX,clientY}))});node.dispatchEvent(event);return event;};
+ touch('touchstart',[[20,20]]);assert.equal(touch('touchmove',[[40,20]]).defaultPrevented,false);
+ touch('touchstart',[[20,20],[120,20]]);assert.equal(touch('touchmove',[[20,20],[220,20]]).defaultPrevented,true);assert.equal(frame.zoom,2);assert.equal(scales.length,1);
+ touch('touchend',[]);node.dispatchEvent(new d.window.MouseEvent('click',{bubbles:true,detail:1}));assert.equal(selected,0);
+ node.dispatchEvent(new d.window.MouseEvent('click',{bubbles:true,detail:0}));assert.equal(selected,1,'keyboard activation remains available');
+ const pointer=(type,x)=>{const e=new d.window.Event(type,{bubbles:true});Object.defineProperties(e,{clientX:{value:x},clientY:{value:0}});node.dispatchEvent(e);};
+ pointer('pointerdown',0);pointer('pointermove',30);pointer('pointerup',30);node.dispatchEvent(new d.window.MouseEvent('click',{bubbles:true,detail:1}));assert.equal(selected,1);
+ d.window.close();
+});
+test('compact controls keep semantic warnings and authored camera without Expand',async()=>{
+ const d=dom(),view=fixture(),container=document.getElementById('a');view.native.notices=['Incomplete semantic evidence'];
+ await renderView(container,view,{compactControls:true,allowExpand:false,fitInitial:true,camera:{zoom:1.5}});
+ assert.equal(container.querySelector('.native-expand'),null);assert.ok(container.querySelector('.native-more'));assert.ok(container.querySelector('[aria-label="Zoom in"]'));assert.equal(container.querySelector('output').textContent,'150%');
+ assert.ok(container.textContent.includes('Incomplete semantic evidence'));assert.ok(!container.textContent.includes('Pan with scroll'));assert.ok(container.querySelector('.native-more').textContent.includes('Show compartments'));d.window.close();
+});
+test('hidden panel restoration waits for visible dimensions and ignores hidden scroll events',async()=>{
+ const d=dom(),container=document.getElementById('a'),view=fixture();
+ await renderView(container,view);let viewport=container.querySelector('.native-scroll');viewport.scrollLeft=140;viewport.scrollTop=90;viewport.dispatchEvent(new d.window.Event('scroll'));
+ container.hidden=true;await renderView(container,view,{selectedId:'semantic-b'});viewport=container.querySelector('.native-scroll');
+ assert.equal(viewport.clientWidth,0);assert.equal(viewport.scrollLeft,0,'hidden render does not restore against zero dimensions');
+ viewport.dispatchEvent(new d.window.Event('scroll'));
+ container.hidden=false;container.querySelector('.native-view').restoreFrame();assert.equal(viewport.scrollLeft,140);assert.equal(viewport.scrollTop,90);
+ container.hidden=true;await renderView(container,view,{frameScope:'new-hidden',fitInitial:true});assert.equal(container.querySelector('output').textContent,'100%');
+ container.hidden=false;container.querySelector('.native-view').restoreFrame();assert.notEqual(container.querySelector('output').textContent,'100%','initial fit is deferred until visible');
+ d.window.close();
 });
