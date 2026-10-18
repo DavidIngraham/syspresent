@@ -1,0 +1,117 @@
+{
+  "title": "Blue Dog: preserving safe separation and recovering control",
+  "sources": [
+    "../../../sv-blue-dog-editorial/models",
+    "../../../sv-blue-dog-editorial/tools/publishing/reference.sysml",
+    "views.sysml"
+  ],
+  "nativeToolRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
+  "libraryScopes": [],
+  "views": [
+    {
+      "id": "avoidance-requirements",
+      "native": "SyspresentBlueDogViews::avoidanceRequirements"
+    },
+    {
+      "id": "supervisor",
+      "native": "#action:BlueDogMissionLogic::SupervisoryCycle"
+    },
+    {
+      "id": "capsize",
+      "native": "#action:BlueDogMissionLogic::CapsizeDisposition"
+    },
+    {
+      "id": "system-failure",
+      "native": "BlueDogFailureViews::SystemTreeView"
+    },
+    {
+      "id": "primary-failure",
+      "native": "BlueDogFailureViews::PrimaryTreeView"
+    },
+    {
+      "id": "scanner-failure",
+      "native": "BlueDogFailureViews::ScannerTreeView"
+    }
+  ],
+  "exploration": {
+    "contextLimit": 24,
+    "defaultRelationshipTypes": [
+      "satisfy",
+      "verify",
+      "composition",
+      "reference",
+      "typing",
+      "causation",
+      "derivation",
+      "allocation",
+      "type",
+      "owner"
+    ],
+    "entryPoints": [
+      {
+        "id": "BlueDogRequirements__trafficSafety",
+        "label": "Traffic safety"
+      },
+      {
+        "id": "BlueDogAvoidanceFailures__Exposure__sharedPowerLoss",
+        "label": "Shared power loss",
+        "view": "system-failure"
+      },
+      {
+        "id": "BlueDogDFMEA__starter",
+        "label": "Starter DFMEA"
+      }
+    ],
+    "modes": [
+      "relationships",
+      "native-views"
+    ],
+    "detailFieldOrder": [
+      "verification",
+      "evidence",
+      "source"
+    ],
+    "grouping": "relationshipType",
+    "presentationPreferences": {
+      "defaultZoom": 1,
+      "showCompartments": false
+    }
+  },
+  "queries": [
+    {
+      "id": "functional-review",
+      "native": "BlueDogAvoidanceDocuments::functionalRows",
+      "asset": "functional-review.json"
+    },
+    {
+      "id": "dfmea-functions",
+      "native": "BlueDogReliabilityDocuments::Functions",
+      "asset": "dfmea-functions.json"
+    },
+    {
+      "id": "dfmea-effects",
+      "native": "BlueDogReliabilityDocuments::Effects",
+      "asset": "dfmea-effects.json"
+    },
+    {
+      "id": "dfmea-actions",
+      "native": "BlueDogReliabilityDocuments::Actions",
+      "asset": "dfmea-actions.json"
+    },
+    {
+      "id": "dfmea-dispositions",
+      "native": "BlueDogReliabilityDocuments::Dispositions",
+      "asset": "dfmea-dispositions.json"
+    }
+  ],
+  "preparedAssets": [
+    {
+      "source": "../../../sv-blue-dog-editorial/docs/figures/passage-reliability.svg",
+      "asset": "passage-reliability.svg",
+      "provenanceSources": [
+        "../../../sv-blue-dog-editorial/tools/publishing/passage_exposure.py",
+        "../../../sv-blue-dog-editorial/models/analyses/passage-exposure.sysml"
+      ]
+    }
+  ]
+}

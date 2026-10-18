@@ -1,0 +1,44 @@
+{
+  "toolRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
+  "modelSha256": "55d67cf46fa21bcaa8e7bafe95c761b99f6f2b31543fca18adda4b8dff70e8ff",
+  "strictValidation": "passed",
+  "renders": [
+    {
+      "id": "actions",
+      "native": "#action:DeskFan::StartCycle",
+      "exitCode": 0,
+      "stderr": "\u2713 package DeskFan\n"
+    },
+    {
+      "id": "states",
+      "native": "#state:DeskFan::operating",
+      "exitCode": 0,
+      "stderr": "\u2713 package DeskFan\n"
+    },
+    {
+      "id": "sequence",
+      "native": "#sequence:DeskFan::StartupExchange",
+      "exitCode": 0,
+      "stderr": "\u2713 package DeskFan\n"
+    },
+    {
+      "id": "matrix",
+      "native": "#matrix:DeskFan",
+      "exitCode": 0,
+      "stderr": "\u2713 package DeskFan\n"
+    }
+  ],
+  "candidateExport": {
+    "provenance": {
+      "nativeToolRevision": "23ca2e2f0-dirty",
+      "nativeBinarySha256": "d62ca81c9c4a0c8107550d32141ea7dcd3d0b82fd65c8945e88895a2ec10b168",
+      "nativeVersion": "sysml-grpc version syspresent-integration\ncommit: 23ca2e2f0-dirty\nbuilt: unknown",
+      "sourceDigests": {
+        "model.sysml": "55d67cf46fa21bcaa8e7bafe95c761b99f6f2b31543fca18adda4b8dff70e8ff"
+      },
+      "librarySourceDigests": {}
+    },
+    "payloadAssertions": "passed: guards, fork/join, composite parents, native sequence message identities/order/self-edge, matrix directions",
+    "viewerSupport": "not evaluated"
+  }
+}

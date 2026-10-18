@@ -1,0 +1,170 @@
+name: Build immutable reviews
+on:
+  workflow_dispatch:
+    inputs:
+      examples:
+        description: Declarative examples
+        type: choice
+        options: [flashlight, blue-dog, both]
+        default: flashlight
+      blue_dog_revision:
+        description: Exact 40-character sv-blue-dog commit (required for blue-dog/both)
+        type: string
+        default: ''
+      publish:
+        description: Preserve history and deploy the validated site
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: immutable-pages-catalog
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      history_exists: ${{ steps.history.outputs.exists }}
+      history_ref: ${{ steps.history.outputs.ref }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: viewer
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.25.11'
+          cache: false
+      - name: Resolve exact project pins
+        id: pins
+        working-directory: viewer
+        env:
+          EXAMPLES: ${{ inputs.examples }}
+          BLUE_DOG_REVISION: ${{ inputs.blue_dog_revision }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          examples = ['flashlight', 'blue-dog'] if os.environ['EXAMPLES'] == 'both' else [os.environ['EXAMPLES']]
+          pins = {json.loads(Path(f'examples/{name}/project.json').read_text())['nativeToolRevision'] for name in examples}
+          if len(pins) != 1 or not re.fullmatch('[0-9a-f]{40}', next(iter(pins))):
+              raise SystemExit('Examples must share one exact native source pin')
+          if 'blue-dog' in examples and not re.fullmatch('[0-9a-f]{40}', os.environ['BLUE_DOG_REVISION']):
+              raise SystemExit('Blue Dog needs an exact source commit')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('native=' + next(iter(pins)) + '\n')
+          PY
+      - name: Check existing immutable history branch
+        id: history
+        working-directory: viewer
+        run: |
+          refs=$(git ls-remote origin refs/heads/pages-history)
+          if [ -n "$refs" ]; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            read -r revision _ <<< "$refs"
+            echo "ref=$revision" >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: DavidIngraham/OpenSysML
+          ref: ${{ steps.pins.outputs.native }}
+          path: viewer/.tools/opensysml
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        if: inputs.examples != 'flashlight'
+        with:
+          repository: DavidIngraham/sv-blue-dog
+          ref: ${{ inputs.blue_dog_revision }}
+          path: sv-blue-dog-editorial
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        if: steps.history.outputs.exists == 'true'
+        with:
+          ref: ${{ steps.history.outputs.ref }}
+          path: viewer/.tools/previous-site
+      - name: Install pinned source clients and renderer dependencies
+        working-directory: viewer
+        run: |
+          python -m pip install ./.tools/opensysml/client/python
+          npm --prefix .tools/opensysml/editors/vscode ci --ignore-scripts --no-audit --no-fund
+          make -C .tools/opensysml build-sysml build-grpc COMMIT="$(git -C .tools/opensysml rev-parse HEAD)" BUILD_TIME=source-pinned
+      - name: Run source and DOM checks
+        working-directory: viewer
+        env:
+          OPENSYSML_SOURCE: ${{ github.workspace }}/viewer/.tools/opensysml
+          OPENSYSML_BINARY: ${{ github.workspace }}/viewer/.tools/opensysml/bin/sysml-grpc
+        run: |
+          python scripts/validate_spec.py --sysml .tools/opensysml/bin/sysml
+          python -m unittest discover -s tests
+          node --test tests/*.test.mjs
+          npm --prefix .tools/opensysml/editors/vscode run typecheck
+          npm --prefix .tools/opensysml/editors/vscode test
+      - name: Build and validate review snapshots while retaining history
+        working-directory: viewer
+        env:
+          OPENSYSML_SOURCE: ${{ github.workspace }}/viewer/.tools/opensysml
+          OPENSYSML_BINARY: ${{ github.workspace }}/viewer/.tools/opensysml/bin/sysml-grpc
+          EXAMPLES: ${{ inputs.examples }}
+          HISTORY_EXISTS: ${{ steps.history.outputs.exists }}
+        run: |
+          args=(--output build/site --work build/ci)
+          if [ "$EXAMPLES" = both ]; then
+            args+=(--example examples/flashlight --example examples/blue-dog)
+          else
+            args+=(--example "examples/$EXAMPLES")
+          fi
+          if [ "$HISTORY_EXISTS" = true ]; then args+=(--previous-site .tools/previous-site); fi
+          python scripts/build_ci.py "${args[@]}"
+      - name: Check publication license files
+        if: inputs.publish
+        working-directory: viewer
+        run: |
+          test -s LICENSE
+          test -s THIRD_PARTY_NOTICES
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: viewer/build/site
+  publish:
+    if: inputs.publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.build.outputs.history_ref }}
+          path: history
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: artifact
+      - name: Retain the complete catalog and immutable snapshots before deployment
+        env:
+          HISTORY_EXISTS: ${{ needs.build.outputs.history_exists }}
+        run: |
+          mkdir site
+          tar -xf artifact/artifact.tar -C site
+          if [ "$HISTORY_EXISTS" != true ]; then git -C history switch --orphan pages-history; fi
+          cp -a site/. history/
+          git -C history config user.name github-actions[bot]
+          git -C history config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C history add .
+          if ! git -C history diff --cached --quiet; then
+            git -C history commit -m "Retain immutable reviews for $GITHUB_SHA"
+            git -C history push origin HEAD:pages-history
+          fi
+      - uses: actions/deploy-pages@v4
+        id: deployment

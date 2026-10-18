@@ -1,0 +1,71 @@
+# First-release requirements evidence
+
+Assessment date: 17 October 2026. This is a source-and-test inspection of the current working tree, not release acceptance. “Implemented” means a concrete implementation and relevant regression coverage exist; it does not assert that every test was rerun for this assessment. No representative-reader study or deployed CI run was observed. The reviewer previously authored native identity transport, snapshot packaging and shared-state validation, so assessment of those components is not independent. No implementation was changed during this assessment.
+
+Evidence paths below are repository-relative. Test references mean tests inspected, not new execution results. Earlier focused shared-state tests were run by this reviewer, but those results do not validate later integration changes.
+
+## Current verification and remaining gaps
+
+The coordinator reports 73 Python tests and 45 Node tests passing on 17 October 2026 (Node 24 with the pinned OpenSysML source configured). The coordinator also reports 330 native renderer TypeScript tests passing and 16 app tests within the Node aggregate. These are reported aggregate results, not reruns by this reviewer. Local `build/site/catalog.json` now records assembled Blue Dog, flashlight and notation-fixture snapshots. Local assembly is not deployed CI or reader acceptance.
+
+- **SP-012:** Export now declares `evaluationMode: bound-attribute`; context is explicitly a provenance label. Inputs and instance rebinding are unsupported and rejected, so general contextual evaluation remains outside the implemented capability.
+- **SP-046:** Details now expose exact native query rows and native rendered verdicts for selected semantic IDs. This closes the earlier dropped-data presentation gap for configured views; elements outside those queries/views still lack a general evidence/verdict projection, and sources remain raw metadata.
+- **SP-050/051:** The fault-tree connection-kind/geometry defect is fixed and locally browser-checked. Native action guard/fork/join semantics remain present, but crossing routes still merit readability work. Rendered checks are documented in [browser-validation.md](browser-validation.md); complete release acceptance remains open.
+- **SP-053:** Prepared evidence now explicitly distinguishes recorded execution from prepared analysis, with required source/configuration/inputs and recorded run identity. Compiler and display tests cover the contract; no actual recorded run or physical verification is invented by these fixtures.
+- **SP-064:** Previously identified entry-point and mode/shared-state issues are resolved and reviewed. Declarative configuration is implemented; this does not replace broader usability acceptance.
+- **SP-021/072:** The build workflow now builds both CLI and gRPC binaries, packages snapshots and preserves history; notice archives normalize metadata. A deployed CI run and representative-reader study remain unobserved. Clean reviewed dependency pins remain required.
+
+## Requirement matrix
+
+| ID | Assessment | Concrete evidence and remaining gap |
+| --- | --- | --- |
+| SP-001 | Partial | `examples/flashlight/story.md` explains definitions/usages, claims/verdicts and possible behavior for newcomers. Comprehension remains untested. |
+| SP-002 | Implemented locally | `src/app.mjs` fetches static bundle/story/manifest; `scripts/package_review.py` assembles static assets. Hosting and released URLs not verified here. |
+| SP-003 | Format implemented | `scripts/story_compiler.py` preserves stops, annotations and speakerNotes; authoring guide documents later presenter mode. No presenter UI claimed. |
+| SP-010 | Implemented | Compiler and `tests/test_story_compiler.py::test_linear_order_provenance_identity_and_no_mutation`; Markdown plus declarative stops, figures and tables. |
+| SP-011 | Implemented, bounded | Compiler typed substitutions; `tests/test_native_units.py` checks native reductions and rejects spelling as authority. Deliberate supported-type/unit limits remain. |
+| SP-012 | Implemented for bound attributes only | Export explicitly declares bound-attribute evaluation and rejects inputs/other modes. Context labels are retained without suggesting native instance rebinding. General instance/config/result evaluation is not supported. |
+| SP-013 | Supported editorial boundary | `docs/authoring.md`, stop modelRefs and examples distinguish model assumptions from narrative. Arbitrary prose engineering claims require editorial review. |
+| SP-014 | Implemented | Prepared asset source/context and hashes in native exporter/package builder; `tests/test_export_assets.py` covers copying/provenance. No reader analysis execution. |
+| SP-015 | Implemented, scoped | Compiler source diagnostics, required assets and schema failures; packaging rejects unmapped nodes/required-view errors. Unknown/unassessed preserved by compiler; native adapter does not export every possible unresolved-value type. |
+| SP-016 | Implemented | Allowlisted JSON substitution grammar; compiler unsafe-expression/type/format tests. No author code evaluation. |
+| SP-017 | Partial | `app.mjs::buildStory` renders ordered prose/evidence and inline mobile scenes. Linear representation exists; full no-animation reading quality not user-tested. |
+| SP-018 | Implemented | Compiler requires final closing block with supports/open/next; both example stories supply it. |
+| SP-020 | Implemented locally | `scripts/snapshots.py`, package builder and immutability/tamper tests freeze source, model, assets and viewer provenance. Real published retention not checked. |
+| SP-021 | Implemented workflow, execution pending | `scripts/build_ci.py` and `.github/workflows/build.yml` run native export, browser build, immutable assembly and history preservation; gRPC service and CLI roles are separate. No successful deployed CI run observed. |
+| SP-022 | Implemented locally | Catalog lifecycle APIs and package lifecycle/catalog-only tests retain snapshots and support reason/replacement metadata. Public historical URL behavior not checked. |
+| SP-023 | Implemented | Catalog reviewer/date/outcome metadata stays outside frozen snapshot; `test_lifecycle_metadata_does_not_mutate_snapshot`. No engineering approval inferred. |
+| SP-024 | Implemented | Snapshot-local URLs/model store; restoreState rejects snapshot mismatch; exploration history/share regression. |
+| SP-025 | Follow-on | No authored evolution timeline implemented. Explicitly outside first-release scope. |
+| SP-030 | Implemented locally | App scroll activation, outline and stop hashes; app direct-stop regression. Human scrolling comfort not assessed. |
+| SP-031 | Implemented; readability acceptance pending | Cached native frames and explicit reset restore authored scenes. Browser checks confirm 100% → 125% → Resume 100% on desktop/mobile; action-route crossings remain a readability concern. |
+| SP-032 | Implemented and locally checked | Reading bands/full-width evidence/mobile disclosure have regressions. Browser validation confirms inline scene reset and document scroll width equals client width at 375 CSS pixels; broad device/user acceptance remains pending. |
+| SP-033 | Implemented and locally checked | Story pause/resume restores authored framing and reading context; real-renderer integration checks independent inline/main camera state and compartment restoration. See browser-validation.md. |
+| SP-034 | Implemented locally | Compiler resolves semantic prose links by exact ID/FQN and validates annotation membership; app activates only compiled ledger targets. Compiler/app regressions cover links and selection. Human interpretation remains untested. |
+| SP-035 | Implemented | Camera/placement/annotation overrides copied onto native layout; compiler membership checks and renderer native-source-immutable regression. |
+| SP-036 | Partial | Stable cached frames and instant scene changes avoid invented cross-notation morphs. Reduced-motion/browser behavior and perceived correspondence need rendered review. |
+| SP-037 | Partial | Native nodes support Enter/Space, tables use real buttons; renderer keyboard/row-selection tests. No complete keyboard or assistive-technology audit. |
+| SP-040 | Implemented, basic | Focus/search/neighbor expansion in app and pure exploration context. Selection is whole-neighborhood plus filters, not a rich per-edge expansion chooser. |
+| SP-041 | Implemented, raw vocabulary | Independent node/relationship filters, explicit incoming/outgoing and native edge kinds; direction test. Native API-property vocabulary can be confusing; semantic-specific UX not comprehensively tested. |
+| SP-042 | Partial | Context budget, omissions and filter reasons; budget/hidden-intermediate tests. Authored native views are not reduced by that local-graph budget; no separate pre-expansion selection dialog. |
+| SP-043 | Implemented within export | `src/model_store.mjs`, shard index and ownership/unavailable disclosures; model-store, ownership and shard tests. Coverage restricted to configured native library exports; not all installed libraries implicitly exported. |
+| SP-044 | Implemented | Navigation snapshots focus, filters, pinned/expanded context; back/forward/reset controls and history test. |
+| SP-045 | Implemented locally | Bounded shared state stores snapshot/stop/view/context, validates native membership and provisional shard IDs; exploration tests and app asynchronous resolution. Shared-state code was authored by this reviewer. |
+| SP-046 | Implemented for configured native records; partial coverage | App details exposes native query rows and rendered verdicts using semantic mappings, plus description/raw source/relevant views and claim disclaimer. Arbitrary elements outside those views lack general verdict/evidence extraction; source navigation remains limited. |
+| SP-050 | Implemented kinds; acceptance pending | Required-kind dispatch, native fixtures and local browser checks cover diagrams/tables/matrices. Fault-tree actual connection-kind routing fixed; action crossing-route readability remains open. |
+| SP-051 | Implemented preservation; readability pending | Browser checks observe nested state markers, ordered sequence/self-message, guard labels and fork/join semantics. Fault-tree topology regression uses actual native connection edges. Complete reader interpretation is untested. |
+| SP-052 | Implemented and locally checked | Native semantic mappings retain selection across diagrams/tables. All four actual matrix rows now map from native source origins; browser keyboard activation selects GuardCheck and focuses details. No label inference. |
+| SP-053 | Implemented prepared-evidence distinction | Compiler validates explicit recorded-execution/prepared-analysis metadata, configuration and typed inputs; recorded execution requires run identity. App displays metadata; static views remain labeled modeled possibility. Synthetic tests claim no actual execution. |
+| SP-054 | Partial | Native table/matrix renderer, prepared tables and marker namespaces for simultaneous views. No explicit comparison-group authoring/control; adjacent prepared content supports a basic comparison. |
+| SP-060 | Implemented in examples | Flashlight and Blue Dog use project JSON/native sources/story rather than project-specific JS. Complete reusable workflow still needs independent end-to-end acceptance. |
+| SP-061 | Implemented | Export uses native parse/query/convert/eval/render; reference direction preserved; tests reject local IDs/labels as semantics. No second SysML parser. |
+| SP-062 | Implemented, experimental native base | Versioned bundle/story/shards retain native payload/index/query/provenance and mappings; exporter/package/store tests. Native API conversion coverage notice remains material. |
+| SP-063 | Implemented local reuse | Renderer imports native canvas/layout/autolayout/table; build provenance records dependency. Dirty candidate permitted only explicit development; clean release pin remains a publication prerequisite. |
+| SP-064 | Implemented; acceptance pending | Validated entry points/modes/default filters/limits/grouping/detail ordering/preferences are consumed by the app. Same-ID distinct views and shared-state/mode exceptions corrected and reviewed; representative usability remains pending. |
+| SP-070 | Local snapshot assembled and inspected | Actual Blue Dog snapshot includes requirements, behavior, DFMEA tables, prepared plot/source provenance and closing. Browser check confirms qualitative fault-tree gate stems/shared causes; reader and engineering acceptance remain separate. |
+| SP-071 | Example supplied | Flashlight tutorial uses core concepts and ISQ/SI, explicitly teaching assumptions; notation fixture adds OMG requirements library. Representative-reader acceptance outstanding. |
+| SP-072 | Not conducted | `docs/reader-study.md` is a protocol only. No observed users, acceptance thresholds or measured accuracy/time/error/confidence/preference results. |
+
+## Release interpretation
+
+This matrix does not accept any first-release verification case. Keep bound-attribute evaluation and configured-record details within their explicit limits. Keep prepared execution metadata distinct from observed execution truth. Improve action-route readability and complete acceptance checks before claiming release acceptance. Exercise all required native kinds in the packaged browser, run the end-to-end CI build, and retain actual reader-study evidence separately from automated checks. Reassess this matrix after code changes; older counts in `docs/implementation-status.md` are historical checkpoints, not current suite totals.

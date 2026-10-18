@@ -1,35 +1,37 @@
 # Syspresent
 
-Self-guided engineering stories and focused model exploration, authored in Markdown and grounded in SysML. Planned as a reusable static application, with live presentation support to follow.
+Self-guided engineering stories and focused model exploration, authored in Markdown and grounded in native SysML data. The reader is a static JavaScript application; native OpenSysML runs at build time. Live presentation and model-evolution timelines are follow-on work.
 
-This repository currently contains the product specification, not an implemented viewer. Blue Dog is the first engineering example, not a dependency of the generic UI.
+The local implementation includes a strict story compiler, semantic prose links and annotations, native diagrams and tables, focused graph traversal, responsive reading, and content-addressed review snapshots. It is under validation and has not been released. The [requirement evidence matrix](docs/requirements-evidence.md) separates implemented behavior from remaining acceptance work. Representative-reader acceptance has not been conducted.
 
-## Specification
+## Build and author
 
-- [Requirements](model/requirements.sysml): 46 owner-agreed requirements with release scope.
-- [Architecture](model/architecture.sysml): logical responsibilities, snapshot/catalog separation and conceptual data contracts.
-- [Verification](model/verification.sysml): nine planned cases linked to requirements; every verdict remains inconclusive.
-- [Decisions](model/decisions.sysml): recorded boundaries, deferred work and open design choices.
-- [Integration plan](docs/integration.md): reuse of OpenSysML and staged implementation.
-- [Research basis](docs/research-basis.md): evidence informing the interaction design and limits of that evidence.
+- [Authoring](docs/authoring.md): Markdown, native references, prepared evidence and closing arguments.
+- [Configuration](docs/configuration.md): entry points, filters, context limits and presentation preferences.
+- [Snapshot assembly](docs/building.md): export, build, validate and package commands.
+- [CI and Pages](docs/ci.md): noninteractive builds and retention of historical snapshots.
+- [Third-party provenance](THIRD_PARTY_NOTICES): reused components and generated license/source records.
 
-Use a native OpenSysML CLI to validate the model:
+OpenSysML remains authoritative for parsing, relationships, evaluation and notation. Syspresent imports its browser canvas, layout and table modules from a pinned checkout. It does not require a browser WASM runtime. Large native indexes are stored in integrity-checked compressed shards, loaded as readers traverse the graph.
+
+A review freezes its story, model, evidence, source records and browser build. Lifecycle changes live in a separate catalog; publication or a current status does not imply engineering approval.
+
+## Examples
+
+1. [Blue Dog avoidance and recovery](examples/blue-dog/story-draft.md): traffic obligations, supervisory behavior, shared failures, DFMEA actions and passage exposure.
+2. [Flashlight tutorial](examples/flashlight/story.md): requirements, part definitions and usages, claims versus verification, concurrency and states.
+3. [Notation inspection](examples/notation-fixtures/story.md): guarded branches, nested states, ordered messages and trace matrices.
+
+All examples use the same exporter, compiler and viewer without project-specific JavaScript.
+
+## Specification and validation
+
+The [46 requirements](model/requirements.sysml), [architecture](model/architecture.sysml), [decisions](model/decisions.sysml) and [verification cases](model/verification.sysml) define the product baseline. See the [research basis](docs/research-basis.md) for the evidence behind the UX choices and its limits.
 
 ```sh
-python3 scripts/validate_spec.py --sysml /path/to/sysml
+python3 scripts/validate_spec.py --sysml /path/to/pinned/sysml
+python3 -m unittest discover -s tests
+OPENSYSML_SOURCE=/path/to/pinned/OpenSysML node --test tests/*.test.mjs
 ```
 
-The initial baseline was validated with DavidIngraham/OpenSysML revision `23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2`. The included GitHub Actions workflow builds that exact compiler revision and runs this validation command. No browser implementation or Pages deployment is included yet. Successful parsing does not establish product acceptance.
-
-## Intended experience
-
-Readers scroll prose alongside stable diagram scenes, branch into the frozen model snapshot, and explicitly resume the story. Native structural and behavioral views preserve their notation. Prepared figures and tables support the argument. Reviews conclude with supported findings, remaining gaps and decisions or next actions.
-
-Published snapshots remain immutable. A separate catalog can mark them draft, current, superseded or withdrawn. A later authored timeline explains model evolution without mixing newer facts into historical reviews.
-
-## First examples
-
-1. Blue Dog avoidance and recovery: requirements, behavior, shared failures, DFMEA and a prepared plot.
-2. A small familiar system introducing core SysML v2 and OMG standard domain-library notation. The exact example system remains to be selected.
-
-Repository license and third-party packaging will be established before reusing source code; public availability alone does not grant reuse rights. No third-party implementation has been copied into this repository.
+The first implementation uses a reviewed local integration candidate. Release requires a clean dependency pin, complete publication checks and the outstanding repository license decision. Native conversion is experimental, so exported coverage and unavailable targets remain explicit. A passing software test is not evidence that a vessel or a reader has passed acceptance.

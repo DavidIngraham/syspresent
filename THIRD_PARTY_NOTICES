@@ -1,0 +1,52 @@
+Third-party materials used by the browser build
+=============================================
+
+Syspresent's browser build reuses selected native OpenSysML browser modules.
+No license for original Syspresent code is assigned by this notice.
+
+The inspected build/viewer/build-inputs.json includes:
+
+* OpenSysML browser source — Apache License 2.0. Source repository:
+  https://github.com/DavidIngraham/OpenSysML
+* elkjs 0.12.0 — package metadata declares EPL-2.0 OR GPL-3.0-or-later;
+  its distributed LICENSE.md contains Eclipse Public License 2.0.
+  Source repository: https://github.com/kieler/elkjs
+* libavoid-js 0.4.5 — package metadata declares LGPL-2.1-or-later;
+  its distributed LICENSE contains GNU Lesser General Public License 2.1.
+  Source repository: https://github.com/Aksem/libavoid-js
+
+The libavoid JavaScript glue is bundled. Its separate WASM loading path is
+not evidence that a WASM resource was included in the inspected browser output.
+The generated package archives exclude WASM binaries. This viewer does not call
+loadAvoid; these notices do not introduce a runtime WASM distribution.
+
+Generate distribution-specific notices after bundling and before hashing the
+browser snapshot:
+
+  OPENSYSML_SOURCE=/path/to/pinned/checkout node scripts/third_party_notices.mjs build/browser
+
+The build can also import generateThirdPartyNotices(outputDir). It reads the
+actual output build-inputs.json, verifies package versions against the source
+package-lock.json, and writes output/notices/: full supplied license texts and
+notices, exact bundled OpenSysML/dependency input files, installed dependency
+archives excluding WASM and including available source maps, lockfile and a hash/provenance manifest.
+Generated third-party source remains in build output, not tracked Syspresent
+source. Include the entire notices directory in the distributable snapshot and
+its hash manifest.
+
+Limits requiring release review
+-------------------------------
+
+An installed npm archive is not automatically complete corresponding source.
+Only libavoid-js JavaScript glue is bundled here; no WASM binary is distributed.
+Its distribution may omit underlying C++ and build inputs;
+ELK's generated distribution may also need its upstream preferred sources.
+Repository and exact distribution links are retained, but this generator does
+not certify completeness, source-offer sufficiency or replacement/relinking
+arrangements. Preserve package-internal copyright/license headers, and resolve
+the applicable source-availability obligations before distribution. This notice
+is an inventory and provenance mechanism, not a legal compliance conclusion.
+
+The source Git revision, dirty-checkout status, lockfile digest and exact bundled
+input hashes are recorded per build. Build-only tools such as esbuild are not
+listed as browser-bundled dependencies merely because they were used to build.

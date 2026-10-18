@@ -1,0 +1,207 @@
+import {drawCanvas} from '@opensysml/canvas';
+import {layoutCanvas} from '@opensysml/layout';
+import {autoLayout} from '@opensysml/autolayout';
+import {tableOf} from '@opensysml/table';
+
+const supported = new Set(['tree','interconnection','state','action','sequence','requirement','definition','package','case','mixed','fault-tree','table','matrix']);
+let serial = 0;
+
+function camel(value) {
+  if (Array.isArray(value)) return value.map(camel);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([,v])=>v!==null).map(([key,v])=>[key.replace(/_([a-z])/g,(_,c)=>c.toUpperCase()),camel(v)]));
+  return value;
+}
+
+/** Wire spelling adapter only. Native nodes, ordering, kinds and relationships stay authoritative. */
+export function canvasPayload(native) {
+  const result=camel(native);
+  result.nodes=(result.nodes??[]).map(node=>{
+    const result={...node,name:node.name??'',type:node.type??'',detail:node.detail??''};
+    if(node.geometry){
+      Object.assign(result,{x:node.geometry.x,y:node.geometry.y,collapsed:node.geometry.collapsed});
+      if(node.geometry.hasSize) Object.assign(result,{width:node.geometry.width,height:node.geometry.height});
+    }
+    if(!result.parent) delete result.parent;
+    return result;
+  });
+  result.edges=(result.edges??[]).map(edge=>({...edge,from:edge.from??edge.fromId,to:edge.to??edge.toId,label:edge.label??''}));
+  result.notices??=[];
+  return result;
+}
+
+function message(container,text) {
+  const p=document.createElement('p');p.className='render-notice';p.textContent=text;container.append(p);
+}
+
+const structuralKinds = new Set(['tree','interconnection','requirement','definition','package','case','mixed']);
+const layoutOnlyTreeKinds = new Set(['requirement','definition','package','case','mixed']);
+const layouts = new WeakMap();
+const frames = new WeakMap();
+
+/** Only optional structural compartments are elided; behavioral labels stay intact. */
+export function presentationPayload(native, showCompartments = true) {
+  const result = canvasPayload(native);
+  if (!showCompartments && structuralKinds.has(result.kind)) {
+    result.shown = (result.shown ?? ['keywords','typings','compartments','qualifiers']).filter(item => item !== 'compartments');
+  }
+  return result;
+}
+export function layoutPayload(native) {
+  return layoutOnlyTreeKinds.has(native.kind) ? {...native,kind:'tree'} : native;
+}
+export function boundedZoom(value) { return Math.max(.05,Math.min(4,value)); }
+async function cachedLayout(source, native, compact) {
+  let variants=layouts.get(source);if(!variants){variants=new Map();layouts.set(source,variants);}
+  const key=compact?'compact':'full';
+  if(!variants.has(key))variants.set(key,autoLayout(layoutPayload(native)));
+  return variants.get(key);
+}
+function frameFor(source, options) {
+  let variants=frames.get(source);if(!variants){variants=new Map();frames.set(source,variants);}
+  const key=JSON.stringify({surface:options.frameScope??"main",camera:options.camera??null,placements:options.placements??[]});
+  const preferences=options.presentationPreferences??{};
+  const preferredZoom=Number.isFinite(preferences.defaultZoom)&&preferences.defaultZoom>=.1&&preferences.defaultZoom<=4?preferences.defaultZoom:1;
+  if(options.resetFrame||!variants.has(key))variants.set(key,{zoom:boundedZoom(options.camera?.zoom??preferredZoom),left:0,top:0,positioned:false,showCompartments:preferences.showCompartments===true});
+  return variants.get(key);
+}
+
+/** Enlarge the existing DOM without copying native nodes, IDs or event bindings. */
+function expandable(container, fragment, frame, title, options) {
+  const expand=document.createElement('button');expand.type='button';expand.textContent='Expand view';expand.className='native-expand';
+  fragment.prepend(expand);
+  expand.addEventListener('click',()=>{
+    const dialog=document.createElement('dialog');dialog.className='native-dialog';
+    if(typeof dialog.showModal!=='function'){message(fragment,'Expanded inspection requires a browser with native dialog support.');return;}
+    const saved={...frame};const viewport=fragment.querySelector('.native-scroll');
+    if(viewport){saved.left=viewport.scrollLeft;saved.top=viewport.scrollTop;}
+    const parent=fragment.parentNode,next=fragment.nextSibling,focus=document.activeElement;
+    const heading=document.createElement('h2');heading.id=`native-dialog-title-${++serial}`;heading.textContent=title;
+    dialog.setAttribute('aria-labelledby',heading.id);
+    const close=document.createElement('button');close.type='button';close.textContent='Close expanded view';
+    const header=document.createElement('div');header.className='native-dialog-header';header.append(heading,close);
+    const body=document.createElement('div');body.className='native-dialog-body';dialog.append(header,body);
+    let restored=false;
+    const restore=()=>{
+      if(restored)return;restored=true;
+      parent.insertBefore(fragment,next?.parentNode===parent?next:null);expand.hidden=false;
+      Object.assign(frame,saved);fragment.restoreScale?.();fragment.restoreFrame?.();
+      dialog.remove();container.closeExpanded=null;
+      if(focus?.isConnected)focus.focus({preventScroll:true});else if(expand.isConnected)expand.focus({preventScroll:true});
+    };
+    const dismiss=()=>{if(dialog.open)dialog.close();restore();};
+    container.closeExpanded=dismiss;
+    dialog.addEventListener('close',restore);
+    dialog.addEventListener('cancel',event=>{event.preventDefault();dismiss();});
+    close.addEventListener('click',dismiss);
+    document.body.append(dialog);body.append(fragment);expand.hidden=true;dialog.showModal();
+    fragment.restoreFrame?.();close.focus();options.onInteract?.();
+  });
+}
+
+export async function renderView(container, view, options={}) {
+  container.closeExpanded?.();
+  const selectSemantic=id=>{container.closeExpanded?.();options.onSelect?.(id);};
+  const token={};container.renderToken=token;
+  const frame=frameFor(view.native,options);
+  options={...options,resetFrame:false};
+  const native=presentationPayload(view.native,frame.showCompartments);
+  if(!supported.has(native.kind)) throw new Error(`Unsupported native view kind: ${native.kind}`);
+  const fragment=document.createElement('div');fragment.className='native-view';
+  if(native.kind==='table'||native.kind==='matrix') {
+    const table=tableOf(native);table.setAttribute('aria-label',view.title??view.id);
+    const represented=new Set();
+    for(const row of table.querySelectorAll('tr[data-opensysml-row]')) {
+      const semantic=view.rowToElement?.[row.dataset.opensysmlRow];
+      if(typeof semantic!=='string'||!semantic)continue;
+      represented.add(semantic);
+      const selected=semantic===options.selectedId;
+      row.dataset.semanticId=semantic;
+      row.classList.toggle('opensysml-selected',selected);
+      row.setAttribute('aria-selected',String(selected));
+      // Retain native table/row/cell roles. A real button in the first data cell
+      // provides keyboard selection without turning the row into a fake button.
+      const select=document.createElement('button');select.type='button';
+      select.textContent=selected?'Selected':'Select';
+      select.setAttribute('aria-label',`${selected?'Selected row':'Select row'} ${Number(row.dataset.opensysmlRow)+1}: show model details`);
+      select.setAttribute('aria-pressed',String(selected));
+      select.addEventListener('click',event=>{event.stopPropagation();selectSemantic(semantic);});
+      const cell=row.querySelector('td');if(cell){cell.prepend(select,document.createTextNode(' '));}
+      row.addEventListener('click',()=>selectSemantic(semantic));
+      if(selected){row.style.backgroundColor='#e0f2ed';row.style.boxShadow='inset 3px 0 #16645d';}
+    }
+    fragment.append(table);
+    if(options.selectedId&&!represented.has(options.selectedId))message(fragment,'The selected element is not represented in this table. Your semantic selection is retained.');
+    if((native.rows??[]).some((_,index)=>!view.rowToElement?.[String(index)]))message(fragment,'Some table rows have no exported semantic identity. Their values are readable, but model selection is unavailable.');
+  } else {
+    const auto=await cachedLayout(view.native,native,!frame.showCompartments);
+    const overrides={nodes:new Map()};
+    for(const placement of options.placements??[]) {
+      for(const node of native.nodes) if((view.nodeToElement?.[node.id]??node.semanticId)===placement.target) overrides.nodes.set(node.id,{x:placement.x,y:placement.y});
+    }
+    const layout=layoutCanvas(native,overrides,auto);
+    const svg=drawCanvas(layout);
+    svg.setAttribute('role','group');svg.setAttribute('aria-label',view.title??view.id);
+    // Native markers have document-global IDs. Namespace every instance so inline
+    // mobile views and prepared comparisons cannot use another diagram's markers.
+    const prefix=`sp-${++serial}-`;
+    const ids=new Map([...svg.querySelectorAll('[id]')].map(el=>[el.id,prefix+el.id]));
+    for(const el of svg.querySelectorAll('*')) {
+      if(el.id) el.id=ids.get(el.id);
+      for(const attr of [...el.attributes]) {
+        let value=attr.value;
+        for(const [oldId,newId] of ids) value=value.replaceAll(`url(#${oldId})`,`url(#${newId})`);
+        if(value!==attr.value) el.setAttribute(attr.name,value);
+      }
+    }
+    for(const group of svg.querySelectorAll('g.opensysml-node')) {
+      const local=group.dataset.opensysmlId;
+      const node=native.nodes.find(n=>n.id===local);
+      const semantic=view.nodeToElement?.[local]??node?.semanticId;
+      group.classList.toggle('selected',!!semantic&&semantic===options.selectedId);
+      if(semantic) {
+        group.setAttribute('tabindex','0');group.setAttribute('role','button');
+        group.setAttribute('aria-label',`${node.name||node.kind}: show model details`);
+        const select=()=>selectSemantic(semantic);
+        group.addEventListener('click',select);
+        group.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});
+      }
+      const notes=(options.annotations??[]).filter(note=>note.target===semantic);
+      if(notes.length) {
+        group.classList.add('annotated');
+        const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=notes.map(n=>n.text).join('; ');group.append(title);
+      }
+    }
+    const controls=document.createElement('div');controls.className='native-toolbar';controls.setAttribute('role','group');controls.setAttribute('aria-label','Diagram scale and detail');
+    const viewport=document.createElement('div');viewport.className='native-scroll';viewport.tabIndex=0;viewport.setAttribute('role','region');viewport.setAttribute('aria-label','Scrollable model diagram; use arrow keys to pan');
+    const scaleLabel=document.createElement('output');scaleLabel.setAttribute('aria-live','polite');
+    const applyScale=()=>{svg.style.width=`${layout.width*frame.zoom}px`;svg.style.height=`${layout.height*frame.zoom}px`;scaleLabel.textContent=`${Math.round(frame.zoom*100)}%`;};
+    const scaleTo=value=>{const previous=frame.zoom;frame.zoom=boundedZoom(value);applyScale();viewport.scrollLeft=(viewport.scrollLeft+viewport.clientWidth/2)*frame.zoom/previous-viewport.clientWidth/2;viewport.scrollTop=(viewport.scrollTop+viewport.clientHeight/2)*frame.zoom/previous-viewport.clientHeight/2;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;};
+    const control=(name,action)=>{const b=document.createElement('button');b.type='button';b.textContent=name;b.addEventListener('click',()=>{options.onInteract?.();action();});controls.append(b);};
+    control('−',()=>scaleTo(frame.zoom/1.25));controls.lastElementChild.setAttribute('aria-label','Zoom out');
+    control('+',()=>scaleTo(frame.zoom*1.25));controls.lastElementChild.setAttribute('aria-label','Zoom in');
+    control('100%',()=>scaleTo(1));
+    control('Fit',()=>scaleTo(Math.min((viewport.clientWidth||400)/layout.width,(viewport.clientHeight||300)/layout.height)));
+    controls.append(scaleLabel);
+    if(structuralKinds.has(native.kind))control(frame.showCompartments?'Hide compartments':'Show compartments',()=>{container.closeExpanded?.();frame.showCompartments=!frame.showCompartments;frame.positioned=false;renderView(container,view,options).catch(error=>message(container,error.message));});
+    fragment.restoreScale=applyScale;applyScale();viewport.append(svg);fragment.append(controls,viewport);
+    message(fragment,'Pan with scroll or arrow keys. Fit shows the whole view.');
+    if(structuralKinds.has(native.kind)&&!frame.showCompartments)message(fragment,'Compartments hidden; select a node for details.');
+    const selectedNode=native.nodes.find(node=>(view.nodeToElement?.[node.id]??node.semanticId)===options.selectedId);
+    if(selectedNode?.detail){const detail=document.createElement('details'),summary=document.createElement('summary'),body=document.createElement('pre');summary.textContent='Selected element: native detail';body.textContent=selectedNode.detail;detail.append(summary,body);fragment.append(detail);}
+    // Intent events distinguish manual panning from asynchronous programmatic scroll events.
+    for(const type of ['wheel','pointerdown'])viewport.addEventListener(type,()=>options.onInteract?.(),{passive:true});
+    viewport.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))options.onInteract?.();});
+    viewport.addEventListener('scroll',()=>{frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;frame.positioned=true;},{passive:true});
+    fragment.restoreFrame=()=>{
+      if(!frame.positioned&&options.camera){const local=native.nodes.find(node=>(view.nodeToElement?.[node.id]??node.semanticId)===options.camera.target);const box=local&&layout.nodes.get(local.id)?.box;if(box){frame.left=Math.max(0,(box.x+box.width/2-layout.origin.x)*frame.zoom-viewport.clientWidth/2);frame.top=Math.max(0,(box.y+box.height/2-layout.origin.y)*frame.zoom-viewport.clientHeight/2);}}
+      viewport.scrollLeft=frame.left;viewport.scrollTop=frame.top;frame.positioned=true;
+    };
+    if(native.nodes.length>600) message(fragment,'Automatic layout limit reached; native/grid placement is shown. Reduce context before requesting a clearer layout.');
+    if(options.selectedId&&!native.nodes.some(n=>(view.nodeToElement?.[n.id]??n.semanticId)===options.selectedId)) message(fragment,'The selected element is not represented in this view. Your semantic selection is retained.');
+  }
+  for(const notice of native.notices) message(fragment,notice);
+  for(const note of native.notes??[]) message(fragment,note.text);
+  for(const annotation of options.annotations??[]) message(fragment,annotation.text);
+  expandable(container,fragment,frame,view.title??view.id,options);
+  if(container.renderToken===token){container.replaceChildren(fragment);fragment.restoreFrame?.();}
+}

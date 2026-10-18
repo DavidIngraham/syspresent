@@ -2,3 +2,4 @@ build/
 .tools/
 node_modules/
 __pycache__/
+examples/notation-fixtures/bundle.native.json

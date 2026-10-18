@@ -1,0 +1,24 @@
+action rendering (no view declared; rendering DeskFan::StartCycle directly)
+
+action def StartCycle
+  initial start
+  decision permission
+  fork prepare
+  action energize
+  action recordRequest
+  join prepared
+  action running
+  action refused
+  final done
+
+flow:
+  start -> permission
+  permission -> prepare: [guardEnabled]
+  permission -> refused: [not guardEnabled]
+  prepare -> energize
+  prepare -> recordRequest
+  energize -> prepared
+  recordRequest -> prepared
+  prepared -> running
+  running -> done
+  refused -> done

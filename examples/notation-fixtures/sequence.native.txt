@@ -1,0 +1,9 @@
+sequence rendering (no view declared; rendering DeskFan::StartupExchange directly)
+
+part panel
+part control
+
+messages:
+  panel => control: request
+  control => control: selfCheck
+  control => panel: ready

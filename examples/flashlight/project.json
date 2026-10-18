@@ -1,0 +1,44 @@
+{
+  "title": "Read a SysML model through a flashlight",
+  "sources": [
+    "model.sysml"
+  ],
+  "nativeToolRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
+  "libraryScopes": [
+    "ISQ::MassValue",
+    "SI::kg",
+    "VerificationCases::VerdictKind"
+  ],
+  "views": [
+    {
+      "id": "requirements",
+      "native": "FlashlightViews::requirements"
+    },
+    {
+      "id": "structure",
+      "native": "FlashlightViews::structure"
+    },
+    {
+      "id": "actions",
+      "native": "#action:Flashlight::turnOn"
+    },
+    {
+      "id": "states",
+      "native": "#state:Flashlight::operating"
+    },
+    {
+      "id": "matrix",
+      "native": "#matrix:Flashlight"
+    }
+  ],
+  "exploration": {
+    "contextLimit": 24,
+    "entryPoint": "Flashlight__light"
+  },
+  "values": [
+    {
+      "ref": "Flashlight::light::mass",
+      "context": "illustrative-design-inputs"
+    }
+  ]
+}
