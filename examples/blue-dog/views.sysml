@@ -1,12 +1,8 @@
 package SyspresentBlueDogViews {
     private import StandardViewDefinitions::*;
     view avoidanceRequirements : GeneralView {
-        filter @SysML::RequirementUsage;
+        doc /* Introduce the collision-avoidance obligation and its tracking requirement. A containment view keeps this opening scoped to these two declarations; the explorer supplies their wider requirement traces. */
         expose BlueDogRequirements::trafficSafety;
         expose BlueDogRequirements::trafficTracking;
-        expose BlueDogRequirements::criticalFailureDisposition;
-        expose BlueDogRequirements::capsizeQualificationRetention;
-        expose GorgeChallenge::safetyCapabilityAbort;
-        expose GorgeChallenge::autonomousShoreRecovery;
     }
 }

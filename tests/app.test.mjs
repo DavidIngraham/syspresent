@@ -229,7 +229,7 @@ test('explicit Resume resets the owning inline scene, while selection does not r
 });
 
 
-test('Resume restores real native inline zoom and compartments after mobile exploration',async()=>{
+test('Resume restores fitted native inline framing and compartments after mobile exploration',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'syspresent-app-renderer-'));
   const previousDocument=globalThis.document;
   let h;
@@ -237,17 +237,21 @@ test('Resume restores real native inline zoom and compartments after mobile expl
     const output=join(directory,'renderer.mjs');const editor=resolve(process.env.OPENSYSML_SOURCE,'editors/vscode');
     await require('esbuild').build({entryPoints:[fileURLToPath(new URL('../src/renderer.mjs',import.meta.url))],outfile:output,bundle:true,format:'esm',platform:'node',alias:Object.fromEntries(['canvas','layout','autolayout','table'].map(k=>['@opensysml/'+k,join(editor,'src/webview',k+'.ts')]))});
     const {renderView}=await import(pathToFileURL(output).href);h=harness('',renderView);globalThis.document=h.w.document;h.setMobile(true);
+    for(const [name,size] of [['clientWidth',400],['clientHeight',300]])Object.defineProperty(h.w.HTMLElement.prototype,name,{configurable:true,get(){return this.classList.contains('native-scroll')?size:0;}});
+
     h.api.addView({id:'v',elementIds:['a','b'],native:{kind:'requirement',form:'mermaid',nodes:[{id:'a',semanticId:'a',kind:'requirement',name:'Alpha',detail:'Synthetic requirement'},{id:'b',semanticId:'b',kind:'requirement',name:'Beta',detail:'Synthetic requirement'}],edges:[]}});
     await h.api.buildStory();h.api.activate('first');h.api.bindNavigationControls();await h.api.draw();
     let inline=h.w.document.querySelector('#first .inline-canvas');
+    const fitted=inline.querySelector('output').textContent;
     [...inline.querySelectorAll('button')].find(b=>b.textContent==='Show compartments').click();
     for(let attempt=0;attempt<100&&!([...inline.querySelectorAll('button')].some(b=>b.textContent==='Hide compartments'));attempt++)await new Promise(resolve=>setTimeout(resolve,10));
+    const beforeZoom=Number.parseInt(inline.querySelector('output').textContent);
     inline.querySelector('button[aria-label="Zoom in"]').click();
     assert.equal(h.api.state().paused,false);
-    assert.equal(inline.querySelector('output').textContent,'250%');
+    assert.ok(Number.parseInt(inline.querySelector('output').textContent)>beforeZoom);
     assert.ok([...inline.querySelectorAll('button')].some(b=>b.textContent==='Hide compartments'));
     await h.w.document.getElementById('resume').onclick();await h.api.draw();
-    inline=h.w.document.querySelector('#first .inline-canvas');assert.equal(inline.querySelector('output').textContent,'200%');
+    inline=h.w.document.querySelector('#first .inline-canvas');assert.equal(inline.querySelector('output').textContent,fitted);
     assert.ok([...inline.querySelectorAll('button')].some(b=>b.textContent==='Show compartments'));
     assert.equal(h.api.state().paused,false);
   }finally{h?.dom.window.close();globalThis.document=previousDocument;await rm(directory,{recursive:true,force:true});}

@@ -3,8 +3,10 @@
 I want to build a small autonomous sailboat for a round trip on the Columbia River. Completing that course is only useful if the boat can coexist with other river users and deal with a failed attempt. This story follows one engineering argument: observation has to arrive early enough to support a real response, and recovery has to remain useful when the primary response fails.
 
 ```syspresent
-{"type":"stop","id":"obligation","title":"Detection and clearance requirements for river traffic","view":"avoidance-requirements","focus":"BlueDogRequirements__trafficSafety","camera":{"target":"BlueDogRequirements__trafficSafety","zoom":1},"modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogClassDetection__policy"]}
+{"type":"stop","id":"obligation","title":"Detection and clearance requirements for river traffic","view":"avoidance-requirements","focus":"BlueDogRequirements__trafficSafety","modelRefs":["BlueDogRequirements__trafficSafety","BlueDogRequirements__trafficTracking","BlueDogClassDetection__policy"]}
 ```
+
+The opening view isolates two requirements: traffic safety and timely traffic tracking. Explore either requirement to follow its relationships to the rest of the model.
 
 Avoiding collision and interference is the obligation. A sensor's catalogue range does not establish that the boat can meet it. I need a timely usable track, a feasible decision and enough achieved motion to preserve separation.
 

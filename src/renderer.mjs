@@ -49,7 +49,7 @@ export function presentationPayload(native, showCompartments = true) {
 export function layoutPayload(native) {
   return layoutOnlyTreeKinds.has(native.kind) ? {...native,kind:'tree'} : native;
 }
-export function boundedZoom(value) { return Math.max(.05,Math.min(4,value)); }
+export function boundedZoom(value) { return Math.max(Number.MIN_VALUE,Math.min(4,value)); }
 /** Keep the content point under the starting midpoint under the moving midpoint. */
 export function pinchFrame(start, midpoint, distance) {
   const zoom=boundedZoom(start.zoom*distance/Math.max(1,start.distance));
@@ -68,7 +68,7 @@ export function installDiagramGestures(viewport, frame, applyScale, onInteract=(
     if(event.touches.length===1&&touchOrigin&&Math.hypot(event.touches[0].clientX-touchOrigin.x,event.touches[0].clientY-touchOrigin.y)>8)suppress();
     if(event.touches.length!==2||!pinch)return;
     event.preventDefault();suppress();
-    const current=pair(event.touches);Object.assign(frame,pinchFrame(pinch,current.midpoint,current.distance));applyScale();viewport.scrollLeft=frame.left;viewport.scrollTop=frame.top;frame.positioned=true;
+    const current=pair(event.touches);frame.fitted=false;Object.assign(frame,pinchFrame(pinch,current.midpoint,current.distance));applyScale();viewport.scrollLeft=frame.left;viewport.scrollTop=frame.top;frame.positioned=true;
   },{passive:false});
   const end=event=>{if(pinch)suppress();if(event.touches.length<2)pinch=null;active=event.touches.length>0;};
   viewport.addEventListener('touchend',end,{passive:true});viewport.addEventListener('touchcancel',end,{passive:true});
@@ -203,12 +203,13 @@ export async function renderView(container, view, options={}) {
     const viewport=document.createElement('div');viewport.className='native-scroll';viewport.tabIndex=0;viewport.setAttribute('role','region');viewport.setAttribute('aria-label','Scrollable model diagram; use arrow keys to pan');
     const scaleLabel=document.createElement('output');scaleLabel.setAttribute('aria-live','polite');
     const applyScale=()=>{svg.style.width=`${layout.width*frame.zoom}px`;svg.style.height=`${layout.height*frame.zoom}px`;scaleLabel.textContent=`${Math.round(frame.zoom*100)}%`;};
-    const scaleTo=value=>{const previous=frame.zoom;frame.zoom=boundedZoom(value);applyScale();viewport.scrollLeft=(viewport.scrollLeft+viewport.clientWidth/2)*frame.zoom/previous-viewport.clientWidth/2;viewport.scrollTop=(viewport.scrollTop+viewport.clientHeight/2)*frame.zoom/previous-viewport.clientHeight/2;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;};
+    const scaleTo=value=>{frame.fitted=false;frame.positioned=true;const previous=frame.zoom;frame.zoom=boundedZoom(value);applyScale();viewport.scrollLeft=(viewport.scrollLeft+viewport.clientWidth/2)*frame.zoom/previous-viewport.clientWidth/2;viewport.scrollTop=(viewport.scrollTop+viewport.clientHeight/2)*frame.zoom/previous-viewport.clientHeight/2;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;};
     const control=(name,action)=>{const b=document.createElement('button');b.type='button';b.textContent=name;if(name==='Fit')b.dataset.readingControl='fit';b.addEventListener('click',()=>{options.onInteract?.();action();});controls.append(b);};
     control('−',()=>scaleTo(frame.zoom/1.25));controls.lastElementChild.setAttribute('aria-label','Zoom out');
     control('+',()=>scaleTo(frame.zoom*1.25));controls.lastElementChild.setAttribute('aria-label','Zoom in');
     control('100%',()=>scaleTo(1));
-    control('Fit',()=>scaleTo(Math.min((viewport.clientWidth||400)/layout.width,(viewport.clientHeight||300)/layout.height)));
+    const fit=()=>{if(!viewport.clientWidth||!viewport.clientHeight)return;frame.zoom=Math.min(4,Math.max(1,viewport.clientWidth-2)/layout.width,Math.max(1,viewport.clientHeight-2)/layout.height);frame.left=0;frame.top=0;frame.positioned=true;frame.fitted=true;applyScale();viewport.scrollLeft=0;viewport.scrollTop=0;};
+    control('Fit',fit);
     controls.append(scaleLabel);
     if(structuralKinds.has(native.kind))control(frame.showCompartments?'Hide compartments':'Show compartments',()=>{container.closeExpanded?.();frame.showCompartments=!frame.showCompartments;frame.positioned=false;renderView(container,view,options).catch(error=>message(container,error.message));});
     if(options.compactControls){
@@ -225,13 +226,16 @@ export async function renderView(container, view, options={}) {
     // Intent events distinguish manual panning from asynchronous programmatic scroll events.
     for(const type of ['wheel','pointerdown'])viewport.addEventListener(type,()=>options.onInteract?.(),{passive:true});
     viewport.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))options.onInteract?.();});
-    viewport.addEventListener('scroll',()=>{if(!viewport.clientWidth||!viewport.clientHeight)return;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;frame.positioned=true;},{passive:true});
+    viewport.addEventListener('scroll',()=>{if(!viewport.clientWidth||!viewport.clientHeight)return;if(viewport.scrollLeft!==frame.left||viewport.scrollTop!==frame.top)frame.fitted=false;frame.left=viewport.scrollLeft;frame.top=viewport.scrollTop;frame.positioned=true;},{passive:true});
     fragment.restoreFrame=()=>{
       if(!viewport.clientWidth||!viewport.clientHeight)return;
-      if(!frame.positioned&&options.fitInitial&&!options.camera&&viewport.clientWidth&&viewport.clientHeight){frame.zoom=boundedZoom(Math.min(viewport.clientWidth/layout.width,viewport.clientHeight/layout.height));applyScale();}
-      if(!frame.positioned&&options.camera){const local=native.nodes.find(node=>(view.nodeToElement?.[node.id]??node.semanticId)===options.camera.target);const box=local&&layout.nodes.get(local.id)?.box;if(box){frame.left=Math.max(0,(box.x+box.width/2-layout.origin.x)*frame.zoom-viewport.clientWidth/2);frame.top=Math.max(0,(box.y+box.height/2-layout.origin.y)*frame.zoom-viewport.clientHeight/2);}}
+      // First display and reset show the complete view, including authored camera scenes.
+      // Selection redraws retain the reader's frame; hidden panels wait for dimensions.
+      if(!frame.positioned||frame.fitted)fit();
       viewport.scrollLeft=frame.left;viewport.scrollTop=frame.top;frame.positioned=true;
     };
+    const ResizeObserverClass=document.defaultView?.ResizeObserver;
+    if(ResizeObserverClass){const observer=new ResizeObserverClass(()=>{if(!fragment.isConnected){observer.disconnect();return;}fragment.restoreFrame();});observer.observe(viewport);}
     if(native.nodes.length>600) message(fragment,'Automatic layout limit reached; native/grid placement is shown. Reduce context before requesting a clearer layout.');
     if(options.selectedId&&!native.nodes.some(n=>(view.nodeToElement?.[n.id]??n.semanticId)===options.selectedId)) message(fragment,'The selected element is not represented in this view. Your semantic selection is retained.');
   }

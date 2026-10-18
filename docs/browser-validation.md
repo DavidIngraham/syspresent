@@ -45,3 +45,13 @@ Default reading now exposes Fit and Explore rather than the full inspector on ev
 Rendered checks at 1180×820 and 1024×768 confirmed the simplified initial screen and no horizontal page overflow. At 1024×768, the model viewport measured approximately 538×432 pixels. Opening Explore, switching to Find, resizing to 390×844 and returning to the story preserved the active panel and released modal state. These are browser viewport checks, not physical iPad tests.
 
 Final desktop check at 1440×900 showed only Fit and Explore as visible inspector controls, with no horizontal overflow. 55 JavaScript tests and 73 Python tests passed; the native specification compiler and browser build passed. Share feedback is mirrored into the dialog status region.
+
+## Automatic fit and Blue Dog opening scope — 2026-10-18
+
+New/reset diagrams now fit their available viewport, including scenes with authored initial camera zoom. Untouched fitted views refit on resize or becoming visible; manual zoom and pan persist while inspecting elements. Fit restores automatic fitting. Regression coverage includes hidden views, camera precedence, resize, large diagrams below 5% scale, and a tap that must not disable fitting.
+
+The previous opening native requirement view expanded six exposed requirements into 267 nodes and 451 edges. Native requirement relationship traversal grows the drawn endpoint set while scanning relationships. The introductory GeneralView now uses a containment rendering of only trafficSafety and trafficTracking, with no invented edge. The story explicitly states that scope and points to exploration for wider traces. A fresh native export confirmed exactly those two semantic identities and zero edges; native CLI rendering also passed.
+
+Rendered checks on the fresh Blue Dog export at 1180×820 and 390×844 confirmed two non-overlapping requirements and drawing bounds inside the viewport. Tablet drawing width 627px fit within 629px; phone drawing width 295px fit within 297px. The Fit and Explore controls now share one row; the measured space between the viewer top and drawing viewport fell from roughly 120px to 59px. Native warnings remain visible. The flashlight example was also checked for initial fitting. These are browser viewport checks, not physical iPad tests.
+
+Independent review caught and resolved a sub-5% zoom-direction bug and a tap disabling responsive fit. 59 JavaScript tests passed, including 19 renderer tests. The specification compiler and fresh browser/package builds passed.

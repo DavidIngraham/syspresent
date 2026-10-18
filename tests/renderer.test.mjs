@@ -54,10 +54,10 @@ test('selection uses native semantic identity, never label inference',async()=>{
 
 test('readable default scale and manual zoom/pan persist across selection',async()=>{
   const d=dom(),view=fixture(),container=document.getElementById('a');await renderView(container,view,{selectedId:'semantic-a'});
-  const svg=container.querySelector('svg');assert.equal(svg.style.width,svg.getAttribute('viewBox').split(' ')[2]+'px');
-  container.querySelector('button[aria-label="Zoom in"]').click();assert.equal(container.querySelector('output').textContent,'125%');
+  fitted(container);
+  container.querySelector('button[aria-label="Zoom in"]').click();const manual=container.querySelector('output').textContent;
   const viewport=container.querySelector('.native-scroll');viewport.scrollLeft=70;viewport.dispatchEvent(new d.window.Event('scroll'));
-  await renderView(container,view,{selectedId:'semantic-b'});assert.equal(container.querySelector('output').textContent,'125%');assert.equal(container.querySelector('.native-scroll').scrollLeft,70);
+  await renderView(container,view,{selectedId:'semantic-b'});assert.equal(container.querySelector('output').textContent,manual);assert.equal(container.querySelector('.native-scroll').scrollLeft,70);
   d.window.close();
 });
 test('native table selection follows rowToElement with accessible controls and cross-view identity',async()=>{
@@ -80,6 +80,7 @@ test('native table selection follows rowToElement with accessible controls and c
   d.window.close();
 });
 
+function fitted(container){const svg=container.querySelector('svg');assert.ok(parseFloat(svg.style.width)<=400);assert.ok(parseFloat(svg.style.height)<=300);assert.equal(container.querySelector('.native-scroll').scrollLeft,0);return container.querySelector('output').textContent;}
 function dialogShim(d){
   d.window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
   d.window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new d.window.Event('close'));};
@@ -88,13 +89,13 @@ test('expanded diagram moves existing native DOM and restores zoom, pan and focu
   const d=dom();dialogShim(d);const view=fixture(),before=JSON.stringify(view),container=document.getElementById('a');let interactions=0;
   await renderView(container,view,{onInteract:()=>interactions++});
   container.querySelector('[aria-label="Zoom in"]').click();
-  const fragment=container.firstElementChild,svg=container.querySelector('svg'),viewport=container.querySelector('.native-scroll'),expand=container.querySelector('.native-expand');
+  const manual=container.querySelector('output').textContent;const fragment=container.firstElementChild,svg=container.querySelector('svg'),viewport=container.querySelector('.native-scroll'),expand=container.querySelector('.native-expand');
   viewport.scrollLeft=80;viewport.scrollTop=40;viewport.dispatchEvent(new d.window.Event('scroll'));expand.focus();expand.click();
   let dialog=document.querySelector('dialog');assert.ok(dialog.open);assert.equal(dialog.querySelector('svg'),svg);assert.equal(document.querySelectorAll('svg').length,1);assert.equal(interactions,2);
   assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent,view.id);
   dialog.querySelector('[aria-label="Zoom in"]').click();viewport.scrollLeft=200;viewport.scrollTop=100;viewport.dispatchEvent(new d.window.Event('scroll'));
   dialog.querySelector('.native-dialog-header button').click();
-  assert.equal(document.querySelector('dialog'),null);assert.equal(container.firstElementChild,fragment);assert.equal(container.querySelector('output').textContent,'125%');assert.equal(viewport.scrollLeft,80);assert.equal(viewport.scrollTop,40);assert.equal(document.activeElement,expand);
+  assert.equal(document.querySelector('dialog'),null);assert.equal(container.firstElementChild,fragment);assert.equal(container.querySelector('output').textContent,manual);assert.equal(viewport.scrollLeft,80);assert.equal(viewport.scrollTop,40);assert.equal(document.activeElement,expand);
   expand.click();dialog=document.querySelector('dialog');dialog.dispatchEvent(new d.window.Event('cancel',{cancelable:true}));assert.equal(document.querySelector('dialog'),null);assert.equal(document.activeElement,expand);assert.equal(JSON.stringify(view),before);
   d.window.close();
 });
@@ -105,12 +106,12 @@ test('expanded native table selects semantic identity after restoring embedded c
   const table=container.querySelector('table');container.querySelector('.native-expand').click();assert.equal(document.querySelector('dialog table'),table);
   table.querySelector('tbody tr').click();assert.deepEqual(selected,['native-id']);d.window.close();
 });
-test('presentation preferences seed new frames but authored camera and user zoom prevail',async()=>{
+test('new frames fit despite zoom preferences or authored camera, while user zoom persists',async()=>{
   const d=dom(),container=document.getElementById('a'),view=fixture();
-  await renderView(container,view,{presentationPreferences:{defaultZoom:.8,showCompartments:true}});assert.equal(container.querySelector('output').textContent,'80%');assert.ok(container.textContent.includes('Hide compartments'));
-  container.querySelector('[aria-label="Zoom in"]').click();
-  await renderView(container,view,{presentationPreferences:{defaultZoom:.5}});assert.equal(container.querySelector('output').textContent,'100%');
-  await renderView(container,view,{camera:{zoom:1.5},presentationPreferences:{defaultZoom:.8}});assert.equal(container.querySelector('output').textContent,'150%');d.window.close();
+  await renderView(container,view,{presentationPreferences:{defaultZoom:.8,showCompartments:true}});fitted(container);assert.ok(container.textContent.includes('Hide compartments'));
+  container.querySelector('[aria-label="Zoom in"]').click();const manual=container.querySelector('output').textContent;
+  await renderView(container,view,{presentationPreferences:{defaultZoom:.5}});assert.equal(container.querySelector('output').textContent,manual);
+  await renderView(container,view,{camera:{zoom:1.5},presentationPreferences:{defaultZoom:.8}});fitted(container);d.window.close();
 });
 test('manual camera controls pause story; programmatic restoration does not',async()=>{
  const d=dom(),container=document.getElementById('a'),view=fixture();let interactions=0;
@@ -125,13 +126,13 @@ test('manual camera controls pause story; programmatic restoration does not',asy
  [...container.querySelectorAll('button')].find(b=>b.textContent==='Show compartments').click();assert.equal(interactions,6);
  for(let i=0;i<100&&!container.textContent.includes('Hide compartments');i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(container.textContent.includes('Hide compartments'));assert.equal(interactions,6);d.window.close();
 });
-test('explicit frame reset restores authored camera and detail defaults, then selection retains changes',async()=>{
+test('explicit frame reset restores fit and detail defaults, then selection retains changes',async()=>{
  const d=dom(),container=document.getElementById('a'),view=fixture();
  const options={camera:{zoom:.8},presentationPreferences:{showCompartments:false}};
- await renderView(container,view,options);container.querySelector('[aria-label="Zoom in"]').click();
+ await renderView(container,view,options);const initial=fitted(container);container.querySelector('[aria-label="Zoom in"]').click();const manual=container.querySelector('output').textContent;
  let viewport=container.querySelector('.native-scroll');viewport.scrollLeft=90;viewport.dispatchEvent(new d.window.Event('scroll'));
- await renderView(container,view,{...options,selectedId:'semantic-b'});assert.equal(container.querySelector('output').textContent,'100%');assert.equal(container.querySelector('.native-scroll').scrollLeft,90);
- await renderView(container,view,{...options,resetFrame:true});assert.equal(container.querySelector('output').textContent,'80%');assert.equal(container.querySelector('.native-scroll').scrollLeft,0);
+ await renderView(container,view,{...options,selectedId:'semantic-b'});assert.equal(container.querySelector('output').textContent,manual);assert.equal(container.querySelector('.native-scroll').scrollLeft,90);
+ await renderView(container,view,{...options,resetFrame:true});assert.equal(fitted(container),initial);
  [...container.querySelectorAll('button')].find(b=>b.textContent==='Show compartments').click();for(let i=0;i<100&&!container.textContent.includes('Hide compartments');i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(container.textContent.includes('Hide compartments'),'recursive render must not replay reset');
  await renderView(container,view,{...options,resetFrame:true});assert.ok(container.textContent.includes('Show compartments'));d.window.close();
 });
@@ -142,10 +143,10 @@ test('inline and explorer surfaces retain independent manual frames for one nati
  await renderView(b,view,{camera:{zoom:.8},resetFrame:true});
  [...a.querySelectorAll('button')].find(x=>x.textContent==='Show compartments').click();
  for(let i=0;i<100&&!a.textContent.includes('Hide compartments');i++)await new Promise(r=>setTimeout(r,10));
- assert.equal(a.querySelector('output').textContent,'100%');assert.ok(a.textContent.includes('Hide compartments'));
- assert.equal(b.querySelector('output').textContent,'80%');assert.ok(b.textContent.includes('Show compartments'));
+ fitted(a);assert.ok(a.textContent.includes('Hide compartments'));
+ fitted(b);assert.ok(b.textContent.includes('Show compartments'));
  await renderView(a,view,{frameScope:'inline:one',camera:{zoom:.8},resetFrame:true});
- assert.equal(a.querySelector('output').textContent,'80%');assert.ok(a.textContent.includes('Show compartments'));d.window.close();
+ fitted(a);assert.ok(a.textContent.includes('Show compartments'));d.window.close();
 });
 
 test('pinch scales around moving midpoint and bounds zoom',()=>{
@@ -166,10 +167,10 @@ test('touch gesture leaves one finger native, handles pinch and suppresses accid
  pointer('pointerdown',0);pointer('pointermove',30);pointer('pointerup',30);node.dispatchEvent(new d.window.MouseEvent('click',{bubbles:true,detail:1}));assert.equal(selected,1);
  d.window.close();
 });
-test('compact controls keep semantic warnings and authored camera without Expand',async()=>{
+test('compact controls keep semantic warnings and fit authored scenes without Expand',async()=>{
  const d=dom(),view=fixture(),container=document.getElementById('a');view.native.notices=['Incomplete semantic evidence'];
  await renderView(container,view,{compactControls:true,allowExpand:false,fitInitial:true,camera:{zoom:1.5}});
- assert.equal(container.querySelector('.native-expand'),null);assert.ok(container.querySelector('.native-more'));assert.ok(container.querySelector('[aria-label="Zoom in"]'));assert.equal(container.querySelector('output').textContent,'150%');
+ assert.equal(container.querySelector('.native-expand'),null);assert.ok(container.querySelector('.native-more'));assert.ok(container.querySelector('[aria-label="Zoom in"]'));fitted(container);
  assert.ok(container.textContent.includes('Incomplete semantic evidence'));assert.ok(!container.textContent.includes('Pan with scroll'));assert.ok(container.querySelector('.native-more').textContent.includes('Show compartments'));d.window.close();
 });
 test('hidden panel restoration waits for visible dimensions and ignores hidden scroll events',async()=>{
@@ -182,4 +183,42 @@ test('hidden panel restoration waits for visible dimensions and ignores hidden s
  container.hidden=true;await renderView(container,view,{frameScope:'new-hidden',fitInitial:true});assert.equal(container.querySelector('output').textContent,'100%');
  container.hidden=false;container.querySelector('.native-view').restoreFrame();assert.notEqual(container.querySelector('output').textContent,'100%','initial fit is deferred until visible');
  d.window.close();
+});
+
+test('Fit clears manual pan and fits large diagrams below five percent',async()=>{
+ const d=dom(),container=document.getElementById('a'),view=fixture();
+ await renderView(container,view,{placements:[{target:'semantic-b',x:20000,y:20000}],camera:{zoom:3,target:'semantic-b'}});
+ const initial=fitted(container);assert.ok(parseInt(initial)<5,'large canvas fits below five percent');
+ container.querySelector('[aria-label="Zoom in"]').click();const viewport=container.querySelector('.native-scroll');viewport.scrollLeft=70;viewport.scrollTop=90;viewport.dispatchEvent(new d.window.Event('scroll'));
+ [...container.querySelectorAll('button')].find(b=>b.textContent==='Fit').click();assert.equal(fitted(container),initial);assert.equal(viewport.scrollTop,0);d.window.close();
+});
+test('resize fits untouched frames and hidden first displays but preserves manual zoom',async()=>{
+ const d=dom(),container=document.getElementById('a'),view=fixture();let notify,width=400,height=300;
+ d.window.ResizeObserver=class{constructor(callback){notify=callback;}observe(){}disconnect(){}};
+ for(const [name,get] of [['clientWidth',()=>width],['clientHeight',()=>height]])Object.defineProperty(d.window.HTMLElement.prototype,name,{configurable:true,get(){return this.classList.contains('native-scroll')&&!this.closest('[hidden]')?get():0;}});
+ container.hidden=true;await renderView(container,view,{camera:{zoom:3}});container.hidden=false;notify();fitted(container);
+ width=200;height=150;notify();let svg=container.querySelector('svg');assert.ok(parseFloat(svg.style.width)<=200);assert.ok(parseFloat(svg.style.height)<=150);
+ container.querySelector('[aria-label="Zoom in"]').click();const manual=container.querySelector('output').textContent;width=400;height=300;notify();assert.equal(container.querySelector('output').textContent,manual);d.window.close();
+});
+
+
+test('zoom out and inward pinch remain monotonic below five percent after fitting a large diagram',async()=>{
+ const d=dom(),container=document.getElementById('a'),view=fixture();
+ await renderView(container,view,{placements:[{target:'semantic-b',x:20000,y:20000}]});
+ const svg=container.querySelector('svg'),initialWidth=parseFloat(svg.style.width);
+ container.querySelector('[aria-label="Zoom out"]').click();assert.ok(parseFloat(svg.style.width)<initialWidth,'zoom out must shrink the fitted diagram');
+ const initialZoom=.01;
+ const pinched=pinchFrame({zoom:initialZoom,left:0,top:0,distance:100,midpoint:{x:50,y:50}},{x:50,y:50},50);
+ assert.ok(pinched.zoom>0&&pinched.zoom<initialZoom,'inward pinch must reduce sub-five-percent zoom');
+ d.window.close();
+});
+
+
+test('touch tap preserves automatic fit until a real pan or pinch changes the frame',()=>{
+ const d=dom(),viewport=document.getElementById('a'),frame={zoom:.01,left:0,top:0,fitted:true};
+ installDiagramGestures(viewport,frame,()=>{});
+ const touch=(type,points)=>{const event=new d.window.Event(type,{bubbles:true,cancelable:true});Object.defineProperty(event,'touches',{value:points.map(([clientX,clientY])=>({clientX,clientY}))});viewport.dispatchEvent(event);};
+ touch('touchstart',[[20,20]]);touch('touchend',[]);assert.equal(frame.fitted,true);
+ touch('touchstart',[[20,20],[120,20]]);assert.equal(frame.fitted,true);
+ touch('touchmove',[[20,20],[70,20]]);assert.equal(frame.fitted,false);assert.equal(frame.zoom,.005);d.window.close();
 });

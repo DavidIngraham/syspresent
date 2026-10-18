@@ -106,3 +106,13 @@ header{padding:.5rem 1rem;gap:1rem}
 .inline-view .native-view>details{display:none}
 
 #explorer-notice:not(:empty){padding:.4rem .75rem;background:#fff0d8;font-size:.85rem}
+
+/* Fit and Explore share one toolbar above the reading diagram. */
+#explorer-disclosure #inspector{position:relative;top:auto}
+#explorer-disclosure .reading-action{position:absolute;top:.5rem;right:.5rem;z-index:1;margin:0}
+#explorer-disclosure .native-toolbar{min-height:44px;margin:0 0 .35rem;padding-right:10rem}
+#explorer-disclosure .native-view{padding:0}
+#explorer-disclosure #canvas{padding:0}
+
+#explorer-disclosure #inspector:has(.native-view>table) .reading-action,
+#explorer-disclosure #inspector:not(:has(.native-view)) .reading-action{position:static;margin:0 0 .35rem auto}
