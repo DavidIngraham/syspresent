@@ -33,3 +33,7 @@ Rendered browser checks at 390×844 on the flashlight story exercised Explore, s
 Independent read-only review identified stranded inline pause state, hidden-canvas restoration, breakpoint restoration, stale selection and late asynchronous tab switching. These were corrected: inline interaction does not pause mobile reading, selection renders while Model is visible before opening Details, all exits restore the story, and late tab switches are guarded. Automated tests cover these paths plus native gesture math and accidental selection suppression. Human reader acceptance remains open.
 
 Final checks: 53 JavaScript tests and 73 Python tests passed; browser bundle and frozen flashlight package built successfully. Final rendered node selection updated native highlighting after returning from Details. Desktop breakpoint transition closed the modal, released the scroll lock and restored the authored scene. Physical iPhone testing remains outstanding.
+
+## Concrete example headings — 2026-10-17
+
+Replaced story, section, figure and closing headings across all three examples with their actual engineering subjects; aligned catalog titles. Independent editorial review checked headings against section content and corrected two desk-fan headings to distinguish motor power from logging and requirements from controller allocation. All three story packages validated against existing native exports; 73 Python tests passed. The rendered Blue Dog outline and section headings were checked in the browser. No model semantics changed.

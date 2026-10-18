@@ -19,3 +19,7 @@ After substantive changes, ask an independent agent that did not author them for
 ## Validation and publication
 
 Validate specification changes with the native compiler. Product tests must cover relationship direction, semantic identity, hidden context, snapshot immutability and behavior-specific notation, not only screenshots. Keep snapshot status separate from verification and approval. Run the affected build and checks before authorized publication. Confirm deployment dispatch without polling unless David asks to wait.
+
+## Example writing
+
+Use concrete section headings that name the system, component, behavior, requirement or engineering question covered. Avoid generic reading instructions such as “Start with the job” or “Follow the meaning,” and abstract conclusions that could head any example. A reader scanning the outline should be able to predict each section’s content.

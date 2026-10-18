@@ -1,5 +1,5 @@
 {
-  "title": "Blue Dog: preserving safe separation and recovering control",
+  "title": "Blue Dog collision avoidance and recovery",
   "sources": [
     "../../../sv-blue-dog-editorial/models",
     "../../../sv-blue-dog-editorial/tools/publishing/reference.sysml",
