@@ -24,6 +24,37 @@ def references(value):
     return []
 
 
+def reading_records(item, by_id):
+    """Project native annotations and declared values; never evaluate expressions."""
+    def declared_value(feature):
+        values = references(feature.get("value"))
+        value = by_id.get(values[0], {}) if len(values) == 1 else {}
+        if value.get("@type") in {"LiteralString", "LiteralBoolean", "LiteralInteger", "LiteralRational"}:
+            return {"kind": "literal", "value": value.get("value"), "elementId": value.get("@id")}
+        referents = references(value.get("referent"))
+        if value.get("@type") == "FeatureReferenceExpression" and len(referents) == 1:
+            target = by_id.get(referents[0], {})
+            return {"kind": "reference", "target": referents[0],
+                    "value": target.get("qualifiedName", target.get("declaredName", referents[0]))}
+        return {"kind": "unevaluated", "elementId": values[0] if len(values) == 1 else None}
+    records = []
+    for identity in references(item.get("ownedMember")):
+        member = by_id.get(identity, {})
+        kind = member.get("@type")
+        if kind == "Comment":
+            records.append({"id": identity, "name": member.get("declaredName", "Comment"), "kind": "comment", "text": member.get("body", "")})
+        elif kind == "MetadataUsage":
+            types = [by_id.get(t, {}).get("qualifiedName", t) for t in references(member.get("type"))]
+            fields = []
+            for field_id in references(member.get("ownedFeature")):
+                feature = by_id.get(field_id, {})
+                fields.append({"name": feature.get("declaredName", feature.get("qualifiedName", "").split("::")[-1]), **declared_value(feature)})
+            records.append({"id": identity, "name": member.get("declaredName", "Metadata"), "kind": "metadata", "types": types, "fields": fields})
+        elif member.get("isResult"):
+            records.append({"id": identity, "name": member.get("declaredName", "Result"), "recordType": "declared-result", **declared_value(member)})
+    return records
+
+
 def build_index(raw, queried, library_ids=(), project_ids=None):
     """Retain every native API reference; no type/relationship inference from labels."""
     project_ids = {item["@id"] for item in raw if "sysx:sourceLine" in item} if project_ids is None else set(project_ids)
@@ -32,6 +63,7 @@ def build_index(raw, queried, library_ids=(), project_ids=None):
         return "project" if identity in project_ids else "library" if identity in library_ids else "external"
     properties = {entry["properties"]["elementId"]: entry for entry in queried if entry["properties"].get("elementId")}
     elements, relationships = [], []
+    by_id = {item["@id"]: item for item in raw}
     seen = set()
     for item in raw:
         identity = item["@id"]
@@ -44,7 +76,7 @@ def build_index(raw, queried, library_ids=(), project_ids=None):
             "name": item.get("declaredName", query.get("name", identity)),
             "kind": item["@type"], "description": query.get("documentation", item.get("body", "")),
             "owner": owner(identity), "source": {key: value for key, value in item.items() if key.startswith("sysx:source")},
-            "native": item,
+            "native": item, "readingRecords": reading_records(item, by_id),
         })
         for property_name, value in item.items():
             if property_name.startswith("@"): continue
@@ -52,6 +84,15 @@ def build_index(raw, queried, library_ids=(), project_ids=None):
                 relationships.append({"id": f"api:{identity}:{property_name}:{ordinal}", "source": identity,
                     "target": target, "kind": property_name, "label": property_name,
                     "authority": "native-api-property", "nativeProperty": property_name})
+    # API dependencies explicitly declare dependent clients and suppliers.
+    for item in raw:
+        if item.get("@type") != "Dependency":
+            continue
+        for i, client in enumerate(references(item.get("client"))):
+            for j, supplier in enumerate(references(item.get("supplier"))):
+                relationships.append({"id": f"dependency:{item['@id']}:{i}:{j}", "source": client,
+                    "target": supplier, "kind": "dependency", "label": "depends on", "authority": "native-api-relationship",
+                    "nativeRelationship": item["@id"]})
     # Explicitly requested library scope results supply identity and details. Their
     # scalar Query projection is not misrepresented as a full relationship export.
     for identity, entry in properties.items():
@@ -106,7 +147,8 @@ def adapt_view(view_id, payload):
             identity_coverage["unmappedEdges"].append({"index": ordinal, "from": edge.get("from_id", edge.get("from")), "to": edge.get("to_id", edge.get("to")), "reason": "endpoint lacks semantic identity; retained in native drawing"})
         if source and target:
             edges.append({"id": f"view:{view_id}:{ordinal}", "source": source, "target": target,
-                "kind": edge["kind"], "label": edge.get("label", ""), "authority": "native-render-view", "view": view_id})
+                "kind": edge["kind"], "label": edge.get("label", ""), "authority": "native-render-view", "view": view_id,
+                "nativeQualifiedName": edge.get("qualified_name", edge.get("qualifiedName", ""))})
     return {"id": view_id, "kind": payload["kind"], "elementIds": sorted({value for value in [*mappings.values(), *row_mappings.values()] if value}),
         "rowToElement": row_mappings, "nodeToElement": mappings, "identityCoverage": identity_coverage, "native": payload, "behaviorEvidence": "modeled-possibility"}, edges
 
@@ -251,6 +293,11 @@ def export(config, root):
             # Authored scope limits the scene, not the explorable native model.
             _, context_edges = adapt_view("context:" + spec["id"], original_payload)
             relationships.extend(context_edges)
+    native_names = {item.get("qualifiedName"): item["@id"] for item in raw if item.get("qualifiedName")}
+    for edge in relationships:
+        name = edge.get("nativeQualifiedName")
+        if name in native_names:
+            edge["nativeRelationship"] = native_names[name]
     for spec in config.get("queries", []):
         views.append(query_view(spec, model.run_document_query(spec["native"]), elements))
     try:

@@ -1,3 +1,4 @@
+import {isRequirement, requirementFamily, requirementReading, loadRequirementReading} from './requirements.mjs';
 import {ModelStore} from './model_store.mjs';
 import {initialState, context, requirementUsages, engineeringEdge, Navigation, shareState, restoreState} from './exploration.mjs';
 import {renderView} from './renderer.mjs';
@@ -34,8 +35,8 @@ function authoredOptions(stop){return {annotations:stop?.annotations,placements:
 function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().filter(key=>value[key]!==undefined).map(key=>[key,canonical(value[key])]));return value;}
 function isAuthoredInspection(state,stop=activeStop){return state.view===stop?.view && !!state.sceneOptions && JSON.stringify(canonical(state.sceneOptions))===JSON.stringify(canonical(authoredOptions(stop)));}
 function explorationAllowed(state,stop=activeStop){return state.view ? modeEnabled('native-views') || isAuthoredInspection(state,stop) : modeEnabled('relationships');}
-function update(patch){if(!explorationAllowed({...nav.state,...patch,sceneOptions:null})){say('This exploration mode is disabled in this snapshot.');return;}pause();nav.update({...patch,sceneOptions:null});if($('mobile-explorer').open)setMobilePanel('model');if(Object.hasOwn(patch,'focus'))selected=patch.focus;draw();}
-function choose(id){if(!elements.has(id)){say('This semantic target is not exported in this snapshot.');return;}selected=id;pause();openMobile('model');const revision=panelRevision;draw().then(()=>{if($('mobile-explorer').open&&selected===id&&revision===panelRevision){setMobilePanel('details');const heading=$('details').querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}}});}
+function update(patch){if(!explorationAllowed({...nav.state,...patch,sceneOptions:null})){say('This exploration mode is disabled in this snapshot.');return;}pause();nav.update({...patch,sceneOptions:null});if($('mobile-explorer').open)setMobilePanel('model');if(Object.hasOwn(patch,'focus')){selected=patch.focus;if($('mobile-explorer').open)$('mobile-host').scrollTop=0;}draw();}
+function choose(id){if(!elements.has(id)){say('This semantic target is not exported in this snapshot.');return;}if(isRequirement(elements.get(id))&&modeEnabled('relationships')){openMobile('model');update({focus:id,view:null,requirementView:'reader'});return;}selected=id;pause();openMobile('model');const revision=panelRevision;draw().then(()=>{if($('mobile-explorer').open&&selected===id&&revision===panelRevision){setMobilePanel('details');const heading=$('details').querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}}});}
 function sourceBlock(parent,title,value){if(value===undefined||value===null)return;const section=el('details');section.append(el('summary',title),el('pre',typeof value==='string'?value:JSON.stringify(value,null,2)));parent.append(section);}
 function details(){const box=$('details');box.replaceChildren();const e=elements.get(selected);if(!e)return;
   box.append(el('h3',label(e.id)),el('p',`${e.kind||'Element'} · ${e.ownership||e.owner||e.origin?.ownership||'Ownership not declared'}`));
@@ -54,10 +55,62 @@ function configureNavigation(){const config=bundle.configuration??{};const relat
 
 const genericCache=new Map();
 function genericView(c){const cacheKey=JSON.stringify([c.elements.map(e=>e.id),c.relationships.map(e=>e.id)]);if(genericCache.has(cacheKey))return genericCache.get(cacheKey);const value= {id:'exploration',title:'Engineering context',elementIds:c.elements.map(e=>e.id),native:{kind:'tree',form:'mermaid',nodes:c.elements.map(e=>({id:e.id,semanticId:e.id,name:e.name||e.qualifiedName,kind:e.kind||'element',type:'',detail:e.owner||'',fqn:e.qualifiedName})),edges:c.relationships.map(e=>({...e,from:e.source,to:e.target,label:e.label||'',kind:e.kind})),notices:['Generic relationship context; select a native behavioral view to inspect behavioral notation.']}};genericCache.set(cacheKey,value);if(genericCache.size>40)genericCache.delete(genericCache.keys().next().value);return value;}
+function readingText(element){
+ const id=element.id;return requirementFamily(bundle,id).map(key=>elements.get(key)).find(e=>e?.description)?.description||element.description||'';
+}
+function showRequirement(reading){
+ const host=el('article',undefined,'requirement-reader');host.setAttribute('aria-label','Requirement questions');
+ const title=el('div',undefined,'requirement-heading');title.append(el('strong',label(reading.focus.id)));
+ const code=reading.focus.native?.declaredShortName||reading.family.map(id=>elements.get(id)?.native?.declaredShortName).find(Boolean);
+ if(code)title.prepend(el('span',code,'requirement-code'));
+ title.append(button('Relationship diagram',()=>update({view:null,requirementView:'graph'})));host.append(title);if(reading.omittedApplications)host.append(button(`Show ${reading.omittedApplications} other applications of this requirement`,()=>update({budget:Math.min(1000,nav.state.budget+24),view:null})));
+ const question=(key,title)=>{const section=el('section',undefined,'requirement-question');section.id='requirement-'+key;section.append(el('h3',title));host.append(section);return section;};
+ const what=question('statement','What does this requirement require?');
+ if(reading.statements.length)for(const e of reading.statements){if(reading.statements.length>1)what.append(el('strong',label(e.id)));what.append(markdown(e.description));}
+ else what.append(el('p','No requirement statement is recorded in this export.'));
+ const recordText=record=>record.text||record.fields?.map(f=>f.kind==='unevaluated'?`${f.name}: value requires evaluation`:`${record.fields.length===1&&f.name==='text'?'':f.name+': '}${String(f.value??'Value not recorded')}`).join(' · ')||'';
+ if(reading.notes.length){const notes=el('details');notes.append(el('summary','Conditions, status and other model notes'));for(const r of reading.notes){notes.append(el('h4',r.name),markdown(recordText(r)));}what.append(notes);}
+ const addRows=(section,key,empty,subset=null)=>{
+   const entries=subset??reading.visible[key];
+   const rows=[...new Map(entries.map(r=>[JSON.stringify([r.id,r.edge.kind]),r])).values()];if(!rows.length)section.append(el('p',empty,'requirement-gap'));
+   for(const r of rows){const item=el('div',undefined,'requirement-link');
+    const target=r.element;
+    const code=target?.native?.declaredShortName||requirementFamily(bundle,r.id).map(id=>elements.get(id)?.native?.declaredShortName).find(Boolean);
+    const name=code?`${code} · ${label(r.id)}`:label(r.id);
+    const link=button(name,()=>{if(!r.available){say('Target unavailable in this export.');return;}update({focus:r.id,view:null,requirementView:'reader'});});link.disabled=!r.available;link.title=target?.qualifiedName||r.id;item.append(link);
+    const relation=r.edge.kind==='derive'?(key==='sources'?'Derived from':'Derived requirement'):r.edge.kind==='verify'?'Verification case':r.edge.kind==='satisfy'?'Modeled satisfaction':r.edge.kind==='refine'?'Refines this requirement':r.edge.kind==='allocate'?'Allocation':r.edge.kind==='dependency'?'Dependency':'Constraint';
+    const paths=r.paths;
+    const vias=[...new Set(paths.map(p=>p.via).filter(Boolean))];const direct=paths.some(p=>!p.via);
+    item.append(el('p',relation+(vias.length?`${direct?' directly and':''} via ${vias.map(label).join(', ')} (indirect)`:'')+(!r.available?' · Target unavailable':''),'requirement-relation'));
+    if(target){const text=readingText(target);if(text)item.append(markdown(text));for(const result of target.readingRecords??[]){if(result.recordType==='declared-result')item.append(el('p',`Declared ${result.name}: ${result.kind==='unevaluated'?'requires evaluation':result.value??'unavailable'} (model value)`));}}
+    section.append(item);
+   }
+   const count=subset?0:reading.omitted[key];if(count)section.append(button(`Show ${count} more ${key==='sources'?'sources':key}`,()=>update({budget:Math.min(1000,nav.state.budget+Math.min(count,24)),view:null})));
+ };
+ if(reading.groups.constraints.length)addRows(what,'constraints','');
+ const why=question('rationale','Why do we need this requirement?');
+ if(reading.rationale.length)for(const r of reading.rationale){if(r.onRelationship)why.append(el('p',`Rationale for upstream link · ${label(r.owner)}`,'requirement-relation'));why.append(markdown(recordText(r)));}
+ else why.append(el('p','No explicit rationale is recorded. The upstream requirements below provide the modeled derivation context.','requirement-gap'));
+ const origin=question('sources','Where does it come from?');addRows(origin,'sources','No upstream derivation or dependency is linked in this export.');
+ const provenance=el('details');provenance.append(el('summary','Model identity and source'));for(const id of reading.family){const e=elements.get(id);if(!e)continue;provenance.append(el('p',`${e.qualifiedName||id} · ${e.kind}${e.source?.['sysx:sourceLine']?` · line ${e.source['sysx:sourceLine']}`:''}`));}origin.append(provenance);
+ const affected=question('affected','What parts of the system does it affect?');
+ const implementation=reading.visible.affected.filter(r=>r.edge.kind!=='dependency');
+ addRows(affected,'affected','No direct implementation or allocation is linked in this export.',implementation);
+ const dependencies=reading.visible.affected.filter(r=>r.edge.kind==='dependency');
+ if(dependencies.length){const other=el('details');other.append(el('summary',`Other dependent model elements (${reading.groups.affected.filter(r=>r.edge.kind==='dependency').length})`));addRows(other,'affected','',dependencies);affected.append(other);}
+ if(reading.omitted.affected)affected.append(button(`Show ${reading.omitted.affected} more links`,()=>update({budget:Math.min(1000,nav.state.budget+24),view:null})));
+ if(reading.groups.derived.length){affected.append(el('h4','Requirements derived from this one'));addRows(affected,'derived','');}
+ affected.append(el('p','Indirect links follow one derived requirement. A satisfaction link records a modeled claim.','requirement-caveat'));
+ const verify=question('verification','How do we verify it?');addRows(verify,'verification','No verification case is linked in this export.');
+ verify.append(el('p','A linked case describes planned verification. Declared model verdicts are shown separately from executed tests and accepted evidence.','requirement-caveat'));
+ $('canvas').replaceChildren(host);
+}
 async function display(container,view,options={}){const mount=el('div');container.replaceChildren(mount);try{await renderView(mount,view,{selectedId:selected,onSelect:choose,onInteract:()=>{if($('mobile-explorer').open)pause();},compactControls:true,allowExpand:false,...options,presentationPreferences:{...bundle.configuration?.presentationPreferences,...options.presentationPreferences}});}catch(e){mount.replaceChildren(el('p',`View unavailable: ${e.message}. This is a rendering gap, not evidence that the model has no content.`));}}
 async function draw(){const serial=++renderSerial,state=nav.state;const activeBefore=document.activeElement;const modelHadFocus=$('canvas').contains(activeBefore)||$('details').contains(activeBefore);let view,options={};
   if(store){try{const result=await store.ensureNeighborhood([state.focus,...state.expanded,...state.pinned,selected].filter(Boolean));if(serial!==renderSerial)return;const usageResult=await store.ensureNeighborhood(requirementUsages(bundle,[state.focus,...state.expanded]));result.unavailable.push(...usageResult.unavailable);if(serial!==renderSerial)return;for(const e of bundle.elements)elements.set(e.id,e);if(result.unavailable.length)say(`${result.unavailable.length} requested model targets are unavailable in this snapshot.`);if(!bundle.elements.some(e=>e.id===state.focus)){$('canvas').replaceChildren(el('p','The requested focus is not present in this frozen model export.'));return;}}catch(error){if(serial!==renderSerial)return;say('Model context could not be loaded: '+error.message);$('canvas').replaceChildren(el('p','Context unavailable. A failed model load does not mean relationships are absent.'));return;}}
 
+  let reading;
+  if(paused && !state.view && isRequirement(elements.get(state.focus)) && state.requirementView!=='graph'){try{$('canvas').replaceChildren(el('p','Loading requirement context…'));reading=await loadRequirementReading(store,bundle,state.focus,state.budget);if(serial!==renderSerial)return;for(const e of bundle.elements)elements.set(e.id,e);}catch(error){if(serial!==renderSerial)return;say('Requirement context could not be loaded: '+error.message);$('canvas').replaceChildren(el('p','Requirement context unavailable. Failed loads do not establish missing traces.'));return;}}
   if(!paused&&activeStop){view=views.get(activeStop.view);options=authoredOptions(activeStop);$('scene-title').textContent=activeStop.title;}
   else {view=views.get(state.view);options=state.sceneOptions||{};$('scene-title').textContent=view?.title||view?.name||view?.id||'Explore engineering context';}
   $('explorer-title').textContent=$('scene-title').textContent;
@@ -65,13 +118,15 @@ async function draw(){const serial=++renderSerial,state=nav.state;const activeBe
   for(const input of document.querySelectorAll('[data-filter]'))input.checked=state[input.dataset.filter].includes(input.value);
   const c=context(bundle,state),hidden=$('omissions');hidden.replaceChildren(el('p',`${c.elements.length} elements shown in local context; ${c.omissions.length} omitted neighbor entries. Filters and context limit do not remove model relationships.`));
   if(bundle.coverage?.notice)hidden.prepend(el('p',bundle.coverage.notice));for(const omission of c.omissions){const row=el('div',`${label(omission.target)} · ${omission.reason} `,'omission');if(elements.has(omission.target))row.append(button('Focus this target',()=>update({focus:omission.target,view:null})));hidden.append(row);}
-  if(!view&&paused&&modeEnabled('relationships'))view=genericView(c);
-  if(view){options.resetFrame=resetAuthoredFrame;resetAuthoredFrame=false;await display($('canvas'),view,options);}else if(!view) $('canvas').replaceChildren(el('p','This story stop has no authored model view.'));
+  if(!view&&!reading&&paused&&modeEnabled('relationships'))view=genericView(c);
+  if(reading){$('scene-title').textContent='Requirement explorer';$('explorer-title').textContent='Requirement explorer';showRequirement(reading);}
+  $('explore').hidden=!modeEnabled('relationships')||!!reading;$('relayout').hidden=!!reading;
+  if(view){options.resetFrame=resetAuthoredFrame;resetAuthoredFrame=false;await display($('canvas'),view,options);if(paused&&!state.view&&isRequirement(elements.get(state.focus)))$('canvas').prepend(button('Requirement questions',()=>update({requirementView:'reader',view:null})));}else if(!view&&!reading) $('canvas').replaceChildren(el('p','This story stop has no authored model view.'));
   if(serial!==renderSerial)return;
   $('annotations').replaceChildren();for(const a of (!paused?activeStop?.annotations:[])||[]){const n=el('div',undefined,'annotation');n.append(button(label(a.target),()=>choose(a.target)),document.createTextNode(' '+a.text));$('annotations').append(n);}
   if(!paused)$('scene-status').textContent=`Authored scene · ${view?.native?.kind||view?.kind||'prose'} · ${view?.elementIds?.length??0} model elements. ${view?.behaviorEvidence==='model-query'?'Native model query; not physical verification.':'Modeled possibilities; no execution record.'}`;
   $('view-info').textContent=paused?'Exploration of the frozen model. Modeled relationships do not establish physical verification.':$('scene-status').textContent;
-  details();if(modelHadFocus&&(document.activeElement===activeBefore||document.activeElement===document.body)){const heading=$('details').querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus();}}
+  details();if(modelHadFocus&&(document.activeElement===activeBefore||document.activeElement===document.body)){const heading=reading?$('canvas').querySelector('.requirement-heading strong'):$('details').querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus();}}
 }
 const mobileLayout=()=>window.matchMedia?.('(max-width: 720px)').matches??false;
 let mobilePanel='model',returnFocus=null,panelRevision=0;
@@ -122,7 +177,7 @@ function dockExplorer(){
 }
 function activate(id,scroll=false){const stop=stops.get(id);if(!stop)return;if(paused&&!scroll)return;activeStop=stop;resetAuthoredFrame=true;selected=stop.focus||stop.modelRefs?.[0]||selected;nav=new Navigation({...initialState(selected||bundle.elements[0]?.id,(bundle.configuration||bundle.config)),view:stop.view||null,sceneOptions:authoredOptions(stop)});for(const a of $('outline').querySelectorAll('a'))a.setAttribute('aria-current',String(a.dataset.stop===id));dockExplorer();if(scroll)$(id).scrollIntoView({behavior:'instant',block:'start'});draw();}
 // Inline scenes own their story anchor even when another scene was being explored.
-function exploreStop(id, target){const reading=window.scrollY;paused=false;activate(id);pause();savedStory={stop:id,scroll:reading};if(target&&elements.has(target))selected=target;openMobile('model');const revision=panelRevision;draw().then(()=>{if(target&&$('mobile-explorer').open&&selected===target&&revision===panelRevision){setMobilePanel('details');const heading=$('details').querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}}});}
+function exploreStop(id, target){const reading=window.scrollY;paused=false;activate(id);pause();savedStory={stop:id,scroll:reading};if(target&&elements.has(target))selected=target;const requirement=isRequirement(elements.get(selected))&&modeEnabled('relationships');if(requirement)nav.update({focus:selected,view:null,sceneOptions:null,requirementView:'reader'});openMobile('model');const revision=panelRevision;draw().then(()=>{if(target&&!requirement&&$('mobile-explorer').open&&selected===target&&revision===panelRevision){setMobilePanel('details');const heading=$('details').querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}}});}
 async function restoreLocation(){
   if(!location.hash)return;closeMobile();
   try{

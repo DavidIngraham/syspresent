@@ -138,7 +138,8 @@ function validateShared(value, expectedSnapshot, bundle) {
   const state = value.exploration;
   if (state === null) return [];
   const fields = ['focus', 'view', 'expanded', 'pinned', 'nodeTypes', 'relationshipTypes', 'budget'];
-  keys(state, [...fields, 'sceneOptions'], fields);
+  keys(state, [...fields, 'sceneOptions', 'requirementView'], fields);
+  if(state.requirementView!==undefined && !['reader','graph'].includes(state.requirementView))throw Error('Invalid requirement view');
   text(state.focus, SHARED_STATE_LIMITS.identifier);
   if (!Number.isInteger(state.budget) || state.budget < 1 || state.budget > 1000) throw new Error('Invalid context limit');
   for (const field of ['expanded', 'pinned']) strings(state[field], SHARED_STATE_LIMITS.elements, SHARED_STATE_LIMITS.identifier);

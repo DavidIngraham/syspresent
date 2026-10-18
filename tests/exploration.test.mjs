@@ -140,3 +140,12 @@ test('requirement definitions open usage context without ownership plumbing or i
   assert.equal(context(graph,{...initialState('definition'),budget:2}).elements.length,2);
   assert.ok(context(graph,{...initialState('definition'),relationshipTypes:['ownedMember']}).elements.some(e=>e.id==='doc'));
 });
+
+
+test('requirement reader or diagram choice restores in shared context',()=>{
+ for(const requirementView of ['reader','graph']){
+  const state={...initialState('r'),requirementView};
+  assert.deepEqual(restoreState(shareState('frozen','intro',state),'frozen',bundle).exploration,state);
+ }
+ assert.throws(()=>restoreState(rawState({...initialState('r'),requirementView:'unknown'}),'frozen',bundle),/requirement view/);
+});

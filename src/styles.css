@@ -116,3 +116,23 @@ header{padding:.5rem 1rem;gap:1rem}
 
 #explorer-disclosure #inspector:has(.native-view>table) .reading-action,
 #explorer-disclosure #inspector:not(:has(.native-view)) .reading-action{position:static;margin:0 0 .35rem auto}
+
+.requirement-reader{padding:.5rem;max-width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem 1.5rem}
+.requirement-heading{grid-column:1/-1;display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.requirement-heading>button{margin-left:auto}
+.requirement-code{font-weight:700;color:#356c64}
+.requirement-question{min-width:0;border-top:1px solid #d6dfdf;padding-top:.6rem}
+.requirement-question h3{margin:.2rem 0 .65rem;font-size:1.05rem}
+.requirement-question h4{margin:1rem 0 .25rem}
+.requirement-question p{margin:.4rem 0;line-height:1.5}
+.requirement-question details{margin:.75rem 0}
+.requirement-question summary{cursor:pointer}
+#requirement-statement{grid-column:1/-1}
+.requirement-link{margin:.65rem 0;padding:.35rem 0 .65rem;border-bottom:1px solid #e7ecec}
+.requirement-link>button{text-align:left;font-weight:600;max-width:100%;white-space:normal;overflow-wrap:anywhere;color:#285e57}
+.requirement-relation,.requirement-caveat,.requirement-gap{font-size:.86rem;color:#4f6264}
+.requirement-link .prose{font-size:.92rem}
+@media(max-width:760px){.requirement-reader{grid-template-columns:minmax(0,1fr);gap:.75rem}.requirement-heading>button{margin-left:0}}
+
+.requirement-reader .prose{margin-bottom:.65rem}
+.requirement-link .prose{margin-bottom:0}

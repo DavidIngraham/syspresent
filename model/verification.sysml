@@ -51,6 +51,8 @@ package SyspresentVerification {
             verify SyspresentRequirements::Exploration::focusHistory;
             verify SyspresentRequirements::Exploration::shareableState;
             verify SyspresentRequirements::Exploration::detailsAndClaims;
+            verify SyspresentRequirements::RequirementReading::requirementQuestions;
+            verify SyspresentRequirements::RequirementReading::traceEvidence;
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }

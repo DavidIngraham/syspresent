@@ -142,6 +142,16 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
     }
+    package RequirementReading {
+        requirement <'SP-047'> requirementQuestions {
+            doc /* Selecting or exploring a requirement shall default to a readable account of its statement, rationale, upstream origins, affected system elements and verification cases. Every related record shall be traversable with navigation history. Definitions and usages shall retain their separate semantic identities while the reader follows their explicit typing. */
+            comment scope /* First release */
+        }
+        requirement <'SP-048'> traceEvidence {
+            doc /* The requirement reader shall identify indirect paths, disclose bounded or unavailable context, preserve native edge direction, and distinguish missing exported links, planned verification, declared model verdicts and executed evidence. A scoped diagram shall remain available as a secondary view. */
+            comment scope /* First release */
+        }
+    }
     package Views {
         requirement <'SP-050'> viewKinds {
             doc /* The explorer shall support requirement relationships, structure, activity/logic, sequence, state-machine and qualitative fault-tree views, and native tabular views. Unsupported native kinds or details shall be explicitly reported rather than silently approximated. Such reporting does not waive required first-release support; a gap in a required kind blocks its acceptance. */

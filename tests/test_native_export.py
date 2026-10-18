@@ -3,6 +3,31 @@ from scripts.native_export import build_index, adapt_view
 
 
 class NativeIndexTests(unittest.TestCase):
+    def test_native_annotations_and_dependencies_preserve_records_without_parsing_source(self):
+        raw = [
+            {"@id": "r", "@type": "RequirementDefinition", "ownedMember": [{"@id": "why"}, {"@id": "note"}]},
+            {"@id": "why", "@type": "MetadataUsage", "declaredName": "rationale", "type": [{"@id": "rationaleType"}], "ownedFeature": [{"@id": "text"}]},
+            {"@id": "rationaleType", "@type": "MetadataDefinition", "qualifiedName": "Example::Rationale"},
+            {"@id": "text", "@type": "ReferenceUsage", "qualifiedName": "R::rationale::text", "value": {"@id": "value"}},
+            {"@id": "value", "@type": "LiteralString", "value": "Because the mission needs it"},
+            {"@id": "note", "@type": "Comment", "declaredName": "conditions", "body": "In the operating envelope"},
+            {"@id": "case", "@type": "VerificationCaseDefinition", "ownedMember": [{"@id": "verdict"}]},
+            {"@id": "verdict", "@type": "ReferenceUsage", "isResult": True, "value": {"@id": "resultValue"}},
+            {"@id": "resultValue", "@type": "LiteralString", "value": "inconclusive"},
+            {"@id": "dependency", "@type": "Dependency", "client": [{"@id": "part"}], "supplier": [{"@id": "r"}]},
+        ]
+        elements, edges, _ = build_index(raw, [])
+        records = elements[0]["readingRecords"]
+        self.assertEqual(records[0]["fields"][0]["value"], "Because the mission needs it")
+        self.assertEqual(records[0]["types"], ["Example::Rationale"])
+        self.assertEqual(records[1]["text"], "In the operating envelope")
+        relation = next(e for e in edges if e["authority"] == "native-api-relationship")
+        self.assertEqual((relation["source"], relation["target"]), ("part", "r"))
+        self.assertEqual(relation["nativeRelationship"], "dependency")
+        result = next(e for e in elements if e["id"] == "case")["readingRecords"][0]
+        self.assertEqual(result["recordType"], "declared-result")
+        self.assertEqual(result["value"], "inconclusive")
+
     def test_native_quantity_preserves_exact_magnitude_and_unit(self):
         from fractions import Fraction
         from scripts.native_export import typed_value, Quantity

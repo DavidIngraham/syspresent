@@ -8,6 +8,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import * as exploration from '../src/exploration.mjs';
+import * as requirements from '../src/requirements.mjs';
 
 if (!process.env.OPENSYSML_SOURCE) throw Error('Set OPENSYSML_SOURCE to the pinned renderer checkout');
 const require=createRequire(resolve(process.env.OPENSYSML_SOURCE,'editors/vscode/package.json'));
@@ -20,7 +21,7 @@ function harness(hash='',renderer=null) {
   const w=dom.window;
   let mobile=false;
   const renders=[];
-  Object.assign(w,exploration,{structuredClone,renderView:async(container,view,options)=>{renders.push({container,host:container.parentElement,view,options});if(renderer)await renderer(container,view,options);},fetch:async()=>({ok:true,json:async()=>[['Parameter','Value'],['Length',1]]})});
+  Object.assign(w,exploration,requirements,{structuredClone,renderView:async(container,view,options)=>{renders.push({container,host:container.parentElement,view,options});if(renderer)await renderer(container,view,options);},fetch:async()=>({ok:true,json:async()=>[['Parameter','Value'],['Length',1]]})});
   w.matchMedia=()=>({matches:mobile,addEventListener(){}});
   w.HTMLElement.prototype.scrollIntoView=function(){this.dataset.scrolled='true';};
   w.scrollTo=()=>{};
@@ -41,7 +42,7 @@ function harness(hash='',renderer=null) {
     manifest={snapshotId:'one'};
     for(const e of bundle.elements)elements.set(e.id,e);for(const v of bundle.views)views.set(v.id,v);
     selected='a';nav=new Navigation(initialState('a'));
-    globalThis.api={evidence,bindNavigationControls,configure:configuration=>{bundle.configuration=configuration;configureNavigation();},addView:view=>{bundle.views.push(view);views.set(view.id,view);},markdown,setStore:value=>{store=value;},draw,buildStory,activate,restoreLocation,exploreStop,update,choose,pause,dockExplorer,
+    globalThis.api={evidence,bindNavigationControls,configure:configuration=>{bundle.configuration=configuration;configureNavigation();},addView:view=>{bundle.views.push(view);views.set(view.id,view);},markdown,setStore:value=>{store=value;},setModel:value=>{bundle.elements=value.elements;bundle.relationships=value.relationships;for(const e of value.elements)elements.set(e.id,e);},draw,buildStory,activate,restoreLocation,exploreStop,update,choose,pause,dockExplorer,
       setStopPreferences:(id,value)=>{story.blocks.find(block=>block.id===id).presentationPreferences=value;},
       state:()=>({selected,paused,stop:activeStop?.id,saved:savedStory,nav:nav.state})};
   `;
@@ -350,5 +351,35 @@ test('authored compartment override merges bundle defaults and survives explorat
  h.w.document.getElementById('return-story').click();await new Promise(setImmediate);
  assert.equal(h.renders.at(-1).options.presentationPreferences.showCompartments,false);
  assert.equal(h.renders.at(-1).options.resetFrame,true);
+ h.dom.window.close();
+});
+
+
+test('requirement selection opens five questions and links traverse with history and graph return',async()=>{
+ const h=harness();await h.api.buildStory();h.api.bindNavigationControls();h.api.activate('first');
+ h.api.setModel({elements:[{id:'a',name:'Alpha',kind:'RequirementDefinition',description:'Alpha shall act',readingRecords:[{name:'rationale',text:'Because the system needs it'}]},{id:'u',name:'Applied alpha',kind:'RequirementUsage'},{id:'b',name:'Beta',kind:'RequirementUsage',description:'Beta shall observe'}],relationships:[{id:'type',source:'u',target:'a',kind:'type',authority:'native-api-property'},{id:'derive',source:'b',target:'u',kind:'derive',authority:'native-render-view'}]});
+ h.api.exploreStop('first');await new Promise(setImmediate);
+ const d=h.w.document;assert.equal(h.api.state().nav.view,null);
+ assert.equal(d.querySelectorAll('.requirement-question').length,5);
+ assert.match(d.getElementById('canvas').textContent,/Alpha shall act/);assert.match(d.getElementById('canvas').textContent,/Because the system needs it/);
+ const target=[...d.querySelectorAll('.requirement-link button')].find(b=>b.textContent==='Beta');target.focus();target.click();await new Promise(setImmediate);
+ assert.equal(h.api.state().nav.focus,'b');assert.match(d.getElementById('canvas').textContent,/Beta shall observe/);assert.ok(d.activeElement.matches('.requirement-heading strong'));
+ d.getElementById('back').click();await new Promise(setImmediate);assert.equal(h.api.state().nav.focus,'a');
+ [...d.querySelectorAll('#canvas button')].find(b=>b.textContent==='Relationship diagram').click();await new Promise(setImmediate);
+ assert.equal(h.renders.at(-1).view.id,'exploration');
+ [...d.querySelectorAll('#canvas button')].find(b=>b.textContent==='Requirement questions').click();await new Promise(setImmediate);
+ assert.equal(d.querySelectorAll('.requirement-question').length,5);
+ h.dom.window.close();
+});
+
+
+test('omitted implementing parts remain expandable when no dependency is visible',async()=>{
+ const h=harness();await h.api.buildStory();h.api.bindNavigationControls();h.api.activate('first');
+ const model={elements:[{id:'a',name:'Alpha',kind:'RequirementDefinition',description:'Alpha shall act'}],relationships:[]};
+ for(let n=0;n<25;n++){model.elements.push({id:'part'+n,name:'Part '+n,kind:'PartUsage'});model.relationships.push({id:'s'+n,source:'part'+n,target:'a',kind:'satisfy',authority:'native-render-view'});}
+ h.api.setModel(model);h.api.exploreStop('first');await new Promise(setImmediate);
+ const d=h.w.document;assert.ok([...d.querySelectorAll('#canvas button')].some(b=>b.textContent==='Show 1 more links'));
+ [...d.querySelectorAll('#canvas button')].find(b=>b.textContent==='Show 1 more links').click();await new Promise(setImmediate);
+ assert.equal(d.querySelectorAll('#requirement-affected .requirement-link').length,25);
  h.dom.window.close();
 });
