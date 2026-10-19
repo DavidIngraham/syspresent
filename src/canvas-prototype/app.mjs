@@ -3,6 +3,7 @@ import {requirementActions,traceContext} from './exploration.mjs';
 import {resolvePresentation,validatePresentation,PRESENTATION_RELATIONSHIP_KINDS} from './preferences.mjs';
 import {surroundingContext} from './context.mjs';
 import {preparePeripheral} from './peripheral.mjs';
+import {routePeripheralEdges,peripheralRoutingMetrics,peripheralRouteScore} from './peripheral-routing.mjs';
 import {sampleTrack,startTimeline,samplePolyline,visibleTrackKeys} from './motion.mjs';
 import {documentationFor,measureCard} from './documentation.mjs';
 import {graphArea,fitDiagram,routeEdges,routeIsClear,routeConnectsEndpoints} from './geometry.mjs';
@@ -107,19 +108,19 @@ async function prepareFrame(view,focus,panels,{journey=false}={}){
  const labelObstacles=[...routed.filter(e=>e.labelBox).map((e,i)=>({...e.labelBox,id:'label-obstacle:'+i})),...active.flatMap(n=>n.portLabelBox?[{...n.portLabelBox,id:'port-label:'+n.id}]:[])];
  const routeObstacles=routed.flatMap(e=>e.points.slice(1).map((p,i)=>({id:'route:'+e.id+':'+i,x:Math.min(p.x,e.points[i].x)-3,y:Math.min(p.y,e.points[i].y)-3,width:Math.max(6,Math.abs(p.x-e.points[i].x)+6),height:Math.max(6,Math.abs(p.y-e.points[i].y)+6)})));
  const context=surroundingContext(state.graph,layout,{budget:displayPreferences().contextBudget});
- const fringe=preparePeripheral(context,active,area,{width:104,height:56,gap:10,obstacles:[...labelObstacles,...routeObstacles],measureLabel:labelSize});
+ const fringe=preparePeripheral(context,active,area,{width:104,height:56,gap:10,activeEdges:routed,labelObstacles,obstacles:[...labelObstacles,...routeObstacles],measureLabel:labelSize});
  const ghosts=fringe.nodes.map(n=>({...n,scale:1,opacity:.22,context:true,displayDetail:'',displayID:''}));
  const markers=fringe.boundaryMarkers.map(n=>({...n,scale:1,opacity:.22,context:true,interactive:false}));
  const nodes=[...active,...ghosts,...markers],counts=new Map(),byID=new Map();
  for(const n of nodes){n.key=nodeKey(n,counts,view);n.container=active.some(c=>c.parentId===n.id);byID.set(n.id,n);}
- const peripheral=[...routeEdges(fringe.edges,[...nodes,...labelObstacles,...fringe.stubEdges.filter(e=>e.labelBox).map(e=>({...e.labelBox,id:'stub-label:'+e.id}))],{area,measureLabel:labelSize}),...fringe.stubEdges];
+ const peripheral=fringe.routedEdges;
  const edgeCounts=new Map(),edges=[...routed,...peripheral].map(e=>{
   const a=byID.get(e.sourceAttachment??e.source),b=byID.get(e.targetAttachment??e.target),ownerA=byID.get(e.source),ownerB=byID.get(e.target),base=[a?.semanticId||a?.key,b?.semanticId||b?.key,e.kind,e.label||''].join('|'),ordinal=edgeCounts.get(base)??0;edgeCounts.set(base,ordinal+1);
   return {...e,journey:journey&&!e.context,sourceClipped:a?.kind==='context-boundary',targetClipped:b?.kind==='context-boundary',key:base+':'+ordinal,sourceKey:a?.key,targetKey:b?.key,sourceSemantic:a?.semanticId||ownerA?.semanticId,targetSemantic:b?.semanticId||ownerB?.semanticId,opacity:e.context?.18:!journey&&displayPreferences().emphasis.length&&!displayPreferences().emphasis.includes(e.kind)?.28:1,routePoints:e.points,points:samplePolyline(e.points.length?e.points:[{x:0,y:0},{x:0,y:0}])};
  });
  const notationNotices=layout.edges.map(e=>({e,appearance:edgeAppearance(e,{viewKind:view.kind})})).filter(p=>!p.appearance.supported).map(p=>({reason:'unsupported-notation',target:p.e.target,relationshipId:p.e.id,message:p.appearance.notice}));
- const omissions=[...(layout.omissions??view.omissions??[]),...notationNotices,...fringe.omissions,...routed.filter(e=>e.labelOmitted||e.routingBlocked).map(e=>({reason:e.labelOmitted?'label-space':'route-space',target:e.semanticTarget||e.target,relationshipId:e.semanticId||e.id}))];
- return {view,nodes,edges,area,width:stage.clientWidth,height:stage.clientHeight,panels,scale:fitted.scale,layout,omissions};
+ const omissions=[...(layout.omissions??view.omissions??[]),...notationNotices,...fringe.omissions,...fringe.notices,...routed.filter(e=>e.labelOmitted||e.routingBlocked).map(e=>({reason:e.labelOmitted?'label-space':'route-space',target:e.semanticTarget||e.target,relationshipId:e.semanticId||e.id}))];
+ return {view,nodes,edges,area,width:stage.clientWidth,height:stage.clientHeight,panels,scale:fitted.scale,layout,omissions,routingMetrics:fringe.routingMetrics};
 }
 function face(n){const host=el('span',undefined,'node-face');if(n.kind==='port'){const text=n.label??n.name??'';if(text)host.append(el('span',text,'port-name'));return host;}const short=(n.name?.split('::').at(-1)||n.kind).replace(/([a-z0-9])([A-Z])/g,'$1\u200b$2');host.append(el('span',`«${n.kind}»${n.displayID?' '+n.displayID:''}${n.type?' : '+n.type:''}`,'kind'),el('span',short,'name'));if(n.displayDetail&&!n.container)host.append(el('span',n.displayDetail,'detail'));return host;}
 function visualNode(n){if(n.kind==='context-boundary'){const marker=el('span',undefined,'node context-boundary');marker.title='Additional model context: '+(n.name||n.semanticId);marker.setAttribute('role','img');marker.setAttribute('aria-label',marker.title);marker.dataset.context='true';const glyph=el('span','›','continuation-glyph');glyph.style.transform=`rotate(${({EAST:0,SOUTH:90,WEST:180,NORTH:270})[n.continuationDirection]??0}deg)`;marker.append(glyph);return marker;}const node=el('button',undefined,`node ${n.kind}${n.container?' container':''}${n.context?' peripheral':''}${n.semanticId&&n.semanticId===state.selected?' selected':''}`);node.type='button';node.dataset.representation=n.id;if(n.semanticId)node.dataset.semanticId=n.semanticId;node.dataset.context=String(!!n.context);node.setAttribute('aria-label',`${n.name||n.kind}: select ${n.kind}${n.context?' (surrounding context)':''}`);node.style.zIndex=String(n.context?0:n.container?1:3);node.append(face(n));node.onclick=event=>{event.stopPropagation();select(n.semanticId,n);};node.oncontextmenu=event=>{event.preventDefault();select(n.semanticId,n);};return node;}
@@ -158,22 +159,47 @@ async function paintFrames(frames,{duration=0,caption='',outgoingPanel}={}){
    return {...item.latest,id:item.key,source:item.latest.sourceKey,target:item.latest.targetKey,label:text};
   });
   const liveRoutes=new Map(routeEdges(liveEdges,currentNodes,{area:destination.area,measureLabel:text=>journeySizes.get(text)}).map(route=>[route.id,route]));
-  for(const {item,r} of sampledEdges){
+  const shapeFor=({item,r})=>{
    const interpolated=Array.from({length:20},(_,i)=>({x:r['x'+i],y:r['y'+i]}));
    // Never morph a line through a moving tile. During travel use a clear
    // rectilinear route and lower its emphasis; the final route is joint ELK geometry.
-   const edge={...item.latest,source:item.latest.sourceKey,target:item.latest.targetKey};
+   const edge={...item.latest,id:item.key,source:item.latest.sourceKey,target:item.latest.targetKey};
    let points=clock===1?(item.latest.routePoints??[]):interpolated,liveLabel;
    const journeyEdge=clock!==1&&r.journey>.5;
    if(journeyEdge){const live=liveRoutes.get(item.key);points=live?.points??[];if(live?.labelBox&&!live.labelLeader&&![...liveRoutes.values()].some(other=>other.points.length>1&&!routeIsClear(other.points,other,currentNodes.concat([{...live.labelBox,id:'journey-label:'+item.key}]),{orthogonalOnly:true})))liveLabel=live;}
    if(!journeyEdge&&clock!==1&&(!routeIsClear(points,edge,currentNodes,{orthogonalOnly:true})||!routeConnectsEndpoints(points,edge,currentNodes))){points=routeEdges([{...edge,label:''}],currentNodes)[0]?.points??[];}
    if(!routeIsClear(points,edge,currentNodes)||!routeConnectsEndpoints(points,edge,currentNodes))points=[];
+   return {points,edge,journeyEdge,liveLabel};
+  };
+  const shapes=new Map(sampledEdges.map(sample=>[sample.item.key,shapeFor(sample)]));
+  const visibleNodes=currentNodes.filter(n=>(n.opacity??1)>.08),visibleIDs=new Set(visibleNodes.map(n=>n.id));
+  const currentActive=sampledEdges.filter(({item,r})=>!item.latest.context&&r.opacity>.01).map(({item,r})=>{
+   const shape=shapes.get(item.key),box=shape.liveLabel?.labelBox??item.latest.labelBox;
+   const labelBox=shape.liveLabel?.labelBox??(box&&(clock===1||clock>.85)?{...box,x:r.x,y:r.y-box.height*.78}:undefined);
+   return {...shape.edge,points:shape.points,...(labelBox?{labelBox}:{} )};
+  }).filter(edge=>edge.points.length>1&&visibleIDs.has(edge.source)&&visibleIDs.has(edge.target));
+  if(clock>0&&clock<1){
+   const contextSizes=new Map(),movingContext=sampledEdges.filter(({item,r})=>item.latest.context&&r.opacity>.01).map(({item})=>{
+    const shape=shapes.get(item.key),text=item.latest.label??'',box=item.latest.labelBox??{width:Math.max(16,text.length*7),height:16},old=contextSizes.get(text);contextSizes.set(text,{width:Math.max(old?.width??0,box.width),height:Math.max(old?.height??0,box.height)});
+    return {...shape.edge,points:shape.points};
+   }).filter(edge=>visibleIDs.has(edge.source)&&visibleIDs.has(edge.target));
+   const before=peripheralRoutingMetrics(movingContext,currentActive);
+   if(before.crossings||before.overlapLength||before.blocked){
+    const optimized=routePeripheralEdges(movingContext,visibleNodes,destination.area,{activeEdges:currentActive,measureLabel:text=>contextSizes.get(text),candidateBudget:4,reverse:false,visibilitySearches:0});
+    if(peripheralRouteScore(optimized.metrics)<peripheralRouteScore(before))for(const route of optimized.edges){const shape=shapes.get(route.id);shape.points=route.points;shape.liveLabel=route.labelBox?route:undefined;}
+   }
+  }
+  const currentContext=sampledEdges.filter(({item,r})=>item.latest.context&&r.opacity>.01).map(({item})=>{const shape=shapes.get(item.key);return {...shape.edge,points:shape.points};});
+  const visibleLabels=[...currentActive.flatMap(edge=>edge.labelBox?[edge.labelBox]:[]),...sampledEdges.filter(({item,r})=>item.latest.context&&clock>.85&&r.labelOpacity>.05).flatMap(({item,r})=>{const box=shapes.get(item.key).liveLabel?.labelBox??item.latest.labelBox;return box?[{...box,x:shapes.get(item.key).liveLabel?.x??r.x,y:(shapes.get(item.key).liveLabel?.y??r.y)-box.height*.78,id:'live-label:'+item.key}]:[];})];
+  for(const {item,r} of sampledEdges){
+   const {points,edge,journeyEdge,liveLabel}=shapes.get(item.key);
    const pathOf=path=>path.map((p,i)=>(i?'L':'M')+p.x+','+p.y).join(' '),signature=points.slice(1).map((p,i)=>Math.abs(p.x-points[i].x)<.01?'V':'H').filter((v,i,a)=>!i||v!==a[i-1]).join('');
    if(clock!==1&&item.signature&&signature!==item.signature){item.outgoingPoints=item.drawnPoints;item.routeChangedAt=clock;}
    const routeFade=clock===1?1:Math.min(1,Math.max(0,(clock-(item.routeChangedAt??-1))*duration/140));
    let outgoing=item.outgoingPoints?.map(p=>({...p}));
    if(outgoing?.length>1&&points.length>1){const first=outgoing[0],second=outgoing[1],last=outgoing.at(-1),penultimate=outgoing.at(-2),horizontalFirst=Math.abs(first.y-second.y)<.01,horizontalLast=Math.abs(last.y-penultimate.y)<.01;outgoing[0]={...points[0]};outgoing[outgoing.length-1]={...points.at(-1)};if(horizontalFirst)second.y=points[0].y;else second.x=points[0].x;if(horizontalLast)penultimate.y=points.at(-1).y;else penultimate.x=points.at(-1).x;}
-   const oldClear=outgoing&&routeIsClear(outgoing,edge,currentNodes,{orthogonalOnly:true})&&routeConnectsEndpoints(outgoing,edge,currentNodes);item.oldLine.setAttribute('d',oldClear?pathOf(outgoing):'');item.oldLine.style.opacity=oldClear?1-routeFade:0;
+   const protectedPaths=[...currentActive,...currentContext.filter(other=>other.id!==edge.id)];
+   const oldClear=outgoing&&routeIsClear(outgoing,edge,currentNodes.concat(visibleLabels),{orthogonalOnly:true})&&routeConnectsEndpoints(outgoing,edge,currentNodes)&&(!item.latest.context||peripheralRouteScore(peripheralRoutingMetrics([{...edge,points:outgoing}],protectedPaths))<=peripheralRouteScore(peripheralRoutingMetrics([{...edge,points}],protectedPaths)));item.oldLine.setAttribute('d',oldClear?pathOf(outgoing):'');item.oldLine.style.opacity=oldClear?1-routeFade:0;
    const path=pathOf(points);item.line.setAttribute('d',path);item.line.style.opacity=routeFade;item.hit.setAttribute('d',path);item.signature=signature;item.drawnPoints=points;
    const traveling=duration&&clock>0&&clock<1,emphasis=traveling&&!journeyEdge?.2+.8*Math.abs(Math.cos(Math.PI*clock)):1;
    const endpoints=[currentNodes.find(n=>n.id===edge.source),currentNodes.find(n=>n.id===edge.target)],presence=Math.min(1,...endpoints.map(n=>n?(n.opacity??1)/(n.context?.22:1):0));const effectiveOpacity=points.length?r.opacity*emphasis*presence:0;item.group.style.opacity=effectiveOpacity;item.group.style.pointerEvents=effectiveOpacity>.1?'auto':'none';item.group.setAttribute('aria-hidden',String(effectiveOpacity<.05));item.group.setAttribute('tabindex',effectiveOpacity>.1?'0':'-1');
@@ -281,6 +307,14 @@ async function capture(){
  const s={type:'scene',id:'captured-'+Date.now(),title:$('scene-title').value||'Captured view',view:viewName,focus:qname(state.focus),panel:{placement:$('panel-placement').value},presentation:editorPresentation(),markdown:$('scene-prose').value};
  if(!s.focus)throw Error('Captured focus needs a native qualified identity');appendScene(project,s);await loadProject(project);await showScene(state.scenes.length-1,false);$('editor').close();status('Scene captured. Export the project ZIP or Markdown to keep it.');
 }
+function contextNotice(notice){
+ if(notice.reason==='context-route-fallback')return `Connection layout: ${notice.continued??0} shortened; ${notice.unrepresented??0} not drawn in this view. Native relationships: ${(notice.relationships??[]).join(', ')}.`;
+ if(notice.reason==='context-route-continuation')return `Shortened context: ${(notice.targets??[]).map(id=>label(id)??id).join(', ')}; ${notice.continued??0} labeled connections.`;
+ if(notice.reason==='context-route-conflict')return `Layout notice: ${notice.crossings} context crossings; ${Math.round(notice.overlapLength??0)} pixels of shared path remain.`;
+ const target=notice.target??notice.relationshipId??'connection',name=label(target)??target;
+ const prefix=notice.reason==='context-route-continuation'?'Shortened connection':['unavailable','outside-scope','metamodel-boundary'].includes(notice.reason)?'Unavailable / boundary':'Hidden by view policy';
+ return `${prefix}: ${notice.reason} · ${name} (${target})`;
+}
 function bind(){
  for(const kind of PRESENTATION_RELATIONSHIP_KINDS){const option=el('option',kind);option.value=kind;$('presentation-emphasis').append(option);}
  $('explore-back').onclick=()=>restoreHistory('back').catch(report);$('explore-forward').onclick=()=>restoreHistory('forward').catch(report);$('trace-next').onclick=()=>followTrace(state.traceRequest.focus,state.traceRequest.mode,state.traceInfo.page+1).catch(report);$('trace-previous').onclick=()=>followTrace(state.traceRequest.focus,state.traceRequest.mode,state.traceInfo.page-1).catch(report);
@@ -288,14 +322,14 @@ function bind(){
  $('fit').onclick=()=>frame(state.view).catch(report);$('reduce').setAttribute('aria-pressed',state.reduce);$('reduce').onclick=()=>{state.reduce=!state.reduce;$('reduce').setAttribute('aria-pressed',state.reduce);if(state.reduce)state.motion?.finish();};$('find-toggle').onclick=()=>{$('find').hidden=!$('find').hidden;if(!$('find').hidden)$('search').focus();};
  $('search').oninput=()=>{const q=$('search').value.trim().toLowerCase();$('search-results').replaceChildren();if(!q)return;const hits=state.graph.elements.filter(e=>e.qualifiedName&&e.layer==='project'&&e.native.declaredName&&(e.name+' '+e.qualifiedName).toLowerCase().includes(q));for(const e of hits.slice(0,30))$('search-results').append(button(e.qualifiedName,async()=>{$('find').hidden=true;await explore(e.id);}));};
  $('open-view').onclick=async()=>{try{const revision=++state.revision,modelHash=state.modelHash,name=$('views').value;let view=state.views.get(name);if(!view){const raw=await state.engine.call('RenderView',{modelHash,view:name,includeSemanticIdentity:true});if(revision!==state.revision||modelHash!==state.modelHash)return;view=requireNativeIdentity(adaptNativeView(raw,name));if(!['requirement','definition','tree','package','interconnection','action','state'].includes(view.kind))throw Error('This canvas does not yet render the native '+view.kind+' notation. The complete source remains included.');state.views.set(name,view);state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);}const target=view.nodes.find(n=>n.semanticId)?.semanticId;$('find').hidden=true;await openExploration(view,target);}catch(e){report(e);}};
- $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent='Context boundaries';const omissions=state.displayOmissions??state.displayed?.omissions??[];$('information-text').textContent=omissions.map(o=>`${['unavailable','outside-scope','metamodel-boundary'].includes(o.reason)?'Unavailable / boundary':'Hidden by view policy'}: ${o.reason} · ${label(o.target)} (${o.target})`).join('\n')+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
+ $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent='Context boundaries';const omissions=state.displayOmissions??state.displayed?.omissions??[];$('information-text').textContent=omissions.map(contextNotice).join('\n')+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
  $('edit').onclick=openEditor;$('view-file').onchange=()=>{$('view-source').value=fileText(state.project,$('view-file').value);};
  $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation();scene().presentation=presentation;scene().title=$('scene-title').value;scene().markdown=$('scene-prose').value;scene().panel={placement:$('panel-placement').value};state.project.files[state.project.manifest.story]=writeStory(state.project.manifest.title,state.scenes);updateLists();$('editor').close();await showScene(state.sceneIndex,false);}catch(e){report(e);}};
  $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project);$('editor').close();}catch(e){report(e);}};
  $('import-project').onclick=()=>{$('project-file').click();};$('project-file').onchange=async()=>{try{const file=$('project-file').files[0];if(file)await loadProject(unpackProject(new Uint8Array(await file.arrayBuffer())));}catch(e){report(e);}finally{$('project-file').value='';}};
  $('import-markdown').onclick=()=>{$('markdown-file').click();};$('markdown-file').onchange=async()=>{try{const file=$('markdown-file').files[0];if(file){const project=structuredClone(state.project);project.files[project.manifest.story]=await file.text();await loadProject(project);}}catch(e){report(e);}finally{$('markdown-file').value='';}};
  $('export-project').onclick=()=>{try{download('syspresent-project.zip',packProject(state.project),'application/zip');$('project-menu').open=false;}catch(e){report(e);}};$('export-markdown').onclick=()=>{download('story.md',fileText(state.project,state.project.manifest.story),'text/markdown');$('project-menu').open=false;};$('load-example').onclick=()=>exampleProject().then(loadProject).catch(report);
- $('about').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent='Engine and project details';$('information-text').textContent=JSON.stringify({engine:state.provenance,project:state.project.manifest,modelHash:state.modelHash,graph:{elements:state.graph.elements.length,relationships:state.graph.relationships.length},view:state.view.id,lastTransition:state.lastTransition,notice:state.exported.notice},null,2);$('information').showModal();};
+ $('about').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent='Engine and project details';$('information-text').textContent=JSON.stringify({engine:state.provenance,project:state.project.manifest,modelHash:state.modelHash,graph:{elements:state.graph.elements.length,relationships:state.graph.relationships.length},routing:state.visualSnapshot?.routingMetrics,view:state.view.id,lastTransition:state.lastTransition,notice:state.exported.notice},null,2);$('information').showModal();};
  $('stage').onclick=e=>{if(e.target===$('stage')||e.target===$('nodes')||e.target===$('connections')){clearTrace();$('selection').hidden=true;}};
  let resize;new ResizeObserver(()=>{clearTimeout(resize);resize=setTimeout(()=>{if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;transitionTo(pending.view,pending.focus,{journey:pending.journey,allowDisconnected:true}).catch(report);}else if(state.view)frame(state.view).catch(report);},100);}).observe($('stage'));
 }

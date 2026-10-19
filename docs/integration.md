@@ -107,3 +107,8 @@ Same-notation changes with shared semantic content retain direct reflow. Disjoin
 
 
 Journey edge emphasis is independent of destination scene emphasis and the ordinary reflow midpoint fade. Small live GV hops route as one batch with distinct drawing attachments and shared label reservations, retaining native relationship identities. Labels appear only when a clear adjacent slot exists; invalid live routes are hidden instead of falling back to independently merged terminals. Final scene preferences and native joint layout remain authoritative.
+
+
+## Peripheral crossing policy
+
+Translucent connections participate in crossing and overlap minimization too. Active routes, labels, cards and fit are fixed before peripheral optimization. The contextual layout can choose alternate positions and orthogonal routes, avoiding active paths and other contextual paths while preserving native endpoints and independent attachments. A common modeled endpoint is distinct from a line crossing or a shared segment: separate relationships must not become an apparent bus. Dense views may use short labeled continuations and disclose omitted or residual conflicts. Zero crossings alone is not a reason to remove otherwise readable context.

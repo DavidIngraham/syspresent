@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM,VirtualConsole} from 'jsdom';
 import ELK from 'elkjs/lib/elk.bundled.js';
+import {routeConflicts} from '../src/canvas-prototype/peripheral-routing.mjs';
 import {packProject} from '../src/canvas-prototype/project.mjs';
 const {outputFiles}=await build({entryPoints:['src/canvas-prototype/app.mjs'],bundle:true,format:'iife',write:false,logLevel:'silent'});
 const html=await readFile('src/canvas-prototype/index.html','utf8');
@@ -25,7 +26,7 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
  window.Worker=class{constructor(url){this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout){holdLayout=false;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else reply();});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
-  else if(method==='ExportModel')respond({elements:structuredClone([...raw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
+  else if(method==='ExportModel')respond({elements:structuredClone([...raw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
   else if(method==='RenderView'&&params.view==='Views::other')respond({kind:'requirement',nodes:[{id:'o',semanticId:'orphan',identityStatus:'mapped',name:'orphan',kind:'part'}],edges:[]});
   else if(method==='RenderView'&&params.view.startsWith('#'))pendingRender=()=>respond({kind:'interconnection',nodes:[native.nodes[1]],edges:[]});
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(native));
@@ -179,4 +180,21 @@ test('a saved same-notation ownership route outside the story boundary is reject
  Object.defineProperty(input,'files',{value:[{text:async()=>authored}],configurable:true});input.dispatchEvent(new h.window.Event('change'));
  await until(()=>d.getElementById('editor-error').textContent.includes('saved journey no longer resolves within the presentation boundary'));
  assert.equal(d.querySelector('#narrative h2').textContent,'Control the part');assert.deepEqual(activeIDs(d),['part','req']);assert.equal(d.getElementById('fit').disabled,false);h.window.close();
+});
+
+
+test('fading old context paths cannot reintroduce crossings against current context or active routes',async()=>{
+ const h=await harness({reducedMotion:false,secondScene:true,contextNeighbor:'shared'}),d=h.document;
+ const points=path=>[...(path??'').matchAll(/[ML]([\d.-]+),([\d.-]+)/g)].map(m=>({x:Number(m[1]),y:Number(m[2])}));
+ d.getElementById('next').click();await until(()=>d.getElementById('stage').dataset.motionProgress!==undefined);let sampled=0;
+ for(let i=0;i<220;i++){
+  const rows=[...d.querySelectorAll('#connections g[data-relationship]')].filter(g=>Number(g.style.opacity)>.01).map(g=>({context:g.dataset.context==='true',now:points(g.querySelector('.edge-line:not(.edge-outgoing)').getAttribute('d')),old:points(g.querySelector('.edge-outgoing').getAttribute('d')),oldOpacity:Number(g.querySelector('.edge-outgoing').style.opacity)}));
+  if(rows.filter(r=>r.context).length>1)sampled++;
+  for(const row of rows.filter(r=>r.context&&r.oldOpacity>.01&&r.old.length>1)){
+   const score=path=>rows.filter(r=>r!==row).reduce((sum,other)=>{const c=routeConflicts(path,other.now);return sum+c.crossings*1e6+c.overlapLength*1e4;},0);
+   assert.ok(score(row.old)<=score(row.now)+.01,'obsolete context path worsens the current crossing/overlap state');
+  }
+  if(d.getElementById('stage').dataset.motionProgress===undefined)break;await new Promise(resolve=>setTimeout(resolve,10));
+ }
+ assert.ok(sampled>0,'exercise multiple faint paths during motion');h.window.close();
 });

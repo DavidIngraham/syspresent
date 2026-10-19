@@ -156,7 +156,7 @@ export function positionSurrounding(context,activePositionedNodes,area,options={
   }
   // Prefer the outside of the active hull, then the shortest connection. Interior
   // holes may be used if they are the only readable space left on a narrow canvas.
-  candidatePoints.sort((a,b)=>Number(overlap(a,hull))-Number(overlap(b,hull))||Math.hypot(center(a).x-anchor.x,center(a).y-anchor.y)-Math.hypot(center(b).x-anchor.x,center(b).y-anchor.y)||a.y-b.y||a.x-b.x);
+  candidatePoints.sort((a,b)=>(options.placementScore?.(a,node,known)??0)-(options.placementScore?.(b,node,known)??0)||Number(overlap(a,hull))-Number(overlap(b,hull))||Math.hypot(center(a).x-anchor.x,center(a).y-anchor.y)-Math.hypot(center(b).x-anchor.x,center(b).y-anchor.y)||a.y-b.y||a.x-b.x);
   if(candidatePoints.length){const placed={...node,...candidatePoints[0]};nodes.push(placed);occupied.push(placed);known.set(placed.id,placed);continue;}
   const points=[{x:left,y:clamp(anchor.y,top,bottom)},{x:right,y:clamp(anchor.y,top,bottom)},{x:clamp(anchor.x,left,right),y:top},{x:clamp(anchor.x,left,right),y:bottom}];
   points.sort((a,b)=>Math.hypot(a.x-anchor.x,a.y-anchor.y)-Math.hypot(b.x-anchor.x,b.y-anchor.y)||a.y-b.y||a.x-b.x);
