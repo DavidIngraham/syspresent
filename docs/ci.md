@@ -54,3 +54,9 @@ Before a publishing run, the repository must contain the selected `LICENSE` and 
 CI installs Go 1.25.11, Node 22.14.0 and Python 3.12.10, checks out the exact native commit, runs `npm ci` against its lockfile, and installs its matching Python client. Python transitive dependencies currently follow that client's declared constraints; they are not a fully locked environment. Record the installed environment when investigating reproducibility differences. Native and viewer provenance plus asset hashes identify each resulting snapshot.
 
 The configured checks include native specification validation, Python unit tests, Node DOM/navigation tests and the native renderer's TypeScript/unit checks. DOM tests do not replace rendered desktop/mobile review or the pending reader study. Successful pipeline execution would establish only the checks actually run.
+
+## Publish the separate canvas prototype
+
+The canvas can be published at `canvas-prototype/` without adding a link to the catalog or blog. Build it from a clean source checkout with `npm run build:canvas`, then use `scripts/stage_canvas_publication.py --archive build/canvas-prototype/site.zip --site /path/to/pages-history` against the retained site checkout. The staging script verifies the snapshot asset hashes, changes only the prototype subdirectory and keeps a frozen ZIP under `canvas-prototype/reviews/<sha256>.zip`. Existing catalog and review files remain byte-identical.
+
+Commit and push that retained site with a normal, non-force push. Dispatch `.github/workflows/publish-retained.yml` with its exact `expected_revision`. The workflow fails if `pages-history` has moved before checkout, shares the existing deployment concurrency group, uploads the retained site and deploys it through the existing GitHub Pages environment. It does not rebuild or add legacy reviews, alter navigation, or publish anything to a dependency repository.

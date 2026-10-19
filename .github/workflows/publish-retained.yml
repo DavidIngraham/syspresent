@@ -1,0 +1,43 @@
+name: Publish retained static site
+on:
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Exact pages-history commit to publish
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: immutable-pages-catalog
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: pages-history
+          path: retained
+      - name: Verify the retained publication revision
+        env:
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+        run: |
+          test "$(git -C retained rev-parse HEAD)" = "$EXPECTED_REVISION"
+          python3 - <<'PY'
+          import shutil
+          shutil.copytree('retained', 'site', ignore=shutil.ignore_patterns('.git'))
+          PY
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment

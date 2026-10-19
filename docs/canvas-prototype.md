@@ -39,7 +39,7 @@ The old viewer may coexist with the prototype. Documentation must distinguish th
 
 ## Evidence recorded on 18 October 2026
 
-The implementation is `src/canvas-prototype/`; the fixture is `examples/canvas-prototype/`. `npm run build:canvas` emits `build/canvas-prototype/site/`, a complete static-site ZIP, and a write-once ZIP under `build/canvas-prototype/snapshots/<sha256>.zip`. These are local artifacts; the new canvas has not replaced the published viewer. `.github/workflows/canvas.yml` reproduces the engine and artifact build without VS Code source dependencies; this workflow has not yet been observed running on GitHub.
+The implementation is `src/canvas-prototype/`; the fixture is `examples/canvas-prototype/`. `npm run build:canvas` emits `build/canvas-prototype/site/`, a complete static-site ZIP, and a write-once ZIP under `build/canvas-prototype/snapshots/<sha256>.zip`. Separate publication uses `/canvas-prototype/`, without replacing the existing viewer or adding a blog/catalog link. `.github/workflows/canvas.yml` reproduces the engine and artifact build without VS Code source dependencies; this workflow has not yet been observed running on GitHub.
 
 The exact local dependency is David's clean branch commit `02a582d3d9baf7b9f59e5aaaa8d65f054b279bc7`. The carried patch against `af37bbf155aea785b8ac494a14afe659244bbcdf` has SHA-256 `1bcab4044a669d6eb9924f982caec510434bc61bfb6f74253c4f5c217a25fff6`. Native and WASM use Go 1.25.11; the WASM binary is 36,688,007 bytes. Provenance includes binary hashes, source diff and patch hashes, runtime version and licenses. The source branch was not pushed and no upstream PR was opened.
 
