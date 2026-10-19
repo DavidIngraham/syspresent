@@ -37,7 +37,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/context.mjs": {
-      "bytes": 12151,
+      "bytes": 12240,
       "imports": [
         {
           "path": "src/canvas-prototype/core/index.mjs",
@@ -57,13 +57,34 @@
       ],
       "format": "esm"
     },
+    "src/canvas-prototype/geometry.mjs": {
+      "bytes": 14939,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/peripheral-routing.mjs": {
+      "bytes": 10016,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        }
+      ],
+      "format": "esm"
+    },
     "src/canvas-prototype/peripheral.mjs": {
-      "bytes": 5815,
+      "bytes": 10917,
       "imports": [
         {
           "path": "src/canvas-prototype/context.mjs",
           "kind": "import-statement",
           "original": "./context.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/peripheral-routing.mjs",
+          "kind": "import-statement",
+          "original": "./peripheral-routing.mjs"
         }
       ],
       "format": "esm"
@@ -75,11 +96,6 @@
     },
     "src/canvas-prototype/documentation.mjs": {
       "bytes": 1564,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/geometry.mjs": {
-      "bytes": 14939,
       "imports": [],
       "format": "esm"
     },
@@ -147,7 +163,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 55392,
+      "bytes": 59176,
       "imports": [
         {
           "path": "src/canvas-prototype/departures.mjs",
@@ -173,6 +189,11 @@
           "path": "src/canvas-prototype/peripheral.mjs",
           "kind": "import-statement",
           "original": "./peripheral.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/peripheral-routing.mjs",
+          "kind": "import-statement",
+          "original": "./peripheral-routing.mjs"
         },
         {
           "path": "src/canvas-prototype/motion.mjs",
@@ -228,7 +249,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 469590
+      "bytes": 508306
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -257,10 +278,16 @@
           "bytesInOutput": 3893
         },
         "src/canvas-prototype/context.mjs": {
-          "bytesInOutput": 11516
+          "bytesInOutput": 11617
+        },
+        "src/canvas-prototype/geometry.mjs": {
+          "bytesInOutput": 15758
+        },
+        "src/canvas-prototype/peripheral-routing.mjs": {
+          "bytesInOutput": 11586
         },
         "src/canvas-prototype/peripheral.mjs": {
-          "bytesInOutput": 5984
+          "bytesInOutput": 11106
         },
         "src/canvas-prototype/motion.mjs": {
           "bytesInOutput": 3230
@@ -268,11 +295,8 @@
         "src/canvas-prototype/documentation.mjs": {
           "bytesInOutput": 1593
         },
-        "src/canvas-prototype/geometry.mjs": {
-          "bytesInOutput": 15747
-        },
         "src/canvas-prototype/elk-layout.mjs": {
-          "bytesInOutput": 26978
+          "bytesInOutput": 26990
         },
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 1698
@@ -284,10 +308,10 @@
           "bytesInOutput": 7521
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 62942
+          "bytesInOutput": 67164
         }
       },
-      "bytes": 220851
+      "bytes": 241953
     }
   }
 }

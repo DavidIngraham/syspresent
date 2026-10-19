@@ -1231,7 +1231,7 @@ function positionSurrounding(context, activePositionedNodes, area, options = {})
       if (!ordered) continue;
       candidatePoints.push(candidate);
     }
-    candidatePoints.sort((a, b) => Number(overlap(a, hull)) - Number(overlap(b, hull)) || Math.hypot(center(a).x - anchor.x, center(a).y - anchor.y) - Math.hypot(center(b).x - anchor.x, center(b).y - anchor.y) || a.y - b.y || a.x - b.x);
+    candidatePoints.sort((a, b) => (options.placementScore?.(a, node, known) ?? 0) - (options.placementScore?.(b, node, known) ?? 0) || Number(overlap(a, hull)) - Number(overlap(b, hull)) || Math.hypot(center(a).x - anchor.x, center(a).y - anchor.y) - Math.hypot(center(b).x - anchor.x, center(b).y - anchor.y) || a.y - b.y || a.x - b.x);
     if (candidatePoints.length) {
       const placed = { ...node, ...candidatePoints[0] };
       nodes.push(placed);
@@ -1251,8 +1251,384 @@ function positionSurrounding(context, activePositionedNodes, area, options = {})
   return { ...context.view, nodes, edges: context.view.edges, boundaryMarkers, omissions, boundary: { ...context.boundary, omitted: omissions.length, byReason, cards: nodes.length, markers: boundaryMarkers.length } };
 }
 
-// src/canvas-prototype/peripheral.mjs
+// src/canvas-prototype/geometry.mjs
 var overlaps2 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var centre = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
+function graphArea(width, height, panels = []) {
+  const left = 16, top = 16, right = Math.max(left + 1, width - 16), bottom = Math.max(top + 1, height - 60);
+  const xs = [left, right, ...panels.flatMap((p) => [Math.max(left, p.x - 16), Math.min(right, p.x + p.width + 16)])];
+  const ys = [top, bottom, ...panels.flatMap((p) => [Math.max(top, p.y - 16), Math.min(bottom, p.y + p.height + 16)])];
+  const candidates2 = [];
+  for (const x of xs) for (const r of xs) for (const y of ys) for (const b of ys) {
+    const rect = { x, y, width: r - x, height: b - y };
+    if (rect.width > 0 && rect.height > 0 && !panels.some((p) => overlaps2(rect, p))) candidates2.push(rect);
+  }
+  return candidates2.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? { x: left, y: top, width: right - left, height: bottom - top };
+}
+function fitNodes(nodes, area) {
+  const minX = nodes.length ? Math.min(...nodes.map((n) => n.x)) : 0, minY = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 0;
+  const maxX = nodes.length ? Math.max(...nodes.map((n) => n.x + n.width)) : 1, maxY = nodes.length ? Math.max(...nodes.map((n) => n.y + n.height)) : 1;
+  const scale = Math.min(1.4, area.width / (maxX - minX + 20), area.height / (maxY - minY + 20));
+  const offsetX = area.x + (area.width - (maxX - minX) * scale) / 2 - minX * scale, offsetY = area.y + (area.height - (maxY - minY) * scale) / 2 - minY * scale;
+  return { scale, nodes: nodes.map((n) => ({ ...n, x: n.x * scale + offsetX, y: n.y * scale + offsetY, width: n.width * scale, height: n.height * scale })) };
+}
+var simplify = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
+function segmentBlocked(a, b, obstacles) {
+  return obstacles.some((n) => a.x === b.x ? a.x > n.x && a.x < n.x + n.width && Math.max(a.y, b.y) > n.y && Math.min(a.y, b.y) < n.y + n.height : a.y > n.y && a.y < n.y + n.height && Math.max(a.x, b.x) > n.x && Math.min(a.x, b.x) < n.x + n.width);
+}
+function routeOrthogonal(start2, end, obstacles, { bendPenalty = 14, segmentCost = () => 0 } = {}) {
+  const xs = [.../* @__PURE__ */ new Set([start2.x, end.x, ...obstacles.flatMap((n) => [n.x, n.x + n.width])])].sort((a, b) => a - b);
+  const ys = [.../* @__PURE__ */ new Set([start2.y, end.y, ...obstacles.flatMap((n) => [n.y, n.y + n.height])])].sort((a, b) => a - b);
+  const points = [], byXY = /* @__PURE__ */ new Map();
+  for (const x of xs) for (const y of ys) if (!obstacles.some((n) => x > n.x && x < n.x + n.width && y > n.y && y < n.y + n.height)) {
+    byXY.set(x + "," + y, points.length);
+    points.push({ x, y });
+  }
+  const first = byXY.get(start2.x + "," + start2.y), last = byXY.get(end.x + "," + end.y);
+  if (first === void 0 || last === void 0) return null;
+  const links = points.map(() => []);
+  for (const axis of ["x", "y"]) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const [i, p] of points.entries()) {
+      const value = p[axis];
+      if (!groups.has(value)) groups.set(value, []);
+      groups.get(value).push(i);
+    }
+    for (const group of groups.values()) {
+      group.sort((a, b) => points[a][axis === "x" ? "y" : "x"] - points[b][axis === "x" ? "y" : "x"]);
+      for (let j = 1; j < group.length; j++) {
+        const a = group[j - 1], b = group[j];
+        if (!segmentBlocked(points[a], points[b], obstacles)) {
+          const length2 = Math.abs(points[a].x - points[b].x) + Math.abs(points[a].y - points[b].y);
+          links[a].push([b, length2, axis]);
+          links[b].push([a, length2, axis]);
+        }
+      }
+    }
+  }
+  const queue = [{ id: first, cost: 0, axis: "", path: [first] }], best = /* @__PURE__ */ new Map();
+  while (queue.length) {
+    queue.sort((a, b) => a.cost - b.cost);
+    const current = queue.shift(), key = current.id + current.axis;
+    if (best.has(key) && best.get(key) < current.cost) continue;
+    if (current.id === last) return current.path.map((i) => points[i]);
+    for (const [id, length2, axis] of links[current.id]) {
+      const cost = current.cost + length2 + (current.axis && current.axis !== axis ? bendPenalty : 0) + Math.max(0, Number(segmentCost(points[current.id], points[id])) || 0), key2 = id + axis;
+      if (best.has(key2) && best.get(key2) <= cost) continue;
+      best.set(key2, cost);
+      queue.push({ id, cost, axis, path: [...current.path, id] });
+    }
+  }
+  return null;
+}
+function endpoints(a, b, sourceFraction = 0.5, targetFraction = 0.5) {
+  const ac = centre(a), bc = centre(b), vertical = Math.abs(ac.y - bc.y) > Math.abs(ac.x - bc.x) * 0.5;
+  const normal = (side) => ({ NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } })[side];
+  const defaultDirection = vertical ? { x: 0, y: bc.y > ac.y ? 1 : -1 } : { x: bc.x > ac.x ? 1 : -1, y: 0 };
+  const sourceDirection = normal(a.kind === "port" ? a.portSide ?? a.side : "") ?? defaultDirection, targetDirection = normal(b.kind === "port" ? b.portSide ?? b.side : "") ?? { x: -defaultDirection.x, y: -defaultDirection.y };
+  const attachment2 = (node, direction, fraction) => direction.x ? { x: node.x + (direction.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (direction.y > 0 ? node.height : 0) };
+  return [attachment2(a, sourceDirection, sourceFraction), attachment2(b, targetDirection, targetFraction), sourceDirection, targetDirection];
+}
+function connectionObstacles(edge, nodes) {
+  const byID = new Map(nodes.map((n) => [n.id, n])), ancestors = /* @__PURE__ */ new Set(), leafPortOwners = /* @__PURE__ */ new Set();
+  for (const id of [edge.source, edge.target]) {
+    let node = byID.get(id);
+    if (node?.kind === "port" && node.parentId && !byID.get(node.parentId)?.headerHeight) leafPortOwners.add(node.parentId);
+    const seen = /* @__PURE__ */ new Set();
+    while (node?.parentId && !seen.has(node.parentId)) {
+      seen.add(node.parentId);
+      ancestors.add(node.parentId);
+      node = byID.get(node.parentId);
+    }
+  }
+  return nodes.filter((n) => (n.opacity ?? 1) > 0.08 && n.width > 0 && n.height > 0).flatMap((n) => ancestors.has(n.id) && !leafPortOwners.has(n.id) ? n.headerHeight ? [{ ...n, height: n.headerHeight }] : [] : [n]);
+}
+function route(a, b, nodes, options = {}) {
+  const [start2, end, direction, targetDirection] = endpoints(a, b, options.sourceFraction, options.targetFraction), clearance = options.clearance ?? 8;
+  let stub = { x: start2.x + direction.x * clearance, y: start2.y + direction.y * clearance }, finish = { x: end.x + targetDirection.x * clearance, y: end.y + targetDirection.y * clearance };
+  const obstacles = connectionObstacles({ source: a.id, target: b.id }, nodes).map((n) => ({ x: n.x - 4, y: n.y - 4, width: n.width + 8, height: n.height + 8 }));
+  let middle = routeOrthogonal(stub, finish, obstacles);
+  if (!middle && clearance > 4.1) {
+    stub = { x: start2.x + direction.x * 4.1, y: start2.y + direction.y * 4.1 };
+    finish = { x: end.x + targetDirection.x * 4.1, y: end.y + targetDirection.y * 4.1 };
+    middle = routeOrthogonal(stub, finish, obstacles);
+  }
+  const points = middle ? simplify([start2, ...middle, end]) : [];
+  return { points, d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), routingBlocked: !middle };
+}
+function lineCrossesRect(a, b, rect, padding = 0) {
+  const left = rect.x - padding, top = rect.y - padding, right = rect.x + rect.width + padding, bottom = rect.y + rect.height + padding;
+  let lo = 0, hi = 1;
+  for (const [origin, delta, min, max2] of [[a.x, b.x - a.x, left, right], [a.y, b.y - a.y, top, bottom]]) {
+    if (Math.abs(delta) < 1e-9) {
+      if (origin <= min || origin >= max2) return false;
+      continue;
+    }
+    let first = (min - origin) / delta, last = (max2 - origin) / delta;
+    if (first > last) [first, last] = [last, first];
+    lo = Math.max(lo, first);
+    hi = Math.min(hi, last);
+    if (lo >= hi) return false;
+  }
+  return hi > 0 && lo < 1;
+}
+function clearLeader(box, points, nodes, labels) {
+  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 }, targets = [...points, ...points.slice(1).map((p, i) => ({ x: (p.x + points[i].x) / 2, y: (p.y + points[i].y) / 2 }))];
+  targets.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
+  const to = targets.find((target) => !nodes.some((n) => n.width > 0 && n.height > 0 && lineCrossesRect(from, target, n, 2)) && !labels.some((label2) => lineCrossesRect(from, target, label2, 2)));
+  return to ? { from, to } : null;
+}
+function labelCandidates(points, width, height) {
+  const candidates2 = [];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    if (length2 < 8) continue;
+    for (const t of [0.5, 0.25, 0.75]) {
+      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      if (a.y === b.y) {
+        candidates2.push({ x: x - width / 2, y: y - height - 3, score: length2 }, { x: x - width / 2, y: y + 3, score: length2 - 1 });
+      } else candidates2.push({ x: x + 5, y: y - height / 2, score: length2 - 2 }, { x: x - width - 5, y: y - height / 2, score: length2 - 3 });
+    }
+  }
+  return candidates2.sort((a, b) => b.score - a.score);
+}
+function routeEdges(edges, nodes, options = {}) {
+  const byID = new Map(nodes.map((n) => [n.id, n])), labels = [], ports = /* @__PURE__ */ new Map();
+  const measured = (text) => {
+    const size = options.measureLabel?.(text);
+    return { width: Math.max(1, size?.width ?? String(text).length * 7.2 + 4), height: Math.max(1, size?.height ?? 16) };
+  };
+  const ordered = [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  for (const edge of ordered) for (const side of ["source", "target"]) {
+    const key = edge[side];
+    if (!ports.has(key)) ports.set(key, []);
+    ports.get(key).push({ edge, side });
+  }
+  const fraction = (edge, side) => {
+    const group = ports.get(edge[side]), index = group.findIndex((item) => item.edge === edge && item.side === side);
+    return group.length === 1 ? 0.5 : 0.2 + 0.6 * (index + 0.5) / group.length;
+  };
+  const area = options.area;
+  return edges.map((edge) => {
+    const a = byID.get(edge.source), b = byID.get(edge.target);
+    if (!a || !b) return null;
+    const result = { ...edge, ...route(a, b, nodes, { ...options, sourceFraction: fraction(edge, "source"), targetFraction: fraction(edge, "target") }) };
+    if (!edge.label || result.routingBlocked) return result;
+    const size = measured(edge.label), valid = (box) => !nodes.some((n) => n.width > 0 && n.height > 0 && overlaps2(box, n, 3)) && !labels.some((other) => overlaps2(box, other, 4)) && (!area || box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height);
+    let labelBox = labelCandidates(result.points, size.width, size.height).map((candidate) => ({ ...candidate, ...size })).find(valid);
+    if (!labelBox) {
+      const mid = result.points[1] ?? result.points[0], region = area ?? { x: Math.min(...nodes.map((n) => n.x)) - 80, y: Math.min(...nodes.map((n) => n.y)) - 40, width: Math.max(...nodes.map((n) => n.x + n.width)) - Math.min(...nodes.map((n) => n.x)) + 160, height: Math.max(...nodes.map((n) => n.y + n.height)) - Math.min(...nodes.map((n) => n.y)) + 80 };
+      const cards = nodes.filter((n) => n.width > 0 && n.height > 0);
+      const xs = [region.x, ...cards.flatMap((n) => [n.x + n.width / 2 - size.width / 2, n.x - size.width - 4, n.x + n.width + 4]), ...result.points.map((p) => p.x - size.width / 2)];
+      const ys = [region.y, ...cards.flatMap((n) => [n.y + n.height + 4, n.y - size.height - 4]), ...result.points.map((p) => p.y - size.height / 2)];
+      for (let y = region.y; y + size.height <= region.y + region.height; y += size.height + 5) ys.push(y);
+      for (let x = region.x; x + size.width <= region.x + region.width; x += Math.max(12, size.width / 2)) xs.push(x);
+      const slots = [];
+      for (const y of new Set(ys)) for (const x of new Set(xs)) {
+        const box = { x, y, ...size };
+        if (valid(box)) slots.push(box);
+      }
+      slots.sort((a2, b3) => Math.hypot(a2.x + a2.width / 2 - mid.x, a2.y + a2.height / 2 - mid.y) - Math.hypot(b3.x + b3.width / 2 - mid.x, b3.y + b3.height / 2 - mid.y));
+      for (const slot of slots) {
+        const leader = clearLeader(slot, result.points, nodes, labels);
+        if (leader) {
+          labelBox = slot;
+          result.labelLeader = leader;
+          break;
+        }
+      }
+    }
+    if (labelBox) {
+      labels.push(labelBox);
+      result.labelBox = labelBox;
+      result.x = labelBox.x;
+      result.y = labelBox.y + labelBox.height * 0.78;
+    } else result.labelOmitted = true;
+    return result;
+  }).filter(Boolean);
+}
+function fitDiagram(layout, area) {
+  const occupied = [...layout.nodes, ...layout.nodes.flatMap((n) => n.portLabelBox ? [n.portLabelBox] : []), ...layout.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], fit = fitNodes(occupied, area), scale = fit.scale;
+  const origin = occupied[0], fitted = fit.nodes[0], dx = origin ? fitted.x - origin.x * scale : area.x, dy = origin ? fitted.y - origin.y * scale : area.y;
+  const point = (p) => ({ x: p.x * scale + dx, y: p.y * scale + dy }), box = (n) => ({ ...n, ...point(n), width: n.width * scale, height: n.height * scale });
+  return { ...layout, scale, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point(p) })) };
+}
+function routeIsClear(points, edge, nodes, { orthogonalOnly = false } = {}) {
+  if (points.length < 2 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
+  const obstacles = connectionObstacles(edge, nodes);
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    if (orthogonalOnly && Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01) return false;
+    if (obstacles.some((n) => lineCrossesRect(a, b, { x: n.x + 0.05, y: n.y + 0.05, width: Math.max(0, n.width - 0.1), height: Math.max(0, n.height - 0.1) }))) return false;
+  }
+  return true;
+}
+function routeConnectsEndpoints(points, edge, nodes, tolerance = 0.7) {
+  const byID = new Map(nodes.map((n) => [n.id, n]));
+  const touches = (point, node) => {
+    if (!point || !node) return false;
+    if (!node.width && !node.height) return Math.hypot(point.x - node.x, point.y - node.y) <= tolerance;
+    const insideX = point.x >= node.x - tolerance && point.x <= node.x + node.width + tolerance, insideY = point.y >= node.y - tolerance && point.y <= node.y + node.height + tolerance;
+    return insideX && insideY && (Math.abs(point.x - node.x) <= tolerance || Math.abs(point.x - node.x - node.width) <= tolerance || Math.abs(point.y - node.y) <= tolerance || Math.abs(point.y - node.y - node.height) <= tolerance);
+  };
+  return points.length >= 2 && touches(points[0], byID.get(edge.source)) && touches(points.at(-1), byID.get(edge.target));
+}
+
+// src/canvas-prototype/peripheral-routing.mjs
+var eps = 0.05;
+var overlap2 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var length = (points) => points.slice(1).reduce((s, p, i) => s + Math.abs(p.x - points[i].x) + Math.abs(p.y - points[i].y), 0);
+var simplify2 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
+var segments = (points) => (points ?? []).slice(1).map((p, i) => [points[i], p]);
+function routeConflicts(points, otherPoints) {
+  const crossingPoints = /* @__PURE__ */ new Set();
+  let overlapLength = 0;
+  for (const [a, b] of segments(points)) for (const [c, d] of segments(otherPoints)) {
+    const av = Math.abs(a.x - b.x) < eps, cv = Math.abs(c.x - d.x) < eps;
+    if (av === cv) {
+      if (Math.abs((av ? a.x : a.y) - (cv ? c.x : c.y)) > eps) continue;
+      const common = Math.min(Math.max(av ? a.y : a.x, av ? b.y : b.x), Math.max(cv ? c.y : c.x, cv ? d.y : d.x)) - Math.max(Math.min(av ? a.y : a.x, av ? b.y : b.x), Math.min(cv ? c.y : c.x, cv ? d.y : d.x));
+      if (common > eps) overlapLength += common;
+    } else {
+      const v = av ? [a, b] : [c, d], h = av ? [c, d] : [a, b], x = v[0].x, y = h[0].y;
+      if (x >= Math.min(h[0].x, h[1].x) - eps && x <= Math.max(h[0].x, h[1].x) + eps && y >= Math.min(v[0].y, v[1].y) - eps && y <= Math.max(v[0].y, v[1].y) + eps) {
+        const isTerminal = (path) => [path[0], path.at(-1)].some((p) => Math.abs(p.x - x) < eps && Math.abs(p.y - y) < eps);
+        if (!(isTerminal(points) && isTerminal(otherPoints))) crossingPoints.add(`${Math.round(x / eps)},${Math.round(y / eps)}`);
+      }
+    }
+  }
+  return { crossings: crossingPoints.size, overlapLength };
+}
+function peripheralRoutingMetrics(edges, activeEdges = []) {
+  const metrics = { crossings: 0, overlapLength: 0, length: 0, bends: 0, blocked: 0 };
+  edges.forEach((edge, i) => {
+    if (!edge.points?.length) {
+      metrics.blocked++;
+      return;
+    }
+    metrics.length += length(edge.points);
+    metrics.bends += Math.max(0, edge.points.length - 2);
+    for (const other of [...activeEdges, ...edges.slice(0, i)]) {
+      const c = routeConflicts(edge.points, other.points);
+      metrics.crossings += c.crossings;
+      metrics.overlapLength += c.overlapLength;
+    }
+  });
+  return metrics;
+}
+function isLongPeripheralDetour(points) {
+  if ((points ?? []).length < 2) return false;
+  const first = points[0], last = points.at(-1), direct = Math.abs(first.x - last.x) + Math.abs(first.y - last.y), total = length(points);
+  return total - direct > 120 && total > direct * 3;
+}
+var peripheralRouteScore = (m) => m.blocked * 1e8 + m.crossings * 1e6 + m.overlapLength * 1e4 + m.length + m.bends * 12;
+var normals = { NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } };
+function terminals(a, b) {
+  if (!a.width && !a.height) return [{ point: { x: a.x, y: a.y }, stub: { x: a.x, y: a.y } }];
+  const dx = b.x + b.width / 2 - a.x - a.width / 2, dy = b.y + b.height / 2 - a.y - a.height / 2;
+  const preferred = Math.abs(dy) > Math.abs(dx) * 0.5 ? dy > 0 ? "SOUTH" : "NORTH" : dx > 0 ? "EAST" : "WEST";
+  const secondary = preferred === "NORTH" || preferred === "SOUTH" ? dx >= 0 ? "EAST" : "WEST" : dy >= 0 ? "SOUTH" : "NORTH";
+  const fixed = a.kind === "port" ? a.portSide ?? a.side : null;
+  return (fixed && normals[fixed] ? [fixed] : [preferred, secondary]).flatMap((side) => (fixed ? [0.5] : side === preferred ? [0.5, 0.25, 0.75] : [0.5]).map((f) => {
+    const n = normals[side], point = n.x ? { x: a.x + (n.x > 0 ? a.width : 0), y: a.y + a.height * f } : { x: a.x + a.width * f, y: a.y + (n.y > 0 ? a.height : 0) };
+    return { point, stub: { x: point.x + n.x * 8, y: point.y + n.y * 8 } };
+  }));
+}
+function cardObstacles(edge, nodes) {
+  const byID = new Map(nodes.map((n) => [n.id, n])), ancestors = /* @__PURE__ */ new Set(), leafPortOwners = /* @__PURE__ */ new Set();
+  for (const id of [edge.source, edge.target]) {
+    let n = byID.get(id);
+    if (n?.kind === "port" && n.parentId && !byID.get(n.parentId)?.headerHeight) leafPortOwners.add(n.parentId);
+    const seen = /* @__PURE__ */ new Set();
+    while (n?.parentId && !seen.has(n.parentId)) {
+      seen.add(n.parentId);
+      ancestors.add(n.parentId);
+      n = byID.get(n.parentId);
+    }
+  }
+  return nodes.filter((n) => n.width > 0 && n.height > 0).flatMap((n) => ancestors.has(n.id) && !leafPortOwners.has(n.id) ? n.headerHeight ? [{ ...n, height: n.headerHeight }] : [] : [n]);
+}
+var segmentHitsRect = (a, b, r) => Math.abs(a.x - b.x) < eps ? a.x > r.x + eps && a.x < r.x + r.width - eps && Math.max(a.y, b.y) > r.y + eps && Math.min(a.y, b.y) < r.y + r.height - eps : a.y > r.y + eps && a.y < r.y + r.height - eps && Math.max(a.x, b.x) > r.x + eps && Math.min(a.x, b.x) < r.x + r.width - eps;
+var segmentBox = (a, b, pad = 1) => ({ x: Math.min(a.x, b.x) - pad, y: Math.min(a.y, b.y) - pad, width: Math.abs(a.x - b.x) + pad * 2, height: Math.abs(a.y - b.y) + pad * 2 });
+var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap2(box, n, 3)) && !labels.some((r) => overlap2(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap2(box, segmentBox(a, b, 1))));
+function labelFor(edge, points, nodes, labels, paths, area, measureLabel) {
+  if (!edge.label) return null;
+  const measured = measureLabel?.(edge.label) ?? { width: String(edge.label).length * 6.5 + 4, height: 14 }, size = { width: Math.max(1, measured.width), height: Math.max(1, measured.height) }, slots = [];
+  for (const [a, b] of segments(points)) for (const t of [0.5, 0.25, 0.75]) {
+    const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+    if (Math.abs(a.y - b.y) < eps) slots.push({ x: x - size.width / 2, y: y - size.height - 4, ...size }, { x: x - size.width / 2, y: y + 4, ...size });
+    else slots.push({ x: x + 5, y: y - size.height / 2, ...size }, { x: x - size.width - 5, y: y - size.height / 2, ...size });
+  }
+  return slots.find((box) => clearLabel(box, nodes, labels, paths, area, measureLabel)) ?? null;
+}
+function routePeripheralEdges(edges, nodes, area, { activeEdges = [], obstacles = [], measureLabel, candidateBudget = 16, reverse = true, visibilitySearches = 2 } = {}) {
+  const byID = new Map(nodes.map((n) => [n.id, n])), activePaths = activeEdges.map((e) => e.points).filter((p) => p?.length), activeLabels = [...obstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])];
+  const run = (ordered2) => {
+    const results = [], labels = [...activeLabels];
+    for (const edge of ordered2) {
+      const a = byID.get(edge.source), b = byID.get(edge.target);
+      if (!a || !b) {
+        results.push({ ...edge, points: [], d: "", routingBlocked: true });
+        continue;
+      }
+      const paths = [...activePaths, ...results.map((e) => e.points)], hard = [...cardObstacles(edge, nodes).map((n) => ({ x: n.x - 4, y: n.y - 4, width: n.width + 8, height: n.height + 8 })), ...labels.map((r) => ({ x: r.x - 2, y: r.y - 2, width: r.width + 4, height: r.height + 4 }))];
+      const laneXs = [area.x + 2, area.x + area.width - 2, ...hard.flatMap((r) => [r.x, r.x + r.width]), ...paths.flatMap((points) => points.flatMap((p) => [p.x - 7, p.x + 7]))], laneYs = [area.y + 2, area.y + area.height - 2, ...hard.flatMap((r) => [r.y, r.y + r.height]), ...paths.flatMap((points) => points.flatMap((p) => [p.y - 7, p.y + 7]))];
+      const uniqueLanes = (values, mid, min, max2) => [...new Set(values)].filter((v) => v >= min && v <= max2).sort((a2, b3) => Math.abs(a2 - mid) - Math.abs(b3 - mid)).slice(0, candidateBudget <= 4 ? 4 : 12);
+      const xs = uniqueLanes(laneXs, (a.x + a.width / 2 + b.x + b.width / 2) / 2, area.x, area.x + area.width), ys = uniqueLanes(laneYs, (a.y + a.height / 2 + b.y + b.height / 2) / 2, area.y, area.y + area.height);
+      let best = null;
+      const inspect = (from, to, middle) => {
+        const points = simplify2([from.point, ...middle, to.point]);
+        if (points.some((p) => p.x < area.x || p.y < area.y || p.x > area.x + area.width || p.y > area.y + area.height) || !routeIsClear(points, edge, nodes)) return;
+        if (segments(points).some(([p, q]) => labels.some((r) => segmentHitsRect(p, q, r)))) return;
+        if (segments(middle).some(([p, q]) => hard.some((r) => segmentHitsRect(p, q, r)))) return;
+        const metric = peripheralRoutingMetrics([{ points }], paths.map((points2) => ({ points: points2 }))), score = peripheralRouteScore(metric);
+        if (best && score >= best.score) return;
+        const labelBox = labelFor(edge, points, nodes, labels, paths, area, measureLabel);
+        if (edge.label && !labelBox) return;
+        best = { points, labelBox, score };
+      };
+      const froms = terminals(a, b), tos = terminals(b, a), pairs = froms.flatMap((from, i) => tos.map((to, j) => ({ from, to, i, j }))).sort((a2, b3) => Math.abs(a2.i - a2.j) - Math.abs(b3.i - b3.j) || a2.i + a2.j - b3.i - b3.j).slice(0, Math.max(1, candidateBudget));
+      for (const { from, to } of pairs) {
+        const p = from.stub, q = to.stub;
+        inspect(from, to, [p, { x: p.x, y: q.y }, q]);
+        inspect(from, to, [p, { x: q.x, y: p.y }, q]);
+        for (const x of [.../* @__PURE__ */ new Set([(p.x + q.x) / 2, ...xs])]) inspect(from, to, [p, { x, y: p.y }, { x, y: q.y }, q]);
+        for (const y of [.../* @__PURE__ */ new Set([(p.y + q.y) / 2, ...ys])]) inspect(from, to, [p, { x: p.x, y }, { x: q.x, y }, q]);
+      }
+      if (candidateBudget > 4 && (!best || best.score >= 1e4)) for (const { from, to } of pairs) {
+        const p = from.stub, q = to.stub;
+        for (const x of [.../* @__PURE__ */ new Set([area.x + 2, area.x + area.width - 2, ...xs.slice(0, 2)])]) for (const y of [.../* @__PURE__ */ new Set([area.y + 2, area.y + area.height - 2, ...ys.slice(0, 2)])]) {
+          inspect(from, to, [p, { x, y: p.y }, { x, y }, { x: q.x, y }, q]);
+          inspect(from, to, [p, { x: p.x, y }, { x, y }, { x, y: q.y }, q]);
+        }
+      }
+      if (!best && candidateBudget > 4) for (const { from, to } of pairs.slice(0, visibilitySearches)) {
+        const middle = routeOrthogonal(from.stub, to.stub, hard, { bendPenalty: 12 });
+        if (middle) inspect(from, to, middle);
+      }
+      if (!best) {
+        results.push({ ...edge, points: [], d: "", routingBlocked: true, labelOmitted: !!edge.label });
+        continue;
+      }
+      const result = { ...edge, points: best.points, d: best.points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" "), routingBlocked: false };
+      if (best.labelBox) {
+        labels.push(best.labelBox);
+        result.labelBox = best.labelBox;
+        result.x = best.labelBox.x;
+        result.y = best.labelBox.y + best.labelBox.height * 0.78;
+      }
+      results.push(result);
+    }
+    return { edges: results, metrics: peripheralRoutingMetrics(results, activeEdges) };
+  };
+  const ordered = [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id))), first = run(ordered);
+  if (!reverse || !first.metrics.crossings && !first.metrics.overlapLength && !first.metrics.blocked) return first;
+  const second = run([...ordered].reverse());
+  return peripheralRouteScore(second.metrics) < peripheralRouteScore(first.metrics) ? second : first;
+}
+
+// src/canvas-prototype/peripheral.mjs
+var overlaps3 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 var inside = (r, a) => r.x >= a.x && r.y >= a.y && r.x + r.width <= a.x + a.width && r.y + r.height <= a.y + a.height;
 function segmentCrosses(a, b, r, pad = 2) {
   const box = { x: r.x - pad, y: r.y - pad, width: r.width + 2 * pad, height: r.height + 2 * pad };
@@ -1266,8 +1642,8 @@ function attachment(node, side, fraction) {
 function candidates(edge, anchor, area, measureLabel) {
   const order = decisionOrder(edge), sides = order ? [order.above === anchor.id ? "SOUTH" : "NORTH"] : ["NORTH", "SOUTH", "EAST", "WEST"];
   const label2 = edge.label || edge.kind, size = measureLabel?.(label2) ?? { width: String(label2).length * 6.5 + 4, height: 14 }, out = [];
-  for (const side of sides) for (const fraction of [0.5, 0.25, 0.75, 0.125, 0.875]) for (const length of [28, 36, 20]) {
-    const d = directions[side], start2 = attachment(anchor, side, fraction), end = { x: start2.x + d.x * length, y: start2.y + d.y * length };
+  for (const side of sides) for (const fraction of [0.5, 0.4, 0.6, 0.25, 0.75, 0.125, 0.875, 0.2, 0.8]) for (const length2 of [28, 36, 20]) {
+    const d = directions[side], start2 = attachment(anchor, side, fraction), end = { x: start2.x + d.x * length2, y: start2.y + d.y * length2 };
     const markerBox = { x: end.x - 5, y: end.y - 5, width: 10, height: 10 };
     if (!inside(markerBox, area)) continue;
     const middle = { x: (start2.x + end.x) / 2, y: (start2.y + end.y) / 2 };
@@ -1277,15 +1653,59 @@ function candidates(edge, anchor, area, measureLabel) {
   return out;
 }
 function preparePeripheral(context, activeNodes, area, options = {}) {
-  const { obstacles = [], measureLabel } = options;
-  const placed = positionSurrounding(context, activeNodes, area, options), active2 = new Map(activeNodes.map((n) => [n.id, n]));
+  const { obstacles = [], measureLabel, activeEdges = [], labelObstacles = [] } = options;
+  const active2 = new Map(activeNodes.map((n) => [n.id, n]));
+  const routingOptions = { activeEdges, obstacles: labelObstacles, measureLabel };
+  const fullRoutes = (placed2) => {
+    const ids = new Set([...activeNodes, ...placed2.nodes].map((n) => n.id));
+    return routePeripheralEdges(context.view.edges.filter((e) => ids.has(e.source) && ids.has(e.target)), [...activeNodes, ...placed2.nodes], area, routingOptions);
+  };
+  let placed = positionSurrounding(context, activeNodes, area, options), routing = fullRoutes(placed);
+  if (routing.metrics.crossings || routing.metrics.overlapLength || routing.metrics.blocked) {
+    const placementScore = (candidate, node, known) => context.view.edges.filter((e) => e.source === node.id || e.target === node.id).reduce((score, e) => {
+      const other = known.get(e.source === node.id ? e.target : e.source);
+      if (!other) return score;
+      const a = { x: candidate.x + candidate.width / 2, y: candidate.y + candidate.height / 2 }, b = { x: other.x + other.width / 2, y: other.y + other.height / 2 }, path = [a, { x: a.x, y: b.y }, b];
+      return score + activeEdges.reduce((sum, edge) => {
+        const c = routeConflicts(path, edge.points);
+        return sum + c.crossings * 1e4 + c.overlapLength * 100;
+      }, 0);
+    }, 0);
+    const alternative = positionSurrounding(context, activeNodes, area, { ...options, placementScore }), alternativeRouting = fullRoutes(alternative);
+    if (alternative.nodes.length >= placed.nodes.length && peripheralRouteScore(alternativeRouting.metrics) < peripheralRouteScore(routing.metrics)) {
+      placed = alternative;
+      routing = alternativeRouting;
+    }
+  }
+  const continuedCards = [];
+  const longDetour = (edge) => isLongPeripheralDetour(edge.points);
+  while ((routing.metrics.crossings >= 2 || routing.metrics.overlapLength || routing.edges.some(longDetour)) && placed.nodes.length) {
+    const scores = placed.nodes.map((node) => ({ node, score: routing.edges.filter((e) => e.source === node.id || e.target === node.id).reduce((sum, edge) => sum + (longDetour(edge) ? 1e3 : 0) + [...activeEdges, ...routing.edges.filter((e) => e.id !== edge.id)].reduce((value, other) => {
+      const c = routeConflicts(edge.points, other.points);
+      return value + c.crossings * 1e3 + c.overlapLength * 10;
+    }, 0), 0) })).sort((a, b) => b.score - a.score || String(a.node.id).localeCompare(String(b.node.id)));
+    if (!scores[0]?.score) break;
+    const removed = scores[0].node, links = routing.edges.filter((e) => e.source === removed.id || e.target === removed.id), reason = links.some(longDetour) ? "long-detour" : links.some((edge) => [...activeEdges, ...routing.edges.filter((e) => e.id !== edge.id)].some((other) => routeConflicts(edge.points, other.points).overlapLength)) ? "shared-route" : "dense-crossing";
+    continuedCards.push({ ...removed, continuationReason: reason });
+    placed = { ...placed, nodes: placed.nodes.filter((n) => n.id !== removed.id) };
+    routing = fullRoutes(placed);
+  }
+  const routedByID = new Map(routing.edges.map((e) => [e.id, e]));
+  const connected = new Set(routing.edges.filter((e) => !e.routingBlocked).flatMap((e) => [e.source, e.target]));
+  placed = { ...placed, nodes: placed.nodes.filter((n) => connected.has(n.id)) };
   const cards = new Map(placed.nodes.map((n) => [n.id, n])), missing = new Map(context.view.nodes.filter((n) => !cards.has(n.id)).map((n) => [n.id, n]));
   const nodes = placed.nodes, boundaryMarkers = [], edges = [], stubEdges = [], omissions = [...placed.omissions];
-  const occupied = [...activeNodes, ...nodes, ...obstacles], reserved = [], paths = [];
+  const occupied = [...activeNodes, ...nodes, ...obstacles], reserved = routing.edges.flatMap((e) => e.labelBox ? [e.labelBox] : []), paths = [...activeEdges, ...routing.edges.filter((e) => !e.routingBlocked)].flatMap((e) => (e.points ?? []).slice(1).map((end, i) => {
+    const start2 = e.points[i];
+    return { start: start2, end, x: Math.min(start2.x, end.x), y: Math.min(start2.y, end.y), width: Math.abs(start2.x - end.x), height: Math.abs(start2.y - end.y) };
+  })), routedEdges = [];
   for (const edge of context.view.edges) {
     const sourceKnown = active2.has(edge.source) || cards.has(edge.source), targetKnown = active2.has(edge.target) || cards.has(edge.target);
     if (sourceKnown && targetKnown) {
+      const routed = routedByID.get(edge.id);
       edges.push(edge);
+      if (routed && !routed.routingBlocked) routedEdges.push(routed);
+      else omissions.push({ relationshipId: edge.semanticId ?? edge.id, reason: "context-route-space" });
       continue;
     }
     const anchor = active2.get(edge.source) ?? active2.get(edge.target), neighbor = missing.get(edge.source) ?? missing.get(edge.target);
@@ -1293,14 +1713,20 @@ function preparePeripheral(context, activeNodes, area, options = {}) {
       omissions.push({ relationshipId: edge.semanticId ?? edge.id, target: neighbor?.semanticId ?? edge.semanticTarget, reason: "context-link-space" });
       continue;
     }
-    const choice = candidates(edge, anchor, area, measureLabel).find((candidate) => {
-      if (occupied.some((n) => overlaps2(candidate.markerBox, n, 3) || overlaps2(candidate.labelBox, n, 3))) return false;
-      if (reserved.some((r) => overlaps2(candidate.markerBox, r, 4) || overlaps2(candidate.labelBox, r, 4))) return false;
+    const choices = candidates(edge, anchor, area, measureLabel).filter((candidate) => {
+      if (occupied.some((n) => overlaps3(candidate.markerBox, n, 3) || overlaps3(candidate.labelBox, n, 3))) return false;
+      if (reserved.some((r) => overlaps3(candidate.markerBox, r, 4) || overlaps3(candidate.labelBox, r, 4))) return false;
       if (occupied.some((n) => n.id !== anchor.id && segmentCrosses(candidate.start, candidate.end, n))) return false;
       if (reserved.some((r) => segmentCrosses(candidate.start, candidate.end, r))) return false;
       if (paths.some((path) => segmentCrosses(candidate.start, candidate.end, path, 4) || segmentCrosses(path.start, path.end, candidate.labelBox, 3) || segmentCrosses(path.start, path.end, candidate.markerBox, 3))) return false;
       return true;
     });
+    const candidateCost = (candidate) => paths.reduce((score, path) => {
+      const c = routeConflicts([candidate.start, candidate.end], [path.start, path.end]);
+      return score + c.crossings * 1e4 + c.overlapLength * 100;
+    }, 0);
+    choices.sort((a, b) => candidateCost(a) - candidateCost(b));
+    const choice = choices[0];
     if (!choice) {
       omissions.push({ relationshipId: edge.semanticId ?? edge.id, target: neighbor.semanticId, anchor: anchor.semanticId, reason: "context-continuation-space" });
       continue;
@@ -1315,7 +1741,12 @@ function preparePeripheral(context, activeNodes, area, options = {}) {
   }
   const byReason = {};
   for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
-  return { ...placed, nodes, edges, stubEdges, boundaryMarkers, omissions, boundary: { ...placed.boundary, cards: nodes.length, markers: boundaryMarkers.length, omitted: omissions.length, byReason } };
+  const finalized = [...routedEdges, ...stubEdges], routingMetrics = peripheralRoutingMetrics(finalized, activeEdges);
+  const notices = routingMetrics.crossings || routingMetrics.overlapLength ? [{ reason: "context-route-conflict", ...routingMetrics }] : [];
+  if (continuedCards.length) notices.push({ reason: "context-route-continuation", targets: continuedCards.map((n) => n.semanticId), reasons: continuedCards.map((n) => ({ target: n.semanticId, reason: n.continuationReason })), continued: stubEdges.length });
+  const fallbacks = routing.edges.filter((e) => e.routingBlocked);
+  if (fallbacks.length) notices.push({ reason: "context-route-fallback", relationships: fallbacks.map((e) => e.semanticId ?? e.id), continued: fallbacks.filter((e) => stubEdges.some((stub) => stub.id === e.id)).length, unrepresented: fallbacks.filter((e) => !stubEdges.some((stub) => stub.id === e.id)).length });
+  return { ...placed, nodes, edges, stubEdges, routedEdges: finalized, routingMetrics, notices, boundaryMarkers, omissions, boundary: { ...placed.boundary, cards: nodes.length, markers: boundaryMarkers.length, omitted: omissions.length, byReason } };
 }
 
 // src/canvas-prototype/motion.mjs
@@ -1427,237 +1858,14 @@ function measureCard(document2, node, detail) {
   return { width, height };
 }
 
-// src/canvas-prototype/geometry.mjs
-var overlaps3 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
-var centre = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
-function graphArea(width, height, panels = []) {
-  const left = 16, top = 16, right = Math.max(left + 1, width - 16), bottom = Math.max(top + 1, height - 60);
-  const xs = [left, right, ...panels.flatMap((p) => [Math.max(left, p.x - 16), Math.min(right, p.x + p.width + 16)])];
-  const ys = [top, bottom, ...panels.flatMap((p) => [Math.max(top, p.y - 16), Math.min(bottom, p.y + p.height + 16)])];
-  const candidates2 = [];
-  for (const x of xs) for (const r of xs) for (const y of ys) for (const b of ys) {
-    const rect = { x, y, width: r - x, height: b - y };
-    if (rect.width > 0 && rect.height > 0 && !panels.some((p) => overlaps3(rect, p))) candidates2.push(rect);
-  }
-  return candidates2.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? { x: left, y: top, width: right - left, height: bottom - top };
-}
-function fitNodes(nodes, area) {
-  const minX = nodes.length ? Math.min(...nodes.map((n) => n.x)) : 0, minY = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 0;
-  const maxX = nodes.length ? Math.max(...nodes.map((n) => n.x + n.width)) : 1, maxY = nodes.length ? Math.max(...nodes.map((n) => n.y + n.height)) : 1;
-  const scale = Math.min(1.4, area.width / (maxX - minX + 20), area.height / (maxY - minY + 20));
-  const offsetX = area.x + (area.width - (maxX - minX) * scale) / 2 - minX * scale, offsetY = area.y + (area.height - (maxY - minY) * scale) / 2 - minY * scale;
-  return { scale, nodes: nodes.map((n) => ({ ...n, x: n.x * scale + offsetX, y: n.y * scale + offsetY, width: n.width * scale, height: n.height * scale })) };
-}
-var simplify = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
-function segmentBlocked(a, b, obstacles) {
-  return obstacles.some((n) => a.x === b.x ? a.x > n.x && a.x < n.x + n.width && Math.max(a.y, b.y) > n.y && Math.min(a.y, b.y) < n.y + n.height : a.y > n.y && a.y < n.y + n.height && Math.max(a.x, b.x) > n.x && Math.min(a.x, b.x) < n.x + n.width);
-}
-function routeOrthogonal(start2, end, obstacles, { bendPenalty = 14, segmentCost = () => 0 } = {}) {
-  const xs = [.../* @__PURE__ */ new Set([start2.x, end.x, ...obstacles.flatMap((n) => [n.x, n.x + n.width])])].sort((a, b) => a - b);
-  const ys = [.../* @__PURE__ */ new Set([start2.y, end.y, ...obstacles.flatMap((n) => [n.y, n.y + n.height])])].sort((a, b) => a - b);
-  const points = [], byXY = /* @__PURE__ */ new Map();
-  for (const x of xs) for (const y of ys) if (!obstacles.some((n) => x > n.x && x < n.x + n.width && y > n.y && y < n.y + n.height)) {
-    byXY.set(x + "," + y, points.length);
-    points.push({ x, y });
-  }
-  const first = byXY.get(start2.x + "," + start2.y), last = byXY.get(end.x + "," + end.y);
-  if (first === void 0 || last === void 0) return null;
-  const links = points.map(() => []);
-  for (const axis of ["x", "y"]) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const [i, p] of points.entries()) {
-      const value = p[axis];
-      if (!groups.has(value)) groups.set(value, []);
-      groups.get(value).push(i);
-    }
-    for (const group of groups.values()) {
-      group.sort((a, b) => points[a][axis === "x" ? "y" : "x"] - points[b][axis === "x" ? "y" : "x"]);
-      for (let j = 1; j < group.length; j++) {
-        const a = group[j - 1], b = group[j];
-        if (!segmentBlocked(points[a], points[b], obstacles)) {
-          const length = Math.abs(points[a].x - points[b].x) + Math.abs(points[a].y - points[b].y);
-          links[a].push([b, length, axis]);
-          links[b].push([a, length, axis]);
-        }
-      }
-    }
-  }
-  const queue = [{ id: first, cost: 0, axis: "", path: [first] }], best = /* @__PURE__ */ new Map();
-  while (queue.length) {
-    queue.sort((a, b) => a.cost - b.cost);
-    const current = queue.shift(), key = current.id + current.axis;
-    if (best.has(key) && best.get(key) < current.cost) continue;
-    if (current.id === last) return current.path.map((i) => points[i]);
-    for (const [id, length, axis] of links[current.id]) {
-      const cost = current.cost + length + (current.axis && current.axis !== axis ? bendPenalty : 0) + Math.max(0, Number(segmentCost(points[current.id], points[id])) || 0), key2 = id + axis;
-      if (best.has(key2) && best.get(key2) <= cost) continue;
-      best.set(key2, cost);
-      queue.push({ id, cost, axis, path: [...current.path, id] });
-    }
-  }
-  return null;
-}
-function endpoints(a, b, sourceFraction = 0.5, targetFraction = 0.5) {
-  const ac = centre(a), bc = centre(b), vertical = Math.abs(ac.y - bc.y) > Math.abs(ac.x - bc.x) * 0.5;
-  const normal = (side) => ({ NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } })[side];
-  const defaultDirection = vertical ? { x: 0, y: bc.y > ac.y ? 1 : -1 } : { x: bc.x > ac.x ? 1 : -1, y: 0 };
-  const sourceDirection = normal(a.kind === "port" ? a.portSide ?? a.side : "") ?? defaultDirection, targetDirection = normal(b.kind === "port" ? b.portSide ?? b.side : "") ?? { x: -defaultDirection.x, y: -defaultDirection.y };
-  const attachment2 = (node, direction, fraction) => direction.x ? { x: node.x + (direction.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (direction.y > 0 ? node.height : 0) };
-  return [attachment2(a, sourceDirection, sourceFraction), attachment2(b, targetDirection, targetFraction), sourceDirection, targetDirection];
-}
-function connectionObstacles(edge, nodes) {
-  const byID = new Map(nodes.map((n) => [n.id, n])), ancestors = /* @__PURE__ */ new Set(), leafPortOwners = /* @__PURE__ */ new Set();
-  for (const id of [edge.source, edge.target]) {
-    let node = byID.get(id);
-    if (node?.kind === "port" && node.parentId && !byID.get(node.parentId)?.headerHeight) leafPortOwners.add(node.parentId);
-    const seen = /* @__PURE__ */ new Set();
-    while (node?.parentId && !seen.has(node.parentId)) {
-      seen.add(node.parentId);
-      ancestors.add(node.parentId);
-      node = byID.get(node.parentId);
-    }
-  }
-  return nodes.filter((n) => (n.opacity ?? 1) > 0.08 && n.width > 0 && n.height > 0).flatMap((n) => ancestors.has(n.id) && !leafPortOwners.has(n.id) ? n.headerHeight ? [{ ...n, height: n.headerHeight }] : [] : [n]);
-}
-function route(a, b, nodes, options = {}) {
-  const [start2, end, direction, targetDirection] = endpoints(a, b, options.sourceFraction, options.targetFraction), clearance = options.clearance ?? 8;
-  let stub = { x: start2.x + direction.x * clearance, y: start2.y + direction.y * clearance }, finish = { x: end.x + targetDirection.x * clearance, y: end.y + targetDirection.y * clearance };
-  const obstacles = connectionObstacles({ source: a.id, target: b.id }, nodes).map((n) => ({ x: n.x - 4, y: n.y - 4, width: n.width + 8, height: n.height + 8 }));
-  let middle = routeOrthogonal(stub, finish, obstacles);
-  if (!middle && clearance > 4.1) {
-    stub = { x: start2.x + direction.x * 4.1, y: start2.y + direction.y * 4.1 };
-    finish = { x: end.x + targetDirection.x * 4.1, y: end.y + targetDirection.y * 4.1 };
-    middle = routeOrthogonal(stub, finish, obstacles);
-  }
-  const points = middle ? simplify([start2, ...middle, end]) : [];
-  return { points, d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), routingBlocked: !middle };
-}
-function lineCrossesRect(a, b, rect, padding = 0) {
-  const left = rect.x - padding, top = rect.y - padding, right = rect.x + rect.width + padding, bottom = rect.y + rect.height + padding;
-  let lo = 0, hi = 1;
-  for (const [origin, delta, min, max2] of [[a.x, b.x - a.x, left, right], [a.y, b.y - a.y, top, bottom]]) {
-    if (Math.abs(delta) < 1e-9) {
-      if (origin <= min || origin >= max2) return false;
-      continue;
-    }
-    let first = (min - origin) / delta, last = (max2 - origin) / delta;
-    if (first > last) [first, last] = [last, first];
-    lo = Math.max(lo, first);
-    hi = Math.min(hi, last);
-    if (lo >= hi) return false;
-  }
-  return hi > 0 && lo < 1;
-}
-function clearLeader(box, points, nodes, labels) {
-  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 }, targets = [...points, ...points.slice(1).map((p, i) => ({ x: (p.x + points[i].x) / 2, y: (p.y + points[i].y) / 2 }))];
-  targets.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
-  const to = targets.find((target) => !nodes.some((n) => n.width > 0 && n.height > 0 && lineCrossesRect(from, target, n, 2)) && !labels.some((label2) => lineCrossesRect(from, target, label2, 2)));
-  return to ? { from, to } : null;
-}
-function labelCandidates(points, width, height) {
-  const candidates2 = [];
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i], length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-    if (length < 8) continue;
-    for (const t of [0.5, 0.25, 0.75]) {
-      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-      if (a.y === b.y) {
-        candidates2.push({ x: x - width / 2, y: y - height - 3, score: length }, { x: x - width / 2, y: y + 3, score: length - 1 });
-      } else candidates2.push({ x: x + 5, y: y - height / 2, score: length - 2 }, { x: x - width - 5, y: y - height / 2, score: length - 3 });
-    }
-  }
-  return candidates2.sort((a, b) => b.score - a.score);
-}
-function routeEdges(edges, nodes, options = {}) {
-  const byID = new Map(nodes.map((n) => [n.id, n])), labels = [], ports = /* @__PURE__ */ new Map();
-  const measured = (text) => {
-    const size = options.measureLabel?.(text);
-    return { width: Math.max(1, size?.width ?? String(text).length * 7.2 + 4), height: Math.max(1, size?.height ?? 16) };
-  };
-  const ordered = [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-  for (const edge of ordered) for (const side of ["source", "target"]) {
-    const key = edge[side];
-    if (!ports.has(key)) ports.set(key, []);
-    ports.get(key).push({ edge, side });
-  }
-  const fraction = (edge, side) => {
-    const group = ports.get(edge[side]), index = group.findIndex((item) => item.edge === edge && item.side === side);
-    return group.length === 1 ? 0.5 : 0.2 + 0.6 * (index + 0.5) / group.length;
-  };
-  const area = options.area;
-  return edges.map((edge) => {
-    const a = byID.get(edge.source), b = byID.get(edge.target);
-    if (!a || !b) return null;
-    const result = { ...edge, ...route(a, b, nodes, { ...options, sourceFraction: fraction(edge, "source"), targetFraction: fraction(edge, "target") }) };
-    if (!edge.label || result.routingBlocked) return result;
-    const size = measured(edge.label), valid = (box) => !nodes.some((n) => n.width > 0 && n.height > 0 && overlaps3(box, n, 3)) && !labels.some((other) => overlaps3(box, other, 4)) && (!area || box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height);
-    let labelBox = labelCandidates(result.points, size.width, size.height).map((candidate) => ({ ...candidate, ...size })).find(valid);
-    if (!labelBox) {
-      const mid = result.points[1] ?? result.points[0], region = area ?? { x: Math.min(...nodes.map((n) => n.x)) - 80, y: Math.min(...nodes.map((n) => n.y)) - 40, width: Math.max(...nodes.map((n) => n.x + n.width)) - Math.min(...nodes.map((n) => n.x)) + 160, height: Math.max(...nodes.map((n) => n.y + n.height)) - Math.min(...nodes.map((n) => n.y)) + 80 };
-      const cards = nodes.filter((n) => n.width > 0 && n.height > 0);
-      const xs = [region.x, ...cards.flatMap((n) => [n.x + n.width / 2 - size.width / 2, n.x - size.width - 4, n.x + n.width + 4]), ...result.points.map((p) => p.x - size.width / 2)];
-      const ys = [region.y, ...cards.flatMap((n) => [n.y + n.height + 4, n.y - size.height - 4]), ...result.points.map((p) => p.y - size.height / 2)];
-      for (let y = region.y; y + size.height <= region.y + region.height; y += size.height + 5) ys.push(y);
-      for (let x = region.x; x + size.width <= region.x + region.width; x += Math.max(12, size.width / 2)) xs.push(x);
-      const slots = [];
-      for (const y of new Set(ys)) for (const x of new Set(xs)) {
-        const box = { x, y, ...size };
-        if (valid(box)) slots.push(box);
-      }
-      slots.sort((a2, b3) => Math.hypot(a2.x + a2.width / 2 - mid.x, a2.y + a2.height / 2 - mid.y) - Math.hypot(b3.x + b3.width / 2 - mid.x, b3.y + b3.height / 2 - mid.y));
-      for (const slot of slots) {
-        const leader = clearLeader(slot, result.points, nodes, labels);
-        if (leader) {
-          labelBox = slot;
-          result.labelLeader = leader;
-          break;
-        }
-      }
-    }
-    if (labelBox) {
-      labels.push(labelBox);
-      result.labelBox = labelBox;
-      result.x = labelBox.x;
-      result.y = labelBox.y + labelBox.height * 0.78;
-    } else result.labelOmitted = true;
-    return result;
-  }).filter(Boolean);
-}
-function fitDiagram(layout, area) {
-  const occupied = [...layout.nodes, ...layout.nodes.flatMap((n) => n.portLabelBox ? [n.portLabelBox] : []), ...layout.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], fit = fitNodes(occupied, area), scale = fit.scale;
-  const origin = occupied[0], fitted = fit.nodes[0], dx = origin ? fitted.x - origin.x * scale : area.x, dy = origin ? fitted.y - origin.y * scale : area.y;
-  const point = (p) => ({ x: p.x * scale + dx, y: p.y * scale + dy }), box = (n) => ({ ...n, ...point(n), width: n.width * scale, height: n.height * scale });
-  return { ...layout, scale, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point(p) })) };
-}
-function routeIsClear(points, edge, nodes, { orthogonalOnly = false } = {}) {
-  if (points.length < 2 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
-  const obstacles = connectionObstacles(edge, nodes);
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i];
-    if (orthogonalOnly && Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01) return false;
-    if (obstacles.some((n) => lineCrossesRect(a, b, { x: n.x + 0.05, y: n.y + 0.05, width: Math.max(0, n.width - 0.1), height: Math.max(0, n.height - 0.1) }))) return false;
-  }
-  return true;
-}
-function routeConnectsEndpoints(points, edge, nodes, tolerance = 0.7) {
-  const byID = new Map(nodes.map((n) => [n.id, n]));
-  const touches = (point, node) => {
-    if (!point || !node) return false;
-    if (!node.width && !node.height) return Math.hypot(point.x - node.x, point.y - node.y) <= tolerance;
-    const insideX = point.x >= node.x - tolerance && point.x <= node.x + node.width + tolerance, insideY = point.y >= node.y - tolerance && point.y <= node.y + node.height + tolerance;
-    return insideX && insideY && (Math.abs(point.x - node.x) <= tolerance || Math.abs(point.x - node.x - node.width) <= tolerance || Math.abs(point.y - node.y) <= tolerance || Math.abs(point.y - node.y - node.height) <= tolerance);
-  };
-  return points.length >= 2 && touches(points[0], byID.get(edge.source)) && touches(points.at(-1), byID.get(edge.target));
-}
-
 // src/canvas-prototype/elk-layout.mjs
 var import_elk_api = __toESM(require_elk_api(), 1);
 var createLayoutEngine = (options) => new import_elk_api.default({ algorithms: ["layered"], ...options });
 var behavioralKinds = /* @__PURE__ */ new Set(["action", "activity", "state"]);
 var sizes = /* @__PURE__ */ new Map([["initial", [28, 28]], ["final", [32, 32]], ["fork", [80, 8]], ["join", [80, 8]], ["decision", [44, 44]], ["merge", [44, 44]], ["start", [28, 28]], ["end", [32, 32]]]);
-var overlap2 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var overlap3 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 var segmentHits = (a, b, n) => a.x === b.x ? a.x > n.x + 0.01 && a.x < n.x + n.width - 0.01 && Math.max(a.y, b.y) > n.y + 0.01 && Math.min(a.y, b.y) < n.y + n.height - 0.01 : a.y === b.y && a.y > n.y + 0.01 && a.y < n.y + n.height - 0.01 && Math.max(a.x, b.x) > n.x + 0.01 && Math.min(a.x, b.x) < n.x + n.width - 0.01;
-var simplify2 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
+var simplify3 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
 var num = (value, fallback) => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
 function dimensions(node) {
   const symbol = sizes.get(node.kind);
@@ -1821,7 +2029,7 @@ function readLayout(view, data, laid, options, profile) {
     const { edge } = record, native = data.edgeMap.get(edge.id);
     if (!native) continue;
     const container = positions.get(edge.container), x = container?.x ?? record.x, y = container?.y ?? record.y;
-    const points = simplify2((edge.sections ?? []).flatMap((s) => [s.startPoint, ...s.bendPoints ?? [], s.endPoint]).map((p) => ({ x: p.x + x, y: p.y + y })));
+    const points = simplify3((edge.sections ?? []).flatMap((s) => [s.startPoint, ...s.bendPoints ?? [], s.endPoint]).map((p) => ({ x: p.x + x, y: p.y + y })));
     const label2 = edge.labels?.[0], labelBox = label2 ? { x: label2.x + x, y: label2.y + y, width: label2.width, height: label2.height } : void 0;
     const first = data.anchors.get(edge.sources?.[0]), last = data.anchors.get(edge.targets?.[0]);
     routes.set(native.edge.id, { ...native.edge, points: native.reversed ? [...points].reverse() : points, ...labelBox ? { labelBox, x: labelBox.x, y: labelBox.y + labelBox.height * 0.78 } : {}, sourceAnchor: native.reversed ? last : first, targetAnchor: native.reversed ? first : last, routingEngine: "elk-layered" });
@@ -1848,14 +2056,14 @@ function readLayout(view, data, laid, options, profile) {
       edge.points = [];
       edge.routingBlocked = true;
     }
-    if (edge.labelBox && (![edge.labelBox.x, edge.labelBox.y, edge.labelBox.width, edge.labelBox.height].every(Number.isFinite) || obstacles.some((n) => overlap2(edge.labelBox, n, 2)))) {
+    if (edge.labelBox && (![edge.labelBox.x, edge.labelBox.y, edge.labelBox.width, edge.labelBox.height].every(Number.isFinite) || obstacles.some((n) => overlap3(edge.labelBox, n, 2)))) {
       delete edge.labelBox;
       edge.labelOmitted = true;
       diagnostics.push({ reason: "unplaceable-connection-label", relationshipId: native.id });
     }
     return edge;
   });
-  for (let i = 0; i < edges.length; i++) for (let j = 0; j < i; j++) if (edges[i].labelBox && edges[j].labelBox && overlap2(edges[i].labelBox, edges[j].labelBox, 2)) {
+  for (let i = 0; i < edges.length; i++) for (let j = 0; j < i; j++) if (edges[i].labelBox && edges[j].labelBox && overlap3(edges[i].labelBox, edges[j].labelBox, 2)) {
     delete edges[i].labelBox;
     edges[i].labelOmitted = true;
     diagnostics.push({ reason: "unplaceable-connection-label", relationshipId: edges[i].id });
@@ -1916,12 +2124,12 @@ function facingSides(view) {
   return sides;
 }
 function scoreLayout(candidate, area) {
-  let length = 0, bends = 0, stretch = 0, crossings = 0;
+  let length2 = 0, bends = 0, stretch = 0, crossings = 0;
   for (const edge of candidate.edges) {
     const points = edge.points;
     let route2 = 0;
     for (let i = 1; i < points.length; i++) route2 += Math.abs(points[i].x - points[i - 1].x) + Math.abs(points[i].y - points[i - 1].y);
-    length += route2;
+    length2 += route2;
     bends += Math.max(0, points.length - 2);
     if (points.length > 1) {
       const direct = Math.abs(points[0].x - points.at(-1).x) + Math.abs(points[0].y - points.at(-1).y);
@@ -1942,8 +2150,8 @@ function scoreLayout(candidate, area) {
   const scale = Math.min(1, area.width / (candidate.bounds.width + 20), area.height / (candidate.bounds.height + 20));
   candidate.layoutFitScale = scale;
   const extent = candidate.nodes.reduce((sum, n) => sum + n.width + n.height, 0);
-  candidate.layoutMetrics = { pathLength: length, bends, pathStretch: stretch, crossings };
-  candidate.layoutScore = candidate.diagnostics.length * 1e4 + 3 / Math.max(0.01, scale) + length / Math.max(1, extent) * 0.45 + stretch * 0.3 + bends * 0.05 + crossings * 0.6 + candidate.bounds.width * candidate.bounds.height / 1e8;
+  candidate.layoutMetrics = { pathLength: length2, bends, pathStretch: stretch, crossings };
+  candidate.layoutScore = candidate.diagnostics.length * 1e4 + 3 / Math.max(0.01, scale) + length2 / Math.max(1, extent) * 0.45 + stretch * 0.3 + bends * 0.05 + crossings * 0.6 + candidate.bounds.width * candidate.bounds.height / 1e8;
 }
 function optimizeRoutes(edges, nodes) {
   const inflated = (n, padding) => ({ x: n.x - padding, y: n.y - padding, width: n.width + padding * 2, height: n.height + padding * 2 });
@@ -1969,8 +2177,8 @@ function optimizeRoutes(edges, nodes) {
       return cost;
     } });
     if (middle) {
-      const points = simplify2([start2, ...middle, end]), length = (ps) => ps.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - ps[i].x) + Math.abs(p.y - ps[i].y), 0);
-      if (length(points) + Math.max(0, points.length - 2) * 24 < length(original) + Math.max(0, original.length - 2) * 24) edge.points = points;
+      const points = simplify3([start2, ...middle, end]), length2 = (ps) => ps.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - ps[i].x) + Math.abs(p.y - ps[i].y), 0);
+      if (length2(points) + Math.max(0, points.length - 2) * 24 < length2(original) + Math.max(0, original.length - 2) * 24) edge.points = points;
     }
     if (!relocateLabels([edge], nodes, edges)) edge.points = original;
     settled.push(edge.points);
@@ -1992,15 +2200,15 @@ function relocateLabels(edges, nodes, allEdges = edges) {
     if (!crossed && box.x >= left && box.x + box.width <= right && distance(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
     const candidates2 = [];
     for (let i = 1; i < edge.points.length; i++) {
-      const a = edge.points[i - 1], b = edge.points[i], length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+      const a = edge.points[i - 1], b = edge.points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
       for (const t of [0.5, 0.25, 0.75]) {
         const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-        if (a.y === b.y) candidates2.push({ ...box, x: x - box.width / 2, y: y - box.height - 5, score: length }, { ...box, x: x - box.width / 2, y: y + 5, score: length - 1 });
-        else candidates2.push({ ...box, x: x + 5, y: y - box.height / 2, score: length }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length - 1 });
+        if (a.y === b.y) candidates2.push({ ...box, x: x - box.width / 2, y: y - box.height - 5, score: length2 }, { ...box, x: x - box.width / 2, y: y + 5, score: length2 - 1 });
+        else candidates2.push({ ...box, x: x + 5, y: y - box.height / 2, score: length2 }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length2 - 1 });
       }
     }
     const labelScore = (candidate) => candidate.score - 12 * (Math.max(0, left - candidate.x) + Math.max(0, candidate.x + candidate.width - right));
-    const replacement = candidates2.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap2(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap2(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
+    const replacement = candidates2.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap3(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap3(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
     if (replacement) {
       delete replacement.score;
       edge.labelBox = replacement;
@@ -3419,7 +3627,7 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
   const labelObstacles = [...routed.filter((e) => e.labelBox).map((e, i) => ({ ...e.labelBox, id: "label-obstacle:" + i })), ...active2.flatMap((n) => n.portLabelBox ? [{ ...n.portLabelBox, id: "port-label:" + n.id }] : [])];
   const routeObstacles = routed.flatMap((e) => e.points.slice(1).map((p, i) => ({ id: "route:" + e.id + ":" + i, x: Math.min(p.x, e.points[i].x) - 3, y: Math.min(p.y, e.points[i].y) - 3, width: Math.max(6, Math.abs(p.x - e.points[i].x) + 6), height: Math.max(6, Math.abs(p.y - e.points[i].y) + 6) })));
   const context = surroundingContext(state.graph, layout, { budget: displayPreferences().contextBudget });
-  const fringe = preparePeripheral(context, active2, area, { width: 104, height: 56, gap: 10, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize });
+  const fringe = preparePeripheral(context, active2, area, { width: 104, height: 56, gap: 10, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize });
   const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.22, context: true, displayDetail: "", displayID: "" }));
   const markers = fringe.boundaryMarkers.map((n) => ({ ...n, scale: 1, opacity: 0.22, context: true, interactive: false }));
   const nodes = [...active2, ...ghosts, ...markers], counts = /* @__PURE__ */ new Map(), byID = /* @__PURE__ */ new Map();
@@ -3428,15 +3636,15 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
     n.container = active2.some((c) => c.parentId === n.id);
     byID.set(n.id, n);
   }
-  const peripheral = [...routeEdges(fringe.edges, [...nodes, ...labelObstacles, ...fringe.stubEdges.filter((e) => e.labelBox).map((e) => ({ ...e.labelBox, id: "stub-label:" + e.id }))], { area, measureLabel: labelSize }), ...fringe.stubEdges];
+  const peripheral = fringe.routedEdges;
   const edgeCounts = /* @__PURE__ */ new Map(), edges = [...routed, ...peripheral].map((e) => {
     const a = byID.get(e.sourceAttachment ?? e.source), b = byID.get(e.targetAttachment ?? e.target), ownerA = byID.get(e.source), ownerB = byID.get(e.target), base = [a?.semanticId || a?.key, b?.semanticId || b?.key, e.kind, e.label || ""].join("|"), ordinal = edgeCounts.get(base) ?? 0;
     edgeCounts.set(base, ordinal + 1);
     return { ...e, journey: journey && !e.context, sourceClipped: a?.kind === "context-boundary", targetClipped: b?.kind === "context-boundary", key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : !journey && displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: edgeAppearance(e, { viewKind: view.kind }) })).filter((p) => !p.appearance.supported).map((p) => ({ reason: "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
-  const omissions = [...layout.omissions ?? view.omissions ?? [], ...notationNotices, ...fringe.omissions, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
-  return { view, nodes, edges, area, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions };
+  const omissions = [...layout.omissions ?? view.omissions ?? [], ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
+  return { view, nodes, edges, area, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics };
 }
 function face(n) {
   const host = el("span", void 0, "node-face");
@@ -3597,9 +3805,9 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
       return { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, label: text };
     });
     const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text) => journeySizes.get(text) }).map((route2) => [route2.id, route2]));
-    for (const { item, r } of sampledEdges) {
+    const shapeFor = ({ item, r }) => {
       const interpolated = Array.from({ length: 20 }, (_, i) => ({ x: r["x" + i], y: r["y" + i] }));
-      const edge = { ...item.latest, source: item.latest.sourceKey, target: item.latest.targetKey };
+      const edge = { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey };
       let points = clock === 1 ? item.latest.routePoints ?? [] : interpolated, liveLabel;
       const journeyEdge = clock !== 1 && r.journey > 0.5;
       if (journeyEdge) {
@@ -3611,6 +3819,41 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
         points = routeEdges([{ ...edge, label: "" }], currentNodes)[0]?.points ?? [];
       }
       if (!routeIsClear(points, edge, currentNodes) || !routeConnectsEndpoints(points, edge, currentNodes)) points = [];
+      return { points, edge, journeyEdge, liveLabel };
+    };
+    const shapes = new Map(sampledEdges.map((sample) => [sample.item.key, shapeFor(sample)]));
+    const visibleNodes = currentNodes.filter((n) => (n.opacity ?? 1) > 0.08), visibleIDs = new Set(visibleNodes.map((n) => n.id));
+    const currentActive = sampledEdges.filter(({ item, r }) => !item.latest.context && r.opacity > 0.01).map(({ item, r }) => {
+      const shape = shapes.get(item.key), box = shape.liveLabel?.labelBox ?? item.latest.labelBox;
+      const labelBox = shape.liveLabel?.labelBox ?? (box && (clock === 1 || clock > 0.85) ? { ...box, x: r.x, y: r.y - box.height * 0.78 } : void 0);
+      return { ...shape.edge, points: shape.points, ...labelBox ? { labelBox } : {} };
+    }).filter((edge) => edge.points.length > 1 && visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
+    if (clock > 0 && clock < 1) {
+      const contextSizes = /* @__PURE__ */ new Map(), movingContext = sampledEdges.filter(({ item, r }) => item.latest.context && r.opacity > 0.01).map(({ item }) => {
+        const shape = shapes.get(item.key), text = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text.length * 7), height: 16 }, old = contextSizes.get(text);
+        contextSizes.set(text, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
+        return { ...shape.edge, points: shape.points };
+      }).filter((edge) => visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
+      const before = peripheralRoutingMetrics(movingContext, currentActive);
+      if (before.crossings || before.overlapLength || before.blocked) {
+        const optimized = routePeripheralEdges(movingContext, visibleNodes, destination.area, { activeEdges: currentActive, measureLabel: (text) => contextSizes.get(text), candidateBudget: 4, reverse: false, visibilitySearches: 0 });
+        if (peripheralRouteScore(optimized.metrics) < peripheralRouteScore(before)) for (const route2 of optimized.edges) {
+          const shape = shapes.get(route2.id);
+          shape.points = route2.points;
+          shape.liveLabel = route2.labelBox ? route2 : void 0;
+        }
+      }
+    }
+    const currentContext = sampledEdges.filter(({ item, r }) => item.latest.context && r.opacity > 0.01).map(({ item }) => {
+      const shape = shapes.get(item.key);
+      return { ...shape.edge, points: shape.points };
+    });
+    const visibleLabels = [...currentActive.flatMap((edge) => edge.labelBox ? [edge.labelBox] : []), ...sampledEdges.filter(({ item, r }) => item.latest.context && clock > 0.85 && r.labelOpacity > 0.05).flatMap(({ item, r }) => {
+      const box = shapes.get(item.key).liveLabel?.labelBox ?? item.latest.labelBox;
+      return box ? [{ ...box, x: shapes.get(item.key).liveLabel?.x ?? r.x, y: (shapes.get(item.key).liveLabel?.y ?? r.y) - box.height * 0.78, id: "live-label:" + item.key }] : [];
+    })];
+    for (const { item, r } of sampledEdges) {
+      const { points, edge, journeyEdge, liveLabel } = shapes.get(item.key);
       const pathOf = (path2) => path2.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), signature = points.slice(1).map((p, i) => Math.abs(p.x - points[i].x) < 0.01 ? "V" : "H").filter((v, i, a) => !i || v !== a[i - 1]).join("");
       if (clock !== 1 && item.signature && signature !== item.signature) {
         item.outgoingPoints = item.drawnPoints;
@@ -3627,7 +3870,8 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
         if (horizontalLast) penultimate.y = points.at(-1).y;
         else penultimate.x = points.at(-1).x;
       }
-      const oldClear = outgoing && routeIsClear(outgoing, edge, currentNodes, { orthogonalOnly: true }) && routeConnectsEndpoints(outgoing, edge, currentNodes);
+      const protectedPaths = [...currentActive, ...currentContext.filter((other) => other.id !== edge.id)];
+      const oldClear = outgoing && routeIsClear(outgoing, edge, currentNodes.concat(visibleLabels), { orthogonalOnly: true }) && routeConnectsEndpoints(outgoing, edge, currentNodes) && (!item.latest.context || peripheralRouteScore(peripheralRoutingMetrics([{ ...edge, points: outgoing }], protectedPaths)) <= peripheralRouteScore(peripheralRoutingMetrics([{ ...edge, points }], protectedPaths)));
       item.oldLine.setAttribute("d", oldClear ? pathOf(outgoing) : "");
       item.oldLine.style.opacity = oldClear ? 1 - routeFade : 0;
       const path = pathOf(points);
@@ -4034,6 +4278,14 @@ async function capture() {
   $("editor").close();
   status("Scene captured. Export the project ZIP or Markdown to keep it.");
 }
+function contextNotice(notice) {
+  if (notice.reason === "context-route-fallback") return `Connection layout: ${notice.continued ?? 0} shortened; ${notice.unrepresented ?? 0} not drawn in this view. Native relationships: ${(notice.relationships ?? []).join(", ")}.`;
+  if (notice.reason === "context-route-continuation") return `Shortened context: ${(notice.targets ?? []).map((id) => label(id) ?? id).join(", ")}; ${notice.continued ?? 0} labeled connections.`;
+  if (notice.reason === "context-route-conflict") return `Layout notice: ${notice.crossings} context crossings; ${Math.round(notice.overlapLength ?? 0)} pixels of shared path remain.`;
+  const target = notice.target ?? notice.relationshipId ?? "connection", name = label(target) ?? target;
+  const prefix = notice.reason === "context-route-continuation" ? "Shortened connection" : ["unavailable", "outside-scope", "metamodel-boundary"].includes(notice.reason) ? "Unavailable / boundary" : "Hidden by view policy";
+  return `${prefix}: ${notice.reason} \xB7 ${name} (${target})`;
+}
 function bind() {
   for (const kind of PRESENTATION_RELATIONSHIP_KINDS) {
     const option = el("option", kind);
@@ -4099,7 +4351,7 @@ function bind() {
     $("information").classList.remove("statement");
     $("information-title").textContent = "Context boundaries";
     const omissions = state.displayOmissions ?? state.displayed?.omissions ?? [];
-    $("information-text").textContent = omissions.map((o) => `${["unavailable", "outside-scope", "metamodel-boundary"].includes(o.reason) ? "Unavailable / boundary" : "Hidden by view policy"}: ${o.reason} \xB7 ${label(o.target)} (${o.target})`).join("\n") + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
+    $("information-text").textContent = omissions.map(contextNotice).join("\n") + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
     $("information").showModal();
   };
   $("edit").onclick = openEditor;
@@ -4179,7 +4431,7 @@ function bind() {
   $("about").onclick = () => {
     $("information").classList.remove("statement");
     $("information-title").textContent = "Engine and project details";
-    $("information-text").textContent = JSON.stringify({ engine: state.provenance, project: state.project.manifest, modelHash: state.modelHash, graph: { elements: state.graph.elements.length, relationships: state.graph.relationships.length }, view: state.view.id, lastTransition: state.lastTransition, notice: state.exported.notice }, null, 2);
+    $("information-text").textContent = JSON.stringify({ engine: state.provenance, project: state.project.manifest, modelHash: state.modelHash, graph: { elements: state.graph.elements.length, relationships: state.graph.relationships.length }, routing: state.visualSnapshot?.routingMetrics, view: state.view.id, lastTransition: state.lastTransition, notice: state.exported.notice }, null, 2);
     $("information").showModal();
   };
   $("stage").onclick = (e) => {
