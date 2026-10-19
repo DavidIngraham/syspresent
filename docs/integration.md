@@ -56,3 +56,11 @@ Publications include the complete project by default. Scoped publications remain
 6. Independently review native semantic claims, actual browser behavior and the limits of the prototype evidence.
 
 Only then use the result to choose/finalize renderer and layout interfaces and plan the broader notation, complete editor and human-usability work. Preserve legacy viewer compatibility separately; replacing it is not proof that every existing view is supported. No upstream dependency PRs are authorized by this integration work.
+
+## Connection layout and selection
+
+The canvas uses pinned elkjs 0.12.0 in a separate browser worker for joint tile, port, corridor and label geometry. This adds no semantic processing: OpenSysML remains authoritative for view membership, containment, relationship kind, endpoints, guards and actual ports. Native endpoint order is restored after any layout-only rank reversal. ELK drawing anchors carry no model identity.
+
+Structural sibling ordering and staggered rows may vary with available space. General requirements remain above their derived requirements; action fork/join branches retain concurrency. One camera transform fits tiles, paths, actual port labels and relationship labels together. Translucent context is placed afterward, avoiding active corridors and labels, and never expands that camera fit. Failed routes are explicit omissions, with no line through an obstacle as a fallback.
+
+Select a connection by touch or keyboard to emphasize its complete path, label and both endpoints. Selection does not relayout. Moving routes are checked against current tiles; an unsafe interpolated path uses a clear orthogonal route or remains hidden. Travel lowers relationship emphasis and restores it continuously as the scene settles. This is a prototype implementation, not proof of arbitrary-model readability or complete notation coverage.

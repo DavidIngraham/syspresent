@@ -40,27 +40,35 @@ function orthogonal(start,end,obstacles){
 }
 function endpoints(a,b,sourceFraction=.5,targetFraction=.5){
  const ac=centre(a),bc=centre(b),vertical=Math.abs(ac.y-bc.y)>Math.abs(ac.x-bc.x)*.5;
- if(vertical){const down=bc.y>ac.y;return [{x:a.x+a.width*sourceFraction,y:down?a.y+a.height:a.y},{x:b.x+b.width*targetFraction,y:down?b.y:b.y+b.height},{x:0,y:down?1:-1}];}
- const right=bc.x>ac.x;return [{x:right?a.x+a.width:a.x,y:a.y+a.height*sourceFraction},{x:right?b.x:b.x+b.width,y:b.y+b.height*targetFraction},{x:right?1:-1,y:0}];
+ const normal=side=>({NORTH:{x:0,y:-1},SOUTH:{x:0,y:1},EAST:{x:1,y:0},WEST:{x:-1,y:0}}[side]);
+ const defaultDirection=vertical?{x:0,y:bc.y>ac.y?1:-1}:{x:bc.x>ac.x?1:-1,y:0};
+ const sourceDirection=normal(a.kind==='port'?(a.portSide??a.side):'')??defaultDirection,targetDirection=normal(b.kind==='port'?(b.portSide??b.side):'')??{x:-defaultDirection.x,y:-defaultDirection.y};
+ const attachment=(node,direction,fraction)=>direction.x?{x:node.x+(direction.x>0?node.width:0),y:node.y+node.height*fraction}:{x:node.x+node.width*fraction,y:node.y+(direction.y>0?node.height:0)};
+ return [attachment(a,sourceDirection,sourceFraction),attachment(b,targetDirection,targetFraction),sourceDirection,targetDirection];
+}
+function connectionObstacles(edge,nodes){
+ const byID=new Map(nodes.map(n=>[n.id,n])),ancestors=new Set(),leafPortOwners=new Set();
+ for(const id of [edge.source,edge.target]){let node=byID.get(id);if(node?.kind==='port'&&node.parentId&&!byID.get(node.parentId)?.headerHeight)leafPortOwners.add(node.parentId);const seen=new Set();while(node?.parentId&&!seen.has(node.parentId)){seen.add(node.parentId);ancestors.add(node.parentId);node=byID.get(node.parentId);}}
+ return nodes.filter(n=>(n.opacity??1)>.08&&n.width>0&&n.height>0).flatMap(n=>ancestors.has(n.id)&&!leafPortOwners.has(n.id)?n.headerHeight?[{...n,height:n.headerHeight}]:[]:[n]);
 }
 function route(a,b,nodes,options={}){
- const [start,end,direction]=endpoints(a,b,options.sourceFraction,options.targetFraction),clearance=options.clearance??8;
- let stub={x:start.x+direction.x*clearance,y:start.y+direction.y*clearance},finish={x:end.x-direction.x*clearance,y:end.y-direction.y*clearance};
- const obstacles=nodes.filter(n=>n.width>0&&n.height>0&&(n.id===a.id||n.id===b.id||!contains(n,a)&&!contains(n,b))).map(n=>({x:n.x-4,y:n.y-4,width:n.width+8,height:n.height+8}));
+ const [start,end,direction,targetDirection]=endpoints(a,b,options.sourceFraction,options.targetFraction),clearance=options.clearance??8;
+ let stub={x:start.x+direction.x*clearance,y:start.y+direction.y*clearance},finish={x:end.x+targetDirection.x*clearance,y:end.y+targetDirection.y*clearance};
+ const obstacles=connectionObstacles({source:a.id,target:b.id},nodes).map(n=>({x:n.x-4,y:n.y-4,width:n.width+8,height:n.height+8}));
  let middle=orthogonal(stub,finish,obstacles);
  // Scaled peer gaps can be narrower than a normal eight-pixel port stub.
  // Keep the stub outside its own four-pixel obstacle without overshooting
  // into a neighboring card. Zero-size boundary markers remain free points.
  if(!middle&&clearance>4.1){
-  stub={x:start.x+direction.x*4.1,y:start.y+direction.y*4.1};finish={x:end.x-direction.x*4.1,y:end.y-direction.y*4.1};middle=orthogonal(stub,finish,obstacles);
+  stub={x:start.x+direction.x*4.1,y:start.y+direction.y*4.1};finish={x:end.x+targetDirection.x*4.1,y:end.y+targetDirection.y*4.1};middle=orthogonal(stub,finish,obstacles);
  }
  // A malformed native containment drawing may not expose a free port. Retain
  // the actual directed endpoints and disclose the routing limitation.
- const points=simplify(middle?[start,...middle,end]:[start,stub,finish,end]);
+ const points=middle?simplify([start,...middle,end]):[];
  return {points,d:points.map((p,i)=>(i?'L':'M')+p.x+','+p.y).join(' '),routingBlocked:!middle};
 }
 /** Compatibility route for one edge. Use routeEdges for collision-aware labels. */
-export function edgeRoute(a,b,nodes=[]){const result=route(a,b,nodes),p=result.points[Math.floor((result.points.length-1)/2)],q=result.points[Math.ceil((result.points.length-1)/2)];return {...result,x:(p.x+q.x)/2,y:(p.y+q.y)/2-5};}
+export function edgeRoute(a,b,nodes=[]){const result=route(a,b,nodes);if(!result.points.length)return {...result,x:0,y:0};const p=result.points[Math.floor((result.points.length-1)/2)],q=result.points[Math.ceil((result.points.length-1)/2)];return {...result,x:(p.x+q.x)/2,y:(p.y+q.y)/2-5};}
 // Liang–Barsky clipping also checks diagonal offset-label leaders.
 function lineCrossesRect(a,b,rect,padding=0){
  const left=rect.x-padding,top=rect.y-padding,right=rect.x+rect.width+padding,bottom=rect.y+rect.height+padding;
@@ -102,7 +110,7 @@ export function routeEdges(edges,nodes,options={}){
  return edges.map(edge=>{
   const a=byID.get(edge.source),b=byID.get(edge.target);if(!a||!b)return null;
   const result={...edge,...route(a,b,nodes,{...options,sourceFraction:fraction(edge,'source'),targetFraction:fraction(edge,'target')})};
-  if(!edge.label)return result;
+  if(!edge.label||result.routingBlocked)return result;
   const size=measured(edge.label),valid=box=>!nodes.some(n=>n.width>0&&n.height>0&&overlaps(box,n,3))&&!labels.some(other=>overlaps(box,other,4))&&(!area||box.x>=area.x&&box.y>=area.y&&box.x+box.width<=area.x+area.width&&box.y+box.height<=area.y+area.height);
   let labelBox=labelCandidates(result.points,size.width,size.height).map(candidate=>({...candidate,...size})).find(valid);
   if(!labelBox){
@@ -124,4 +132,22 @@ export function routeEdges(edges,nodes,options={}){
   else result.labelOmitted=true; // Explicitly report an impossible label fit.
   return result;
  }).filter(Boolean);
+}
+
+/** One camera transform for all occupied joint geometry, including labels. */
+export function fitDiagram(layout,area){
+ const occupied=[...layout.nodes,...layout.nodes.flatMap(n=>n.portLabelBox?[n.portLabelBox]:[]),...layout.edges.flatMap(e=>[...(e.labelBox?[e.labelBox]:[]),...e.points.map(p=>({...p,width:0,height:0}))])],fit=fitNodes(occupied,area),scale=fit.scale;
+ const origin=occupied[0],fitted=fit.nodes[0],dx=origin?fitted.x-origin.x*scale:area.x,dy=origin?fitted.y-origin.y*scale:area.y;
+ const point=p=>({x:p.x*scale+dx,y:p.y*scale+dy}),box=n=>({...n,...point(n),width:n.width*scale,height:n.height*scale});
+ return {...layout,scale,nodes:layout.nodes.map(n=>({...box(n),...(n.headerHeight?{headerHeight:n.headerHeight*scale}:{}),...(n.portLabelBox?{portLabelBox:box(n.portLabelBox)}:{})})),edges:layout.edges.map(e=>({...e,points:e.points.map(point),...(e.labelBox?{labelBox:box(e.labelBox),x:e.x*scale+dx,y:e.y*scale+dy}:{}),labelScale:scale})),ports:layout.ports?.map(p=>({...p,...point(p)}))};
+}
+/** Validate actual segments, including during motion; containment is identity based. */
+export function routeIsClear(points,edge,nodes,{orthogonalOnly=false}={}){
+ if(points.length<2||points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))return false;
+ const obstacles=connectionObstacles(edge,nodes);
+ for(let i=1;i<points.length;i++){
+  const a=points[i-1],b=points[i];if(orthogonalOnly&&Math.abs(a.x-b.x)>.01&&Math.abs(a.y-b.y)>.01)return false;
+  if(obstacles.some(n=>lineCrossesRect(a,b,{x:n.x+.05,y:n.y+.05,width:Math.max(0,n.width-.1),height:Math.max(0,n.height-.1)})))return false;
+ }
+ return true;
 }

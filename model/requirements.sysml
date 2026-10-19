@@ -88,7 +88,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-032'> responsiveLayout {
-            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. Settled connection labels shall avoid cards and other labels; an impossible fit shall be disclosed rather than drawn as overlapping text. */
+            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. Joint tile placement and connection routing shall reserve unobstructed corridors and measured labels. Connections shall not cross unrelated tiles, container headers or prose. Distinct relationships shall keep distinct terminal attachments and recognizable native notation. Settled connection labels shall avoid cards and other labels; an impossible route or label fit shall be disclosed rather than drawn through an obstacle. During transitions invalid intermediate paths shall not be drawn. */
             comment scope /* First release */
         }
         requirement <'SP-033'> explorationHandoff {

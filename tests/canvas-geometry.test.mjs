@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {layoutScene} from '../src/canvas-prototype/core/index.mjs';
-import {graphArea,fitNodes,routeEdges} from '../src/canvas-prototype/geometry.mjs';
+import {graphArea,fitNodes,fitDiagram,routeEdges,routeIsClear} from '../src/canvas-prototype/geometry.mjs';
 const overlap=(a,b)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;
 const fixture=()=>({kind:'requirement',nodes:[{id:'traffic',semanticId:'native-traffic',width:280,height:185},...['tracking','assessment','command','fault'].map(id=>({id,semanticId:'native-'+id,width:160,height:76}))],edges:['tracking','assessment','command','fault'].map(id=>({id:'derive-'+id,source:id,target:'traffic',kind:'derive',label:'derive'}))});
 const segmentCrosses=(a,b,n)=>a.x===b.x?a.x>n.x+.01&&a.x<n.x+n.width-.01&&Math.max(a.y,b.y)>n.y+.01&&Math.min(a.y,b.y)<n.y+n.height-.01:a.y===b.y&&a.y>n.y+.01&&a.y<n.y+n.height-.01&&Math.max(a.x,b.x)>n.x+.01&&Math.min(a.x,b.x)<n.x+n.width-.01;
@@ -73,4 +73,16 @@ test('actual narrow-phone derivation geometry retains all four labels in clear l
   }
  }
  for(let i=0;i<routes.length;i++)for(let j=i+1;j<routes.length;j++)assert.equal(overlap(routes[i].labelBox,routes[j].labelBox),false);
+});
+
+test('camera includes complete routes and labels without letting peripheral context change its fit',()=>{
+ const diagram={nodes:[{id:'a',x:100,y:100,width:100,height:70}],edges:[{id:'e',points:[{x:150,y:170},{x:150,y:300},{x:400,y:300}],labelBox:{x:300,y:310,width:120,height:16},x:300,y:322}]},area={x:16,y:20,width:358,height:240},fitted=fitDiagram(diagram,area);
+ for(const rect of [...fitted.nodes,...fitted.edges.map(e=>e.labelBox)]){assert.ok(rect.x>=area.x&&rect.y>=area.y);assert.ok(rect.x+rect.width<=area.x+area.width&&rect.y+rect.height<=area.y+area.height);}for(const point of fitted.edges[0].points)assert.ok(point.x<=area.x+area.width&&point.y<=area.y+area.height);
+});
+test('moving routes cannot cross an unrelated tile, a header or a real port owner body',()=>{
+ const nodes=[{id:'assembly',x:0,y:0,width:400,height:350,headerHeight:50},{id:'owner',parentId:'assembly',x:100,y:100,width:100,height:80},{id:'pin',kind:'port',parentId:'owner',x:194,y:130,width:12,height:12},{id:'b',parentId:'assembly',x:280,y:100,width:100,height:80}];
+ const edge={source:'pin',target:'b'};
+ assert.equal(routeIsClear([{x:206,y:136},{x:280,y:136}],edge,nodes),true);
+ assert.equal(routeIsClear([{x:194,y:136},{x:150,y:136},{x:150,y:80},{x:300,y:80},{x:300,y:100}],edge,nodes),false);
+ assert.equal(routeIsClear([{x:206,y:136},{x:230,y:136},{x:230,y:20},{x:300,y:20},{x:300,y:100}],edge,nodes),false);
 });

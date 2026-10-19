@@ -20,6 +20,12 @@ await copy('src/canvas-prototype/index.html','index.html');await copy('src/canva
 for(const name of ['sysml-wasm.wasm','wasm_exec.js','provenance.json','OPENSYSML-LICENSE','GO-LICENSE'])await copy(join(engine,name),'engine/'+name);
 await copy('src/canvas-prototype/engine/worker.js','engine/worker.js');
 await copy('node_modules/fflate/LICENSE','notices/fflate-LICENSE');
+await copy('node_modules/elkjs/LICENSE.md','notices/elkjs-LICENSE');
+await copy('node_modules/elkjs/lib/elk-worker.min.js','layout/elk-worker.js');
+await copy('node_modules/elkjs/lib/elk-api.js','notices/elk-api.js');
+await copy('node_modules/elkjs/package.json','notices/elkjs-package.json');
+await copy('package-lock.json','notices/package-lock.json');
+await copy('node_modules/elkjs/lib/elk-worker.js','notices/elk-worker-source.js');
 const manifest=JSON.parse(await readFile(join(project,'project.json'),'utf8'));
 if(cachePath){
  const data=await readFile(resolve(cachePath)),cache=JSON.parse(data),engineInfo=JSON.parse(await readFile(join(engine,'provenance.json'),'utf8')),sourceFiles={};

@@ -25,3 +25,19 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 .node.peripheral .kind{display:none}.node.peripheral .name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 @media(max-width:700px){#transition:not([data-notice=true]){display:none}#transition[data-notice=true]{bottom:52px;max-width:calc(100% - 24px)}}
+
+/* Connections have their own accessible touch target; endpoint cards stay readable. */
+#connections g[data-relationship]{cursor:pointer;pointer-events:auto}
+#connections .edge-line,#connections text{pointer-events:none}
+#connections g:focus-visible .edge-line,#connections g.traced .edge-line{stroke:#a05d18;stroke-width:2.8}
+#stage.tracing .node:not(.trace-endpoint){filter:opacity(.25)}
+#stage.tracing #connections g:not(.traced){filter:opacity(.15)}
+.node.trace-endpoint{outline:3px solid #b77129;outline-offset:2px}
+.node.port{border-radius:0;padding:0;overflow:visible;box-shadow:none;border:1.5px solid #426869;background:white}
+.node.port .node-face{overflow:visible;padding:0}
+.port-name{position:absolute;left:16px;top:-2px;font-size:11px;white-space:nowrap;background:#f5f7f7}
+.node.context-boundary{border:0;background:transparent;border-radius:0;color:#426869;font:bold 18px/1 system-ui;min-width:14px;min-height:18px;margin:-9px -7px;overflow:visible}
+
+.node.fork:before,.node.join:before{top:0;height:100%}
+
+#connections g[data-relationship]:focus{outline:none}

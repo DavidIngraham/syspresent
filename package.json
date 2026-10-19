@@ -9,6 +9,7 @@
     "test:canvas": "node --test tests/canvas-*.test.mjs tests/wasm-prototype/*.test.mjs"
   },
   "dependencies": {
+    "elkjs": "0.12.0",
     "fflate": "0.8.2"
   },
   "devDependencies": {
