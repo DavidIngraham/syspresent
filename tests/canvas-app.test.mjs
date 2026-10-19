@@ -13,7 +13,7 @@ const coverage={kind:'requirement',nodes:native.nodes,edges:native.edges};
 const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfInterest:['Model'],modelSources:['model.sysml'],viewSources:['views.sysml'],story:'story.md',assets:[],publication:{scope:'complete'}};
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
-async function harness({reducedMotion=true,secondScene=false,contextNeighbor=false,traceFixture=false,ambiguousRefs=false,presentation,size={width:1000,height:700}}={}){
+async function harness({reducedMotion=true,secondScene=false,contextNeighbor=false,traceFixture=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,size={width:1000,height:700}}={}){
  let resizeCallback;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:'Model::orphan'})+'\n```\n\nOther context.';
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  let pendingRender,holdLayout=false;const heldLayouts=[];
@@ -25,13 +25,13 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
  window.Worker=class{constructor(url){this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout){holdLayout=false;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else reply();});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
-  else if(method==='ExportModel')respond({elements:structuredClone([...raw,...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
+  else if(method==='ExportModel')respond({elements:structuredClone([...raw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
   else if(method==='RenderView'&&params.view==='Views::other')respond({kind:'requirement',nodes:[{id:'o',semanticId:'orphan',identityStatus:'mapped',name:'orphan',kind:'part'}],edges:[]});
   else if(method==='RenderView'&&params.view.startsWith('#'))pendingRender=()=>respond({kind:'interconnection',nodes:[native.nodes[1]],edges:[]});
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(native));
  }terminate(){}};
  window.eval(outputFiles[0].text);await until(()=>window.document.querySelectorAll('.node[data-context=\"false\"]').length===2&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ return {window,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('a delayed native view cannot overwrite a newer scene navigation',async()=>{
  const h=await harness(),d=h.document;
@@ -156,4 +156,27 @@ test('faded transition connections cannot retain invisible pointer or keyboard t
   await new Promise(resolve=>setTimeout(resolve,10));
  }
  assert.ok(hidden>0,'exercise an actually faded connection during the journey');h.window.close();
+});
+
+
+test('disjoint same-notation navigation visibly ascends native ownership and descends before settling',async()=>{
+ const h=await harness({reducedMotion:false,secondScene:true,ancestorFixture:true,presentation:{emphasis:['derive']}}),d=h.document;
+ d.getElementById('next').click();await until(()=>d.getElementById('stage').dataset.motionProgress!==undefined);
+ await until(()=>[...d.querySelectorAll('[data-semantic-id="Model"]')].some(n=>Number(n.style.opacity)>.1));
+ assert.match(d.getElementById('transition').textContent,/Model ownership route/);
+ const edges=[...d.querySelectorAll('#connections g[data-relationship]')];assert.ok(edges.some(g=>g.dataset.source==='Model'&&g.dataset.target==='req'));assert.ok(edges.some(g=>g.dataset.source==='Model'&&g.dataset.target==='orphan'));
+ await until(()=>[...d.querySelectorAll('#connections g[data-kind="containment"]')].some(g=>Number(g.style.opacity)>.8&&Number(g.querySelector('text')?.style.opacity)>.8));
+ await until(()=>[...d.querySelectorAll('#connections g[data-kind="containment"]')].filter(g=>Number(g.style.opacity)>.6).length===2);
+ const attachments=[...d.querySelectorAll('#connections g[data-kind="containment"]')].filter(g=>Number(g.style.opacity)>.6).map(g=>g.querySelector('.edge-line:not(.edge-outgoing)').getAttribute('d').match(/^M([\d.-]+),([\d.-]+)/).slice(1).map(Number));
+ assert.notDeepEqual(attachments[0],attachments[1],'live ownership hops retain separate native-parent drawing attachments');
+ d.getElementById('fit').click();await until(()=>activeIDs(d).join(',')==='orphan'&&d.getElementById('stage').dataset.motionProgress===undefined);assert.equal(d.getElementById('scenes').value,'1');h.window.close();
+});
+
+
+test('a saved same-notation ownership route outside the story boundary is rejected before replacing the project',async()=>{
+ const h=await harness({secondScene:true,foreignOwnerFixture:true}),d=h.document,input=d.getElementById('markdown-file');
+ const authored=h.story.replace('"focus":"Model::orphan"','"focus":"Model::orphan","journey":["Model::req","Foreign::root","Model::orphan"]');
+ Object.defineProperty(input,'files',{value:[{text:async()=>authored}],configurable:true});input.dispatchEvent(new h.window.Event('change'));
+ await until(()=>d.getElementById('editor-error').textContent.includes('saved journey no longer resolves within the presentation boundary'));
+ assert.equal(d.querySelector('#narrative h2').textContent,'Control the part');assert.deepEqual(activeIDs(d),['part','req']);assert.equal(d.getElementById('fit').disabled,false);h.window.close();
 });

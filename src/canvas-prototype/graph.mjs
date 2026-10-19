@@ -4,9 +4,14 @@ const camel=value=>Array.isArray(value)?value.map(camel):value&&typeof value==='
 export function adaptNativeView(raw,name){const v=camel(raw);return {...v,id:name,title:name,nodes:v.nodes??[],edges:v.edges??[],notices:v.notices??[]};}
 export function modelGraph(raw,views=[]){
  const elements=raw.map(e=>({id:e['@id'],kind:e['@type'],name:e.declaredName||e.qualifiedName||e['@id'],qualifiedName:e.qualifiedName,description:e.body||'',native:e,layer:e['sysx:sourceLine']?'project':'library'}));
- const index=new Map(elements.map(e=>[e.id,e])),relationships=[];
+ const index=new Map(elements.map(e=>[e.id,e])),relationships=[],containment=[];
+ // Navigation-only ownership comes from the native API role, never qname
+ // truncation or a membership/type/library walk. Keep it outside engineering
+ // context so namespace location cannot masquerade as a design dependency.
+ const declaration=e=>e?.layer==='project'&&/^(Package|Namespace|(?:Part|Item|Action|State|Requirement|UseCase|VerificationCase|AnalysisCase|Case|Concern|Constraint|Calculation|Port|Attribute|Interface|Connection|Occurrence|Enumeration)(?:Usage|Definition))$/.test(e.kind);
  const add=(source,target,kind,id,nativeRelationship)=>{if(!source||!target)return;relationships.push({id,source,target,kind,label:kind,authority:'native-api',nativeRelationship});};
  for(const item of raw){const id=item['@id'];
+  if(declaration(index.get(id)))for(const owner of refs(item.owner))if(declaration(index.get(owner)))containment.push({id:`owner:${owner}:${id}`,source:owner,target:id,kind:'containment',label:'owns',authority:'native-api',nativeRelationship:refs(item.owningMembership)[0]??refs(item.owningRelationship)[0]??null,nativeRole:'owner',navigationOnly:true});
   if(item['@type']==='Dependency')for(const client of refs(item.client))for(const supplier of refs(item.supplier))add(client,supplier,'dependency','api:'+id+':'+client+':'+supplier,id);
   // A part's owned PartUsage is engineering composition, not a path through memberships.
   if(['PartUsage','PartDefinition'].includes(item['@type']))for(const child of refs(item.ownedMember))if(index.get(child)?.kind==='PartUsage')add(id,child,'composition',`part:${id}:${child}`);
@@ -17,7 +22,7 @@ export function modelGraph(raw,views=[]){
   const source=nodes.get(edge.fromId??edge.from??edge.source),target=nodes.get(edge.toId??edge.to??edge.target);
   add(source,target,edge.kind,`view:${view.id}:${i}`);
  }}
- const seen=new Set();return {elements,relationships:relationships.filter(e=>{const key=JSON.stringify([e.source,e.target,e.kind]);if(seen.has(key))return false;seen.add(key);return true;})};
+ const seen=new Set();return {elements,containment,relationships:relationships.filter(e=>{const key=JSON.stringify([e.source,e.target,e.kind]);if(seen.has(key))return false;seen.add(key);return true;})};
 }
 export function graphView(graph,context,name='Focused General View'){
  const known=new Map(graph.elements.map(e=>[e.id,e]));

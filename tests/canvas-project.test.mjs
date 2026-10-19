@@ -83,3 +83,12 @@ test('wrapped requirement edges detour around intervening cards without reversin
  assert.deepEqual(route.points[0],{x:106,y:324});assert.deepEqual(route.points.at(-1),{x:166,y:200});assert.ok(route.points.some(p=>p.x<26||p.x>186));
  for(let i=1;i<route.points.length;i++){const a=route.points[i-1],b=route.points[i];assert.ok(!(a.x===b.x&&a.x>26&&a.x<186&&Math.min(a.y,b.y)<300&&Math.max(a.y,b.y)>224));}
 });
+
+
+test('native project ownership is a separate location graph without namespace or typing inference',()=>{
+ const project=(id,kind,owner)=>({'@id':id,'@type':kind,'sysx:sourceLine':1,declaredName:id,...(owner?{owner:{'@id':owner},owningMembership:{'@id':id+'-membership'}}:{})});
+ const graph=modelGraph([project('system','Package'),project('requirements','Package','system'),project('req','RequirementUsage','requirements'),project('member','OwningMembership','system'),project('doc','Documentation','req'),project('expr','OperatorExpression','req'),{'@id':'lib','@type':'PartDefinition'},project('instance','PartUsage','lib'),{...project('fake','PartUsage'),qualifiedName:'system::fake'}]);
+ assert.deepEqual(graph.containment.map(e=>[e.source,e.target]),[['system','requirements'],['requirements','req']]);
+ assert.equal(graph.containment[1].nativeRelationship,'req-membership');assert.ok(graph.containment.every(e=>e.navigationOnly&&e.nativeRole==='owner'&&e.authority==='native-api'));
+ assert.equal(graph.relationships.some(e=>e.kind==='containment'),false);assert.equal(graph.containment.some(e=>e.target==='fake'),false);
+});

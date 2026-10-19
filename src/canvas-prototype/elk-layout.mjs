@@ -145,24 +145,32 @@ export async function layoutDiagram(nativeView,options={}){
    // the opposite perimeter. Try exterior facing sides chosen from the actual
    // first joint placement, then let ELK solve placement, paths and labels again.
    // Actual native ports remain fixed: these choices affect drawing anchors only.
-   const anchorSides=!behavioral&&profile.capacity?facingSides(candidate):null;
-   if(anchorSides?.size){const alternate={...profile,anchorSides},joint=makeGraph(view,options,alternate),result=readLayout(view,joint,await elk.layout(joint.graph),options,alternate);scoreLayout(result,area);candidates.push(result);}
+   // Side constraints may reorder siblings; reassess settled geometry until
+   // stable, with a bounded retry count and cycle detection.
+   let previous=candidate;const seen=new Set();
+   for(let retry=0;!behavioral&&profile.capacity&&retry<3;retry++){
+    const anchorSides=facingSides(previous);if(!anchorSides.size)break;
+    const key=JSON.stringify([...anchorSides]);if(seen.has(key))break;seen.add(key);
+    const alternate={...profile,anchorSides},joint=makeGraph(view,options,alternate),result=readLayout(view,joint,await elk.layout(joint.graph),options,alternate);scoreLayout(result,area);candidates.push(result);previous=result;
+   }
   }catch(error){candidates.push({...view,nodes:[],edges:view.edges.map(e=>({...e,points:[],routingBlocked:true})),ports:[],bounds:{x:0,y:0,width:1,height:1},layoutEngine:'elk-layered',layoutScore:1e9,diagnostics:[{reason:'layout-failed',message:error.message}]});}}
  candidates.sort((a,b)=>a.layoutScore-b.layoutScore);if(!candidates.some(candidate=>candidate.nodes.length))throw Error(candidates[0]?.diagnostics[0]?.message??'ELK could not lay out the native diagram');return candidates[0];
 }
 
 function requirementFanout(view){
- if(view.kind!=='requirement'||view.nodes.some(n=>n.parentId)||view.edges.length!==view.nodes.length-1)return false;
+ if(!['requirement','definition','general'].includes(view.kind)||view.nodes.some(n=>n.parentId)||view.edges.length!==view.nodes.length-1)return false;
  const oriented=view.edges.map(edge=>edgeLayoutHints(edge,{viewKind:view.kind}).rank==='target-above-source'?orientation(edge,false,view.kind):null);
  return oriented.every(Boolean)&&oriented.every(([source])=>source===oriented[0][0])&&new Set(oriented.map(([,target])=>target)).size===view.nodes.length-1;
 }
 function facingSides(view){
- const nodes=new Map(view.nodes.map(n=>[n.id,n])),sides=new Map(),rows=[...new Set(view.nodes.filter(n=>!n.parentId).map(n=>n.y))].sort((a,b)=>a-b);
+ const nodes=new Map(view.nodes.map(n=>[n.id,n])),sides=new Map();
+ // Variable-height siblings can share a row without sharing their top y.
+ // Count an intervening row by actual rectangle separation, not exact y ranks.
  for(const edge of view.edges){
   if(edgeLayoutHints(edge,{viewKind:view.kind}).rank==='free')continue;
   const [from,to]=orientation(edge,false,view.kind),a=nodes.get(from),b=nodes.get(to);
   if(!a||!b||a.parentId||b.parentId||a.kind==='port'||b.kind==='port')continue;
-  if(rows.indexOf(b.y)-rows.indexOf(a.y)<2)continue;
+  if(!view.nodes.some(n=>n!==a&&n!==b&&!n.parentId&&n.y>=a.y+a.height-.01&&n.y+n.height<=b.y+.01))continue;
   const side=b.x+b.width/2<a.x+a.width/2?'WEST':'EAST';sides.set(edge.id,[side,side]);
  }
  return sides;
@@ -183,7 +191,8 @@ function scoreLayout(candidate,area){
  const scale=Math.min(1,area.width/(candidate.bounds.width+20),area.height/(candidate.bounds.height+20));candidate.layoutFitScale=scale;
  const extent=candidate.nodes.reduce((sum,n)=>sum+n.width+n.height,0);
  candidate.layoutMetrics={pathLength:length,bends,pathStretch:stretch,crossings};
- candidate.layoutScore=candidate.diagnostics.length*10000+3/Math.max(.01,scale)+length/Math.max(1,extent)*.45+stretch*.3+bends*.035+crossings*.12+(candidate.bounds.width*candidate.bounds.height)/1e8;
+ // A marginally larger camera fit must not win by crossing independent links.
+ candidate.layoutScore=candidate.diagnostics.length*10000+3/Math.max(.01,scale)+length/Math.max(1,extent)*.45+stretch*.3+bends*.05+crossings*.6+(candidate.bounds.width*candidate.bounds.height)/1e8;
 }
 
 /** Keep ELK's terminal identities and label reservations, but discard needless
@@ -221,13 +230,15 @@ function relocateLabels(edges,nodes,allEdges=edges){
  for(const edge of edges){
   const box=edge.labelBox;if(!box)continue;
   const crossed=edge.points.slice(1).some((p,i)=>segmentHits(edge.points[i],p,box));
-  if(!crossed&&distance(box,edge.points)<Math.max(box.width,box.height)/2+12)continue;
+  const left=Math.min(...nodes.map(n=>n.x)),right=Math.max(...nodes.map(n=>n.x+n.width));
+  if(!crossed&&box.x>=left&&box.x+box.width<=right&&distance(box,edge.points)<Math.max(box.width,box.height)/2+12)continue;
   const candidates=[];
   for(let i=1;i<edge.points.length;i++){
    const a=edge.points[i-1],b=edge.points[i],length=Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
    for(const t of [.5,.25,.75]){const x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;if(a.y===b.y)candidates.push({...box,x:x-box.width/2,y:y-box.height-5,score:length},{...box,x:x-box.width/2,y:y+5,score:length-1});else candidates.push({...box,x:x+5,y:y-box.height/2,score:length},{...box,x:x-box.width-5,y:y-box.height/2,score:length-1});}
   }
-  const left=Math.min(...nodes.map(n=>n.x)),right=Math.max(...nodes.map(n=>n.x+n.width)),labelScore=candidate=>candidate.score-4*(Math.max(0,left-candidate.x)+Math.max(0,candidate.x+candidate.width-right));
+  // Favor local label slots over widening the whole diagram for a long outer leg.
+  const labelScore=candidate=>candidate.score-12*(Math.max(0,left-candidate.x)+Math.max(0,candidate.x+candidate.width-right));
   const replacement=candidates.sort((a,b)=>labelScore(b)-labelScore(a)).find(candidate=>!nodes.some(n=>overlap(candidate,n,3))&&!allEdges.some(other=>other!==edge&&other.labelBox&&overlap(candidate,other.labelBox,4))&&!allEdges.some(other=>other.points.slice(1).some((p,i)=>segmentHits(other.points[i],p,{x:candidate.x-2,y:candidate.y-2,width:candidate.width+4,height:candidate.height+4}))));
   if(replacement){delete replacement.score;edge.labelBox=replacement;edge.x=replacement.x;edge.y=replacement.y+replacement.height*.78;}else return false;
  }

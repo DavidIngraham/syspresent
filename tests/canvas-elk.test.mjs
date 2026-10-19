@@ -95,3 +95,30 @@ test('native Blue Dog wide fanout centers the general requirement above its spec
  assert.equal(view.layoutMetrics.crossings,0);assert.ok(view.layoutFitScale>=.99);
  for(const edge of view.edges){assert.equal(edge.target,'n0');assert.ok(edge.points.length<=4);assert.ok(edge.labelBox);}
 });
+
+// Native complete-project coverage payload at engine 19eaec64755f / model b12b07985500.
+// This is the communications exploration fanout; definition is the focused GV kind.
+const blueDogCommunications={"kind":"definition","nodes":[{"identityStatus":"mapped","semanticId":"BlueDogRequirements__backlogCurrentPriority","qualifiedName":"BlueDogRequirements::backlogCurrentPriority","id":"n281","kind":"requirement","name":"BlueDogRequirements::backlogCurrentPriority","type":"","detail":""},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__backlogOrdering","qualifiedName":"BlueDogRequirements::backlogOrdering","id":"n282","kind":"requirement","name":"BlueDogRequirements::backlogOrdering","type":"","detail":""},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__communications","qualifiedName":"BlueDogRequirements::communications","id":"n300","kind":"requirement","name":"BlueDogRequirements::communications","type":"","detail":""},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__logRetention","qualifiedName":"BlueDogRequirements::logRetention","id":"n352","kind":"requirement","name":"BlueDogRequirements::logRetention","type":"","detail":""},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__outageAutonomy","qualifiedName":"BlueDogRequirements::outageAutonomy","id":"n386","kind":"requirement","name":"BlueDogRequirements::outageAutonomy","type":"","detail":""}],"edges":[{"identityStatus":"mapped","semanticId":"BlueDogRequirements__decomposeOutageAutonomy","qualifiedName":"BlueDogRequirements::decomposeOutageAutonomy","from":"n386","to":"n300","label":"derive","kind":"derive"},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__decomposeBacklogOrdering","qualifiedName":"BlueDogRequirements::decomposeBacklogOrdering","from":"n282","to":"n300","label":"derive","kind":"derive"},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__decomposeBacklogCurrentPriority","qualifiedName":"BlueDogRequirements::decomposeBacklogCurrentPriority","from":"n281","to":"n300","label":"derive","kind":"derive"},{"identityStatus":"mapped","semanticId":"BlueDogRequirements__sharedAcceptance19","qualifiedName":"BlueDogRequirements::sharedAcceptance19","from":"n352","to":"n300","label":"derive","kind":"derive"}]};
+for(const [width,height]of [[390,520],[390,650],[1000,650]])test(`native expanded communications fanout stays readable at ${width}×${height}`,async()=>{
+ const native=structuredClone(blueDogCommunications),parentId='n300';
+ for(const node of native.nodes){node.width=node.id===parentId?280:160;node.height=node.id===parentId?138:node.id==='n281'?92:76;}
+ const before=structuredClone(native),view=await layoutDiagram(native,{...options,width,height}),parent=view.nodes.find(n=>n.id===parentId),children=view.nodes.filter(n=>n.id!==parentId);
+ assert.deepEqual(native,before);assert.equal(view.diagnostics.length,0);clear(view);
+ assert.equal(view.layoutMetrics.crossings,0,'do not buy a slightly larger fit by crossing derivations');
+ assert.ok(view.layoutMetrics.bends<=8,'no more than two bends for each independent relationship');
+ assert.ok(view.layoutFitScale>=.95,'connection labels should use local clear slots instead of widening the camera');
+ assert.ok(children.every(n=>n.y>parent.y+parent.height),'source requirement stays above all derived requirements');
+ for(const edge of view.edges){
+  assert.equal(edge.target,parentId);assert.ok(edge.labelBox);assert.ok(edge.points.length<=4);
+  const original=native.edges.find(e=>e.semanticId===edge.semanticId);assert.equal(edge.source,original.from);assert.equal(edge.target,original.to);
+  const points=edge.points,length=points.slice(1).reduce((sum,p,i)=>sum+Math.abs(p.x-points[i].x)+Math.abs(p.y-points[i].y),0),direct=Math.abs(points[0].x-points.at(-1).x)+Math.abs(points[0].y-points.at(-1).y);
+  assert.ok(length/direct<=1.15,'avoid unnecessary detours around intervening siblings');
+ }
+ if(width<700){assert.equal(new Set(children.map(n=>n.y)).size,2);assert.ok(view.layoutMetrics.pathLength<1000);}
+ else {assert.equal(new Set(children.map(n=>n.y)).size,1);const center=(Math.min(...children.map(n=>n.x))+Math.max(...children.map(n=>n.x+n.width)))/2;assert.ok(Math.abs(parent.x+parent.width/2-center)<=1,'focused GV uses the same centered fanout candidate as an authored requirement view');}
+ for(let i=0;i<view.edges.length;i++)for(let j=0;j<i;j++)for(let a=1;a<view.edges[i].points.length;a++)for(let b=1;b<view.edges[j].points.length;b++){
+  const [aa,ab]=view.edges[i].points.slice(a-1,a+1),[ba,bb]=view.edges[j].points.slice(b-1,b+1);
+  if(aa.x===ab.x&&ba.x===bb.x&&aa.x===ba.x)assert.ok(Math.min(Math.max(aa.y,ab.y),Math.max(ba.y,bb.y))-Math.max(Math.min(aa.y,ab.y),Math.min(ba.y,bb.y))<=.01,'no false shared vertical bus');
+  if(aa.y===ab.y&&ba.y===bb.y&&aa.y===ba.y)assert.ok(Math.min(Math.max(aa.x,ab.x),Math.max(ba.x,bb.x))-Math.max(Math.min(aa.x,ab.x),Math.min(ba.x,bb.x))<=.01,'no false shared horizontal bus');
+ }
+});

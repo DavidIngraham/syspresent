@@ -53,3 +53,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 .continuation-glyph{display:block;transform-origin:center;font:700 20px/1 system-ui}
 #connections g.traced,.node.trace-endpoint{opacity:1!important}
+
+/* Journey notices occupy footer flow, never the prose or model canvas. */
+footer #transition{position:static;max-width:none;flex:1;text-align:left;font:inherit;padding:0;background:none;border-radius:0}
+footer:has(#transition[data-notice=true]) #status{display:none}
+footer #transition:not([data-notice=true]){display:none}

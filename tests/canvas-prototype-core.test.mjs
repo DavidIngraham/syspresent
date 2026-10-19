@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {engineeringContext,findEngineeringRoute,directTypingContext,projectView,layoutScene,planTransition} from '../src/canvas-prototype/core/index.mjs';
+import {engineeringContext,findEngineeringRoute,findHierarchyRoute,findExplicitRoute,directTypingContext,projectView,layoutScene,planTransition} from '../src/canvas-prototype/core/index.mjs';
 const graph={elements:[{id:'system',name:'System',kind:'part'},{id:'need',name:'Need',kind:'requirement'},{id:'derived',name:'Derived',kind:'requirement'},{id:'part',kind:'part'},{id:'test',kind:'verification'},{id:'classifier',kind:'definition'},{id:'other',kind:'part'},{id:'doc',kind:'documentation'},{id:'base',layer:'metamodel',kind:'definition'}],relationships:[
  {id:'derive',source:'derived',target:'need',kind:'derive',rationale:'Native rationale'},
  {id:'satisfy',source:'part',target:'derived',kind:'satisfy'},
@@ -102,9 +102,9 @@ test('same-kind transitions reflow directly while cross-kind transitions gather 
  const from={view:generalView,focus:'need'},to={view:next,focus:'part'};
  const transition=planTransition(from,to,{graph});
  assert.equal(transition.mode,'cross-kind');
- assert.deepEqual(transition.stages.map(stage=>stage.kind),['gv-bridge','gv-journey','gv-gather','morph']);
+ assert.deepEqual(transition.stages.map(stage=>stage.kind),['gv-bridge','gv-journey','gv-journey','gv-gather','morph']);
  assert.equal(transition.route.found,true);
- assert.deepEqual(transition.stages[2].semanticIds,['part','derived']);
+ assert.deepEqual(transition.stages.find(stage=>stage.kind==='gv-gather').semanticIds,['part','derived']);
  assert.deepEqual(transition.correspondence,[{semanticId:'derived',fromRepresentationIds:['child'],toRepresentationIds:['r']}]);
  assert.deepEqual(planTransition(from,{view:{...generalView,id:'other'}}).stages.map(stage=>stage.kind),['reflow']);
  const reduced=planTransition(from,to,{graph,reducedMotion:true});
@@ -139,4 +139,92 @@ test('activity containment uses native succession ranks to show parallel branche
  assert.equal(byId.fork.height,24);
  assert.deepEqual(result.omissions,[]);
  for(const node of result.nodes)for(const panel of result.panels)assert.equal(overlaps(node,panel),false);
+});
+
+const branches={elements:['root','a','left','b','right','unrelated'].map(id=>({id,kind:'requirement',layer:'project'})),relationships:[
+ {id:'left-a',source:'left',target:'a',kind:'derive',nativeRelationship:'native:left-a'},
+ {id:'a-root',source:'a',target:'root',kind:'refine'},
+ {id:'right-b',source:'right',target:'b',kind:'derive'},
+ {id:'b-root',source:'b',target:'root',kind:'derive'},
+ {id:'shortcut',source:'left',target:'right',kind:'dependency'}
+]};
+test('hierarchy journey ascends to common engineering ancestor before descending, not across a generic shortcut',()=>{
+ const route=findHierarchyRoute(branches,{from:'left',to:'right'});
+ assert.equal(route.found,true);assert.equal(route.commonAncestor,'root');assert.equal(route.strategy,'common-ancestor');
+ assert.deepEqual(route.elements.map(e=>e.id),['left','a','root','b','right']);
+ assert.deepEqual(route.ascentIds,['left','a','root']);assert.deepEqual(route.descentIds,['root','b','right']);
+ assert.deepEqual(route.relationships.map(e=>[e.id,e.source,e.target]),[['left-a','left','a'],['a-root','a','root'],['b-root','b','root'],['right-b','right','b']]);
+ assert.equal(route.relationships[0].nativeRelationship,'native:left-a');
+ assert.equal(findEngineeringRoute(branches,{from:'left',to:'right'}).relationships[0].id,'shortcut');
+});
+test('hierarchy bounds count both legs and project scope does not silently admit an ancestor',()=>{
+ assert.equal(findHierarchyRoute(branches,{from:'left',to:'right',maxHops:3}).found,false);
+ assert.ok(findHierarchyRoute(branches,{from:'left',to:'right',maxHops:3}).omissions.some(e=>e.reason==='hop-limit'));
+ const scopeIds=['left','a','right','b'];
+ assert.equal(findHierarchyRoute(branches,{from:'left',to:'right',scopeIds}).found,false);
+ assert.equal(findHierarchyRoute(branches,{from:'left',to:'right',scopeIds,includedIds:['root']}).found,true);
+ assert.equal(findHierarchyRoute(branches,{from:'left',to:'unrelated'}).found,false);
+ assert.throws(()=>findHierarchyRoute(branches,{from:'left',to:'right',maxHops:-1}),/hop limit/);
+});
+test('native ownership is a separately identified fallback; engineering ancestry wins over a shorter package route',()=>{
+ const source=structuredClone(branches);source.elements.push({id:'package',kind:'Package',layer:'project'});
+ source.containment=['left','right'].map(child=>({id:'owns-'+child,source:'package',target:child,kind:'containment',navigationOnly:true,authority:'native-api',nativeRelationship:'membership:'+child}));
+ assert.equal(findHierarchyRoute(source,{from:'left',to:'right'}).strategy,'common-ancestor');
+ source.relationships=[];const route=findHierarchyRoute(source,{from:'left',to:'right'});
+ assert.equal(route.strategy,'ownership-ancestor');assert.equal(route.commonAncestor,'package');
+ assert.deepEqual(route.elements.map(e=>e.id),['left','package','right']);
+ assert.deepEqual(route.relationships.map(e=>[e.source,e.target]),[['package','left'],['package','right']]);
+ assert.equal(route.relationships[0].nativeRelationship,'membership:left');
+ source.elements.find(e=>e.id==='package').layer='library';
+ assert.equal(findHierarchyRoute(source,{from:'left',to:'right'}).found,false);
+ source.elements.find(e=>e.id==='package').layer='metamodel';
+ assert.equal(findHierarchyRoute(source,{from:'left',to:'right'}).found,false);
+});
+test('same-kind disjoint scenes journey through bounded GV windows with actual local focus and edges',()=>{
+ const scene=id=>({focus:id,view:{kind:'requirement',nodes:[{id:'representation-'+id,semanticId:id}],edges:[]}});
+ const plan=planTransition(scene('left'),scene('right'),{graph:branches});
+ assert.equal(plan.mode,'same-kind-journey');assert.equal(plan.journeyRequired,true);assert.equal(plan.route.commonAncestor,'root');
+ const windows=plan.stages.filter(s=>s.kind==='gv-journey');
+ assert.deepEqual(windows.map(s=>s.focusId),['a','root','b','right']);
+ assert.deepEqual(windows.map(s=>s.phase),['ascent','ascent','descent','descent']);
+ for(const stage of windows){assert.ok(stage.semanticIds.length<=3);assert.ok(stage.semanticIds.includes(stage.focusId));for(const edge of stage.route){assert.ok(stage.semanticIds.includes(edge.source));assert.ok(stage.semanticIds.includes(edge.target));}}
+ const reduced=planTransition(scene('left'),scene('right'),{graph:branches,reducedMotion:true});
+ assert.ok(reduced.stages.every(s=>s.duration===0));
+ const failed=planTransition(scene('left'),scene('unrelated'),{graph:branches});
+ assert.equal(failed.route.found,false);assert.ok(failed.stages.some(s=>s.disconnected));
+ assert.deepEqual(failed.stages.find(s=>s.disconnected).semanticIds,[]);
+});
+test('same-kind overlapping content reflows without pretending a path was traveled',()=>{
+ const left={focus:'left',view:{kind:'definition',nodes:[{id:'old',semanticId:'a'},{id:'left',semanticId:'left'}]}};
+ const right={focus:'right',view:{kind:'definition',nodes:[{id:'new',semanticId:'a'},{id:'right',semanticId:'right'}]}};
+ const result=planTransition(left,right,{graph:branches});assert.equal(result.mode,'same-kind');assert.equal(result.journeyRequired,false);
+ assert.deepEqual(result.stages.map(s=>s.kind),['reflow']);assert.equal(result.correspondence[0].semanticId,'a');
+});
+test('saved explicit native paths are retained and validated rather than replaced by automatic ancestry',()=>{
+ const route=findExplicitRoute(branches,['left','right']);assert.equal(route.strategy,'explicit');assert.equal(route.relationships[0].id,'shortcut');
+ const scene=id=>({focus:id,view:{kind:'requirement',nodes:[{id,semanticId:id}]}});
+ const result=planTransition(scene('left'),scene('right'),{graph:branches,journey:['left','right']});
+ assert.deepEqual(result.route.elements.map(e=>e.id),['left','right']);assert.equal(result.route.strategy,'explicit');
+ assert.equal(findExplicitRoute(branches,['left','unrelated']).found,false);
+ assert.equal(planTransition(scene('left'),scene('right'),{graph:branches,journey:['a','root']}).route.found,false);
+ const frozen=freeze(structuredClone(branches)),before=JSON.stringify(frozen);
+ findHierarchyRoute(frozen,{from:'left',to:'right'});findExplicitRoute(frozen,['left','right']);
+ planTransition(scene('left'),scene('right'),{graph:frozen});assert.equal(JSON.stringify(frozen),before);
+});
+
+test('hierarchy planning cannot fabricate an ancestor from an undirected valley, shared type or explicit library addition',()=>{
+ const source={elements:['left','right','hub'].map(id=>({id,kind:'part',layer:'project'})),relationships:[
+  {id:'valley-left',source:'hub',target:'left',kind:'derive'},
+  {id:'valley-right',source:'hub',target:'right',kind:'derive'},
+  {id:'generic-shortcut',source:'left',target:'right',kind:'dependency'},
+  {id:'type-left',source:'left',target:'shared',kind:'typing'},
+  {id:'type-right',source:'right',target:'shared',kind:'typing'}
+ ]};
+ source.elements.push({id:'shared',layer:'library',kind:'definition'});
+ assert.equal(findEngineeringRoute(source,{from:'left',to:'right'}).found,true);
+ assert.equal(findHierarchyRoute(source,{from:'left',to:'right'}).found,false);
+ source.containment=[{id:'library-left',source:'shared',target:'left',kind:'containment'},{id:'library-right',source:'shared',target:'right',kind:'containment'}];
+ assert.equal(findHierarchyRoute(source,{from:'left',to:'right',includedIds:['shared']}).found,false);
+ source.elements.find(e=>e.id==='shared').layer='metamodel';
+ assert.equal(findHierarchyRoute(source,{from:'left',to:'right',includedIds:['shared']}).found,false);
 });

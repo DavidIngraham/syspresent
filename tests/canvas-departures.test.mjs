@@ -82,3 +82,46 @@ test('held replacements start moving with continuous position and zero initial v
  assert.equal(before.y,at.y);assert.ok(Math.abs((after.y-at.y)/epsilon)<.05);
  const finish=plan.sampleNode('system',1-epsilon,sampler);assert.ok(Math.abs((final.y-finish.y)/epsilon)<.05);
 });
+
+function journeySampler(frames,key,offsets){
+ const track=frames.map((f,index)=>{const item=f.nodes.find(n=>n.key===key);if(item)return item;let nearest;for(let distance=1;distance<frames.length&&!nearest;distance++)nearest=frames[index-distance]?.nodes.find(n=>n.key===key)??frames[index+distance]?.nodes.find(n=>n.key===key);return {...nearest,opacity:0};});
+ return progress=>sampleTrack(track,offsets,progress);
+}
+test('multi-hop slot replacement preserves the right waypoint instead of retiming it across the entire journey',()=>{
+ const left=node('left',150,170),parent=node('parent',150,30),right=node('right',150,170);
+ const frames=[[left],[left],[left,parent],[parent,right],[right],[right]].map(frame),offsets=[0,.2,.4,.6,.8,1],plan=planDepartures(frames,{offsets});
+ assert.equal(plan.departures.length,1);assert.equal(plan.departures[0].interval,2);
+ const draw=journeySampler(frames,'right',offsets);
+ assert.equal(draw(.6).opacity,1);assert.deepEqual(plan.sampleNode('right',.6,draw),draw(.6));
+ for(const key of ['left','parent','right']){const sample=journeySampler(frames,key,offsets);for(const stop of offsets)assert.deepEqual(plan.sampleNode(key,stop,sample),sample(stop));}
+ assert.deepEqual(plan.sampleNode('right',.7,draw),draw(.7));
+ // Only the local .4 -> .6 handoff is delayed: the replacement still reaches
+ // its actual hop endpoint on time and the former endpoint clears first.
+ for(let p=.4;p<=.6;p+=.001){const old=plan.sampleNode('left',p,journeySampler(frames,'left',offsets)),next=plan.sampleNode('right',p,draw);if(old.opacity>.01&&next.opacity>.01)assert.equal(overlap(old,next),false);}
+});
+test('nonuniform GV offsets constrain repeated handoffs independently and preserve semantic endpoint identities',()=>{
+ const a=node('a',150,170),b=node('b',150,170),c=node('c',150,170),frames=[[a],[b],[b],[c],[c]].map(frame),offsets=[0,.18,.5,.74,1],plan=planDepartures(frames,{offsets});
+ assert.deepEqual(plan.departures.map(item=>[item.semanticId,item.startAt,item.endAt]),[['a',0,.18],['b',.5,.74]]);
+ for(const key of ['a','b','c']){
+  const draw=journeySampler(frames,key,offsets);
+  for(const stop of offsets){const result=plan.sampleNode(key,stop,draw);assert.deepEqual(result,draw(stop));assert.equal(result.semanticId,key);}
+ }
+ const drawB=journeySampler(frames,'b',offsets);assert.equal(plan.sampleNode('b',.18,drawB).opacity,1);assert.equal(plan.sampleNode('b',.5,drawB).opacity,1);
+ assert.equal(plan.sampleNode('c',.74,journeySampler(frames,'c',offsets)).opacity,1);
+});
+test('local peripheral returns finish at their intermediate waypoint before later active appearances',()=>{
+ const a=node('a',150,170),b=node('b',150,170),ghost=node('a',20,400,{context:true,opacity:.22}),again=node('a',150,300),frames=[[a],[ghost,b],[again,b]].map(frame),offsets=[0,.3,1],plan=planDepartures(frames,{offsets});
+ const draw=journeySampler(frames,'a',offsets);
+ assert.equal(plan.sampleNode('a',.2,draw).opacity,0);
+ assert.deepEqual(plan.sampleNode('a',.3,draw),draw(.3));
+ assert.equal(plan.sampleNode('a',.3,draw).opacity,ghost.opacity);assert.equal(plan.sampleNode('a',.3,draw).x,ghost.x);
+ assert.deepEqual(plan.sampleNode('a',.6,draw),draw(.6));
+ assert.deepEqual(plan.sampleNode('a',1,draw),again);
+});
+test('single-frame and reduced-motion samples remain exact and malformed offsets are rejected',()=>{
+ const a=node('a',150,170),frames=[frame([a])],plan=planDepartures(frames),draw=()=>a;
+ assert.deepEqual(plan.departures,[]);assert.deepEqual(plan.sampleNode('a',1,draw),a);
+ const more=[frame([a]),frame([node('b',150,170)]),frame([a])];
+ for(const offsets of [[0,1],[0,.5,.4],[.1,.5,1],[0,NaN,1]])assert.throws(()=>planDepartures(more,{offsets}),/offsets/);
+ const final=journeySampler(more,'a',[0,.5,1]);assert.deepEqual(planDepartures(more).sampleNode('a',1,final),a);
+});

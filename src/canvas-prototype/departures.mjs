@@ -44,56 +44,61 @@ function exitPosition(node,width,height,obstacles){
  return candidates.sort((a,b)=>a.obstructions-b.obstructions||a.distance-b.distance)[0];
 }
 /**
- * Vacate reused slots before their replacements move into them. This is a
- * per-node schedule on the existing continuous journey clock, not extra
- * animation stages. sampleAt(progress) is the caller's ordinary track sampler.
- *
- * Intermediate frames remain untouched; identity matching uses native IDs,
- * never labels. A peripheral representation is allowed to reappear later at
- * its own settled position, after the departing active representation is gone.
+ * Vacate reused slots within each adjacent frame interval. Never retime the
+ * whole journey: every supplied GV waypoint and its endpoint presence is exact.
+ * sampleAt(progress) remains the caller's ordinary continuous track sampler.
  */
-export function planDepartures(frames,{width,height,panels=[],clearAt=.28,arriveAfter=.31,contextAfter=.78}={}){
+export function planDepartures(frames,{width,height,panels=[],offsets,clearAt=.28,arriveAfter=.31,contextAfter=.78}={}){
  if(!Array.isArray(frames)||!frames.length)throw new TypeError('Departure planning requires frames');
  const first=frames[0],last=frames.at(-1);
  width=width??last.width??first.width;height=height??last.height??first.height;
  if(!(width>0&&height>0))throw new RangeError('Departure planning requires a positive viewport');
  if(!(clearAt>0&&clearAt<arriveAfter&&arriveAfter<contextAfter&&contextAfter<1))throw new RangeError('Departure phases must be ordered within the journey');
- const finalByKey=new Map(last.nodes.map(node=>[node.key,node]));
- const arrivals=new Set(),departures=[];
- for(const node of first.nodes){
-  const final=finalByKey.get(node.key);
-  if(!active(node)||active(final))continue;
-  const replacements=last.nodes.filter(next=>active(next)&&identity(next)!==identity(node)&&overlaps(node,next,4));
-  if(!replacements.length)continue;
-  const exit=exitPosition(node,width,height,[...panels,...nativeObstacles(node,first.nodes)]);
-  departures.push({key:node.key,semanticId:identity(node),from:rectangle(node),exit:{x:exit.x,y:exit.y},side:exit.side,fadeUntil:exit.fadeUntil,clearAt,arriveAfter,replacements:replacements.map(next=>next.key)});
-  for(const next of replacements)arrivals.add(next.key);
+ offsets=offsets??frames.map((_,index)=>index/(frames.length-1||1));
+ if(offsets.length!==frames.length||offsets[0]!==0||(frames.length>1&&offsets.at(-1)!==1)||offsets.some((value,index)=>!Number.isFinite(value)||(index>0&&value<=offsets[index-1])))throw new RangeError('Departure offsets must match frames and increase from zero to one');
+ const departures=[],arrivals=new Set(),contextReturns=new Set(),intervals=[];
+ for(let interval=0;interval<frames.length-1;interval++){
+  const startFrame=frames[interval],endFrame=frames[interval+1],finalByKey=new Map(endFrame.nodes.map(node=>[node.key,node]));
+  const localDepartures=[],localArrivals=new Set();
+  for(const node of startFrame.nodes){
+   const final=finalByKey.get(node.key);
+   if(!active(node)||active(final))continue;
+   const replacements=endFrame.nodes.filter(next=>active(next)&&identity(next)!==identity(node)&&overlaps(node,next,4));
+   if(!replacements.length)continue;
+   const occupiedPanels=[...panels,...(startFrame.panels??[]),...(endFrame.panels??[])];
+   const exit=exitPosition(node,width,height,[...occupiedPanels,...nativeObstacles(node,startFrame.nodes)]);
+   localDepartures.push({key:node.key,semanticId:identity(node),from:rectangle(node),exit:{x:exit.x,y:exit.y},side:exit.side,fadeUntil:exit.fadeUntil,clearAt,arriveAfter,replacements:replacements.map(next=>next.key),interval,startAt:offsets[interval],endAt:offsets[interval+1]});
+   for(const next of replacements){localArrivals.add(next.key);arrivals.add(next.key);}
+  }
+  const identities=new Set(localDepartures.map(item=>item.semanticId));
+  const localReturns=new Set(endFrame.nodes.filter(node=>!active(node)&&visible(node)&&identities.has(identity(node))).map(node=>node.key));
+  for(const key of localReturns)contextReturns.add(key);
+  departures.push(...localDepartures);
+  intervals.push({startAt:offsets[interval],endAt:offsets[interval+1],byKey:new Map(localDepartures.map(item=>[item.key,item])),arrivals:localArrivals,contextReturns:localReturns});
  }
- const byKey=new Map(departures.map(item=>[item.key,item]));
- const departingIdentities=new Set(departures.map(item=>item.semanticId));
- // A semantic element can legitimately use another visual key when it becomes
- // a boundary marker. Keep the representations distinct, but do not show the
- // returning marker before its outgoing active card has vacated the slot.
- const contextReturns=new Map(last.nodes.filter(node=>!active(node)&&visible(node)&&departingIdentities.has(identity(node))).map(node=>[node.key,node]));
  function sampleNode(key,progress,sampleAt){
-  // Endpoints are exact, including reduced-motion and interrupted snapshots.
+  // Includes reduced motion, interrupted snapshots and every interior waypoint.
   if(progress<=0)return sampleAt(0);if(progress>=1)return sampleAt(1);
-  const departure=byKey.get(key);
+  if(offsets.some(offset=>Math.abs(progress-offset)<1e-12))return sampleAt(progress);
+  const interval=intervals.find(item=>progress>item.startAt&&progress<item.endAt);
+  if(!interval)return sampleAt(progress);
+  const span=interval.endAt-interval.startAt,local=(progress-interval.startAt)/span;
+  const departure=interval.byKey.get(key);
   if(departure){
-   const base=sampleAt(progress),start=sampleAt(0),finish=sampleAt(1);
-   if(progress<=clearAt){const t=smooth(progress/clearAt);return {...base,...rectangle(start),scale:start.scale,x:start.x+(departure.exit.x-start.x)*t,y:start.y+(departure.exit.y-start.y)*t,opacity:(start.opacity??1)*(1-smooth(departure.fadeUntil>0?t/departure.fadeUntil:1))};}
-   // Reposition while invisible, then fade the peripheral tile in at its final
-   // location. No active card travels back across its replacement's slot.
-   return {...base,...rectangle(finish),scale:finish.scale,opacity:(finish.opacity??0)*smooth((progress-contextAfter)/(1-contextAfter))};
+   const base=sampleAt(progress),start=sampleAt(interval.startAt),finish=sampleAt(interval.endAt);
+   if(local<=clearAt){const t=smooth(local/clearAt);return {...base,...rectangle(start),scale:start.scale,x:start.x+(departure.exit.x-start.x)*t,y:start.y+(departure.exit.y-start.y)*t,opacity:(start.opacity??1)*(1-smooth(departure.fadeUntil>0?t/departure.fadeUntil:1))};}
+   // Reposition invisibly, then return any peripheral representation at this
+   // hop's endpoint, not at the final scene's unrelated location.
+   return {...base,...rectangle(finish),scale:finish.scale,opacity:(finish.opacity??0)*smooth((local-contextAfter)/(1-contextAfter))};
   }
-  if(contextReturns.has(key)){
-   const finish=sampleAt(1);return {...finish,opacity:(finish.opacity??0)*smooth((progress-contextAfter)/(1-contextAfter))};
+  if(interval.contextReturns.has(key)){
+   const finish=sampleAt(interval.endAt);return {...finish,opacity:(finish.opacity??0)*smooth((local-contextAfter)/(1-contextAfter))};
   }
-  if(arrivals.has(key)){
-   const start=sampleAt(0),t=clamp((progress-arriveAfter)/(1-arriveAfter));
-   return {...sampleAt(smooth(t)),...(progress<=arriveAfter?start:{})};
+  if(interval.arrivals.has(key)){
+   const start=sampleAt(interval.startAt),t=clamp((local-arriveAfter)/(1-arriveAfter));
+   return {...sampleAt(interval.startAt+smooth(t)*span),...(local<=arriveAfter?start:{})};
   }
   return sampleAt(progress);
  }
- return {departures,arrivals:[...arrivals],contextReturns:[...contextReturns.keys()],sampleNode};
+ return {departures,arrivals:[...arrivals],contextReturns:[...contextReturns],sampleNode};
 }

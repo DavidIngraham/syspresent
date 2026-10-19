@@ -9,7 +9,7 @@ import {graphArea,fitDiagram,routeEdges,routeIsClear,routeConnectsEndpoints} fro
 import {createLayoutEngine,layoutDiagram} from './elk-layout.mjs';
 import {edgeAppearance,markerDefinition} from './notation.mjs';
 import {createSemanticEngine} from './engine/client.mjs';
-import {engineeringContext,findEngineeringRoute,planTransition,directTypingContext} from './core/index.mjs';
+import {engineeringContext,findEngineeringRoute,findHierarchyRoute,planTransition,directTypingContext} from './core/index.mjs';
 import {adaptNativeView,modelGraph,graphView,requireNativeIdentity} from './graph.mjs';
 import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,appendScene,captureViewSource,requirementCoverageSource,verifiedRuntimeCache} from './project.mjs';
 const trustedCacheHash=document.querySelector('meta[name="syspresent-runtime-cache"]')?.content;
@@ -54,9 +54,9 @@ async function compile(project){
  const graph=modelGraph(exported.elements,[...views.values(),coverage]);
  for(const root of project.manifest.systemOfInterest)if(!graph.elements.some(e=>e.qualifiedName===root))throw Error('System of interest does not resolve: '+root);
  const byName=value=>resolveInGraph(graph,value);
- for(const [sceneIndex,item] of scenes.entries()){resolvePresentation(item.presentation,{resolve:byName});if(item.journey?.length&&(byName(item.journey.at(-1))!==byName(item.focus)||(sceneIndex>0&&byName(item.journey[0])!==byName(scenes[sceneIndex-1].focus))))throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);if(!views.has(item.view))throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);if(!byName(item.focus))throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);for(let i=1;i<(item.journey??[]).length;i++){const from=byName(item.journey[i-1]),to=byName(item.journey[i]);if(!from||!to||!findEngineeringRoute(graph,{from,to,maxHops:1}).found)throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);}}
+ for(const [sceneIndex,item] of scenes.entries()){resolvePresentation(item.presentation,{resolve:byName});if(item.journey?.length&&(byName(item.journey.at(-1))!==byName(item.focus)||(sceneIndex>0&&byName(item.journey[0])!==byName(scenes[sceneIndex-1].focus))))throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);if(!views.has(item.view))throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);if(!byName(item.focus))throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);for(let i=1;i<(item.journey??[]).length;i++){const from=byName(item.journey[i-1]),to=byName(item.journey[i]);if(!from||!to||!findEngineeringRoute(graph,{from,to,maxHops:1}).found&&!findHierarchyRoute(graph,{from,to,maxHops:1}).found)throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);}}
  const scoped=graph.elements.filter(e=>project.manifest.systemOfInterest.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);
- for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped});if(plan.mode==='cross-kind'&&!plan.route.found)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
+ for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
  return {project,modelHash:parsed.modelHash,exported,graph,views,scenes,coverage,availableViews};
 }
 function busy(value){$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','fit','find-toggle','edit'])$(id).disabled=value;}
@@ -96,7 +96,7 @@ function cancelAnimations(){state.motion?.cancel();state.motion=null;for(const a
 function svgel(name,attrs={}){const e=document.createElementNS('http://www.w3.org/2000/svg',name);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);return e;}
 const nodeKey=(node,counts,view)=>{const base=node.kind==='context-boundary'?'boundary:'+node.id:node.semanticId?'semantic:'+node.semanticId:'notation:'+view.id+':'+node.id;const count=counts.get(base)??0;counts.set(base,count+1);return base+':'+count;};
 function labelSize(text){const span=el('span',text);span.style.cssText='position:fixed;visibility:hidden;left:-10000px;white-space:pre;font:12px system-ui,sans-serif';document.body.append(span);const rect=span.getBoundingClientRect();span.remove();return {width:Math.ceil(rect.width)+4,height:16};}
-async function prepareFrame(view,focus,panels){
+async function prepareFrame(view,focus,panels,{journey=false}={}){
  const stage=$('stage'),area=graphArea(stage.clientWidth,stage.clientHeight,panels);
  const layoutFor=compact=>layoutDiagram(sizeView(view,focus,{compact}),{width:area.width,height:area.height,elk:state.layoutEngine,measureLabel:labelSize,grouping:displayPreferences().grouping});
  let layout=await layoutFor(false),fitted=fitDiagram(layout,area);
@@ -115,7 +115,7 @@ async function prepareFrame(view,focus,panels){
  const peripheral=[...routeEdges(fringe.edges,[...nodes,...labelObstacles,...fringe.stubEdges.filter(e=>e.labelBox).map(e=>({...e.labelBox,id:'stub-label:'+e.id}))],{area,measureLabel:labelSize}),...fringe.stubEdges];
  const edgeCounts=new Map(),edges=[...routed,...peripheral].map(e=>{
   const a=byID.get(e.sourceAttachment??e.source),b=byID.get(e.targetAttachment??e.target),ownerA=byID.get(e.source),ownerB=byID.get(e.target),base=[a?.semanticId||a?.key,b?.semanticId||b?.key,e.kind,e.label||''].join('|'),ordinal=edgeCounts.get(base)??0;edgeCounts.set(base,ordinal+1);
-  return {...e,sourceClipped:a?.kind==='context-boundary',targetClipped:b?.kind==='context-boundary',key:base+':'+ordinal,sourceKey:a?.key,targetKey:b?.key,sourceSemantic:a?.semanticId||ownerA?.semanticId,targetSemantic:b?.semanticId||ownerB?.semanticId,opacity:e.context?.18:displayPreferences().emphasis.length&&!displayPreferences().emphasis.includes(e.kind)?.28:1,routePoints:e.points,points:samplePolyline(e.points.length?e.points:[{x:0,y:0},{x:0,y:0}])};
+  return {...e,journey:journey&&!e.context,sourceClipped:a?.kind==='context-boundary',targetClipped:b?.kind==='context-boundary',key:base+':'+ordinal,sourceKey:a?.key,targetKey:b?.key,sourceSemantic:a?.semanticId||ownerA?.semanticId,targetSemantic:b?.semanticId||ownerB?.semanticId,opacity:e.context?.18:!journey&&displayPreferences().emphasis.length&&!displayPreferences().emphasis.includes(e.kind)?.28:1,routePoints:e.points,points:samplePolyline(e.points.length?e.points:[{x:0,y:0},{x:0,y:0}])};
  });
  const notationNotices=layout.edges.map(e=>({e,appearance:edgeAppearance(e,{viewKind:view.kind})})).filter(p=>!p.appearance.supported).map(p=>({reason:'unsupported-notation',target:p.e.target,relationshipId:p.e.id,message:p.appearance.notice}));
  const omissions=[...(layout.omissions??view.omissions??[]),...notationNotices,...fringe.omissions,...routed.filter(e=>e.labelOmitted||e.routingBlocked).map(e=>({reason:e.labelOmitted?'label-space':'route-space',target:e.semanticTarget||e.target,relationshipId:e.semanticId||e.id}))];
@@ -128,8 +128,8 @@ function presenceTrack(frames,key,collection){return frames.map((f,index)=>{cons
 async function paintFrames(frames,{duration=0,caption='',outgoingPanel}={}){
  clearTrace();cancelAnimations();const destination=frames.at(-1),svg=$('connections'),host=$('nodes'),stage=$('stage');svg.replaceChildren();host.replaceChildren();svg.setAttribute('viewBox',`0 0 ${stage.clientWidth} ${stage.clientHeight}`);
  const defs=svgel('defs');for(const name of ['open-arrow','filled-arrow','hollow-triangle','diamond','hollow-diamond','containment']){const {path,fill,...attrs}=markerDefinition(name),marker=svgel('marker',{id:'edge-'+name,...attrs,markerUnits:'userSpaceOnUse'});marker.append(svgel('path',{d:path,fill:fill==='line'?'#426869':fill==='background'?'#f5f7f7':'none',stroke:'#426869','stroke-width':1.2}));defs.append(marker);}svg.append(defs);
- const departurePlan=planDepartures(frames,{width:stage.clientWidth,height:stage.clientHeight,panels:destination.panels??[]});stage.dataset.departureCount=String(departurePlan.departures.length);
  const offsets=frames.length===5?[0,.18,.5,.74,1]:frames.map((_,i)=>i/(frames.length-1||1));
+ const departurePlan=planDepartures(frames,{width:stage.clientWidth,height:stage.clientHeight,panels:destination.panels??[],offsets});stage.dataset.departureCount=String(departurePlan.departures.length);
  const nodeKeys=visibleTrackKeys(frames,'nodes'),edgeKeys=visibleTrackKeys(frames,'edges').sort((a,b)=>{const edge=key=>destination.edges.find(e=>e.key===key)??frames.flatMap(f=>f.edges).find(e=>e.key===key);return Number(!!edge(b)?.context)-Number(!!edge(a)?.context);});
  const nodeTracks=nodeKeys.map(key=>{const track=presenceTrack(frames,key,'nodes'),latest=destination.nodes.find(n=>n.key===key)??track.filter(n=>n.opacity>0).at(-1),node=visualNode(latest);host.append(node);
   const first=track.find(n=>n.opacity>0),oldFace=latest.kind!=='context-boundary'&&first&&JSON.stringify([first.kind,first.displayDetail,first.type,first.container])!==JSON.stringify([latest.kind,latest.displayDetail,latest.type,latest.container])?face(first):null;
@@ -147,18 +147,26 @@ async function paintFrames(frames,{duration=0,caption='',outgoingPanel}={}){
   let text;if(latest.label&&!latest.labelOmitted){text=svgel('text',{'font-size':12*(latest.labelScale??1),'font-family':'system-ui, sans-serif',fill:'#355e60','paint-order':'stroke',stroke:'#f5f7f7','stroke-width':4,'text-anchor':'start'});text.textContent=latest.label;group.append(text);}
   group.onclick=event=>{event.stopPropagation();traceEdge(latest,key);};group.onkeydown=event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();traceEdge(latest,key);}};
   svg.append(group);
-  const numeric=track.map(e=>{const r={opacity:e.opacity??1,x:e.x??0,y:e.y??0,labelOpacity:e.label&&!e.labelOmitted?1:0};for(const [i,p]of e.points.entries()){r['x'+i]=p.x;r['y'+i]=p.y;}return r;});
+  const numeric=track.map(e=>{const r={opacity:e.opacity??1,x:e.x??0,y:e.y??0,labelOpacity:e.label&&!e.labelOmitted?1:0,journey:e.journey?1:0};for(const [i,p]of e.points.entries()){r['x'+i]=p.x;r['y'+i]=p.y;}return r;});
   return {key,group,line,oldLine,hit,text,latest,track:numeric};
  });
  const draw=(progress,clock)=>{const nodes=[],edges=[];for(const item of nodeTracks){const r=departurePlan.sampleNode(item.key,progress,p=>sampleTrack(item.track,offsets,p)),n=item.node;n.style.width=(r.width/(r.scale||1))+'px';n.style.height=(r.height/(r.scale||1))+'px';n.style.transform=`translate(${r.x}px,${r.y}px) scale(${r.scale})`;n.style.opacity=r.opacity;n.style.pointerEvents=item.latest.interactive!==false&&r.opacity>.12?'auto':'none';n.setAttribute('aria-hidden',String(r.opacity<.05));if(item.latest.portLabelBox){const label=n.querySelector('.port-name'),box=item.latest.portLabelBox;if(label){label.style.left=(box.x-item.latest.x)/(item.latest.scale||1)+'px';label.style.top=(box.y-item.latest.y)/(item.latest.scale||1)+'px';label.style.width=box.width/(item.latest.scale||1)+'px';label.style.height=box.height/(item.latest.scale||1)+'px';}}if(item.oldFace){const fade=Math.max(0,Math.min(1,(progress-.25)/.5));item.oldFace.style.opacity=1-fade;item.newFace.style.opacity=fade;}nodes.push({...item.latest,...r});}
-  for(const item of edgeTracks){
-   const r=sampleTrack(item.track,offsets,progress),interpolated=Array.from({length:20},(_,i)=>({x:r['x'+i],y:r['y'+i]}));
+  const currentNodes=nodes.map(n=>({...n,id:n.key,parentId:n.parentId?nodes.find(p=>p.id===n.parentId)?.key:undefined}));
+  const sampledEdges=edgeTracks.map(item=>({item,r:sampleTrack(item.track,offsets,progress)})),journeySizes=new Map();
+  const liveEdges=sampledEdges.filter(({r})=>clock!==1&&r.journey>.5&&r.opacity>.01).map(({item})=>{
+   const text=item.latest.label??'',box=item.latest.labelBox??{width:Math.max(16,text.length*7),height:16},old=journeySizes.get(text);journeySizes.set(text,{width:Math.max(old?.width??0,box.width),height:Math.max(old?.height??0,box.height)});
+   return {...item.latest,id:item.key,source:item.latest.sourceKey,target:item.latest.targetKey,label:text};
+  });
+  const liveRoutes=new Map(routeEdges(liveEdges,currentNodes,{area:destination.area,measureLabel:text=>journeySizes.get(text)}).map(route=>[route.id,route]));
+  for(const {item,r} of sampledEdges){
+   const interpolated=Array.from({length:20},(_,i)=>({x:r['x'+i],y:r['y'+i]}));
    // Never morph a line through a moving tile. During travel use a clear
    // rectilinear route and lower its emphasis; the final route is joint ELK geometry.
-   const currentNodes=nodes.map(n=>({...n,id:n.key,parentId:n.parentId?nodes.find(p=>p.id===n.parentId)?.key:undefined}));
    const edge={...item.latest,source:item.latest.sourceKey,target:item.latest.targetKey};
-   let points=clock===1?(item.latest.routePoints??[]):interpolated;
-   if(clock!==1&&(!routeIsClear(points,edge,currentNodes,{orthogonalOnly:true})||!routeConnectsEndpoints(points,edge,currentNodes))){points=routeEdges([{...edge,label:''}],currentNodes)[0]?.points??[];}
+   let points=clock===1?(item.latest.routePoints??[]):interpolated,liveLabel;
+   const journeyEdge=clock!==1&&r.journey>.5;
+   if(journeyEdge){const live=liveRoutes.get(item.key);points=live?.points??[];if(live?.labelBox&&!live.labelLeader&&![...liveRoutes.values()].some(other=>other.points.length>1&&!routeIsClear(other.points,other,currentNodes.concat([{...live.labelBox,id:'journey-label:'+item.key}]),{orthogonalOnly:true})))liveLabel=live;}
+   if(!journeyEdge&&clock!==1&&(!routeIsClear(points,edge,currentNodes,{orthogonalOnly:true})||!routeConnectsEndpoints(points,edge,currentNodes))){points=routeEdges([{...edge,label:''}],currentNodes)[0]?.points??[];}
    if(!routeIsClear(points,edge,currentNodes)||!routeConnectsEndpoints(points,edge,currentNodes))points=[];
    const pathOf=path=>path.map((p,i)=>(i?'L':'M')+p.x+','+p.y).join(' '),signature=points.slice(1).map((p,i)=>Math.abs(p.x-points[i].x)<.01?'V':'H').filter((v,i,a)=>!i||v!==a[i-1]).join('');
    if(clock!==1&&item.signature&&signature!==item.signature){item.outgoingPoints=item.drawnPoints;item.routeChangedAt=clock;}
@@ -167,9 +175,9 @@ async function paintFrames(frames,{duration=0,caption='',outgoingPanel}={}){
    if(outgoing?.length>1&&points.length>1){const first=outgoing[0],second=outgoing[1],last=outgoing.at(-1),penultimate=outgoing.at(-2),horizontalFirst=Math.abs(first.y-second.y)<.01,horizontalLast=Math.abs(last.y-penultimate.y)<.01;outgoing[0]={...points[0]};outgoing[outgoing.length-1]={...points.at(-1)};if(horizontalFirst)second.y=points[0].y;else second.x=points[0].x;if(horizontalLast)penultimate.y=points.at(-1).y;else penultimate.x=points.at(-1).x;}
    const oldClear=outgoing&&routeIsClear(outgoing,edge,currentNodes,{orthogonalOnly:true})&&routeConnectsEndpoints(outgoing,edge,currentNodes);item.oldLine.setAttribute('d',oldClear?pathOf(outgoing):'');item.oldLine.style.opacity=oldClear?1-routeFade:0;
    const path=pathOf(points);item.line.setAttribute('d',path);item.line.style.opacity=routeFade;item.hit.setAttribute('d',path);item.signature=signature;item.drawnPoints=points;
-   const traveling=duration&&clock>0&&clock<1,emphasis=traveling?.2+.8*Math.abs(Math.cos(Math.PI*clock)):1;
+   const traveling=duration&&clock>0&&clock<1,emphasis=traveling&&!journeyEdge?.2+.8*Math.abs(Math.cos(Math.PI*clock)):1;
    const endpoints=[currentNodes.find(n=>n.id===edge.source),currentNodes.find(n=>n.id===edge.target)],presence=Math.min(1,...endpoints.map(n=>n?(n.opacity??1)/(n.context?.22:1):0));const effectiveOpacity=points.length?r.opacity*emphasis*presence:0;item.group.style.opacity=effectiveOpacity;item.group.style.pointerEvents=effectiveOpacity>.1?'auto':'none';item.group.setAttribute('aria-hidden',String(effectiveOpacity<.05));item.group.setAttribute('tabindex',effectiveOpacity>.1?'0':'-1');
-   if(item.text){item.text.setAttribute('x',r.x);item.text.setAttribute('y',r.y);item.text.style.opacity=traveling?Math.max(0,(clock-.85)/.15):r.labelOpacity;}
+   if(item.text){item.text.setAttribute('x',liveLabel?.x??r.x);item.text.setAttribute('y',liveLabel?.y??r.y);item.text.style.opacity=journeyEdge?(liveLabel?r.labelOpacity*routeFade:0):traveling?Math.max(0,(clock-.85)/.15):r.labelOpacity;}
    edges.push({...item.latest,points,opacity:effectiveOpacity,x:r.x,y:r.y});
   }
   if(outgoingPanel)outgoingPanel.style.opacity=Math.max(0,1-clock*3);$('narrative').style.opacity=duration?Math.min(1,clock*2):1;stage.dataset.motionProgress=String(clock);state.visualSnapshot={...destination,nodes,edges};
@@ -181,21 +189,22 @@ async function paintFrames(frames,{duration=0,caption='',outgoingPanel}={}){
 }
 async function frame(view,caption='',duration=0,focus=state.focus){if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;return transitionTo(pending.view,pending.focus,{animate:false,allowDisconnected:true,journey:pending.journey});}const revision=++state.revision,panels=panelGeometry(view),destination=await prepareFrame(view,focus,panels),previous=state.visualSnapshot;if(revision!==state.revision)return;return paintFrames(duration&&previous?[previous,destination]:[destination],{duration,caption});}
 
-function gather(ids){const set=new Set(ids),elements=state.graph.elements.filter(e=>set.has(e.id));return graphView(state.graph,{elements,relationships:state.graph.relationships.filter(e=>set.has(e.source)&&set.has(e.target))},'General View journey');}
+function gather(ids,relationships){const set=new Set(ids),elements=state.graph.elements.filter(e=>set.has(e.id));return graphView(state.graph,{elements,relationships:(relationships??state.graph.relationships).filter(e=>set.has(e.source)&&set.has(e.target))},'General View journey');}
 async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=false}={}){
  const revision=++state.revision,previous=state.view;
  // Validate the route before committing focus or starting an animation.
- const plan=previous?planTransition({view:previous,focus:state.previousFocus},{view,focus},{graph:state.graph,scopeIds:state.exploring?undefined:scopeIds(),reducedMotion:state.reduce}):null;
- if(journey?.length>1&&plan?.route&&resolve(journey[0])===state.previousFocus&&resolve(journey.at(-1))===focus){const ids=journey.map(resolve);const routeEdges=[];for(let i=1;i<ids.length;i++){const route=findEngineeringRoute(state.graph,{from:ids[i-1],to:ids[i],scopeIds:scopeIds(),maxHops:1});if(!route.found)throw Error('Saved journey no longer resolves within the presentation boundary');routeEdges.push(...route.relationships);}plan.route={found:true,elements:ids.map(element),relationships:routeEdges};const stage=plan.stages.find(s=>s.kind==='gv-journey');if(stage){stage.route=routeEdges;stage.semanticIds=ids;}}
- const disconnected=plan?.mode==='cross-kind'&&plan.route?.found===false;
+ const savedJourney=journey?.length>1&&resolve(journey[0])===state.previousFocus&&resolve(journey.at(-1))===focus?journey.map(resolve):undefined;
+ const plan=previous?planTransition({view:previous,focus:state.previousFocus},{view,focus},{graph:state.graph,scopeIds:state.exploring?undefined:scopeIds(),reducedMotion:state.reduce,journey:savedJourney}):null;
+ if(savedJourney&&!plan?.route?.found)throw Error('Saved journey no longer resolves within the presentation boundary');
+ const disconnected=plan?.journeyRequired&&plan.route?.found===false;
  if(disconnected&&!state.exploring&&!allowDisconnected)throw Error('No engineering route connects these viewpoints within the presentation system. Explore the model to open a disconnected viewpoint explicitly.');
  cancelAnimations();for(const p of $('stage').querySelectorAll('.narrative-outgoing'))p.remove();$('selection').hidden=true;state.transitioning=true;state.pendingDestination={view,focus,journey};state.lastTransition=plan;
  let oldPanel;try{
  oldPanel=!$('narrative').hidden?$('narrative').cloneNode(true):null;if(oldPanel){oldPanel.removeAttribute('id');oldPanel.classList.add('narrative-outgoing');oldPanel.setAttribute('aria-hidden','true');$('stage').append(oldPanel);}
  const panels=panelGeometry(view),target=await prepareFrame(view,focus,panels),frames=[];if(revision!==state.revision){oldPanel?.remove();return;}
- if(state.visualSnapshot&&animate&&!state.reduce){frames.push(state.visualSnapshot);if(plan?.mode==='cross-kind'&&!disconnected){for(const step of plan.stages.slice(0,-1))frames.push(await prepareFrame(gather(step.semanticIds),focus,panels));}frames.push(target);}else frames.push(target);
+ if(state.visualSnapshot&&animate&&!state.reduce){frames.push(state.visualSnapshot);if(plan?.journeyRequired&&!disconnected){for(const step of plan.stages.filter(step=>step.viewKind==='gv')){frames.push(await prepareFrame(gather(step.semanticIds,step.route),step.focusId??focus,panels,{journey:true}));if(revision!==state.revision){oldPanel?.remove();return;}}}frames.push(target);}else frames.push(target);
  if(revision!==state.revision){oldPanel?.remove();return;}
- const result=await paintFrames(frames,{duration:frames.length>2?1700:frames.length>1?780:0,caption:disconnected?'No engineering route · explicit view jump':'',outgoingPanel:oldPanel});
+ const result=await paintFrames(frames,{duration:frames.length>2?Math.max(1700,(frames.length-1)*420):frames.length>1?780:0,caption:disconnected?'No engineering route · explicit view jump':plan?.route?.strategy==='ownership-ancestor'?'Model ownership route · location, not derivation':'',outgoingPanel:oldPanel});
  if(result.cancelled||revision!==state.revision)return;state.view=view;state.focus=focus;state.previousFocus=focus;
  if(!state.exploring)status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);else status(state.traceInfo?.summary.message??'Explore this native view · select an element for contextual actions');
  $('boundary').textContent=!scopeIds().includes(focus)?'Outside presentation boundary · loaded model context':state.project.manifest.publication.scope==='scoped'?'Scoped publication · supplied model context only':'Complete project · standalone exploration available';

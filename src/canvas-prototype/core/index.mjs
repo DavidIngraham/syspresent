@@ -69,6 +69,90 @@ export function findEngineeringRoute(graph, options={}) {
   }
   return copy({found:false,elements:[],relationships:[],omissions});
 }
+// Display hierarchy is independent of native arrow direction. These are actual
+// directed decision/composition relations, never shared-classifier shortcuts.
+const UPWARD_KINDS = new Set(['derive','derivation','refine','refinement','satisfy','satisfaction','verify','verification']);
+const DOWNWARD_KINDS = new Set(['composition','containment']);
+function hierarchyPolicy(graph, options, includeOwnership) {
+  const policy=graphPolicy(graph,options), omissions=[], seen=new Set(), upward=new Map();
+  const omit=(edge,target,reason)=>{const key=JSON.stringify([edge?.id,target,reason]);if(!seen.has(key)){seen.add(key);omissions.push({relationshipId:edge?.id??null,target,reason});}};
+  const allowed=id=>{
+    const reason=policy.allowedElement(id);if(reason)return reason;
+    const element=policy.elements.get(id);
+    if(element.layer==='metamodel'||element.metamodel===true)return 'metamodel-boundary';
+    return element.layer==='library'?'library-boundary':null;
+  };
+  const ownershipIds=new Set((graph.containment??[]).map(edge=>edge.id));
+  const links=[...policy.edges,...(includeOwnership?(graph.containment??[]).map(edge=>({...edge,source:endpoint(edge,'source'),target:endpoint(edge,'target')})):[])];
+  for(const edge of links){
+    const ownership=includeOwnership&&ownershipIds.has(edge.id)&&['owner','ownership','containment'].includes(edge.kind);
+    if(!ownership&&!UPWARD_KINDS.has(edge.kind)&&!DOWNWARD_KINDS.has(edge.kind))continue;
+    if(!ownership&&!policy.kinds.has(edge.kind))continue;
+    const [child,parent]=DOWNWARD_KINDS.has(edge.kind)?[edge.target,edge.source]:[edge.source,edge.target];
+    if(!upward.has(child))upward.set(child,[]);upward.get(child).push({parent,edge,ownership});
+  }
+  // Stable tie-breaking avoids publication changes caused only by export order.
+  for(const links of upward.values())links.sort((a,b)=>a.parent.localeCompare(b.parent)||String(a.edge.id).localeCompare(String(b.edge.id)));
+  return {...policy,allowed,upward,omissions,omit};
+}
+/** Find the nearest common engineering ancestor, then descend to the destination.
+ * graph.containment is an optional, separately exported native ownership index:
+ * owner -> child containment edges. This is location context, not a satisfaction claim.
+ * No undirected dependency, classifier, membership or library path is invented.
+ */
+export function findHierarchyRoute(graph,options={}) {
+  const {from,to,maxHops=12}=options;
+  if(!Number.isInteger(maxHops)||maxHops<0)throw Error('Invalid route hop limit');
+  function search(includeOwnership){
+    const policy=hierarchyPolicy(graph,options,includeOwnership);
+    for(const id of [from,to]){const reason=policy.allowed(id);if(reason)return {found:false,elements:[],relationships:[],omissions:[{target:id,reason}]};}
+    function ancestors(root){
+      const found=new Map([[root,{ids:[root],edges:[],ownership:false}]]),queue=[root];
+      for(let cursor=0;cursor<queue.length;cursor++){
+        const current=queue[cursor],path=found.get(current);
+        for(const {parent,edge,ownership} of policy.upward.get(current)??[]){
+          const reason=policy.allowed(parent);if(reason){policy.omit(edge,parent,reason);continue;}
+          if(found.has(parent))continue;
+          if(path.edges.length>=maxHops){policy.omit(edge,parent,'hop-limit');continue;}
+          found.set(parent,{ids:[...path.ids,parent],edges:[...path.edges,edge],ownership:path.ownership||ownership});queue.push(parent);
+        }
+      }
+      return found;
+    }
+    const left=ancestors(from),right=ancestors(to),common=[...left.keys()].filter(id=>right.has(id));
+    const bounded=common.filter(id=>left.get(id).edges.length+right.get(id).edges.length<=maxHops);
+    bounded.sort((a,b)=>{
+      const lengths=id=>[left.get(id).edges.length,right.get(id).edges.length];
+      const [al,ar]=lengths(a),[bl,br]=lengths(b);
+      return al+ar-bl-br||Math.max(al,ar)-Math.max(bl,br)||a.localeCompare(b);
+    });
+    if(!bounded.length){
+      if(common.length)policy.omit(null,to,'hop-limit');
+      policy.omit(null,to,'no-common-ancestor');
+      return {found:false,elements:[],relationships:[],omissions:policy.omissions};
+    }
+    const ancestor=bounded[0],ascent=left.get(ancestor),descent=right.get(ancestor),ids=[...ascent.ids,...descent.ids.slice(0,-1).reverse()];
+    return copy({found:true,strategy:ascent.ownership||descent.ownership?'ownership-ancestor':'common-ancestor',commonAncestor:ancestor,
+      ascentIds:ascent.ids,descentIds:[...descent.ids].reverse(),elements:ids.map(id=>policy.elements.get(id)),
+      relationships:[...ascent.edges,...[...descent.edges].reverse()],omissions:policy.omissions});
+  }
+  const engineering=search(false);
+  return engineering.found||!(graph.containment??[]).length?engineering:search(true);
+}
+/** Validate an author-chosen route without replacing it with a shorter proposal. */
+export function findExplicitRoute(graph,ids,options={}) {
+  const policy=graphPolicy(graph,options),relationships=[],elements=[],omissions=[];
+  if(!Array.isArray(ids)||!ids.length)return {found:false,elements:[],relationships:[],omissions:[{reason:'empty-route'}]};
+  const ownership=new Set((graph.containment??[]).map(edge=>edge.id));
+  const edges=[...policy.edges,...(graph.containment??[]).map(edge=>({...edge,source:endpoint(edge,'source'),target:endpoint(edge,'target')}))];
+  for(const [index,id]of ids.entries()){
+    const reason=policy.allowedElement(id);if(reason)return {found:false,elements:[],relationships:[],omissions:[{target:id,reason}]};
+    elements.push(policy.elements.get(id));if(!index)continue;
+    const previous=ids[index-1],edge=edges.find(edge=>(policy.kinds.has(edge.kind)||ownership.has(edge.id))&&((edge.source===previous&&edge.target===id)||(edge.target===previous&&edge.source===id)));
+    if(!edge)return {found:false,elements:[],relationships:[],omissions:[{target:id,reason:'missing-explicit-link'}]};relationships.push(edge);
+  }
+  return copy({found:true,strategy:'explicit',elements,relationships,omissions});
+}
 /** Explicit one-hop typing bridge; never part of route search or recursive traversal. */
 export function directTypingContext(graph, id) {
   const elements=new Map((graph.elements ?? []).map(element=>[element.id,element]));
@@ -192,19 +276,29 @@ export function layoutScene(nativeView, options={}) {
   return {...view,nodes:result,panels:reserved,bounds,omissions};
 }
 function semanticIds(scene){return [...new Set((scene.nodes??scene.view?.nodes??[]).map(node=>node.semanticId).filter(Boolean))];}
-/** Plan honest semantic continuity; actual interpolation belongs to the renderer. */
+/** Plan honest semantic continuity; actual interpolation belongs to the renderer.
+ * A disjoint same-notation view still needs a journey. Shared content can reflow
+ * directly; changing notation uses GV even when the endpoint identities overlap.
+ */
 export function planTransition(fromScene,toScene,options={}) {
   const previous=fromScene.view??fromScene,next=toScene.view??toScene;
   const oldIds=semanticIds(previous),newIds=semanticIds(next),duration=options.reducedMotion?0:360;
   const correspondence=oldIds.filter(id=>newIds.includes(id)).map(semanticId=>({semanticId,fromRepresentationIds:previous.nodes.filter(node=>node.semanticId===semanticId).map(node=>node.id),toRepresentationIds:next.nodes.filter(node=>node.semanticId===semanticId).map(node=>node.id)}));
-  if(previous.kind===next.kind)return {mode:'same-kind',correspondence,stages:[{kind:'reflow',viewKind:next.kind,semanticIds:newIds,duration}]};
-  const route=options.graph&&fromScene.focus&&toScene.focus?findEngineeringRoute(options.graph,{...options,from:fromScene.focus,to:toScene.focus}):null;
-  const journey=route?.found?route.elements.map(element=>element.id):[];
-  const all=[...new Set([...oldIds,...journey,...newIds])];
-  return {mode:'cross-kind',correspondence,route,stages:[
-    {kind:'gv-bridge',viewKind:'gv',semanticIds:oldIds,duration},
-    {kind:'gv-journey',viewKind:'gv',semanticIds:all,route:route?.found?route.relationships:[],disconnected:route?.found===false,duration},
-    {kind:'gv-gather',viewKind:'gv',semanticIds:newIds,duration},
-    {kind:'morph',viewKind:next.kind,semanticIds:newIds,duration}
-  ]};
+  if(previous.kind===next.kind&&correspondence.length&&!options.journey?.length)return {mode:'same-kind',journeyRequired:false,correspondence,stages:[{kind:'reflow',viewKind:next.kind,semanticIds:newIds,focusId:toScene.focus,duration}]};
+  const route=options.graph&&fromScene.focus&&toScene.focus
+    ? options.journey?.length?(options.journey[0]===fromScene.focus&&options.journey.at(-1)===toScene.focus?findExplicitRoute(options.graph,options.journey,options):{found:false,elements:[],relationships:[],omissions:[{reason:'explicit-route-endpoints'}]}):findHierarchyRoute(options.graph,{...options,from:fromScene.focus,to:toScene.focus})
+    : {found:false,elements:[],relationships:[],omissions:[{reason:'missing-route-context'}]};
+  const journey=route.found?route.elements.map(element=>element.id):[],stages=[{kind:'gv-bridge',viewKind:'gv',semanticIds:oldIds,focusId:fromScene.focus,duration}];
+  if(route.found){
+    // Overlapping three-element windows show each local hop without shrinking a
+    // long route into one overview. Native relationship directions are intact.
+    if(journey.length===1)stages.push({kind:'gv-journey',viewKind:'gv',semanticIds:journey,focusId:journey[0],route:[],routeIndex:0,duration});
+    else for(let index=1;index<journey.length;index++){
+      const start=Math.max(0,index-1),end=Math.min(journey.length,index+2);
+      stages.push({kind:'gv-journey',viewKind:'gv',semanticIds:journey.slice(start,end),focusId:journey[index],route:route.relationships.slice(start,end-1),routeIndex:index,
+        phase:route.commonAncestor?(index<=journey.indexOf(route.commonAncestor)?'ascent':'descent'):'explicit',duration});
+    }
+  }else stages.push({kind:'gv-journey',viewKind:'gv',semanticIds:[],focusId:toScene.focus,route:[],disconnected:true,duration});
+  stages.push({kind:'gv-gather',viewKind:'gv',semanticIds:newIds,focusId:toScene.focus,duration},{kind:'morph',viewKind:next.kind,semanticIds:newIds,focusId:toScene.focus,duration});
+  return {mode:previous.kind===next.kind?'same-kind-journey':'cross-kind',journeyRequired:true,correspondence,route,stages};
 }
