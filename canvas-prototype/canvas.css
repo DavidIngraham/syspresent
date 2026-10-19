@@ -41,3 +41,12 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .node.fork:before,.node.join:before{top:0;height:100%}
 
 #connections g[data-relationship]:focus{outline:none}
+
+#exploration-controls{flex-basis:100%;display:flex;align-items:center;gap:.35rem;min-width:0;padding-top:.2rem;border-top:1px solid #dce5e2}
+#exploration-controls button{font-size:.8rem;flex-shrink:0}
+#exploration-label{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:#526e70}
+.requirement-actions{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin:.5rem 0}
+#selection .requirement-actions button{margin:0;text-align:left;min-height:40px}
+#selection details{border-top:1px solid #dce5e2;margin-top:.5rem;padding-top:.3rem}
+#selection .projection-note{font-size:.73rem;color:#526e70}
+#presentation-emphasis{min-height:120px}

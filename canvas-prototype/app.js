@@ -427,6 +427,278 @@ function planTransition(fromScene, toScene, options = {}) {
   ] };
 }
 
+// src/canvas-prototype/exploration.mjs
+var engineeringKinds = new Set(ENGINEERING_RELATIONSHIPS);
+var requirementKinds = /* @__PURE__ */ new Set(["RequirementDefinition", "RequirementUsage"]);
+var engineeringElement = /^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
+var origins = /* @__PURE__ */ new Set(["derive", "derivation", "refine", "refinement"]);
+var satisfaction = /* @__PURE__ */ new Set(["satisfy", "satisfaction"]);
+var allocation = /* @__PURE__ */ new Set(["allocate", "allocation"]);
+var verification = /* @__PURE__ */ new Set(["verify", "verification"]);
+var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var clone = (value) => structuredClone(value);
+var edgeKey = (edge) => JSON.stringify([edge.id ?? null, edge.source, edge.target, edge.kind]);
+var modes = Object.freeze({
+  origins: { label: "Origins", empty: "No upstream derivation or refinement links are known in the loaded model." },
+  derived: { label: "Derived requirements", empty: "No downstream derivation or refinement links are known in the loaded model." },
+  impact: { label: "Design impact", empty: "No satisfaction or allocation links are known in the loaded model." },
+  verification: { label: "Verification", empty: "No verification links are known in the loaded model." },
+  context: { label: "Explore connections", empty: "No engineering neighbors are known in the loaded model." }
+});
+var endpoint2 = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
+function accepts(edge, anchor, mode) {
+  if (mode === "origins") return origins.has(edge.kind) && edge.source === anchor;
+  if (mode === "derived") return origins.has(edge.kind) && edge.target === anchor;
+  if (mode === "impact") return satisfaction.has(edge.kind) && edge.target === anchor || allocation.has(edge.kind);
+  if (mode === "verification") return verification.has(edge.kind) && edge.target === anchor;
+  return engineeringKinds.has(edge.kind);
+}
+function prepare(graph) {
+  const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
+  const keyed = new Map((graph.relationships ?? []).map((edge) => {
+    const value = { ...edge, source: endpoint2(edge, "source"), target: endpoint2(edge, "target") };
+    return [edgeKey(value), value];
+  }));
+  const edges = [...keyed].sort((a, b) => compare(a[0], b[0])).map(([, edge]) => edge);
+  const incident = /* @__PURE__ */ new Map();
+  for (const edge of edges) for (const id of /* @__PURE__ */ new Set([edge.source, edge.target])) {
+    if (!incident.has(id)) incident.set(id, []);
+    incident.get(id).push(edge);
+  }
+  return { elements, edges, incident };
+}
+function projection(graph, focus, mode, options = {}, prepared = prepare(graph)) {
+  if (!modes[mode]) throw new Error("Unknown exploration mode: " + mode);
+  const { elements, edges, incident } = prepared;
+  const omissions = [], seen = /* @__PURE__ */ new Set(), anchors = /* @__PURE__ */ new Map([[focus, null]]), candidates = /* @__PURE__ */ new Map(), unavailable = /* @__PURE__ */ new Set(), filtered = /* @__PURE__ */ new Set();
+  const kinds2 = options.relationshipKinds ? new Set(options.relationshipKinds) : null;
+  const nodeKinds = options.elementKinds ? new Set(options.elementKinds) : null;
+  const scope = options.scopeIds ? new Set(options.scopeIds) : null;
+  const omit = (edge, target, reason2, anchor) => {
+    const key = JSON.stringify([edgeKey(edge ?? {}), target, reason2, anchor]);
+    if (!seen.has(key)) {
+      seen.add(key);
+      omissions.push({ relationshipId: edge?.id ?? null, target, reason: reason2, anchor: anchor ?? null });
+    }
+  };
+  const reason = (id) => {
+    const element2 = elements.get(id);
+    if (!element2) return "unavailable";
+    if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
+    if (scope && !scope.has(id)) return "outside-scope";
+    if (!engineeringElement.test(element2.kind ?? "") && !(id === focus && mode === "context" && element2.kind === "Package")) return "element-policy";
+    if (nodeKinds && !nodeKinds.has(element2.kind)) return "element-filter";
+    return null;
+  };
+  const root = elements.get(focus), rootReason = reason(focus);
+  if (rootReason) {
+    omit(null, focus, rootReason, null);
+    return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason, root };
+  }
+  if (requirementKinds.has(root.kind)) for (const edge of incident.get(focus) ?? []) {
+    if (!["type", "typing"].includes(edge.kind) || edge.source !== focus && edge.target !== focus) continue;
+    const target = edge.source === focus ? edge.target : edge.source, other = elements.get(target);
+    const opposite = root.kind === "RequirementUsage" ? "RequirementDefinition" : "RequirementUsage";
+    const excluded = reason(target);
+    if (excluded) {
+      omit(edge, target, excluded, focus);
+      if (excluded === "unavailable") unavailable.add(target);
+      continue;
+    }
+    if (other.kind !== opposite) {
+      omit(edge, target, "typing-boundary", focus);
+      continue;
+    }
+    if (!anchors.has(target)) anchors.set(target, edge);
+  }
+  if (mode !== "context" && !requirementKinds.has(root.kind)) return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason: "not-requirement", root };
+  for (const [anchor, bridge] of anchors) for (const edge of incident.get(anchor) ?? []) {
+    if (edge.source !== anchor && edge.target !== anchor) continue;
+    const target = edge.source === anchor ? edge.target : edge.source;
+    if (anchors.has(target)) continue;
+    if (!accepts(edge, anchor, mode)) {
+      omit(edge, target, "relationship-policy", anchor);
+      continue;
+    }
+    const excluded = kinds2 && !kinds2.has(edge.kind) ? "relationship-filter" : reason(target);
+    if (excluded) {
+      omit(edge, target, excluded, anchor);
+      (excluded === "unavailable" ? unavailable : filtered).add(target);
+      continue;
+    }
+    if (!candidates.has(target)) candidates.set(target, []);
+    candidates.get(target).push({ edge, anchor, bridge });
+  }
+  for (const target of candidates.keys()) filtered.delete(target);
+  for (const links of candidates.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare(a.anchor, b.anchor) || compare(edgeKey(a.edge), edgeKey(b.edge)));
+  return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason: null, root };
+}
+function summaryFor(data, mode, shown, total) {
+  const unavailable = data.unavailable.size, filtered = data.filtered.size;
+  let status2 = shown ? "shown" : unavailable ? "unavailable" : filtered ? "filtered" : "no-known-links";
+  let message = shown ? `${shown} of ${total} matching engineering neighbors shown.` : modes[mode].empty;
+  if (data.rootReason) {
+    status2 = data.rootReason === "not-requirement" ? "filtered" : "missing-focus";
+    message = data.rootReason === "not-requirement" ? "This action applies to requirement definitions and usages." : "The focused element is unavailable or excluded from engineering exploration.";
+  }
+  if (unavailable) message += ` ${unavailable} referenced element${unavailable === 1 ? " is" : "s are"} unavailable; missing context is not evidence that a link is absent.`;
+  if (filtered) message += ` ${filtered} matching neighbor${filtered === 1 ? " is" : "s are"} excluded by the active exploration policy.`;
+  if (mode === "verification" && shown) message += " These are modeled verification links, not executed results or acceptance verdicts.";
+  return { status: status2, message, shown, total, unavailable, filtered };
+}
+function requirementActions(graph, focus) {
+  const prepared = prepare(graph);
+  return Object.entries(modes).map(([mode, definition]) => {
+    const data = projection(graph, focus, mode, {}, prepared), count = data.candidates.size;
+    return { mode, label: definition.label, count, total: count + data.unavailable.size + data.filtered.size, unavailable: data.unavailable.size, filtered: data.filtered.size, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
+  });
+}
+function traceContext(graph, options = {}) {
+  const { focus, mode = "context", budget = 7, page = 0 } = options;
+  if (!Number.isInteger(budget) || budget < 1) throw new Error("Invalid exploration budget");
+  if (!Number.isInteger(page) || page < 0) throw new Error("Invalid exploration page");
+  const effectiveBudget = Math.max(3, Math.min(24, budget)), data = projection(graph, focus, mode, options);
+  const priorities = new Map(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification", "allocate", "allocation", "composition", "connection", "reference", "flow", "dependency"].map((kind, index) => [kind, index]));
+  const priority = (id) => mode === "context" ? Math.min(...data.candidates.get(id).map((link) => priorities.get(link.edge.kind) ?? 99)) : 0;
+  const targets = [...data.candidates.keys()].sort((a, b) => priority(a) - priority(b) || compare(a, b)), pages = [];
+  let group = [], ids = /* @__PURE__ */ new Set([focus]);
+  for (const target of targets) {
+    const best = data.candidates.get(target)[0], addition = [target, ...best.bridge ? [best.anchor] : []];
+    const cost = addition.filter((id) => !ids.has(id)).length;
+    if (group.length && ids.size + cost > effectiveBudget) {
+      pages.push(group);
+      group = [];
+      ids = /* @__PURE__ */ new Set([focus]);
+    }
+    group.push(target);
+    for (const id of addition) ids.add(id);
+  }
+  if (group.length) pages.push(group);
+  const actualPage = Math.min(page, Math.max(0, pages.length - 1)), shown = pages[actualPage] ?? [], wanted = new Set(data.rootReason ? [] : [focus]), bridges = /* @__PURE__ */ new Map();
+  for (const target of shown) {
+    wanted.add(target);
+    const best = data.candidates.get(target)[0];
+    if (best.bridge) {
+      wanted.add(best.anchor);
+      bridges.set(edgeKey(best.bridge), best.bridge);
+    }
+  }
+  const relationships = new Map(bridges), omissions = [...data.omissions];
+  for (const [target, links] of data.candidates) {
+    if (!wanted.has(target)) {
+      for (const { edge, anchor } of links) omissions.push({ relationshipId: edge.id ?? null, target, anchor, reason: "budget" });
+      continue;
+    }
+    for (const { edge, anchor, bridge } of links) if (wanted.has(anchor)) {
+      relationships.set(edgeKey(edge), edge);
+      if (bridge) relationships.set(edgeKey(bridge), bridge);
+    }
+  }
+  return clone({
+    elements: [...wanted].map((id) => data.elements.get(id)),
+    relationships: [...relationships.values()].sort((a, b) => compare(edgeKey(a), edgeKey(b))),
+    omissions,
+    summary: summaryFor(data, mode, shown.length, targets.length),
+    mode,
+    page: actualPage,
+    total: targets.length,
+    pages: pages.length,
+    shown: shown.length,
+    targets: shown,
+    typingBridges: [...bridges.values()].map((edge) => edge.id),
+    budget: effectiveBudget
+  });
+}
+
+// src/canvas-prototype/preferences.mjs
+var PRESENTATION_RELATIONSHIP_KINDS = Object.freeze([
+  "connection",
+  "transition",
+  "succession",
+  "flow",
+  "binding",
+  "specialization",
+  "typing",
+  "composition",
+  "reference",
+  "containment",
+  "import",
+  "satisfy",
+  "verify",
+  "derive",
+  "refine",
+  "allocate",
+  "association",
+  "include",
+  "anchor",
+  "dependency"
+]);
+var keys = /* @__PURE__ */ new Set(["compartments", "expanded", "emphasis", "contextBudget", "grouping"]);
+var kinds = new Set(PRESENTATION_RELATIONSHIP_KINDS);
+var own = (value, key) => Object.hasOwn(value, key);
+var fail = (message) => {
+  throw new TypeError(`Scene presentation: ${message}`);
+};
+function stringList(value, key, allowed) {
+  if (!Array.isArray(value)) fail(`${key} must be an array`);
+  const result = [];
+  for (const entry of value) {
+    if (typeof entry !== "string" || !entry.trim() || entry !== entry.trim()) {
+      fail(`${key} entries must be nonempty strings without surrounding whitespace`);
+    }
+    if (allowed && !allowed.has(entry)) fail(`unsupported ${key} relationship kind "${entry}"`);
+    if (!result.includes(entry)) result.push(entry);
+  }
+  return result;
+}
+function validatePresentation(config = {}) {
+  if (!config || typeof config !== "object" || Array.isArray(config) || ![Object.prototype, null].includes(Object.getPrototypeOf(config))) {
+    fail("configuration must be a plain object");
+  }
+  if (Object.getOwnPropertySymbols(config).length) fail("symbol keys are not supported");
+  for (const key of Object.getOwnPropertyNames(config)) {
+    if (!keys.has(key)) fail(`unknown option "${key}"`);
+    const descriptor = Object.getOwnPropertyDescriptor(config, key);
+    if (!descriptor.enumerable || !own(descriptor, "value")) fail(`${key} must be an ordinary JSON property`);
+  }
+  const compartments = own(config, "compartments") ? config.compartments : "auto";
+  if (!["auto", "compact", "expanded"].includes(compartments)) fail("compartments must be auto, compact or expanded");
+  const grouping = own(config, "grouping") ? config.grouping : "none";
+  if (!["none", "owner"].includes(grouping)) fail("grouping must be none or owner");
+  const expanded = stringList(own(config, "expanded") ? config.expanded : [], "expanded");
+  const emphasis = stringList(own(config, "emphasis") ? config.emphasis : [], "emphasis", kinds);
+  const result = { compartments, expanded, emphasis, grouping };
+  if (own(config, "contextBudget")) {
+    if (!Number.isInteger(config.contextBudget) || config.contextBudget < 0 || config.contextBudget > 8) {
+      fail("contextBudget must be an integer from 0 through 8");
+    }
+    result.contextBudget = config.contextBudget;
+  }
+  return result;
+}
+function resolvePresentation(config = {}, { width = 1024, resolve: resolve2 } = {}) {
+  const presentation = validatePresentation(config);
+  if (!Number.isFinite(width) || width <= 0) fail("viewport width must be a positive finite number");
+  if (presentation.expanded.length && typeof resolve2 !== "function") {
+    fail("expanded references require a native identity resolver");
+  }
+  const expandedIds = [];
+  for (const reference of presentation.expanded) {
+    let element2;
+    try {
+      element2 = resolve2(reference);
+    } catch (cause) {
+      throw new TypeError(`Scene presentation: cannot resolve expanded reference "${reference}": ${cause?.message ?? String(cause)}`, { cause });
+    }
+    const id = typeof element2 === "string" ? element2 : element2 && !Array.isArray(element2) ? element2.id : null;
+    if (typeof id !== "string" || !id.trim() || id !== id.trim()) {
+      fail(`unresolved or ambiguous expanded reference "${reference}"`);
+    }
+    if (!expandedIds.includes(id)) expandedIds.push(id);
+  }
+  return { ...presentation, contextBudget: presentation.contextBudget ?? (width < 700 ? 4 : 6), expandedIds };
+}
+
 // src/canvas-prototype/graph.mjs
 var refs = (value) => Array.isArray(value) ? value.flatMap(refs) : value && typeof value === "object" && typeof value["@id"] === "string" ? [value["@id"]] : [];
 var camel = (value) => Array.isArray(value) ? value.map(camel) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camel(v)])) : value;
@@ -481,24 +753,24 @@ function requireNativeIdentity(view) {
 // src/canvas-prototype/context.mjs
 var allowedKinds2 = new Set(ENGINEERING_RELATIONSHIPS);
 var forbiddenKinds = /* @__PURE__ */ new Set(["type", "typing", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership", "succession", "transition"]);
-var engineeringElement = /^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
-var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-var edgeKey = (edge) => JSON.stringify([edge.id, edge.source, edge.target, edge.kind]);
+var engineeringElement2 = /^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
+var compare2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var edgeKey2 = (edge) => JSON.stringify([edge.id, edge.source, edge.target, edge.kind]);
 var kindOrder = new Map(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification", "allocate", "allocation", "composition", "connection", "reference", "flow", "item-flow", "control-flow", "causation", "dependency"].map((kind, index) => [kind, index]));
 function surroundingContext(graph, activeView, options = {}) {
   const { budget = 6 } = options;
   if (!Number.isInteger(budget) || budget < 0) throw new Error("Invalid surrounding context budget");
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
   const activeNodes = activeView.nodes ?? [], activeEdges = activeView.edges ?? [];
-  const activeIds = [...new Set(activeNodes.map((node) => node.semanticId).filter(Boolean))].sort(compare);
+  const activeIds = [...new Set(activeNodes.map((node) => node.semanticId).filter(Boolean))].sort(compare2);
   const active = new Set(activeIds), scope = options.scopeIds ? new Set(options.scopeIds) : null;
-  const kinds = new Set((options.relationshipKinds ?? [...allowedKinds2]).filter((kind) => allowedKinds2.has(kind) && !forbiddenKinds.has(kind)));
+  const kinds2 = new Set((options.relationshipKinds ?? [...allowedKinds2]).filter((kind) => allowedKinds2.has(kind) && !forbiddenKinds.has(kind)));
   const representations = /* @__PURE__ */ new Map();
-  for (const node of [...activeNodes].sort((a, b) => compare(a.id, b.id))) if (node.semanticId && !representations.has(node.semanticId)) representations.set(node.semanticId, node.id);
-  const edges = [...new Map((graph.relationships ?? []).map((edge) => [edgeKey(edge), edge])).values()].sort((a, b) => compare(edgeKey(a), edgeKey(b)));
+  for (const node of [...activeNodes].sort((a, b) => compare2(a.id, b.id))) if (node.semanticId && !representations.has(node.semanticId)) representations.set(node.semanticId, node.id);
+  const edges = [...new Map((graph.relationships ?? []).map((edge) => [edgeKey2(edge), edge])).values()].sort((a, b) => compare2(edgeKey2(a), edgeKey2(b)));
   const omissions = [], seenOmissions = /* @__PURE__ */ new Set();
   const omit = (edge, target, reason, anchor) => {
-    const key = JSON.stringify([edgeKey(edge), target, reason]);
+    const key = JSON.stringify([edgeKey2(edge), target, reason]);
     if (seenOmissions.has(key)) return;
     seenOmissions.add(key);
     omissions.push({ relationshipId: edge.id ?? null, target, anchor, reason });
@@ -508,7 +780,7 @@ function surroundingContext(graph, activeView, options = {}) {
     if (!element2) return "unavailable";
     if (scope && !scope.has(id)) return "outside-scope";
     if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
-    if (!engineeringElement.test(element2.kind ?? "")) return "element-policy";
+    if (!engineeringElement2.test(element2.kind ?? "")) return "element-policy";
     return null;
   };
   const candidates = /* @__PURE__ */ new Map();
@@ -516,7 +788,7 @@ function surroundingContext(graph, activeView, options = {}) {
     const sourceActive = active.has(edge.source), targetActive = active.has(edge.target);
     if (sourceActive === targetActive) continue;
     const target = sourceActive ? edge.target : edge.source, anchor = sourceActive ? edge.source : edge.target;
-    const reason = !kinds.has(edge.kind) ? "relationship-policy" : elementReason(target);
+    const reason = !kinds2.has(edge.kind) ? "relationship-policy" : elementReason(target);
     if (reason) {
       omit(edge, target, reason, anchor);
       continue;
@@ -525,7 +797,7 @@ function surroundingContext(graph, activeView, options = {}) {
     candidates.get(target).push(edge);
   }
   const priority = (id) => Math.min(...candidates.get(id).map((edge) => kindOrder.get(edge.kind) ?? 99));
-  const chosen = /* @__PURE__ */ new Set(), pending = new Map(activeIds.map((id) => [id, [...candidates.keys()].filter((target) => candidates.get(target).some((edge) => edge.source === id || edge.target === id)).sort((a, b) => priority(a) - priority(b) || compare(a, b))]));
+  const chosen = /* @__PURE__ */ new Set(), pending = new Map(activeIds.map((id) => [id, [...candidates.keys()].filter((target) => candidates.get(target).some((edge) => edge.source === id || edge.target === id)).sort((a, b) => priority(a) - priority(b) || compare2(a, b))]));
   while (chosen.size < budget) {
     let progress = false;
     for (const id of activeIds) {
@@ -544,7 +816,7 @@ function surroundingContext(graph, activeView, options = {}) {
     else for (const edge of links) omit(edge, target, "budget", active.has(edge.source) ? edge.source : edge.target);
   }
   for (const edge of edges) if (chosen.has(edge.source) && chosen.has(edge.target)) {
-    if (kinds.has(edge.kind)) relationships.push(edge);
+    if (kinds2.has(edge.kind)) relationships.push(edge);
     else omit(edge, edge.target, "relationship-policy", edge.source);
   }
   for (const edge of edges) {
@@ -552,13 +824,13 @@ function surroundingContext(graph, activeView, options = {}) {
     if (sourceChosen === targetChosen) continue;
     const target = sourceChosen ? edge.target : edge.source, anchor = sourceChosen ? edge.source : edge.target;
     if (active.has(target)) continue;
-    const reason = !kinds.has(edge.kind) ? "relationship-policy" : elementReason(target) ?? "depth";
+    const reason = !kinds2.has(edge.kind) ? "relationship-policy" : elementReason(target) ?? "depth";
     omit(edge, target, reason, anchor);
   }
   const contextElements = [...chosen].map((id) => elements.get(id));
   const projected = graphView(graph, { elements: contextElements, relationships: [] }, "Surrounding engineering context");
   const contextIDs = new Map(contextElements.map((element2) => [element2.id, `context:${activeView.id ?? "view"}:${element2.id}`]));
-  const endpoint2 = (id) => representations.get(id) ?? contextIDs.get(id);
+  const endpoint3 = (id) => representations.get(id) ?? contextIDs.get(id);
   const byReason = {};
   for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
   const boundary = { omitted: omissions.length, byReason, budget, depth: 1, shown: contextElements.length };
@@ -579,7 +851,7 @@ function surroundingContext(graph, activeView, options = {}) {
       fit: false,
       boundary,
       nodes: projected.nodes.map((node) => ({ ...node, id: contextIDs.get(node.semanticId), detail: "", type: "", parentId: null, context: true, fit: false, notation: "general" })),
-      edges: relationships.map((edge) => ({ ...edge, id: `context:${edge.id ?? edgeKey(edge)}`, semanticSource: edge.source, semanticTarget: edge.target, source: endpoint2(edge.source), target: endpoint2(edge.target), context: true, fit: false, notation: "general" }))
+      edges: relationships.map((edge) => ({ ...edge, id: `context:${edge.id ?? edgeKey2(edge)}`, semanticSource: edge.source, semanticTarget: edge.target, source: endpoint3(edge.source), target: endpoint3(edge.target), context: true, fit: false, notation: "general" }))
     }
   };
 }
@@ -713,15 +985,15 @@ function documentationFor(graph, id) {
     index = new Map((graph?.elements ?? []).map((e) => [e.id, e]));
     if (graph) indexes.set(graph, index);
   }
-  const own = index.get(id);
-  if (own?.description) return { text: own.description, source: own };
-  const types = own?.native?.type;
+  const own2 = index.get(id);
+  if (own2?.description) return { text: own2.description, source: own2 };
+  const types = own2?.native?.type;
   const references = Array.isArray(types) ? types : types ? [types] : [];
   for (const reference of references) {
     const type = index.get(reference?.["@id"]);
     if (type?.description) return { text: type.description, source: type };
   }
-  return { text: "", source: own };
+  return { text: "", source: own2 };
 }
 function measureCard(document2, node, detail) {
   const width = Math.max(Number(node.width) || 0, detail ? 280 : 160);
@@ -1080,11 +1352,11 @@ function projectEmbeddedPorts(view) {
   }
   const edges = view.edges.map((edge) => {
     const result = { ...edge };
-    for (const [endpoint2, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
+    for (const [endpoint3, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
       const pin = edge[field] ?? edge[field === "fromPort" ? "from_port" : "to_port"];
       if (!pin) continue;
-      const id = attachments.get(JSON.stringify([edge[endpoint2], pin]));
-      if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint2]);
+      const id = attachments.get(JSON.stringify([edge[endpoint3], pin]));
+      if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint3]);
       result[attachment] = id;
     }
     return result;
@@ -1126,6 +1398,7 @@ function makeGraph(view, options, profile) {
   const nodes = new Map(view.nodes.map((n) => [n.id, n])), behavioral = behavioralKinds.has(view.kind), actualPorts = new Set(view.nodes.filter((n) => isPort(n, nodes)).map((n) => n.id)), children = new Map(view.nodes.map((n) => [n.id, []]));
   for (const node of view.nodes) if (node.parentId && nodes.has(node.parentId) && !actualPorts.has(node.id)) children.get(node.parentId).push(node.id);
   const roots = view.nodes.filter((n) => !actualPorts.has(n.id) && (!n.parentId || !nodes.has(n.parentId)));
+  if (options.grouping === "owner" && !behavioral) roots.sort((a, b) => String(a.layoutGroup || a.id).localeCompare(String(b.layoutGroup || b.id)) || a.id.localeCompare(b.id));
   const rootOf = (id) => {
     let node = nodes.get(id), seen = /* @__PURE__ */ new Set();
     while (node?.parentId && nodes.has(node.parentId)) {
@@ -1167,7 +1440,8 @@ function makeGraph(view, options, profile) {
     "elk.layered.unnecessaryBendpoints": "true",
     "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
     "elk.layered.nodePlacement.strategy": profile.capacity ? "SIMPLE" : "BRANDES_KOEPF",
-    ...rows ? { "elk.partitioning.activate": "true" } : {}
+    ...rows ? { "elk.partitioning.activate": "true" } : {},
+    ...options.grouping === "owner" && !behavioral ? { "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES" } : {}
   } };
   for (const native of view.nodes.filter((n) => actualPorts.has(n.id))) {
     const owner = elkNodes.get(native.parentId), incoming = view.edges.find((e) => (e.sourceAttachment ?? e.source) === native.id || (e.targetAttachment ?? e.target) === native.id), specified = String(native.portSide ?? native.side ?? "").toUpperCase();
@@ -2331,6 +2605,7 @@ function parseStory(markdown2) {
     for (const key of ["id", "title", "view", "focus"]) if (typeof config[key] !== "string" || !config[key]) throw Error("Scene requires " + key);
     if (scenes.some((s) => s.id === config.id)) throw Error("Duplicate scene " + config.id);
     if (config.journey !== void 0 && (!Array.isArray(config.journey) || !config.journey.every((x) => typeof x === "string" && x))) throw Error("Invalid scene journey");
+    if (config.presentation !== void 0) validatePresentation(config.presentation);
     if (!["right", "bottom", "left"].includes(config.panel?.placement ?? "right")) throw Error("Unsupported panel placement");
     previous = { ...config, bodyStart: match.index + match[0].length, markdown: "" };
     scenes.push(previous);
@@ -2428,7 +2703,7 @@ var button = (text, fn) => {
   e.onclick = () => Promise.resolve(fn()).catch(report);
   return e;
 };
-var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [] };
+var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [], future: [], presentation: {}, traceRequest: null };
 var report = (error) => {
   $("status").textContent = error.message || String(error);
   $("editor-error").textContent = error.message || String(error);
@@ -2436,7 +2711,14 @@ var report = (error) => {
 };
 var element = (id) => state.graph?.elements.find((e) => e.id === id);
 var label = (id) => element(id)?.name || id;
-var resolve = (value) => state.graph?.elements.find((e) => e.id === value || e.qualifiedName === value)?.id;
+function resolveInGraph(graph, value) {
+  const exact = graph?.elements.find((e) => e.id === value);
+  if (exact) return exact.id;
+  const matches = graph?.elements.filter((e) => e.qualifiedName === value) ?? [];
+  if (matches.length > 1) throw Error("Ambiguous native qualified reference: " + value);
+  return matches[0]?.id;
+}
+var resolve = (value) => resolveInGraph(state.graph, value);
 var qname = (id) => element(id)?.qualifiedName;
 var scene = () => state.scenes[state.sceneIndex];
 function scopeIds() {
@@ -2534,8 +2816,9 @@ async function compile(project) {
   }
   const graph = modelGraph(exported.elements, [...views.values(), coverage]);
   for (const root of project.manifest.systemOfInterest) if (!graph.elements.some((e) => e.qualifiedName === root)) throw Error("System of interest does not resolve: " + root);
-  const byName = (value) => graph.elements.find((e) => e.id === value || e.qualifiedName === value)?.id;
+  const byName = (value) => resolveInGraph(graph, value);
   for (const [sceneIndex, item] of scenes.entries()) {
+    resolvePresentation(item.presentation, { resolve: byName });
     if (item.journey?.length && (byName(item.journey.at(-1)) !== byName(item.focus) || sceneIndex > 0 && byName(item.journey[0]) !== byName(scenes[sceneIndex - 1].focus))) throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);
     if (!views.has(item.view)) throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);
     if (!byName(item.focus)) throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);
@@ -2573,7 +2856,7 @@ async function loadProject(project) {
     throw error;
   }
   if (revision !== state.loadRevision) return;
-  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], extraViews: /* @__PURE__ */ new Map() });
+  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map() });
   busy(false);
   updateLists();
   $("editor-error").textContent = "";
@@ -2632,14 +2915,14 @@ function panelGeometry(view = state.view) {
 }
 function sizeView(view, focus, { compact = false } = {}) {
   return { ...view, nodes: view.nodes.map((n) => {
-    const expanded = state.expanded.has(n.semanticId), requirement = !compact && n.kind === "requirement" && n.semanticId === focus && !state.collapsed.has(n.semanticId), documentation = documentationFor(state.graph, n.semanticId);
+    const preferences = displayPreferences(), expanded = !state.collapsed.has(n.semanticId) && (state.expanded.has(n.semanticId) || preferences.compartments === "expanded"), requirement = preferences.compartments !== "compact" && !compact && n.kind === "requirement" && n.semanticId === focus && !state.collapsed.has(n.semanticId), documentation = documentationFor(state.graph, n.semanticId);
     const detail = expanded || requirement ? documentation.text || n.detail || (expanded ? "No statement or documentation recorded." : "") : "";
     const attribution = detail && documentation.text && documentation.source?.id !== n.semanticId ? `Statement from ${documentation.source.qualifiedName || documentation.source.name}
 ` : "";
     const displayDetail = attribution + detail;
     const displayID = element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "";
     const measured = ["initial", "final", "fork", "join", "decision", "merge", "port"].includes(n.kind) ? {} : measureCard(document, { ...n, displayID }, displayDetail);
-    return { ...n, ...measured, displayDetail, displayID: element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "" };
+    return { ...n, ...measured, layoutGroup: preferences.grouping === "owner" ? element(n.semanticId)?.native?.owner?.["@id"] ?? "" : "", displayDetail, displayID: element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "" };
   }) };
 }
 function cancelAnimations() {
@@ -2669,9 +2952,9 @@ function labelSize(text) {
 }
 async function prepareFrame(view, focus, panels) {
   const stage = $("stage"), area = graphArea(stage.clientWidth, stage.clientHeight, panels);
-  const layoutFor = (compact) => layoutDiagram(sizeView(view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize });
+  const layoutFor = (compact) => layoutDiagram(sizeView(view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize, grouping: displayPreferences().grouping });
   let layout = await layoutFor(false), fitted = fitDiagram(layout, area);
-  if (fitted.scale < 0.9 && view.nodes.length > 3 && !state.expanded.has(focus)) {
+  if (fitted.scale < 0.9 && view.nodes.length > 3 && !state.expanded.has(focus) && displayPreferences().compartments !== "expanded") {
     layout = await layoutFor(true);
     fitted = fitDiagram(layout, area);
   }
@@ -2679,7 +2962,7 @@ async function prepareFrame(view, focus, panels) {
   const routed = fitted.edges;
   const labelObstacles = [...routed.filter((e) => e.labelBox).map((e, i) => ({ ...e.labelBox, id: "label-obstacle:" + i })), ...active.flatMap((n) => n.portLabelBox ? [{ ...n.portLabelBox, id: "port-label:" + n.id }] : [])];
   const routeObstacles = routed.flatMap((e) => e.points.slice(1).map((p, i) => ({ id: "route:" + e.id + ":" + i, x: Math.min(p.x, e.points[i].x) - 3, y: Math.min(p.y, e.points[i].y) - 3, width: Math.max(6, Math.abs(p.x - e.points[i].x) + 6), height: Math.max(6, Math.abs(p.y - e.points[i].y) + 6) })));
-  const context = surroundingContext(state.graph, layout, { budget: stage.clientWidth < 700 ? 4 : 6 });
+  const context = surroundingContext(state.graph, layout, { budget: displayPreferences().contextBudget });
   const fringe = positionSurrounding(context, [...active, ...labelObstacles, ...routeObstacles], area, { width: 104, height: 56, gap: 10 });
   const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.22, context: true, displayDetail: "", displayID: "" }));
   const markers = fringe.boundaryMarkers.map((n) => ({ ...n, x: n.x + (n.x === area.x ? -8 : n.x === area.x + area.width ? 8 : 0), y: n.y + (n.y === area.y ? -8 : n.y === area.y + area.height ? 8 : 0), scale: 1, opacity: 0.22, context: true, interactive: false }));
@@ -2693,7 +2976,7 @@ async function prepareFrame(view, focus, panels) {
   const edgeCounts = /* @__PURE__ */ new Map(), edges = [...routed, ...peripheral].map((e) => {
     const a = byID.get(e.sourceAttachment ?? e.source), b = byID.get(e.targetAttachment ?? e.target), ownerA = byID.get(e.source), ownerB = byID.get(e.target), base = [a?.semanticId || a?.key, b?.semanticId || b?.key, e.kind, e.label || ""].join("|"), ordinal = edgeCounts.get(base) ?? 0;
     edgeCounts.set(base, ordinal + 1);
-    return { ...e, key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
+    return { ...e, key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: edgeAppearance(e, { viewKind: view.kind }) })).filter((p) => !p.appearance.supported).map((p) => ({ reason: "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
   const omissions = [...layout.omissions ?? view.omissions ?? [], ...notationNotices, ...fringe.omissions, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
@@ -2994,6 +3277,7 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
     state.focus = focus;
     state.previousFocus = focus;
     if (!state.exploring) status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
+    else status(state.traceInfo?.summary.message ?? "Explore this native view \xB7 select an element for contextual actions");
     $("boundary").textContent = !scopeIds().includes(focus) ? "Outside presentation boundary \xB7 loaded model context" : state.project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 supplied model context only" : "Complete project \xB7 standalone exploration available";
   } finally {
     oldPanel?.remove();
@@ -3003,12 +3287,19 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
     }
   }
 }
-async function showScene(index, animate = true) {
+async function showScene(index, animate = true, { record = false } = {}) {
   if (index < 0 || index >= state.scenes.length) return;
-  const saved = { sceneIndex: state.sceneIndex, exploring: state.exploring, selected: state.selected };
+  const saved = snapshot(), savedHistory = [...state.history], savedFuture = [...state.future];
+  if (record) remember();
   state.sceneIndex = index;
   state.exploring = false;
   state.selected = null;
+  state.traceRequest = null;
+  state.traceInfo = null;
+  state.presentation = structuredClone(state.scenes[index].presentation ?? {});
+  state.expanded = new Set(displayPreferences().expandedIds);
+  state.collapsed = /* @__PURE__ */ new Set();
+  updateExplorationControls();
   const s = scene();
   const focus = resolve(s.focus), view = state.views.get(s.view);
   let navigationRevision;
@@ -3019,10 +3310,13 @@ async function showScene(index, animate = true) {
     await pending;
   } catch (error) {
     if (navigationRevision !== void 0 && navigationRevision !== state.revision) return;
-    Object.assign(state, saved);
-    if (state.view) await frame(state.view);
+    state.history = savedHistory;
+    state.future = savedFuture;
+    restoreValues(saved);
+    if (saved.view) await transitionTo(saved.view, saved.focus, { animate: false, allowDisconnected: true });
     throw error;
   } finally {
+    updateExplorationControls();
     $("scenes").value = state.sceneIndex;
     $("previous").disabled = state.sceneIndex === 0;
     $("next").disabled = state.sceneIndex === state.scenes.length - 1;
@@ -3030,31 +3324,108 @@ async function showScene(index, animate = true) {
     $("standalone").hidden = state.exploring;
   }
 }
+function displayPreferences() {
+  return resolvePresentation(state.presentation, { width: $("stage").clientWidth, resolve });
+}
+function snapshot() {
+  return { view: state.pendingDestination?.view ?? state.view, focus: state.pendingDestination?.focus ?? state.focus, sceneIndex: state.sceneIndex, exploring: state.exploring, selected: state.selected, expanded: [...state.expanded], collapsed: [...state.collapsed], presentation: structuredClone(state.presentation), traceRequest: structuredClone(state.traceRequest), traceInfo: structuredClone(state.traceInfo ?? null) };
+}
+function restoreValues(target) {
+  Object.assign(state, { sceneIndex: target.sceneIndex, exploring: target.exploring, selected: target.selected, expanded: new Set(target.expanded), collapsed: new Set(target.collapsed), presentation: structuredClone(target.presentation), traceRequest: structuredClone(target.traceRequest) });
+  state.traceInfo = structuredClone(target.traceInfo ?? null);
+}
+function remember() {
+  if (!state.view) return;
+  state.history.push(snapshot());
+  if (state.history.length > 40) state.history.shift();
+  state.future = [];
+  updateExplorationControls();
+}
+function updateExplorationControls() {
+  const exploring = state.exploring;
+  document.querySelector("header nav").hidden = exploring;
+  $("exploration-controls").hidden = !exploring && !state.history.length && !state.future.length;
+  $("explore-back").disabled = !state.history.length;
+  $("explore-forward").disabled = !state.future.length;
+  $("return").hidden = !exploring || !state.scenes.length;
+  $("standalone").hidden = exploring;
+  const request = state.traceRequest, info = state.traceInfo;
+  $("exploration-label").textContent = exploring ? request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
+  $("exploration-label").title = $("exploration-label").textContent;
+  $("trace-previous").hidden = !request || !info || info.pages < 2;
+  $("trace-next").hidden = !request || !info || info.pages < 2;
+  $("trace-previous").disabled = !info || info.page === 0;
+  $("trace-next").disabled = !info || info.page >= info.pages - 1;
+  if (info?.pages > 1) $("trace-next").textContent = `More (${info.page + 1}/${info.pages})`;
+}
+async function restoreHistory(direction) {
+  const from = direction === "back" ? state.history : state.future, to = direction === "back" ? state.future : state.history;
+  if (!from.length) return;
+  const target = from.pop(), current = snapshot();
+  to.push(current);
+  restoreValues(target);
+  updateExplorationControls();
+  const revision = state.revision + 1;
+  try {
+    await transitionTo(target.view, target.focus, { allowDisconnected: true });
+    if (revision !== state.revision) return;
+    $("scenes").value = state.sceneIndex;
+    updateExplorationControls();
+    if (state.traceInfo) status(state.traceInfo.summary.message);
+  } catch (error) {
+    if (revision !== state.revision) return;
+    to.pop();
+    from.push(target);
+    restoreValues(current);
+    updateExplorationControls();
+    await transitionTo(current.view, current.focus, { animate: false, allowDisconnected: true });
+    throw error;
+  }
+}
+async function openExploration(view, id, { request = null, info = null, record = true } = {}) {
+  const previous = snapshot(), history = [...state.history], future = [...state.future];
+  if (record) remember();
+  state.exploring = true;
+  state.traceRequest = request;
+  state.traceInfo = info;
+  if (request) state.presentation = { ...state.presentation, emphasis: [] };
+  state.selected = null;
+  updateExplorationControls();
+  const revision = state.revision + 1;
+  try {
+    await transitionTo(view, id, { allowDisconnected: true });
+    if (revision !== state.revision) return;
+    updateExplorationControls();
+    status(info ? info.summary.message : "Explore this native view \xB7 select an element for contextual actions");
+  } catch (error) {
+    if (revision !== state.revision) return;
+    state.history = history;
+    state.future = future;
+    restoreValues(previous);
+    updateExplorationControls();
+    if (previous.view) await transitionTo(previous.view, previous.focus, { animate: false, allowDisconnected: true });
+    throw error;
+  }
+}
 async function explore(id, kind) {
   if (!id || !element(id)) throw Error("Model target unavailable");
   const revision = ++state.revision, modelHash = state.modelHash;
-  let view;
   if (kind) {
     const q = qname(id);
     if (!q) throw Error("Native view requires a qualified model identity");
     const raw = await state.engine.call("RenderView", { modelHash, view: `#${kind}:${q}`, includeSemanticIdentity: true });
     if (revision !== state.revision || modelHash !== state.modelHash) return;
-    view = { ...requireNativeIdentity(adaptNativeView(raw, `#${kind}:${q}`)), capture: { definition: kind === "action" ? "ActionFlowView" : "InterconnectionView", root: q } };
+    const view = { ...requireNativeIdentity(adaptNativeView(raw, `#${kind}:${q}`)), capture: { definition: kind === "action" ? "ActionFlowView" : "InterconnectionView", root: q } };
     state.extraViews ??= /* @__PURE__ */ new Map();
     state.extraViews.set(view.id, view);
     state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
-  }
-  if (revision !== state.revision) return;
-  state.history.push({ view: state.view, focus: state.focus });
-  state.exploring = true;
-  $("return").hidden = !state.scenes.length;
-  $("standalone").hidden = true;
-  if (view) await transitionTo(view, id);
-  else {
-    const context = engineeringContext(state.graph, { focus: id, depth: 1, budget: 14 });
-    await transitionTo(graphView(state.graph, context), id);
-    status(`Focused General View \xB7 ${context.elements.length} elements \xB7 ${context.omissions.length} context boundaries (details available)`);
-  }
+    await openExploration(view, id);
+  } else await followTrace(id, "context");
+}
+async function followTrace(id, mode, page = 0) {
+  const request = { focus: id, mode, budget: $("stage").clientWidth < 700 ? 5 : 7, page }, context = traceContext(state.graph, request), view = graphView(state.graph, context, mode + " of " + label(id));
+  view.traceRequest = request;
+  await openExploration(view, id, { request, info: context });
 }
 function select(id, node) {
   clearTrace();
@@ -3090,18 +3461,27 @@ function select(id, node) {
   const e = element(id);
   if (["PartUsage", "PartDefinition", "Package"].includes(e?.kind)) menu.append(button("Internal view", () => explore(id, "interconnection")));
   if (["ActionUsage", "ActionDefinition"].includes(e?.kind)) menu.append(button("Activity view", () => explore(id, "action")));
-  const kinds = [...new Set(state.graph.relationships.filter((r) => r.source === id || r.target === id).map((r) => r.kind))].filter((k) => !["typing", "owner", "specialization"].includes(k));
-  for (const kind of kinds) menu.append(button(`Follow ${kind} relationships`, async () => {
-    state.exploring = true;
-    $("return").hidden = !state.scenes.length;
-    const context = engineeringContext(state.graph, { focus: id, relationshipKinds: [kind], depth: 1, budget: 14 });
-    await transitionTo(graphView(state.graph, context), id);
+  if (["RequirementUsage", "RequirementDefinition"].includes(e?.kind)) {
+    const actions = el("div", void 0, "requirement-actions");
+    for (const action of requirementActions(state.graph, id).filter((a) => a.mode !== "context")) {
+      const control = button(`${action.label} (${action.count})`, () => followTrace(id, action.mode));
+      control.disabled = action.count === 0 && action.unavailable === 0 && action.filtered === 0;
+      control.title = action.summary?.message ?? "";
+      actions.append(control);
+    }
+    menu.append(actions, el("p", "Counts describe links in this loaded projection. Missing links are not proof that none exist.", "projection-note"));
+  }
+  const advanced = el("details"), summary = el("summary", "Other relationships");
+  advanced.append(summary);
+  const kinds2 = [...new Set(state.graph.relationships.filter((r) => r.source === id || r.target === id).map((r) => r.kind))].filter((k) => !["typing", "owner", "specialization"].includes(k));
+  for (const kind of kinds2) advanced.append(button(`Follow ${kind} relationships`, async () => {
+    const context = engineeringContext(state.graph, { focus: id, relationshipKinds: [kind], depth: 1, budget: 7 });
+    await openExploration(graphView(state.graph, context), id);
   }));
+  menu.append(advanced);
   const typing = directTypingContext(state.graph, id);
   if (typing.elements.length > 1) menu.append(button("Show direct type context", async () => {
-    state.exploring = true;
-    $("return").hidden = !state.scenes.length;
-    await transitionTo(graphView(state.graph, typing, "Explicit typing context"), id);
+    await openExploration(graphView(state.graph, typing, "Explicit typing context"), id);
   }));
   menu.append(button("Close", () => {
     menu.hidden = true;
@@ -3142,12 +3522,24 @@ function download(name, bytes, type) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 3e3);
 }
+function editorPresentation() {
+  const config = { compartments: $("presentation-compartments").value, expanded: $("presentation-expanded").value.split("\n").map((s) => s.trim()).filter(Boolean), emphasis: [...$("presentation-emphasis").selectedOptions].map((o) => o.value), grouping: $("presentation-grouping").value };
+  if ($("presentation-context").value !== "") config.contextBudget = Number($("presentation-context").value);
+  resolvePresentation(config, { resolve });
+  return validatePresentation(config);
+}
 function openEditor() {
   if (!state.project) return;
   $("scene-title").value = scene()?.title || "New scene";
   $("scene-prose").value = scene()?.markdown || "";
   $("panel-placement").value = scene()?.panel?.placement || "right";
   $("view-source").value = fileText(state.project, $("view-file").value);
+  const p = validatePresentation(scene()?.presentation);
+  $("presentation-compartments").value = p.compartments;
+  $("presentation-expanded").value = p.expanded.join("\n");
+  for (const o of [...$("presentation-emphasis").options]) o.selected = p.emphasis.includes(o.value);
+  $("presentation-context").value = p.contextBudget ?? "";
+  $("presentation-grouping").value = p.grouping;
   $("editor-error").textContent = "";
   $("editor").showModal();
 }
@@ -3166,7 +3558,7 @@ async function capture() {
     if (!project.manifest.viewSources.includes(filename)) project.manifest.viewSources.push(filename);
     viewName = packageName + "::" + name;
   }
-  const s = { type: "scene", id: "captured-" + Date.now(), title: $("scene-title").value || "Captured view", view: viewName, focus: qname(state.focus), panel: { placement: $("panel-placement").value }, markdown: $("scene-prose").value };
+  const s = { type: "scene", id: "captured-" + Date.now(), title: $("scene-title").value || "Captured view", view: viewName, focus: qname(state.focus), panel: { placement: $("panel-placement").value }, presentation: editorPresentation(), markdown: $("scene-prose").value };
   if (!s.focus) throw Error("Captured focus needs a native qualified identity");
   appendScene(project, s);
   await loadProject(project);
@@ -3175,21 +3567,26 @@ async function capture() {
   status("Scene captured. Export the project ZIP or Markdown to keep it.");
 }
 function bind() {
+  for (const kind of PRESENTATION_RELATIONSHIP_KINDS) {
+    const option = el("option", kind);
+    option.value = kind;
+    $("presentation-emphasis").append(option);
+  }
+  $("explore-back").onclick = () => restoreHistory("back").catch(report);
+  $("explore-forward").onclick = () => restoreHistory("forward").catch(report);
+  $("trace-next").onclick = () => followTrace(state.traceRequest.focus, state.traceRequest.mode, state.traceInfo.page + 1).catch(report);
+  $("trace-previous").onclick = () => followTrace(state.traceRequest.focus, state.traceRequest.mode, state.traceInfo.page - 1).catch(report);
   $("previous").onclick = () => showScene(state.sceneIndex - 1).catch(report);
   $("next").onclick = () => showScene(state.sceneIndex + 1).catch(report);
   $("scenes").onchange = () => showScene(Number($("scenes").value)).catch(report);
   $("standalone").onclick = async () => {
     try {
-      state.exploring = true;
-      $("return").hidden = !state.scenes.length;
-      $("standalone").hidden = true;
-      await transitionTo(state.view, state.focus);
-      status("Explore this native view \xB7 select an element for contextual actions");
+      await openExploration(state.view, state.focus);
     } catch (error) {
       report(error);
     }
   };
-  $("return").onclick = () => showScene(state.sceneIndex).catch(report);
+  $("return").onclick = () => showScene(state.sceneIndex, true, { record: true }).catch(report);
   $("fit").onclick = () => frame(state.view).catch(report);
   $("reduce").setAttribute("aria-pressed", state.reduce);
   $("reduce").onclick = () => {
@@ -3224,10 +3621,8 @@ function bind() {
         state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
       }
       const target = view.nodes.find((n) => n.semanticId)?.semanticId;
-      state.exploring = true;
-      $("return").hidden = !state.scenes.length;
       $("find").hidden = true;
-      await transitionTo(view, target);
+      await openExploration(view, target);
     } catch (e) {
       report(e);
     }
@@ -3246,6 +3641,8 @@ function bind() {
   $("save-scene").onclick = async () => {
     try {
       if (!scene()) throw Error("Capture a first scene before editing it");
+      const presentation = editorPresentation();
+      scene().presentation = presentation;
       scene().title = $("scene-title").value;
       scene().markdown = $("scene-prose").value;
       scene().panel = { placement: $("panel-placement").value };
