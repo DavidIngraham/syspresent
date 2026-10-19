@@ -1,8 +1,23 @@
+Standalone canvas prototype
+---------------------------
+
+The new canvas uses Syspresent JavaScript (Apache-2.0), OpenSysML Go/WASM
+(Apache-2.0), the Go browser runtime (BSD-3-Clause) and fflate 0.8.2 (MIT).
+It does not bundle the VS Code renderer, ELK or libavoid. The static build
+includes LICENSE, engine/OPENSYSML-LICENSE, engine/GO-LICENSE and
+notices/fflate-LICENSE. engine/provenance.json records the exact source,
+carried patch and binary hashes. build-inputs.json records browser inputs.
+The reproducible engine source patch and its original base are retained in
+scripts/wasm-prototype; no upstream dependency PR is needed to rebuild it.
+
+Previous viewer inventory
+-------------------------
+
 Third-party materials used by the browser build
 =============================================
 
 Syspresent's browser build reuses selected native OpenSysML browser modules.
-No license for original Syspresent code is assigned by this notice.
+Original Syspresent code is covered by the repository Apache-2.0 LICENSE.
 
 The inspected build/viewer/build-inputs.json includes:
 

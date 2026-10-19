@@ -1,4 +1,6 @@
-# First-release requirements evidence
+# Previous viewer requirements evidence
+
+This 17 October assessment describes the previous viewer. The 18 October canvas architecture supersedes several requirements it assessed; those older verdicts do not establish compliance of the new canvas. See [canvas prototype evidence](canvas-prototype.md) for the current scoped implementation.
 
 Assessment date: 17 October 2026. This is a source-and-test inspection of the current working tree, not release acceptance. “Implemented” means a concrete implementation and relevant regression coverage exist; it does not assert that every test was rerun for this assessment. No representative-reader study or deployed CI run was observed. The reviewer previously authored native identity transport, snapshot packaging and shared-state validation, so assessment of those components is not independent. No implementation was changed during this assessment.
 

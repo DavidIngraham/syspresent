@@ -93,6 +93,7 @@ jobs:
       - name: Install pinned source clients and renderer dependencies
         working-directory: viewer
         run: |
+          npm ci --ignore-scripts --no-audit --no-fund
           python -m pip install ./.tools/opensysml/client/python
           npm --prefix .tools/opensysml/editors/vscode ci --ignore-scripts --no-audit --no-fund
           make -C .tools/opensysml build-sysml build-grpc COMMIT="$(git -C .tools/opensysml rev-parse HEAD)" BUILD_TIME=source-pinned

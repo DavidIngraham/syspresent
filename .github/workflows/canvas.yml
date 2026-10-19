@@ -1,0 +1,51 @@
+name: Validate standalone canvas prototype
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prototype:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.25.11'
+          cache: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: DavidIngraham/OpenSysML
+          ref: af37bbf155aea785b8ac494a14afe659244bbcdf
+          path: .tools/opensysml-canvas
+      - name: Apply David's standalone semantic-view changes
+        run: git -C .tools/opensysml-canvas apply --check "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch" && git -C .tools/opensysml-canvas apply "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch"
+      - name: Install pinned canvas dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check affected native contracts
+        working-directory: .tools/opensysml-canvas
+        run: |
+          go test ./internal/frontend/engine ./internal/frontend/combined ./internal/frontend/renderidentity
+          go test ./tests/wasm -run 'TestCombinedWireParity|TestEngineDependencies|TestCombinedDependencies' -count=1
+      - name: Build matching native and browser engines
+        run: python3 scripts/wasm-prototype/build.py --source .tools/opensysml-canvas
+      - name: Check semantic parity, capture, traversal and UI recovery
+        run: |
+          node --test tests/canvas-*.test.mjs tests/wasm-prototype/*.test.mjs
+          node scripts/wasm-prototype/parity.mjs
+      - name: Build portable static artifact
+        run: npm run build:canvas
+      - uses: actions/upload-artifact@v4
+        with:
+          name: syspresent-canvas-prototype
+          path: |
+            build/canvas-prototype/site.zip
+            build/canvas-prototype/parity-native.json
+          if-no-files-found: error

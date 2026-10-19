@@ -1,52 +1,56 @@
-# Integration plan and reuse decision
+# Canvas architecture and semantic integration
 
-## Decision
+## Agreed direction
 
-Reuse OpenSysML's semantic rendering contract and evaluate its existing browser canvas, layout, routing and export components. Build Syspresent's exploration and narrative shell separately. The new UX requirements increase the need for a separate shell; they do not by themselves invalidate the underlying renderer.
+The graph canvas is Syspresent's primary interface for guided presentations and standalone exploration. OpenSysML Go remains the semantic engine: browser WASM in a worker for the standalone app, native Go for CI and publication builds. Syspresent owns its interactive rendering, layout coordination, transitions and presentation editor. The new canvas does not depend on the VS Code extension's source modules.
 
-The pinned source already separates `editors/vscode/src/webview/{canvas,layout,autolayout,avoid}.ts` from host orchestration, and its `src/landing` demonstrator reuses several of these modules outside VS Code. Exact extraction boundaries must be established by code audit; these are source modules, not a promised stable standalone npm library. Export code also exists under `src/landing/export.ts` and `src/export.ts`.
+The existing viewer reused VS Code-derived drawing and layout modules. That was a useful prototype decision, but it is historical implementation rather than the target architecture. Do not describe the new canvas as implemented merely because the old viewer can display a native diagram. Reuse of independent general-purpose geometry or layout packages remains possible with explicit interfaces and provenance.
 
-Reuse candidates: native notation drawing, geometry, ELK layout, libavoid routing, selection primitives and suitable SVG export. Syspresent-specific work: story compilation, typed prose references, snapshot/catalog management, search and selective graph expansion, ownership boundaries, navigation history, annotation binding, shareable state and responsive story orchestration. Do not adopt landing-model constants, VS Code messaging or demo controls.
+The immediate implementation and verification scope is [the canvas prototype](canvas-prototype.md). The broader requirements in `model/requirements.sysml` remain intended product behavior. In particular, this prototype does not by itself establish all notation support, complete project editing or reader-study acceptance.
 
-## Integration spike
+## Semantic runtime boundary
 
-1. Audit imports, browser/runtime assumptions and licenses at the exact pinned revision. Compare with the relevant changes in David's branch without silently adopting unrelated runtime updates.
-2. Render native fixtures for requirements, structure, activities, sequences, states, tables/matrices and fault trees in a standalone harness. Check guards, order, concurrency, hierarchy and shared identities, not merely appearance. The new fault-tree kind may require a generic canvas addition even though its Mermaid form works.
-3. Test external selection, stable scene framing, explicit relayout, annotations and responsive dimensions. Do not force continuous motion while the user reads.
-4. If separation is clean, expose a small browser package in David's fork. Otherwise vendor only the necessary modules with revision and license provenance while planning an extraction. Reject a module if retaining it forces semantic losses or excessive host coupling; document that finding before replacing it.
+The browser worker loads model and required library sources, parses and resolves them through the actual WASM engine, resolves declared SysML views and answers focused exploration requests. Native and WASM paths use the same pinned Go engine. Parsing and view resolution must not be reimplemented in JavaScript. Failures and unsupported operations are explicit diagnostics, not synthetic fallback semantics.
 
-No upstream PRs. No commitment to a new rendering engine before this spike.
+The adapter exposes a versioned browser-friendly contract with:
 
-## Data boundary
+- Semantic model identities and typed, directed relationships with source provenance.
+- Scoped diagram projections with representation identities separate from semantic identities.
+- Behavior-specific information such as ports, participants, ordering, guards and gates where supported natively.
+- View identities and definitions, project/library ownership, publication coverage and unavailable references.
+- Engine version and source/dependency information sufficient to resolve fresh views and queries.
 
-Native RenderView output describes one scoped view, not the complete model. Export a versioned bundle containing unchanged native view payloads, native-derived element/relationship indexes, query results, available-view catalog and provenance. Define semantic identity separately from render-local node IDs. Record export coverage, unresolved targets and library ownership. The exporter, not browser heuristics, resolves model relationships.
+A scoped RenderView payload alone is too narrow for unrestricted exploration. A raw metamodel dump alone contains incidental relationships unsuitable for default engineering navigation. The contract must support an intentional engineering graph as well as native notation projections. Actual native relationships remain authoritative in both; a shared classifier or KerML ancestor is not a system connection.
 
-The conceptual SysML items are not a finalized JSON schema. Resolve identity guarantees and payload scale before freezing the wire contract. Keep an adapter so native schema changes are localized. Unsupported native detail remains visible as a limitation.
+No permanent wire schema is implied by these conceptual fields. A narrow adapter contains native API changes. The prototype must demonstrate actual identity and view parity before this boundary is treated as stable. Browser-worker request identities and stale-result handling should keep a slow earlier response from replacing a newer scene.
 
-## Authoring boundary
+## Rendering and transition boundary
 
-The Markdown grammar and replacement syntax are not yet fixed. Engineering alternatives, assumptions, decisions and reusable views belong in model records; story order, audience explanation, camera placement, highlights and speaker notes belong in presentation content. Substitutions reference native values or explicitly contextualized recorded results. Permit explicit unknowns; reject broken references. Prepared plots and tables carry evidence provenance.
+Keep five concepts separate: model element, diagram representation, scene intent, calculated layout and transition correspondence. One model element may have several representations. Dynamic scene positions are not model properties and need not persist globally.
 
-## Delivery sequence
+The canvas measures floating Markdown panels and includes their occupied rectangles in layout. Authors express focus, grouping, emphasis and optional constraints; the engine calculates readable placement for the current viewport. Each scene can rearrange the graph. A settled scene remains steady while read. Multiple diagram regions may coexist with explicit notation boundaries; this is a full-product requirement, not necessarily a first-prototype demonstration.
 
-1. Validate this specification and agree unresolved acceptance thresholds when measurements are available.
-2. Prove canvas reuse and the native export contract on a small unrelated model.
-3. Implement a static story with stable scrolling scenes, model-linked prose and annotations.
-4. Add selective exploration, type filters, ownership boundaries, history, sharing and exact return to story.
-5. Exercise every required view kind; add tables/matrices for coverage and simultaneous prepared comparisons.
-6. Deliver the avoidance/recovery story and the core/OMG-library notation tutorial through the same generic code.
-7. Run independent technical review, browser checks and a formative reader study; then integrate immutable snapshot publication and lifecycle catalog into CI and GitHub Pages.
+Same-notation transitions gather relevant content, fade context and reflow directly. Cross-notation transitions use GV as navigation: expose the relevant engineering path, gather destination elements and features, then transform into the destination notation. Preserve identity where there is actual correspondence. Additional notation may appear as the destination takes shape; a line must not silently change engineering meaning because it has moved.
 
-Live presenter UI and the authored evolution timeline follow. WASM execution, offline bundles and visual authoring remain deferred. The first release uses prepared evidence and build-time exports.
+A route planner proposes actual engineering paths inside the presentation's system of interest and explicit scene additions. Authors inspect and edit the proposal and save the chosen route. Generic ancestry does not produce automatic shortcuts. Deliberate exploration into library/metamodel content remains available beyond story guidance, with visible boundaries and return history.
 
-## Default reading controls
+## Views and presentation authoring
 
-At every screen size, reading shows the narrative and model with Fit and Explore. Contents and review metadata use disclosures. Explicit exploration opens the same tabbed workspace on phone, tablet and desktop; search, filters, history and element details stay there. The explorer shows its current view name once, supports sharing without leaving it, and returns to the authored story. Wide layouts allocate more width to the model and avoid repeating the section title beside the prose.
+Reusable selection belongs in SysML view definitions and usages, using native executable semantics. Markdown references views and supplies prose, scene order, annotations, emphasis and transition choreography. It must not become a competing model-selection language. Rendering definitions can express intent; JavaScript still implements geometry, animation and interaction.
 
-New and reset diagrams fit the available viewport by default. This takes precedence over authored initial camera zoom. A reader’s deliberate zoom and pan remain stable while inspecting elements; Fit returns the view to automatic fitting on viewport changes. Opening scenes should expose only the elements needed for their explanation, with broader relationship traversal available through exploration.
+The static-site editor loads a project, explores its model, captures viewpoints into authored views/scenes and exports them. Initial system-model sources remain read-only; view and presentation sources are editable. A first click/tap/key selection exposes contextual actions without moving the graph. Explicit refocus/expand/viewpoint actions trigger rearrangement. Leaving a guided scene collapses prose to Return to scene; returning restores authored context.
 
-Requirement exploration defaults to engineering context. Native render relationships and explicit API typing links are shown; direct owned constraints are included. A requirement definition also opens the neighborhood of its explicitly typed requirement usages, subject to filters and the context budget. Documentation and membership plumbing remain available through explicit relationship filters and the details disclosure. Scoped story diagrams retain their complete native source relationships for exploration. No relationship is inferred from a name, and the selected definition is not replaced by a usage.
+A portable project uses ordinary files: model and required library sources, authored views, Markdown, assets and a small manifest naming dependencies and entry points. Folder/ZIP import/export is the intended project format. Individual Markdown import/export remains supported. Exported SysML view declarations must accompany scenes that depend on them; a screenshot or cached layout is not a substitute for their semantic definition.
 
-The requirement reader is the default exploration surface for requirement definitions and usages. Its five questions use native statement documentation, owned comments/metadata, explicit derive/dependency directions, satisfaction/refinement/allocation links and verification cases. A single downstream derivation step exposes indirect implementing elements and tests with the intervening requirement named. This is not a transitive satisfaction claim. Lists are bounded by the context limit and offer more results. Native declared literal/reference values are projected for annotation and result display without interpreting source text or executing expressions. The Relationship diagram action preserves the same focus and history; Requirement questions returns to reading. Other native view kinds retain their existing exploration.
+Publications include the complete project by default. Scoped publications remain possible and disclose unavailable targets separately from hidden diagram context. Frozen snapshots retain exact model/story/runtime content. Rebuilds report broken references and routes; automatic deep change history, semantic adjudication and compulsory reapproval are outside the agreed current scope.
 
-Dependency clients and suppliers are projected from their native API roles with the relationship identity retained. Their records appear in a separate disclosure beneath implementation/allocation links, so supporting analyses and failure records do not obscure system parts. Upstream derivation rationale is resolved by the exact qualified relationship name supplied by the native renderer; downstream rationale is not presented as the reason for the selected parent.
+## Integration sequence
+
+1. Prove the real native/WASM contract on a small unrelated model: identity, relationships and view membership.
+2. Implement focused engineering traversal and diagram selection without relying on a story.
+3. Demonstrate direct same-notation transitions and one cross-notation GV gathering journey.
+4. Coordinate measured Markdown space with responsive diagram layout and explicit exploration/return.
+5. Capture and export a scene referencing an authored native view, then reload the exercised portable format.
+6. Independently review native semantic claims, actual browser behavior and the limits of the prototype evidence.
+
+Only then use the result to choose/finalize renderer and layout interfaces and plan the broader notation, complete editor and human-usability work. Preserve legacy viewer compatibility separately; replacing it is not proof that every existing view is supported. No upstream dependency PRs are authorized by this integration work.

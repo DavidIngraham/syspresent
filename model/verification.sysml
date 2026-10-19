@@ -27,7 +27,7 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'SV-003'> story {
-        doc /* Exercise forward/backward scrolling, section links, broad settled scene intervals, manual exploration and exact resumption on desktop and mobile. Check keyboard focus, reduced motion and non-hover details. */
+        doc /* Exercise forward/backward guided canvas scenes, scene links, settled reading intervals, manual exploration and exact resumption on desktop and mobile. Check keyboard focus, reduced motion and non-hover details. */
         objective acceptance {
             verify SyspresentRequirements::Audience::selfGuided;
             verify SyspresentRequirements::StoryExperience::continuousStory;
@@ -69,7 +69,7 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'SV-006'> reuse {
-        doc /* Build and serve both the Blue Dog acceptance story and unrelated tutorial without modifying viewer JavaScript. Inspect pinned dependencies, native payload preservation, identity mapping, declared bundle coverage and static hosting with no application service. */
+        doc /* Build and serve both the Blue Dog acceptance story and unrelated tutorial without modifying viewer JavaScript. Inspect pinned dependencies, native payload preservation, identity mapping, declared bundle coverage and static hosting with WASM but no required application service. */
         objective acceptance {
             verify SyspresentRequirements::Audience::staticHosting;
             verify SyspresentRequirements::Reuse::declarativeReuse;
@@ -103,4 +103,62 @@ package SyspresentVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def <'SV-010'> canvasRuntimePrototype {
+        doc /* Load the same small unrelated model and authored views through the pinned native Go and real browser WASM engines. Compare semantic identities, relationship directions and projected view membership. Record the fixture and engine revision. A mocked worker or canned JSON cannot establish runtime parity. */
+        objective acceptance {
+            verify SyspresentRequirements::CanvasAuthoring::runtimeParity;
+            verify SyspresentRequirements::Audience::staticHosting;
+            verify SyspresentRequirements::Reuse::nativeAuthority;
+            verify SyspresentRequirements::Reuse::reuseCanvas;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'SV-011'> focusedTraversalPrototype {
+        doc /* With no story, load the fixture, select without moving, explicitly follow engineering context and restore focus history. Confirm route proposals follow actual system relationships, do not shortcut through shared KerML ancestors and respect story scope with explicit additions. Show a proposed route that the author can change and capture. */
+        objective acceptance {
+            verify SyspresentRequirements::CanvasAuthoring::selectionActions;
+            verify SyspresentRequirements::CanvasAuthoring::engineeringJourneys;
+            verify SyspresentRequirements::CanvasAuthoring::standaloneExploration;
+            verify SyspresentRequirements::RequirementReading::requirementQuestions;
+            verify SyspresentRequirements::RequirementReading::traceEvidence;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'SV-012'> transitionPrototype {
+        doc /* Demonstrate direct gather/fade/reflow within one notation and a GV engineering journey that gathers destination features before entering another notation. Inspect correspondence and native semantic meaning at every stage. Reduced-motion controls must expose the same final content; full notation support and multi-region composition remain separate acceptance work. */
+        objective acceptance {
+            verify SyspresentRequirements::CanvasAuthoring::transitionKinds;
+            verify SyspresentRequirements::Views::crossViewIdentity;
+            verify SyspresentRequirements::StoryExperience::purposefulMotion;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'SV-013'> occupiedPanelPrototype {
+        doc /* Render a measured Markdown panel and a diagram on wide and narrow viewports. Confirm diagram content accounts for the panel's occupied region, each scene may relayout, and the settled panel remains steady while read. Explicit exploration collapses narrative; Return to scene restores it. */
+        objective acceptance {
+            verify SyspresentRequirements::StoryExperience::responsiveLayout;
+            verify SyspresentRequirements::StoryExperience::stableScenes;
+            verify SyspresentRequirements::StoryExperience::explorationHandoff;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'SV-014'> sceneCapturePrototype {
+        doc /* Capture an explored viewpoint into a scene referencing an authored SysML view; export Markdown and associated portable-project files, reload them and compare native view selection and presentation content. Report the exact format subset exercised. This prototype does not establish all-folder/ZIP round-trip support. */
+        objective acceptance {
+            verify SyspresentRequirements::Authoring::markdownSource;
+            verify SyspresentRequirements::CanvasAuthoring::staticEditor;
+            verify SyspresentRequirements::CanvasAuthoring::portableProject;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'SV-015'> publicationBoundaryPrototype {
+        doc /* Resolve references in a captured scene and saved journey; report deliberately broken targets. Distinguish hidden view context from explicitly omitted publication content. Retain and hash-check the original snapshot after an updated publication. Deep change adjudication is not required. */
+        objective acceptance {
+            verify SyspresentRequirements::CanvasAuthoring::basicRebuildValidation;
+            verify SyspresentRequirements::CanvasAuthoring::publicationCoverage;
+            verify SyspresentRequirements::Snapshots::frozenSnapshot;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }

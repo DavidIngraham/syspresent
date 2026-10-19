@@ -1,0 +1,454 @@
+From fe3796d11356fb088cf234b90f9d453d158eba14 Mon Sep 17 00:00:00 2001
+From: David Ingraham <davingrahamd@gmail.com>
+Date: Sun, 18 Oct 2026 17:29:21 -0700
+Subject: [PATCH 1/2] feat(wasm): expose semantic views and model export
+
+---
+ .../browser-semantic-view-export.added.md     |  1 +
+ docs/project/spec-compliance.md               |  8 ++
+ docs/reference/wasm.md                        | 26 +++---
+ internal/frontend/combined/combined.go        |  5 +-
+ .../frontend/combined/render_export_test.go   | 85 +++++++++++++++++++
+ internal/frontend/engine/engine.go            |  6 ++
+ internal/frontend/engine/export.go            | 41 +++++++++
+ .../frontend/engine/render_identity_test.go   |  8 --
+ internal/frontend/renderidentity/document.go  |  7 --
+ internal/frontend/renderidentity/identity.go  |  4 +-
+ .../frontend/renderidentity/identity_test.go  |  2 -
+ .../frontend/renderidentity/identity_wasm.go  | 14 ---
+ .../renderidentity/identity_wasm_test.go      | 20 -----
+ 13 files changed, 160 insertions(+), 67 deletions(-)
+ create mode 100644 changes/unreleased/browser-semantic-view-export.added.md
+ create mode 100644 internal/frontend/combined/render_export_test.go
+ create mode 100644 internal/frontend/engine/export.go
+ delete mode 100644 internal/frontend/renderidentity/identity_wasm.go
+ delete mode 100644 internal/frontend/renderidentity/identity_wasm_test.go
+
+diff --git a/changes/unreleased/browser-semantic-view-export.added.md b/changes/unreleased/browser-semantic-view-export.added.md
+new file mode 100644
+index 000000000..e02e1a2cc
+--- /dev/null
++++ b/changes/unreleased/browser-semantic-view-export.added.md
+@@ -0,0 +1 @@
++- Enable conversion-backed semantic rendering identities in WebAssembly and expose `RenderView` and experimental `ExportModel` through the combined standalone engine.
+diff --git a/docs/project/spec-compliance.md b/docs/project/spec-compliance.md
+index e909e790a..ec659db3f 100644
+--- a/docs/project/spec-compliance.md
++++ b/docs/project/spec-compliance.md
+@@ -3580,3 +3580,11 @@ Synthetic or unrepresented artifacts remain unidentified; no label matching is u
+ - Status: additive tool API, not a SysML notation extension. Identity conversion remains subject
+   to the documented experimental RDF/API mapping coverage. Run timeline payloads are not added
+   to RenderView by this change.
++
++
++## Standalone view rendering transport
++
++| Contract | Implementation | Tests | Status |
++|---|---|---|---|
++| Rendered declarations retain the same conversion element IDs on native, JavaScript/WASM and WASI targets; synthetic notation has no invented model identity. | `internal/frontend/renderidentity.Bind`, combined `RenderView` dispatch | `TestIdentityCoverage`, `TestRenderIdentityAndNotationFields`, `TestRenderingAndExportShareConversionIdentities` | Implemented; source-origin binding reuses the conversion identity backend. |
++| Standalone API-JSON export preserves the existing mapping and refuses partial syntax trees. | `internal/frontend/engine.exportModel`, combined `ExportModel` dispatch | `TestRenderingAndExportShareConversionIdentities`, `TestExportRefusesPartialParse` | Experimental mapping; this transport does not establish additional OMG repository API conformance. |
+diff --git a/docs/reference/wasm.md b/docs/reference/wasm.md
+index aef650495..c3c183c87 100644
+--- a/docs/reference/wasm.md
++++ b/docs/reference/wasm.md
+@@ -13,14 +13,15 @@ remain available from source for hosts that run modules rather than executables.
+ 
+ ## Optional rendering identities
+ 
+-`RenderView` remains available on both WebAssembly targets. The optional
+-`includeSemanticIdentity` request is supported by native builds only: it uses the
+-native conversion identity backend, which is excluded from the lightweight
+-JS/WASI engine dependency graph. A WebAssembly request that enables this option
+-returns an explicit error: `semantic rendering identity is unavailable on JS/WASI;
+-use the native engine or gRPC service`. Leaving the option false preserves ordinary
+-rendering. Static viewers can obtain identity-enriched drawings from the native
+-gRPC service before publication without loading the conversion backend in browsers.
++`RenderView` supports `includeSemanticIdentity` on native and WebAssembly targets.
++Identity binding uses the same conversion backend on every target. It identifies declarations
++by their source origins, never by labels; synthetic drawing artifacts remain explicitly
++unidentified. Linking that backend increases the module size.
++
++The combined module also serves `ExportModel` with `{modelHash}`. Its response contains
++`elements` in API-JSON form plus `experimental: true` and a mapping notice. It rejects a
++model with syntax errors instead of exporting a partial graph. This is the existing
++experimental notation-to-API mapping, not a new claim of OMG API conformance.
+ 
+ ## Building
+ 
+@@ -271,7 +272,7 @@ package is `@openmbee/opensysml-wasm`.
+ and `GetServerInfo`. Parsing and symbol facts route through the core; evaluation and
+ execution route through the engine. `ParseSources` and `ParseFile` check that both frontends
+ produce the same model hash and return the core response, including roots and diagnostics.
+-It does not dispatch the engine's `RenderView` call.
++It also dispatches `RenderView` and `ExportModel` to the engine.
+ 
+ A hash from either parse method is shared by every method that takes a `modelHash`, including
+ `GetDiagnostics`, `GetSymbol`, `Evaluate`, `Instantiate`, `ExecuteAction` and `ExecuteState`.
+@@ -281,7 +282,8 @@ The module retains the 16 most recently used models; an evicted hash is evicted
+ `feature_values`, `inline_language`, `strict_conformance`, `parse_sources`, `complex_values`,
+ `structured_values`, `measurement_refs`, `function_values`, `set_values`, `tensor_values`,
+ `infinity_value`, `diagnostic_codes`, `schedule`, `final_time`, `metaobject_values`,
+-`undetermined_value`, `performer`, `big_int_values`.
++`undetermined_value`, `performer`, `big_int_values`, `render_view`,
++`semantic_rendering_identity`, `export_model`.
+ 
+ The `js` build installs one synchronous host surface, `globalThis.sysmlWasm`, with
+ `version` and `call(method, paramsJSON)`. The call returns a JSON-RPC envelope string.
+@@ -289,8 +291,8 @@ Passing `-stdio` selects the sequential, `Content-Length`-framed JSON-RPC pipe i
+ native and `wasip1` builds always use that pipe. Every other method answers Unimplemented
+ with `<Method> is not served by sysml-wasm: it is served by sysml-grpc`.
+ 
+-Measured on a `go1.25.11` `js/wasm` build with `-s -w -trimpath`: 31,526,528 raw bytes,
+-7,790,873 bytes gzipped with gzip `-9`, and 5,479,244 bytes with Brotli `-q 11`.
++Measured on a `go1.25.11` `js/wasm` build with `-s -w -trimpath`, including the
++conversion identity backend: approximately 36.7 MB raw and 8.94 MB with gzip `-9`.
+ 
+ ## What works
+ 
+diff --git a/internal/frontend/combined/combined.go b/internal/frontend/combined/combined.go
+index e3494202a..72a5c5d8c 100644
+--- a/internal/frontend/combined/combined.go
++++ b/internal/frontend/combined/combined.go
+@@ -42,6 +42,9 @@ var capabilities = []string{
+ 	"undetermined_value",
+ 	"performer",
+ 	"big_int_values",
++	"render_view",
++	"semantic_rendering_identity",
++	"export_model",
+ }
+ 
+ // Server combines the parsing/validation and execution JSON surfaces.
+@@ -115,7 +118,7 @@ func (s *Server) Call(ctx context.Context, method string, params []byte) ([]byte
+ 			s.touchRequest(params)
+ 		}
+ 		return body, err
+-	case "Evaluate", "Instantiate", "ExecuteAction", "ExecuteState":
++	case "Evaluate", "Instantiate", "ExecuteAction", "ExecuteState", "RenderView", "ExportModel":
+ 		body, err := s.engine.Call(ctx, method, params)
+ 		if err == nil {
+ 			s.touchRequest(params)
+diff --git a/internal/frontend/combined/render_export_test.go b/internal/frontend/combined/render_export_test.go
+new file mode 100644
+index 000000000..7c63ef207
+--- /dev/null
++++ b/internal/frontend/combined/render_export_test.go
+@@ -0,0 +1,85 @@
++package combined
++
++import (
++	"context"
++	"encoding/json"
++	"github.com/Open-MBEE/OpenSysML/internal/frontend/engine"
++	"testing"
++)
++
++func TestRenderingAndExportShareConversionIdentities(t *testing.T) {
++	server, err := New("view-test")
++	if err != nil {
++		t.Fatal(err)
++	}
++	params, _ := json.Marshal(map[string]any{"documents": []map[string]string{
++		{"name": "model.sysml", "content": `package Demo { part def Device; part device : Device; }`},
++		{"name": "views.sysml", "content": `package Views { view device { expose Demo::device; } }`},
++	}})
++	parsed, err := server.Call(context.Background(), "ParseSources", params)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var model struct {
++		ModelHash string `json:"modelHash"`
++	}
++	if err := json.Unmarshal(parsed, &model); err != nil {
++		t.Fatal(err)
++	}
++	params, _ = json.Marshal(map[string]any{"modelHash": model.ModelHash, "view": "Views::device", "includeSemanticIdentity": true})
++	rendered, err := server.Call(context.Background(), "RenderView", params)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var drawing engine.JRenderViewResponse
++	if err := json.Unmarshal(rendered, &drawing); err != nil {
++		t.Fatal(err)
++	}
++	if len(drawing.Nodes) != 1 || drawing.Nodes[0].SemanticID != "Demo__device" || drawing.Nodes[0].IdentityStatus != "mapped" {
++		t.Fatalf("identity absent: %s", rendered)
++	}
++	params, _ = json.Marshal(map[string]any{"modelHash": model.ModelHash})
++	exported, err := server.Call(context.Background(), "ExportModel", params)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var graph struct {
++		Elements     []map[string]any `json:"elements"`
++		Experimental bool             `json:"experimental"`
++		Notice       string           `json:"notice"`
++	}
++	if err := json.Unmarshal(exported, &graph); err != nil {
++		t.Fatal(err)
++	}
++	if !graph.Experimental || graph.Notice == "" {
++		t.Fatalf("experimental mapping not disclosed: %s", exported)
++	}
++	for _, element := range graph.Elements {
++		if element["@id"] == drawing.Nodes[0].SemanticID {
++			return
++		}
++	}
++	t.Fatalf("rendered identity does not occur in exported graph: %s", exported)
++}
++
++func TestExportRefusesPartialParse(t *testing.T) {
++	server, err := New("invalid-test")
++	if err != nil {
++		t.Fatal(err)
++	}
++	params, _ := json.Marshal(map[string]any{"documents": []map[string]string{{"name": "broken.sysml", "content": "package Demo { part"}}})
++	parsed, err := server.Call(context.Background(), "ParseSources", params)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var model struct {
++		ModelHash string `json:"modelHash"`
++	}
++	if err := json.Unmarshal(parsed, &model); err != nil {
++		t.Fatal(err)
++	}
++	params, _ = json.Marshal(map[string]string{"modelHash": model.ModelHash})
++	if _, err := server.Call(context.Background(), "ExportModel", params); err == nil {
++		t.Fatal("exported a partial parse")
++	}
++}
+diff --git a/internal/frontend/engine/engine.go b/internal/frontend/engine/engine.go
+index 6da0930c0..68fd89127 100644
+--- a/internal/frontend/engine/engine.go
++++ b/internal/frontend/engine/engine.go
+@@ -296,6 +296,12 @@ func (e *Engine) Call(ctx context.Context, method string, params []byte) (result
+ 			return nil, err
+ 		}
+ 		return e.executeState(ctx, &req)
++	case "ExportModel":
++		var req JExportModelRequest
++		if err := decode(params, &req); err != nil {
++			return nil, err
++		}
++		return e.exportModel(&req)
+ 	case "RenderView":
+ 		// RenderView is served by both sysml-engine and sysml-grpc.
+ 		var req JRenderViewRequest
+diff --git a/internal/frontend/engine/export.go b/internal/frontend/engine/export.go
+new file mode 100644
+index 000000000..7487c1102
+--- /dev/null
++++ b/internal/frontend/engine/export.go
+@@ -0,0 +1,41 @@
++package engine
++
++import (
++	"encoding/json"
++	"github.com/Open-MBEE/OpenSysML/internal/translate/export"
++)
++
++// JExportModelRequest selects a parsed model for API-JSON export.
++type JExportModelRequest struct {
++	ModelHash string `json:"modelHash"`
++}
++
++// JExportModelResponse preserves the experimental API mapping and its notice.
++type JExportModelResponse struct {
++	Elements     json.RawMessage `json:"elements"`
++	Experimental bool            `json:"experimental"`
++	Notice       string          `json:"notice"`
++}
++
++func (e *Engine) exportModel(req *JExportModelRequest) ([]byte, error) {
++	cached, ok := e.get(req.ModelHash)
++	if !ok {
++		return nil, statusErrorf(codeNotFound, msgModelNotFound, req.ModelHash)
++	}
++	documents := make([]export.ModelDocument, 0, len(cached.Documents))
++	for _, doc := range cached.Documents {
++		if len(doc.Errors) > 0 {
++			return nil, statusError(codeFailedPrecondition, "cannot export a model with syntax errors")
++		}
++		documents = append(documents, export.ModelDocument{File: doc.Source, Root: doc.Root})
++	}
++	graph, err := export.ModelToRDFWith(documents, export.IDQualifiedName)
++	if err != nil {
++		return nil, statusError(codeInvalidArgument, err.Error())
++	}
++	elements, err := export.WriteAPIJSON(graph)
++	if err != nil {
++		return nil, statusError(codeInvalidArgument, err.Error())
++	}
++	return json.Marshal(JExportModelResponse{Elements: elements, Experimental: true, Notice: "The SysML to API-JSON mapping is experimental; preserve source and provenance."})
++}
+diff --git a/internal/frontend/engine/render_identity_test.go b/internal/frontend/engine/render_identity_test.go
+index d6d76fe11..332c66144 100644
+--- a/internal/frontend/engine/render_identity_test.go
++++ b/internal/frontend/engine/render_identity_test.go
+@@ -4,8 +4,6 @@ import (
+ 	"context"
+ 	"encoding/json"
+ 	"github.com/Open-MBEE/OpenSysML/internal/ir/view"
+-	"runtime"
+-	"strings"
+ 	"testing"
+ )
+ 
+@@ -29,12 +27,6 @@ func TestRenderIdentityAndNotationFields(t *testing.T) {
+ 	}
+ 	params, _ = json.Marshal(JRenderViewRequest{ModelHash: model.ModelHash, View: "Demo::diagram", IncludeSemanticIdentity: true})
+ 	response, err := eng.Call(context.Background(), "RenderView", params)
+-	if runtime.GOOS == "js" || runtime.GOOS == "wasip1" {
+-		if err == nil || !strings.Contains(err.Error(), "semantic rendering identity is unavailable") {
+-			t.Fatalf("want explicit platform capability error, got %v", err)
+-		}
+-		return
+-	}
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/frontend/renderidentity/document.go b/internal/frontend/renderidentity/document.go
+index 72d16960f..01c277566 100644
+--- a/internal/frontend/renderidentity/document.go
++++ b/internal/frontend/renderidentity/document.go
+@@ -10,10 +10,3 @@ type Document struct {
+ 	File *source.SourceFile
+ 	Root *ast.RootNamespace
+ }
+-
+-// UnsupportedPlatformError reports an explicitly requested unavailable capability.
+-type UnsupportedPlatformError struct{}
+-
+-func (*UnsupportedPlatformError) Error() string {
+-	return "semantic rendering identity is unavailable on JS/WASI; use the native engine or gRPC service"
+-}
+diff --git a/internal/frontend/renderidentity/identity.go b/internal/frontend/renderidentity/identity.go
+index ee4a0e968..8e7213845 100644
+--- a/internal/frontend/renderidentity/identity.go
++++ b/internal/frontend/renderidentity/identity.go
+@@ -1,6 +1,4 @@
+-//go:build !js && !wasip1
+-
+-// Package renderidentity binds native drawings to native conversion identities.
++// Package renderidentity binds drawings to conversion identities on every platform.
+ package renderidentity
+ 
+ import (
+diff --git a/internal/frontend/renderidentity/identity_test.go b/internal/frontend/renderidentity/identity_test.go
+index 6b2117a98..4078cac6b 100644
+--- a/internal/frontend/renderidentity/identity_test.go
++++ b/internal/frontend/renderidentity/identity_test.go
+@@ -1,5 +1,3 @@
+-//go:build !js && !wasip1
+-
+ package renderidentity
+ 
+ import (
+diff --git a/internal/frontend/renderidentity/identity_wasm.go b/internal/frontend/renderidentity/identity_wasm.go
+deleted file mode 100644
+index 4fcc61e0c..000000000
+--- a/internal/frontend/renderidentity/identity_wasm.go
++++ /dev/null
+@@ -1,14 +0,0 @@
+-//go:build js || wasip1
+-
+-package renderidentity
+-
+-import (
+-	"github.com/Open-MBEE/OpenSysML/internal/ir/view"
+-	"github.com/Open-MBEE/OpenSysML/internal/semantic/symbols"
+-)
+-
+-// Bind rejects optional conversion identities on lightweight WASM engines.
+-// Ordinary rendering does not call Bind and remains available.
+-func Bind(_ *view.Data, _ []Document, _ *symbols.Index) error {
+-	return &UnsupportedPlatformError{}
+-}
+diff --git a/internal/frontend/renderidentity/identity_wasm_test.go b/internal/frontend/renderidentity/identity_wasm_test.go
+deleted file mode 100644
+index 4ba88d55a..000000000
+--- a/internal/frontend/renderidentity/identity_wasm_test.go
++++ /dev/null
+@@ -1,20 +0,0 @@
+-//go:build js || wasip1
+-
+-package renderidentity
+-
+-import (
+-	"errors"
+-	"github.com/Open-MBEE/OpenSysML/internal/ir/view"
+-	"testing"
+-)
+-
+-func TestIdentityExplicitlyUnavailable(t *testing.T) {
+-	data := view.Data{Nodes: []view.NodeData{{ID: "unchanged"}}}
+-	var unsupported *UnsupportedPlatformError
+-	if err := Bind(&data, nil, nil); !errors.As(err, &unsupported) {
+-		t.Fatalf("want explicit unsupported capability, got %v", err)
+-	}
+-	if data.Nodes[0].ID != "unchanged" || data.Nodes[0].SemanticID != "" {
+-		t.Fatal("unsupported binding changed native data")
+-	}
+-}
+-- 
+2.43.0
+
+
+From 02a582d3d9baf7b9f59e5aaaa8d65f054b279bc7 Mon Sep 17 00:00:00 2001
+From: David Ingraham <davingrahamd@gmail.com>
+Date: Sun, 18 Oct 2026 17:38:53 -0700
+Subject: [PATCH 2/2] test(wasm): verify standalone rendering capabilities
+
+---
+ tests/wasm/combined_test.go | 6 ++++--
+ tests/wasm/engine_test.go   | 7 +++++--
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/tests/wasm/combined_test.go b/tests/wasm/combined_test.go
+index fe2764acc..262daa9ed 100644
+--- a/tests/wasm/combined_test.go
++++ b/tests/wasm/combined_test.go
+@@ -346,8 +346,10 @@ func TestCombinedWireParity(t *testing.T) {
+ 	if info.Version != "combined-wire-test" {
+ 		t.Errorf("GetServerInfo version = %q", info.Version)
+ 	}
+-	if !reflect.DeepEqual(info.Capabilities, expectedCapabilities) {
+-		t.Errorf("GetServerInfo capabilities = %v, want %v", info.Capabilities, expectedCapabilities)
++	// Standalone-only view/export operations extend the shared execution contract.
++	standaloneCapabilities := append(append([]string{}, expectedCapabilities...), "render_view", "semantic_rendering_identity", "export_model")
++	if !reflect.DeepEqual(info.Capabilities, standaloneCapabilities) {
++		t.Errorf("GetServerInfo capabilities = %v, want %v", info.Capabilities, standaloneCapabilities)
+ 	}
+ 	reported := make(map[string]bool)
+ 	for _, capability := range sysmlgrpc.Capabilities() {
+diff --git a/tests/wasm/engine_test.go b/tests/wasm/engine_test.go
+index 1999bc02a..587c51019 100644
+--- a/tests/wasm/engine_test.go
++++ b/tests/wasm/engine_test.go
+@@ -34,6 +34,8 @@ func TestEngineDependencies(t *testing.T) {
+ 		module + "/internal/exec/runtime",
+ 		module + "/internal/check/passes",
+ 		module + "/internal/workspace/libs",
++		module + "/internal/translate/export",
++		module + "/internal/translate/rdf/ontology",
+ 	}
+ 	checkWasmDependencies(t, "./cmd/sysml-engine", required, func(dependency string) bool {
+ 		return forbiddenEngineDependency(module, dependency)
+@@ -91,9 +93,10 @@ func forbiddenEngineDependency(module, dependency string) bool {
+ 			return true
+ 		}
+ 	}
+-	// RDF is the only converter shared with the engine.
++	// Rendering identity and API-JSON export share the native conversion backend.
+ 	translate := module + "/internal/translate"
+-	return hasDependencyPrefix(dependency, translate) && dependency != translate+"/rdf"
++	allowed := dependency == translate+"/rdf" || dependency == translate+"/rdf/ontology" || dependency == translate+"/export"
++	return hasDependencyPrefix(dependency, translate) && !allowed
+ }
+ 
+ func hasDependencyPrefix(dependency, prefix string) bool {
+-- 
+2.43.0
+

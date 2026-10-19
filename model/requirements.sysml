@@ -1,12 +1,12 @@
 package SyspresentRequirements {
-    doc /* Owner-agreed product baseline, 17 October 2026. Shall statements specify intended behavior, not implemented capability. Scope notes identify first-release versus follow-on work. */
+    doc /* Owner-agreed canvas architecture baseline, 18 October 2026. The scoped canvas prototype is not acceptance of the complete product. Shall statements specify intended behavior, not implemented capability. Scope notes identify first-release versus follow-on work. */
     package Audience {
         requirement <'SP-001'> selfGuided {
             doc /* The first release shall support a technically minded reader with basic systems engineering knowledge but no required SysML knowledge, following a self-guided engineering story. */
             comment scope /* First release */
         }
         requirement <'SP-002'> staticHosting {
-            doc /* The reader application shall run as a static site on GitHub Pages without application servers, accounts, or a required WASM runtime. */
+            doc /* The application shall run as a standalone static web application without a required application server or account. A browser-hosted OpenSysML WASM engine shall support model loading, view resolution and exploration, with the same Go engine available natively for CI. */
             comment scope /* First release */
         }
         requirement <'SP-003'> presentationLater {
@@ -16,7 +16,7 @@ package SyspresentRequirements {
     }
     package Authoring {
         requirement <'SP-010'> markdownSource {
-            doc /* Authors shall define narratives in Markdown with declarative blocks for native model views, prepared figures, prepared tables, annotations and story stops. */
+            doc /* Authors shall define narratives in Markdown that references SysML views and includes prepared figures, prepared tables, annotations, ordered scenes and presentation transitions. Reusable model selection shall be expressed by SysML view definitions and view usages rather than a duplicate Markdown traversal language. */
             comment scope /* First release */
         }
         requirement <'SP-011'> typedSubstitution {
@@ -44,7 +44,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-017'> linearReading {
-            doc /* The same story source shall provide a linear readable presentation of its narrative, relevant figures and tables, without requiring animation to convey its argument. */
+            doc /* The same story source shall support ordered readable scenes and their narrative, relevant figures and tables without requiring animation to convey the argument. Reduced-motion navigation shall retain the information and correspondence of animated scenes. */
             comment scope /* First release */
         }
         requirement <'SP-018'> closingArgument {
@@ -80,19 +80,19 @@ package SyspresentRequirements {
     }
     package StoryExperience {
         requirement <'SP-030'> continuousStory {
-            doc /* Readers shall progress by normal continuous page scrolling, with a section outline and direct links to story stops. Narrative progression shall not require precision positioning of the scrollbar. */
+            doc /* The primary presentation surface shall be a graph canvas supporting ordered guided scenes and direct links to scenes. Guided navigation shall traverse the model while each settled scene presents only its intended viewpoint and discloses hidden context when explored. */
             comment scope /* First release */
         }
         requirement <'SP-031'> stableScenes {
-            doc /* Authored scenes shall remain stable over a reading interval. Scene transitions shall be reversible on backward navigation and shall preserve readable labels and meaningful element correspondence. */
+            doc /* The graph shall dynamically rearrange to make each scene and exploration action readable. Settled scenes shall remain stable over a reading interval; transitions shall preserve meaningful semantic correspondence and support backward navigation without requiring fixed global element positions. */
             comment scope /* First release */
         }
         requirement <'SP-032'> responsiveLayout {
-            doc /* Desktop stories shall provide scrolling prose beside a persistent model canvas, with full-width prepared figures/tables where requested. Mobile stories shall place views inline and avoid persistent controls obscuring the reading area. */
+            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. */
             comment scope /* First release */
         }
         requirement <'SP-033'> explorationHandoff {
-            doc /* Manual graph exploration shall suspend automatic story camera movement. An explicit resume control shall restore the authored scene and reading position. */
+            doc /* Leaving an authored scene for manual exploration shall collapse its narrative panels into a compact Return to scene control and suspend guided movement. Returning shall restore the authored viewpoint, narrative and presentation preferences. */
             comment scope /* First release */
         }
         requirement <'SP-034'> semanticAnnotations {
@@ -100,7 +100,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-035'> presentationOverrides {
-            doc /* Authors may override camera framing, highlights and node placement per story stop without modifying the reusable model view or its semantic relationships. Overrides shall be keyed to identities. */
+            doc /* Authors shall express focus, emphasis, annotation anchors and optional layout constraints per scene using semantic identities. Runtime layout shall determine responsive positions; presentation constraints shall not alter model meaning or require a fixed global layout. */
             comment scope /* First release */
         }
         requirement <'SP-036'> purposefulMotion {
@@ -144,11 +144,11 @@ package SyspresentRequirements {
     }
     package RequirementReading {
         requirement <'SP-047'> requirementQuestions {
-            doc /* Selecting or exploring a requirement shall default to a readable account of its statement, rationale, upstream origins, affected system elements and verification cases. Every related record shall be traversable with navigation history. Definitions and usages shall retain their separate semantic identities while the reader follows their explicit typing. */
+            doc /* Requirement diagrams and contextual exploration actions shall reveal the requirement statement, rationale, upstream origins, affected system elements and verification cases within the graph. Definitions and usages shall retain distinct semantic identities through explicit typing. A separate question-reader interface shall not replace diagram exploration. */
             comment scope /* First release */
         }
         requirement <'SP-048'> traceEvidence {
-            doc /* The requirement reader shall identify indirect paths, disclose bounded or unavailable context, preserve native edge direction, and distinguish missing exported links, planned verification, declared model verdicts and executed evidence. A scoped diagram shall remain available as a secondary view. */
+            doc /* Graph exploration shall identify indirect paths, disclose bounded or unavailable context, preserve native edge direction, and distinguish missing links, planned verification, declared model verdicts and executed evidence. Diagram representations shall remain the primary exploration surface. */
             comment scope /* First release */
         }
     }
@@ -192,12 +192,54 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-063'> reuseCanvas {
-            doc /* The implementation shall evaluate reuse of OpenSysML browser canvas, layout, routing and export components before introducing equivalents. Reused dependencies shall be pinned with license and source provenance. */
+            doc /* Syspresent shall own its interactive canvas, layout orchestration and transition framework without a runtime or source dependency on the OpenSysML VS Code extension. OpenSysML Go shall supply authoritative parsing and view semantics through an explicit versioned adapter contract. Other reused dependencies shall retain revision, license and source provenance. */
             comment scope /* First release */
         }
         requirement <'SP-064'> configuration {
             doc /* Entry points, exploration modes, default filters, context limits, grouping, detail fields and presentation preferences shall be declarative; Blue Dog names shall not be hardcoded in the viewer. */
             comment scope /* First release */
+        }
+    }
+    package CanvasAuthoring {
+        requirement <'SP-080'> selectionActions {
+            doc /* A first click, tap or keyboard selection shall highlight the element and expose contextual actions without rearranging the graph. Refocus, expansion and viewpoint changes shall require an explicit action, with equivalent touch and keyboard access. */
+            comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-081'> transitionKinds {
+            doc /* Transitions within one diagram type shall gather, fade and rearrange content directly in that notation. Transitions between diagram types shall use a General View journey through relevant engineering relationships, collect destination elements and features, then transform into the destination notation without inventing semantic equivalence. */
+            comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-082'> engineeringJourneys {
+            doc /* Route proposals shall use explicit engineering relationships within the presentation system of interest and scene-specific additions. Shared library or KerML ancestry shall not create an implicit shortcut between system elements. Authors shall be able to inspect and adjust proposed routes, and save the selected explicit route. Deliberate library or metamodel exploration shall remain available outside guided routing. */
+            comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-083'> multipleRegions {
+            doc /* A scene shall be able to compose multiple diagram regions with explicit notation boundaries, shared semantic identities and coordinated narrative-panel layout. */
+            comment scope /* Full canvas product; prototype may demonstrate one primary region */
+        }
+        requirement <'SP-084'> staticEditor {
+            doc /* The standalone static application shall import, edit and export views and presentations. Authors shall be able to explore the model, capture a viewpoint as a scene, edit Markdown and annotations and adjust semantic visibility and presentation constraints. The initial underlying system model shall remain read-only. */
+            comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-085'> portableProject {
+            doc /* A presentation project shall use ordinary files for model and required library sources, authored SysML views, Markdown, assets and a small manifest with dependencies and entry points. Folder or ZIP import/export shall preserve those files; individual Markdown import/export shall also be supported. */
+            comment scope /* Canvas architecture baseline; complete browser round-trip not implied by prototype */
+        }
+        requirement <'SP-086'> standaloneExploration {
+            doc /* Users shall be able to load and explore a model without a story, create views and traverse all loaded model content. Story viewpoints shall guide exploration without restricting it; engineering route defaults and deliberate metamodel traversal shall remain distinct. */
+            comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-087'> publicationCoverage {
+            doc /* Publication shall include the complete model project by default and permit an explicitly scoped export. The application shall distinguish an export boundary or unavailable target from content hidden by a view or exploration filter. */
+            comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-088'> runtimeParity {
+            doc /* Native Go and browser WASM processing of the same project and declared view shall provide consistent semantic identities, relationship meaning and view content. The browser engine shall run in a worker so parsing and resolution do not block canvas interaction. Required unsupported operations shall be reported explicitly. */
+            comment scope /* Canvas architecture baseline; scoped parity demonstrated by prototype */
+        }
+        requirement <'SP-089'> basicRebuildValidation {
+            doc /* A rebuild shall identify scene, route and annotation references that no longer resolve and allow authors to repair them. Immutable published snapshots shall remain unchanged. Automatic semantic change adjudication, deep model history and mandatory change-review workflows are outside the current scope. */
+            comment scope /* Canvas architecture baseline */
         }
     }
     package Acceptance {
