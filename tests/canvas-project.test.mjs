@@ -80,6 +80,6 @@ import {edgeRoute} from '../src/canvas-prototype/geometry.mjs';
 test('wrapped requirement edges detour around intervening cards without reversing endpoints',()=>{
  const parent={id:'parent',x:26,y:30,width:280,height:170},upper={id:'upper',x:26,y:224,width:160,height:76},lower={id:'lower',x:26,y:324,width:160,height:76};
  const route=edgeRoute(lower,parent,[parent,upper,lower]);
- assert.deepEqual(route.points[0],{x:106,y:324});assert.deepEqual(route.points.at(-1),{x:166,y:200});assert.ok(route.points.some(p=>p.x<26));
+ assert.deepEqual(route.points[0],{x:106,y:324});assert.deepEqual(route.points.at(-1),{x:166,y:200});assert.ok(route.points.some(p=>p.x<26||p.x>186));
  for(let i=1;i<route.points.length;i++){const a=route.points[i-1],b=route.points[i];assert.ok(!(a.x===b.x&&a.x>26&&a.x<186&&Math.min(a.y,b.y)<300&&Math.max(a.y,b.y)>224));}
 });

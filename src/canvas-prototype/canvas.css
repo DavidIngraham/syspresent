@@ -7,3 +7,21 @@
 .node .kind{overflow-wrap:anywhere}dialog.statement pre{font:1rem/1.6 system-ui,sans-serif;white-space:pre-wrap}dialog.statement{max-height:90dvh;overflow:auto}
 
 #loading{position:absolute;z-index:15;left:50%;top:40%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));padding:1.3rem;background:#fff;border:1px solid var(--line);border-radius:10px;text-align:center;box-shadow:0 8px 30px #2442}#loading p{margin:.6rem 0 0;overflow-wrap:anywhere}
+
+/* Faces crossfade while their shared semantic card follows the journey. */
+.node:has(.node-face){padding:0;appearance:none;-webkit-appearance:none}
+.node-face{display:block;position:absolute;inset:0;padding:10px;overflow:hidden;text-align:left}
+.node-face.old-face{pointer-events:none}
+.node.container .node-face>.kind,.node.container .node-face>.name{position:absolute;left:10px;right:10px}
+.node.container .node-face>.kind{top:10px}.node.container .node-face>.name{top:30px}
+.node.peripheral{border-style:dashed;box-shadow:none;background:#f5f7f7}
+.node.peripheral .kind{font-size:10px}.node.peripheral .name{font-size:11px;line-height:1.15}
+.narrative-outgoing{position:absolute;z-index:6;overflow:hidden;padding:1.1rem 1.25rem;border:1px solid #b8cbc7;border-radius:10px;background:#fff;pointer-events:none;box-shadow:0 5px 25px #2442}
+.narrative-outgoing h2{font-size:1.2rem;line-height:1.25;margin:0 0 .8rem}.narrative-outgoing .scene-count{font-size:.72rem;color:#58716e}.narrative-outgoing p{margin:.7rem 0}
+@media(max-width:700px){.narrative-outgoing{padding:.75rem}.narrative-outgoing h2{font-size:1rem}.narrative-outgoing p{font-size:.9rem}}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+
+.node.context-boundary{min-width:6px;min-height:6px;width:6px;height:6px;margin:-3px;border:1px solid #426869;border-radius:50%;background:#426869;padding:0;box-shadow:none;pointer-events:none}
+
+.node.peripheral .kind{display:none}.node.peripheral .name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+@media(max-width:700px){#transition:not([data-notice=true]){display:none}#transition[data-notice=true]{bottom:52px;max-width:calc(100% - 24px)}}

@@ -80,7 +80,7 @@ package SyspresentRequirements {
     }
     package StoryExperience {
         requirement <'SP-030'> continuousStory {
-            doc /* The primary presentation surface shall be a graph canvas supporting ordered guided scenes and direct links to scenes. Guided navigation shall traverse the model while each settled scene presents only its intended viewpoint and discloses hidden context when explored. */
+            doc /* The primary presentation surface shall be a graph canvas supporting ordered guided scenes and direct links to scenes. Guided navigation shall traverse the model while each settled scene emphasizes its intended active viewpoint. Bounded peripheral context may remain translucent; hidden context shall be disclosed when explored. */
             comment scope /* First release */
         }
         requirement <'SP-031'> stableScenes {
@@ -88,7 +88,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-032'> responsiveLayout {
-            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. */
+            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. Settled connection labels shall avoid cards and other labels; an impossible fit shall be disclosed rather than drawn as overlapping text. */
             comment scope /* First release */
         }
         requirement <'SP-033'> explorationHandoff {
@@ -104,7 +104,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-036'> purposefulMotion {
-            doc /* Camera motion shall communicate location or correspondence. Changes between incompatible notations shall not imply false spatial or causal equivalence. Reduced-motion presentation shall preserve the same information. */
+            doc /* Camera motion shall communicate location or correspondence. Changes between incompatible notations shall not imply false spatial or causal equivalence. Reduced-motion presentation shall preserve the same information. A multi-stage journey shall use continuous motion through intermediate viewpoints without repeated stop-and-restart easing; entering and leaving content shall fade. */
             comment scope /* First release */
         }
         requirement <'SP-037'> accessibleControls {
@@ -122,7 +122,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-042'> boundedContext {
-            doc /* Expansion shall disclose omitted neighbors and active filters and allow choosing additional context before excessive expansion. Context limits shall be configurable and shall not imply that hidden relationships are absent. */
+            doc /* Expansion shall disclose omitted neighbors and active filters and allow choosing additional context before excessive expansion. Context limits shall be configurable and shall not imply that hidden relationships are absent. Bounded engineering connections beyond the active viewpoint shall remain visible as translucent peripheral context, distinguishable from the active diagram. Peripheral context shall not determine the active content camera fit, centering or layout. */
             comment scope /* First release */
         }
         requirement <'SP-043'> freeTraversal {

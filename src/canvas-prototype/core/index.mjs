@@ -112,13 +112,21 @@ export function layoutScene(nativeView, options={}) {
   for(const node of view.nodes)if(node.parentId && nodeMap.has(node.parentId))children.get(node.parentId).push(node.id);
   const roots=view.nodes.filter(node=>!node.parentId||!nodeMap.has(node.parentId));
   const sizes=new Map(), visiting=new Set(), childPlacements=new Map();
-  // The author supplies measured panel rectangles. Estimate the available upper
-  // canvas stripe for child wrapping; final placement checks every rectangle.
-  let intervals=[[padding,width-padding]];
-  for(const panel of panels.filter(panel=>panel.y<=padding+76&&panel.y+panel.height>padding)){
-    intervals=intervals.flatMap(([left,right])=>panel.x>=right||panel.x+panel.width<=left?[[left,right]]:[[left,Math.min(right,panel.x-gap)],[Math.max(left,panel.x+panel.width+gap),right]].filter(([a,b])=>b>a));
+  // Lay out in one compact reading rectangle. Reserving the prose in a packing
+  // pass and subsequently fitting the whole result used to preserve a large,
+  // invisible hole when a wrapped row was pushed below a bottom narrative.
+  let area={x:0,y:0,width,height};
+  if(panels.length){
+    const xs=[0,width,...panels.flatMap(p=>[Math.max(0,p.x-gap),Math.min(width,p.x+p.width+gap)])];
+    const ys=[0,height,...panels.flatMap(p=>[Math.max(0,p.y-gap),Math.min(height,p.y+p.height+gap)])];
+    const candidates=[];
+    for(const x of xs)for(const right of xs)for(const y of ys)for(const bottom of ys){
+      const rect={x,y,width:right-x,height:bottom-y};
+      if(rect.width>=160&&rect.height>=76&&!panels.some(p=>intersects(rect,p)))candidates.push(rect);
+    }
+    area=candidates.sort((a,b)=>b.width*b.height-a.width*a.height)[0]??area;
   }
-  const contentWidth=Math.max(160,...intervals.map(([a,b])=>b-a));
+  const contentWidth=Math.max(160,area.width-2*padding);
   const controlSizes=new Map([['initial',[28,28]],['final',[32,32]],['fork',[80,24]],['join',[80,24]],['decision',[44,44]],['merge',[44,44]],['start',[28,28]],['end',[32,32]]]);
   const flowKinds=new Set(['succession','control-flow','transition','flow']);
   function directChildOf(id,parent){let child=nodeMap.get(id),count=0;while(child?.parentId&&child.parentId!==parent){child=nodeMap.get(child.parentId);if(++count>view.nodes.length)throw new Error('Cyclic native drawing containment');}return child?.parentId===parent?child.id:null;}
@@ -158,20 +166,23 @@ export function layoutScene(nativeView, options={}) {
     return general.has(view.kind)&&['derive','derivation','typing','type','specialization','satisfy','satisfaction','verify','verification'].includes(edge.kind)?[b,a]:[a,b];
   });
   const ranks=topologicalRanks(roots.map(node=>node.id),orderedEdges);
-  const reserved=panels.map(panel=>({...copy(panel)})),occupied=[...reserved],placed=new Map();
-  let minimumY=padding,lastRank=-1,rankBottom=padding;
+  const reserved=panels.map(panel=>({...copy(panel)})),placed=new Map();
+  const behavioral=['action','activity','state'].includes(view.kind);
+  const columnGap=Math.min(gap,16);
+  const rows=[];
   for(const node of [...roots].sort((a,b)=>ranks.get(a.id)-ranks.get(b.id)||a.id.localeCompare(b.id))){
-    const rank=ranks.get(node.id),size=sizes.get(node.id);
-    if(rank!==lastRank){minimumY=rankBottom+(lastRank<0?0:gap);lastRank=rank;}
-    const ys=[minimumY,...occupied.map(rect=>rect.y+rect.height+gap).filter(y=>y>=minimumY)].sort((a,b)=>a-b);
-    let position=null;
-    for(const y of [...new Set(ys)]){
-      const xs=[padding,...occupied.filter(rect=>y<rect.y+rect.height+gap&&y+size.height+gap>rect.y).map(rect=>rect.x+rect.width+gap)].sort((a,b)=>a-b);
-      for(const x of [...new Set(xs)]){const rect={x,y,width:size.width,height:size.height};if(x+size.width>width-padding)continue;if(!occupied.some(other=>intersects(rect,other,gap))){position=rect;break;}}
-      if(position)break;
-    }
-    if(!position){const y=Math.max(minimumY,...occupied.map(rect=>rect.y+rect.height+gap));position={x:padding,y,width:size.width,height:size.height};}
-    occupied.push(position);placed.set(node.id,position);rankBottom=Math.max(rankBottom,position.y+position.height);
+    const size=sizes.get(node.id),rank=ranks.get(node.id),row=rows.at(-1);
+    if(!row||row.rank!==rank||(!behavioral&&row.width+columnGap+size.width>contentWidth))rows.push({rank,ids:[node.id],width:size.width,height:size.height});
+    else{row.ids.push(node.id);row.width+=columnGap+size.width;row.height=Math.max(row.height,size.height);}
+  }
+  // All rows share a compact centreline. Wrapped peers remain peers; behavioral
+  // parallel branches are deliberately never wrapped into a false sequence.
+  const occupiedWidth=Math.max(0,...rows.map(row=>row.width));
+  let y=area.y+padding;
+  for(const row of rows){
+    let x=area.x+padding+(occupiedWidth-row.width)/2;
+    for(const id of row.ids){const size=sizes.get(id);placed.set(id,{x,y:y+(row.height-size.height)/2,...size});x+=size.width+columnGap;}
+    y+=row.height+gap;
   }
   const result=[];
   function collect(id,rect){const node=nodeMap.get(id);result.push({...node,...rect});for(const child of childPlacements.get(id)??[])collect(child.id,{x:rect.x+child.x,y:rect.y+child.y,width:child.width,height:child.height});}
