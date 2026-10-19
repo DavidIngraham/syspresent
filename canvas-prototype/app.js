@@ -1,3 +1,38 @@
+// src/canvas-prototype/documentation.mjs
+var indexes = /* @__PURE__ */ new WeakMap();
+function documentationFor(graph, id) {
+  let index = indexes.get(graph);
+  if (!index) {
+    index = new Map((graph?.elements ?? []).map((e) => [e.id, e]));
+    if (graph) indexes.set(graph, index);
+  }
+  const own = index.get(id);
+  if (own?.description) return { text: own.description, source: own };
+  const types = own?.native?.type;
+  const references = Array.isArray(types) ? types : types ? [types] : [];
+  for (const reference of references) {
+    const type = index.get(reference?.["@id"]);
+    if (type?.description) return { text: type.description, source: type };
+  }
+  return { text: "", source: own };
+}
+function measureCard(document2, node, detail) {
+  const width = Math.max(Number(node.width) || 0, detail ? 280 : 160);
+  const card = document2.createElement("div");
+  card.className = "node";
+  card.style.cssText = `position:fixed;left:-10000px;top:0;visibility:hidden;width:${width}px;height:auto;transform:none;`;
+  for (const [className, text] of [["kind", `\xAB${node.kind}\xBB${node.displayID ? " " + node.displayID : ""}${node.type ? " : " + node.type : ""}`], ["name", node.name?.split("::").at(-1) || node.kind], ...detail ? [["detail", detail]] : []]) {
+    const part = document2.createElement("span");
+    part.className = className;
+    part.textContent = text;
+    card.append(part);
+  }
+  document2.body.append(card);
+  const height = Math.max(76, Math.ceil(card.getBoundingClientRect().height), card.scrollHeight);
+  card.remove();
+  return { width, height };
+}
+
 // src/canvas-prototype/geometry.mjs
 function graphArea(width, height, panels = []) {
   if (!panels.length) return { x: 16, y: 16, width: width - 32, height: height - 76 };
@@ -13,9 +48,42 @@ function fitNodes(nodes, area) {
   const offsetX = area.x + (area.width - (maxX - minX) * scale) / 2 - minX * scale, offsetY = area.y + (area.height - (maxY - minY) * scale) / 2 - minY * scale;
   return { scale, nodes: nodes.map((n) => ({ ...n, x: n.x * scale + offsetX, y: n.y * scale + offsetY, width: n.width * scale, height: n.height * scale })) };
 }
+function edgeRoute(a, b, nodes = []) {
+  const ac = { x: a.x + a.width / 2, y: a.y + a.height / 2 }, bc = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  const vertical = Math.abs(ac.y - bc.y) > Math.abs(ac.x - bc.x) * 0.5;
+  let points;
+  if (vertical) {
+    const down = bc.y > ac.y, start2 = { x: ac.x, y: down ? a.y + a.height : a.y }, end = { x: bc.x, y: down ? b.y : b.y + b.height }, middle = (start2.y + end.y) / 2;
+    points = [start2, { x: start2.x, y: middle }, { x: end.x, y: middle }, end];
+  } else {
+    const right = bc.x > ac.x, start2 = { x: right ? a.x + a.width : a.x, y: ac.y }, end = { x: right ? b.x : b.x + b.width, y: bc.y }, middle = (start2.x + end.x) / 2;
+    points = [start2, { x: middle, y: start2.y }, { x: middle, y: end.y }, end];
+  }
+  const contains = (outer, inner) => outer.x <= inner.x && outer.y <= inner.y && outer.x + outer.width >= inner.x + inner.width && outer.y + outer.height >= inner.y + inner.height;
+  const obstacles = nodes.filter((n) => n.id !== a.id && n.id !== b.id && !contains(n, a) && !contains(n, b));
+  const blocked = (path) => path.slice(1).some((q, i) => {
+    const p = path[i];
+    return obstacles.some((n) => p.x === q.x ? p.x > n.x - 2 && p.x < n.x + n.width + 2 && Math.max(p.y, q.y) > n.y - 2 && Math.min(p.y, q.y) < n.y + n.height + 2 : p.y > n.y - 2 && p.y < n.y + n.height + 2 && Math.max(p.x, q.x) > n.x - 2 && Math.min(p.x, q.x) < n.x + n.width + 2);
+  });
+  let label2 = { x: (points[1].x + points[2].x) / 2, y: (points[1].y + points[2].y) / 2 - 5 };
+  if (vertical && blocked(points)) {
+    const start2 = points[0], end = points.at(-1), direction = end.y > start2.y ? 1 : -1;
+    const left = Math.min(...nodes.map((n) => n.x)) - 12, right = Math.max(...nodes.map((n) => n.x + n.width)) + 12;
+    const buses = ac.x < (left + right) / 2 ? [left, right] : [right, left];
+    for (const bus of buses) {
+      const candidate = [start2, { x: start2.x, y: start2.y + direction * 10 }, { x: bus, y: start2.y + direction * 10 }, { x: bus, y: end.y - direction * 10 }, { x: end.x, y: end.y - direction * 10 }, end];
+      if (!blocked(candidate)) {
+        points = candidate;
+        label2 = { x: start2.x, y: start2.y - 7 };
+        break;
+      }
+    }
+  }
+  return { points, d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), ...label2 };
+}
 
 // src/canvas-prototype/engine/client.mjs
-function createSemanticEngine({ assetBase, workerURL = new URL("./worker.js", import.meta.url), WorkerClass = globalThis.Worker } = {}) {
+function createSemanticEngine({ assetBase, assetVersion, workerURL = new URL("./worker.js", import.meta.url), WorkerClass = globalThis.Worker } = {}) {
   if (!assetBase) throw new TypeError("assetBase must locate the pinned Go/WASM engine assets");
   const worker = new WorkerClass(workerURL);
   const pending = /* @__PURE__ */ new Map();
@@ -49,7 +117,7 @@ function createSemanticEngine({ assetBase, workerURL = new URL("./worker.js", im
     worker.terminate();
   };
   const base = new URL(assetBase, globalThis.location?.href || import.meta.url).href;
-  const ready = request("Initialize", { assetBase: base });
+  const ready = request("Initialize", { assetBase: base, assetVersion });
   return {
     ready,
     async call(method, params = {}) {
@@ -272,7 +340,7 @@ function layoutScene(nativeView, options = {}) {
     const lines = [node.label ?? node.name ?? "", ...(node.compartments ?? []).map((value) => typeof value === "string" ? value : JSON.stringify(value))].join("\n").split("\n");
     const symbol = controlSizes.get(node.kind);
     const ownHeight = symbol ? symbol[1] : Math.max(76, Math.min(16, lines.length) * 18 + 24, Number(node.height) || 0);
-    const ownWidth = symbol ? symbol[0] : Math.max(160, Math.min(280, Math.max(0, ...lines.map((line) => line.length)) * 7 + 32), Number(node.width) || 0);
+    const ownWidth = symbol ? symbol[0] : Number(node.width) > 0 ? Number(node.width) : Math.max(160, Math.min(280, Math.max(0, ...lines.map((line) => line.length)) * 7 + 32));
     for (const child of items) measure(child);
     const behavioral = ["action", "activity", "state"].includes(view.kind);
     const edges = view.edges.filter((edge) => !behavioral || flowKinds.has(edge.kind)).map((edge) => [directChildOf(edge.source, id), directChildOf(edge.target, id)]).filter(([a, b]) => a && b && a !== b);
@@ -1409,6 +1477,8 @@ function validateProject(project) {
   const m = project.manifest;
   if (m?.schemaVersion !== SCHEMA) throw Error("Unsupported project manifest");
   for (const key of ["modelSources", "viewSources", "systemOfInterest"]) if (!Array.isArray(m[key]) || !m[key].length || !m[key].every((x) => typeof x === "string" && x)) throw Error("Project requires " + key);
+  if (m.requirementSeeds !== void 0 && (!Array.isArray(m.requirementSeeds) || !m.requirementSeeds.length || !m.requirementSeeds.every((x) => typeof x === "string" && x))) throw Error("Invalid native requirement seeds");
+  if (m.modelRoots !== void 0 && (!Array.isArray(m.modelRoots) || !m.modelRoots.length || !m.modelRoots.every((x) => typeof x === "string" && x))) throw Error("Invalid native model roots");
   for (const name of [...m.modelSources, ...m.viewSources, m.story, ...m.assets ?? []]) fileText(project, name);
   if ((/* @__PURE__ */ new Set([...m.modelSources, ...m.viewSources])).size !== m.modelSources.length + m.viewSources.length) throw Error("Model and view source files must be separate");
   if (!["complete", "scoped"].includes(m.publication?.scope)) throw Error("Publication scope must be complete or scoped");
@@ -1483,19 +1553,36 @@ ${refs2.map((q) => "        expose " + reference(q) + ";").join("\n")}
 }
 `;
 }
-function requirementCoverageSource(qualifiedRoots, packageName = "SyspresentRuntimeContext") {
+function requirementCoverageSource(qualifiedRoots, packageName = "SyspresentRuntimeContext", seeds) {
   const quoted = (s) => "'" + s.replaceAll("\\", "\\\\").replaceAll("'", "\\'") + "'";
   return `package ${packageName} {
  private import StandardViewDefinitions::*;
  view coverage : GeneralView {
-  filter @SysML::RequirementUsage or @SysML::RequirementDefinition;
-${qualifiedRoots.map((q) => "  expose " + q.split("::").map(quoted).join("::") + "::**;").join("\n")}
+${seeds ? "  @OpenSysMLRenderings::RequirementContext { relationshipDepth = 1; }\n" : ""}  filter @SysML::RequirementUsage or @SysML::RequirementDefinition;
+${(seeds ?? qualifiedRoots).map((q) => "  expose " + q.split("::").map(quoted).join("::") + (seeds ? ";" : "::**;")).join("\n")}
  }
 }
 `;
 }
+async function sourceDigest(documents) {
+  const bytes = new TextEncoder().encode(JSON.stringify(documents));
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function verifiedRuntimeCache(project, { trustedHash, engineVersion, engineFingerprint, documents, modelHash }) {
+  const filename = project.manifest.runtimeCache;
+  if (!filename || !trustedHash) return null;
+  const value = project.files[filename], bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+  if (!bytes) return null;
+  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (hash !== trustedHash) return null;
+  const cache = JSON.parse(fileText(project, filename));
+  if (cache.schemaVersion !== "syspresent.native-cache.v1" || cache.engineVersion !== engineVersion || cache.engineFingerprint !== engineFingerprint || cache.modelHash !== modelHash || cache.sourceDigest !== await sourceDigest(documents)) return null;
+  return cache;
+}
 
 // src/canvas-prototype/app.mjs
+var trustedCacheHash = document.querySelector('meta[name="syspresent-runtime-cache"]')?.content;
+var buildVersion = document.querySelector('meta[name="syspresent-build"]')?.content || "development";
 var $ = (id) => document.getElementById(id);
 var el = (name, text, cls) => {
   const e = document.createElement(name);
@@ -1509,7 +1596,7 @@ var button = (text, fn) => {
   e.onclick = () => Promise.resolve(fn()).catch(report);
   return e;
 };
-var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [] };
+var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [] };
 var report = (error) => {
   $("status").textContent = error.message || String(error);
   $("editor-error").textContent = error.message || String(error);
@@ -1526,6 +1613,7 @@ function scopeIds() {
 }
 function status(text) {
   $("status").textContent = text;
+  $("loading-phase").textContent = text;
 }
 function inline(parent, text) {
   let start2 = 0;
@@ -1569,43 +1657,51 @@ function markdown(text) {
   return host;
 }
 async function exampleProject() {
-  const manifest = await fetch("./example/project.json").then((r) => {
-    if (!r.ok) throw Error("Example project unavailable");
-    return r.json();
-  });
-  const files = {};
-  await Promise.all([...manifest.modelSources, ...manifest.viewSources, manifest.story, ...manifest.assets].map(async (name) => {
-    const r = await fetch("./example/" + name);
-    if (!r.ok) throw Error("Missing example " + name);
-    files[name] = await r.text();
-  }));
-  return validateProject({ manifest, files });
+  const response = await fetch("./project.zip?v=" + buildVersion);
+  if (!response.ok) throw Error("Example project unavailable");
+  return unpackProject(new Uint8Array(await response.arrayBuffer()));
 }
 async function compile(project) {
-  let parsed = await state.engine.call("ParseSources", { documents: documentsFor(project) });
-  const errors = (parsed.diagnostics ?? []).filter((d) => String(d.severity).toLowerCase().includes("error"));
-  if (errors.length) throw Error(errors.map((d) => `${d.message} (${d.span?.file ?? "source"}:${d.span?.startLine ?? "?"})`).join("\n"));
-  if (!parsed.modelHash) throw Error("Native engine returned no model identity");
-  let exported = await state.engine.call("ExportModel", { modelHash: parsed.modelHash });
+  const documents = documentsFor(project), scenes = parseStory(fileText(project, project.manifest.story));
+  let parsed, exported, roots = project.manifest.modelRoots, runtimePackage = "SyspresentRuntimeContext";
+  const check = (result) => {
+    const errors = (result.diagnostics ?? []).filter((d) => String(d.severity).toLowerCase().includes("error"));
+    if (errors.length) throw Error(errors.map((d) => `${d.message} (${d.span?.file ?? "source"}:${d.span?.startLine ?? "?"})`).join("\n"));
+    if (!result.modelHash) throw Error("Native engine returned no model identity");
+  };
+  if (!roots?.length) {
+    parsed = await state.engine.call("ParseSources", { documents });
+    check(parsed);
+    exported = await state.engine.call("ExportModel", { modelHash: parsed.modelHash, projection: "declarations" });
+    const rootIDs = (parsed.roots ?? []).flatMap((r) => r.childIds ?? []);
+    roots = exported.elements.filter((e) => rootIDs.includes(e["@id"]) && e.qualifiedName).map((e) => e.qualifiedName);
+  }
+  while (roots.includes(runtimePackage)) runtimePackage += "X";
+  status("Resolving the complete project with OpenSysML WASM\u2026");
+  const allDocuments = [...documents, { name: "__syspresent_runtime_context.sysml", content: requirementCoverageSource(roots, runtimePackage, project.manifest.requirementSeeds) }];
+  parsed = await state.engine.call("ParseSources", { documents: allDocuments });
+  check(parsed);
+  const cache = await verifiedRuntimeCache(project, { trustedHash: trustedCacheHash, engineVersion: state.engineInfo?.version, engineFingerprint: state.provenance?.assets?.["sysml-wasm.wasm"]?.sha256, documents: allDocuments, modelHash: parsed.modelHash });
+  status("Loading model declarations and requirement relationships\u2026");
+  exported = cache?.exported ?? await state.engine.call("ExportModel", { modelHash: parsed.modelHash, projection: "declarations" });
   if (!Array.isArray(exported.elements)) throw Error("Native model export has no element array");
-  const rootIDs = (parsed.roots ?? []).flatMap((r) => r.childIds ?? []), roots = exported.elements.filter((e) => rootIDs.includes(e["@id"]) && e.qualifiedName).map((e) => e.qualifiedName);
-  let runtimePackage = "SyspresentRuntimeContext";
-  while (exported.elements.some((e) => e.qualifiedName === runtimePackage)) runtimePackage += "X";
-  parsed = await state.engine.call("ParseSources", { documents: [...documentsFor(project), { name: "__syspresent_runtime_context.sysml", content: requirementCoverageSource(roots, runtimePackage) }] });
-  const runtimeErrors = (parsed.diagnostics ?? []).filter((d) => String(d.severity).toLowerCase().includes("error"));
-  if (runtimeErrors.length) throw Error(runtimeErrors.map((d) => d.message).join("\n"));
-  exported = await state.engine.call("ExportModel", { modelHash: parsed.modelHash });
-  const coverage = requireNativeIdentity(adaptNativeView(await state.engine.call("RenderView", { modelHash: parsed.modelHash, view: runtimePackage + "::coverage", includeSemanticIdentity: true }), runtimePackage + "::coverage"));
+  if (project.manifest.modelRoots?.length) {
+    const modelRootIDs = parsed.roots.slice(0, project.manifest.modelSources.length).flatMap((r) => r.childIds ?? []), actual = exported.elements.filter((e) => modelRootIDs.includes(e["@id"]) && e.qualifiedName).map((e) => e.qualifiedName);
+    const missing = actual.filter((name) => !roots.includes(name));
+    if (missing.length) throw Error("Native model roots need rebuilding: " + missing.join(", "));
+  }
+  const coverage = requireNativeIdentity(adaptNativeView(cache?.coverage ?? await state.engine.call("RenderView", { modelHash: parsed.modelHash, view: runtimePackage + "::coverage", includeSemanticIdentity: true }), runtimePackage + "::coverage"));
   exported.elements = exported.elements.filter((e) => e.qualifiedName !== runtimePackage && !e.qualifiedName?.startsWith(runtimePackage + "::"));
-  const viewNames = exported.elements.filter((e) => e["@type"] === "ViewUsage" && e.qualifiedName && e["sysx:sourceLine"]).map((e) => e.qualifiedName);
-  const views = /* @__PURE__ */ new Map();
-  for (const name of viewNames) {
-    const raw = await state.engine.call("RenderView", { modelHash: parsed.modelHash, view: name, includeSemanticIdentity: true });
+  const availableViews = exported.elements.filter((e) => e["@type"] === "ViewUsage" && e.qualifiedName && e["sysx:sourceLine"]).map((e) => e.qualifiedName);
+  const needed = /* @__PURE__ */ new Set([...scenes.map((s) => s.view), ...project.manifest.entryView ? [project.manifest.entryView] : []]), views = /* @__PURE__ */ new Map();
+  for (const name of needed) {
+    if (!availableViews.includes(name)) throw Error("Native view does not resolve: " + name);
+    status("Preparing " + (scenes.find((s) => s.view === name)?.title || "model view") + "\u2026");
+    const raw = cache?.views?.[name] ?? await state.engine.call("RenderView", { modelHash: parsed.modelHash, view: name, includeSemanticIdentity: true });
     views.set(name, requireNativeIdentity(adaptNativeView(raw, name)));
   }
   const graph = modelGraph(exported.elements, [...views.values(), coverage]);
   for (const root of project.manifest.systemOfInterest) if (!graph.elements.some((e) => e.qualifiedName === root)) throw Error("System of interest does not resolve: " + root);
-  const scenes = parseStory(fileText(project, project.manifest.story));
   const byName = (value) => graph.elements.find((e) => e.id === value || e.qualifiedName === value)?.id;
   for (const [sceneIndex, item] of scenes.entries()) {
     if (item.journey?.length && (byName(item.journey.at(-1)) !== byName(item.focus) || sceneIndex > 0 && byName(item.journey[0]) !== byName(scenes[sceneIndex - 1].focus))) throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);
@@ -1616,13 +1712,15 @@ async function compile(project) {
       if (!from || !to || !findEngineeringRoute(graph, { from, to, maxHops: 1 }).found) throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);
     }
   }
+  const scoped = graph.elements.filter((e) => project.manifest.systemOfInterest.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id);
   for (let i = 1; i < scenes.length; i++) {
-    const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: graph.elements.filter((e) => project.manifest.systemOfInterest.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id) });
+    const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: scoped });
     if (plan.mode === "cross-kind" && !plan.route.found) throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);
   }
-  return { project, modelHash: parsed.modelHash, exported, graph, views, scenes, coverage };
+  return { project, modelHash: parsed.modelHash, exported, graph, views, scenes, coverage, availableViews };
 }
 function busy(value) {
+  $("loading").hidden = !value;
   for (const id of ["previous", "next", "scenes", "standalone", "return", "fit", "find-toggle", "edit"]) $(id).disabled = value;
 }
 async function loadProject(project) {
@@ -1643,7 +1741,7 @@ async function loadProject(project) {
     throw error;
   }
   if (revision !== state.loadRevision) return;
-  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], extraViews: /* @__PURE__ */ new Map() });
+  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], extraViews: /* @__PURE__ */ new Map() });
   busy(false);
   updateLists();
   $("editor-error").textContent = "";
@@ -1653,7 +1751,7 @@ async function loadProject(project) {
     state.focus = resolve(project.manifest.systemOfInterest[0]);
     await explore(state.focus);
   }
-  status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.views.size} views`);
+  status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
   $("boundary").textContent = project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 traversal stays within supplied model" : "Complete project \xB7 standalone exploration available";
 }
 function updateLists() {
@@ -1664,7 +1762,7 @@ function updateLists() {
     $("scenes").append(option);
   }
   $("views").replaceChildren();
-  for (const name of state.views.keys()) {
+  for (const name of state.availableViews) {
     const option = el("option", name);
     option.value = name;
     $("views").append(option);
@@ -1691,7 +1789,7 @@ function panelGeometry() {
     panel.style.width = width - 24 + "px";
     panel.style.left = "12px";
     panel.style.bottom = "58px";
-    panel.style.maxHeight = (narrow ? Math.max(140, height * 0.27) : Math.max(140, height * 0.25)) + "px";
+    panel.style.maxHeight = (narrow ? Math.max(180, Math.min(height * 0.42, height - 300)) : Math.max(140, height * 0.25)) + "px";
   } else {
     panel.style.top = "16px";
     panel.style[placement === "left" ? "left" : "right"] = "16px";
@@ -1700,11 +1798,16 @@ function panelGeometry() {
   const a = panel.getBoundingClientRect(), b = stage.getBoundingClientRect();
   return [{ id: "narrative", x: a.x - b.x, y: a.y - b.y, width: a.width, height: a.height }];
 }
-function sizeView(view) {
+function sizeView(view, focus) {
   return { ...view, nodes: view.nodes.map((n) => {
-    const expanded = state.expanded.has(n.semanticId), detail = expanded ? element(n.semanticId)?.description || n.detail || "No statement or documentation recorded." : n.kind === "requirement" ? n.detail ?? "" : "";
-    const lines = Math.max(1, Math.ceil(detail.length / 32));
-    return { ...n, displayDetail: detail, height: detail ? Math.max(n.height || 0, 58 + lines * 16) : n.height };
+    const expanded = state.expanded.has(n.semanticId), requirement = n.kind === "requirement" && n.semanticId === focus && !state.collapsed.has(n.semanticId), documentation = documentationFor(state.graph, n.semanticId);
+    const detail = expanded || requirement ? documentation.text || n.detail || (expanded ? "No statement or documentation recorded." : "") : "";
+    const attribution = detail && documentation.text && documentation.source?.id !== n.semanticId ? `Statement from ${documentation.source.qualifiedName || documentation.source.name}
+` : "";
+    const displayDetail = attribution + detail;
+    const displayID = element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "";
+    const measured = ["initial", "final", "fork", "join", "decision", "merge"].includes(n.kind) ? {} : measureCard(document, { ...n, displayID }, displayDetail);
+    return { ...n, ...measured, displayDetail, displayID: element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "" };
   }) };
 }
 function cancelAnimations() {
@@ -1716,19 +1819,10 @@ function svgel(name, attrs = {}) {
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
   return e;
 }
-function edgePoints(a, b) {
-  const ac = { x: a.x + a.width / 2, y: a.y + a.height / 2 }, bc = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-  if (Math.abs(ac.y - bc.y) > Math.abs(ac.x - bc.x) * 0.5) {
-    const down = bc.y > ac.y, start3 = { x: ac.x, y: down ? a.y + a.height : a.y }, end2 = { x: bc.x, y: down ? b.y : b.y + b.height }, middle2 = (start3.y + end2.y) / 2;
-    return { d: `M${start3.x},${start3.y} L${start3.x},${middle2} L${end2.x},${middle2} L${end2.x},${end2.y}`, x: (start3.x + end2.x) / 2, y: middle2 - 5 };
-  }
-  const right = bc.x > ac.x, start2 = { x: right ? a.x + a.width : a.x, y: ac.y }, end = { x: right ? b.x : b.x + b.width, y: bc.y }, middle = (start2.x + end.x) / 2;
-  return { d: `M${start2.x},${start2.y} L${middle},${start2.y} L${middle},${end.y} L${end.x},${end.y}`, x: middle + 4, y: (start2.y + end.y) / 2 - 5 };
-}
-async function frame(view, caption = "", duration = 0) {
+async function frame(view, caption = "", duration = 0, focus = state.focus) {
   cancelAnimations();
   const stage = $("stage"), width = stage.clientWidth, height = stage.clientHeight, panels = panelGeometry();
-  const layout = layoutScene(sizeView(view), { width, height, panels, padding: 16, gap: 24 }), area = graphArea(width, height, panels), nodes = layout.nodes;
+  const layout = layoutScene(sizeView(view, focus), { width, height, panels, padding: 16, gap: 24 }), area = graphArea(width, height, panels), nodes = layout.nodes;
   const fitted = fitNodes(nodes, area), scale = fitted.scale, positioned = fitted.nodes, byID = new Map(positioned.map((n) => [n.id, n]));
   const svg = $("connections");
   svg.replaceChildren();
@@ -1740,7 +1834,7 @@ async function frame(view, caption = "", duration = 0) {
   for (const e of layout.edges) {
     const a = byID.get(e.source), b = byID.get(e.target);
     if (!a || !b) continue;
-    const path = edgePoints(a, b), group = svgel("g", { "data-relationship": e.semanticId || e.id });
+    const path = edgeRoute(a, b, positioned), group = svgel("g", { "data-relationship": e.semanticId || e.id });
     const line = svgel("path", { d: path.d, fill: "none", stroke: "#426869", "stroke-width": 1.5, "marker-end": "url(#arrow)" });
     if (["satisfy", "verify", "dependency", "derive", "typing", "specialization"].includes(e.kind)) line.setAttribute("stroke-dasharray", "5 3");
     group.append(line);
@@ -1766,7 +1860,7 @@ async function frame(view, caption = "", duration = 0) {
     node.style.zIndex = String(children ? 0 : 3);
     node.style.transform = `translate(${n.x}px,${n.y}px) scale(${scale})`;
     const shortName = n.name?.includes("::") ? n.name.split("::").at(-1) : n.name;
-    node.append(el("span", `\xAB${n.kind}\xBB${n.type ? " : " + n.type : ""}`, "kind"), el("span", shortName || n.kind, "name"));
+    node.append(el("span", `\xAB${n.kind}\xBB${n.displayID ? " " + n.displayID : ""}${n.type ? " : " + n.type : ""}`, "kind"), el("span", shortName || n.kind, "name"));
     if (n.displayDetail && !children) node.append(el("span", n.displayDetail, "detail"));
     node.onclick = (event) => {
       event.stopPropagation();
@@ -1826,15 +1920,16 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
       for (const step of plan.stages) {
         if (revision !== state.revision) return;
         const projected = step.viewKind === "gv" ? gather(step.semanticIds) : view;
-        await frame(projected, step.kind === "gv-bridge" ? "General View \xB7 leaving the current notation" : step.kind === "gv-journey" ? "General View \xB7 following engineering connections" : step.kind === "gv-gather" ? "General View \xB7 gathering destination features" : step.kind === "morph" ? "Arranging the destination view" : "Rearranging within this notation", step.duration);
+        await frame(projected, step.kind === "gv-bridge" ? "General View \xB7 leaving the current notation" : step.kind === "gv-journey" ? "General View \xB7 following engineering connections" : step.kind === "gv-gather" ? "General View \xB7 gathering destination features" : step.kind === "morph" ? "Arranging the destination view" : "Rearranging within this notation", step.duration, focus);
       }
     }
     if (revision !== state.revision) return;
-    await frame(view, disconnected ? "No engineering route \xB7 explicit view jump" : "", disconnected && !state.reduce ? 240 : 0);
+    await frame(view, disconnected ? "No engineering route \xB7 explicit view jump" : "", disconnected && !state.reduce ? 240 : 0, focus);
     if (revision !== state.revision) return;
     state.view = view;
     state.focus = focus;
     state.previousFocus = focus;
+    if (!state.exploring) status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
     $("boundary").textContent = !scopeIds().includes(focus) ? "Outside presentation boundary \xB7 loaded model context" : state.project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 supplied model context only" : "Complete project \xB7 standalone exploration available";
   } finally {
     if (revision === state.revision) state.transitioning = false;
@@ -1901,9 +1996,21 @@ function select(id, node) {
     }));
     return;
   }
-  menu.append(button("Focus", () => explore(id)), button(state.expanded.has(id) ? "Collapse compartment" : "Show statement / compartment", async () => {
-    if (state.expanded.has(id)) state.expanded.delete(id);
-    else state.expanded.add(id);
+  const documentation = documentationFor(state.graph, id);
+  if (documentation.text) menu.append(button("Read full statement", () => {
+    $("information").classList.add("statement");
+    $("information-title").textContent = "Full statement";
+    $("information-text").textContent = (documentation.source?.qualifiedName || label(id)) + "\n\n" + documentation.text;
+    $("information").showModal();
+  }));
+  menu.append(button("Focus", () => explore(id)), button(state.expanded.has(id) || node?.kind === "requirement" && id === state.focus && !state.collapsed.has(id) ? "Collapse compartment" : "Show statement / compartment", async () => {
+    if (state.expanded.has(id) || node?.kind === "requirement" && id === state.focus && !state.collapsed.has(id)) {
+      state.expanded.delete(id);
+      state.collapsed.add(id);
+    } else {
+      state.collapsed.delete(id);
+      state.expanded.add(id);
+    }
     await frame(state.view);
     select(id, node);
   }));
@@ -2006,8 +2113,16 @@ function bind() {
   };
   $("open-view").onclick = async () => {
     try {
-      const view = state.views.get($("views").value);
-      if (!view) return;
+      const revision = ++state.revision, modelHash = state.modelHash, name = $("views").value;
+      let view = state.views.get(name);
+      if (!view) {
+        const raw = await state.engine.call("RenderView", { modelHash, view: name, includeSemanticIdentity: true });
+        if (revision !== state.revision || modelHash !== state.modelHash) return;
+        view = requireNativeIdentity(adaptNativeView(raw, name));
+        if (!["requirement", "definition", "tree", "package", "interconnection", "action", "state"].includes(view.kind)) throw Error("This canvas does not yet render the native " + view.kind + " notation. The complete source remains included.");
+        state.views.set(name, view);
+        state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
+      }
       const target = view.nodes.find((n) => n.semanticId)?.semanticId;
       state.exploring = true;
       $("return").hidden = !state.scenes.length;
@@ -2018,6 +2133,8 @@ function bind() {
     }
   };
   $("context-details").onclick = () => {
+    $("information").classList.remove("statement");
+    $("information-title").textContent = "Context boundaries";
     const omissions = state.displayed?.omissions ?? [];
     $("information-text").textContent = omissions.map((o) => `${["unavailable", "outside-scope", "metamodel-boundary"].includes(o.reason) ? "Unavailable / boundary" : "Hidden by view policy"}: ${o.reason} \xB7 ${label(o.target)} (${o.target})`).join("\n") + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
     $("information").showModal();
@@ -2095,6 +2212,8 @@ function bind() {
   };
   $("load-example").onclick = () => exampleProject().then(loadProject).catch(report);
   $("about").onclick = () => {
+    $("information").classList.remove("statement");
+    $("information-title").textContent = "Engine and project details";
     $("information-text").textContent = JSON.stringify({ engine: state.provenance, project: state.project.manifest, modelHash: state.modelHash, graph: { elements: state.graph.elements.length, relationships: state.graph.relationships.length }, view: state.view.id, lastTransition: state.lastTransition, notice: state.exported.notice }, null, 2);
     $("information").showModal();
   };
@@ -2112,9 +2231,10 @@ function bind() {
 async function start() {
   bind();
   busy(true);
-  state.engine = createSemanticEngine({ assetBase: new URL("./engine/", location.href), workerURL: new URL("./engine/worker.js", location.href) });
+  state.engine = createSemanticEngine({ assetBase: new URL("./engine/", location.href), assetVersion: buildVersion, workerURL: new URL("./engine/worker.js?v=" + buildVersion, location.href) });
   const [project, info] = await Promise.all([exampleProject(), state.engine.ready]);
-  state.provenance = await fetch("./engine/provenance.json").then((r) => r.ok ? r.json() : info);
+  state.engineInfo = info;
+  state.provenance = await fetch("./engine/provenance.json?v=" + buildVersion).then((r) => r.ok ? r.json() : info);
   await loadProject(project);
 }
 start().catch(report);

@@ -3,3 +3,7 @@
 .node.fork .name,.node.join .name,.node.initial .name,.node.final .name{display:none}
 
 .node.container>.kind,.node.container>.name{position:absolute;left:10px;right:10px}.node.container>.kind{top:10px}.node.container>.name{top:30px}
+
+.node .kind{overflow-wrap:anywhere}dialog.statement pre{font:1rem/1.6 system-ui,sans-serif;white-space:pre-wrap}dialog.statement{max-height:90dvh;overflow:auto}
+
+#loading{position:absolute;z-index:15;left:50%;top:40%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));padding:1.3rem;background:#fff;border:1px solid var(--line);border-radius:10px;text-align:center;box-shadow:0 8px 30px #2442}#loading p{margin:.6rem 0 0;overflow-wrap:anywhere}

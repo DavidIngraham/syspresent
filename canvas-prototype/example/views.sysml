@@ -1,17 +1,38 @@
-package CanvasViews {
+package BlueDogCanvasViews {
     private import StandardViewDefinitions::*;
-    view requirements : GeneralView {
+
+    view challengeTraffic : GeneralView {
+        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose Flashlight::controllable;
+        expose GorgeChallenge::trafficCoexistence;
+        expose BlueDogRequirements::trafficSafety;
     }
-    view structure : GeneralView {
-        filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose Flashlight::light;
+    view trafficDerivation : GeneralView {
+        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
+        filter @SysML::RequirementUsage;
+        expose BlueDogRequirements::trafficSafety;
+        expose BlueDogRequirements::trafficTracking;
+        expose BlueDogRequirements::collisionAssessmentCadence;
+        expose BlueDogRequirements::avoidanceCommandDeadline;
+        expose BlueDogRequirements::trafficAwarenessFault;
     }
-    view assembly : InterconnectionView {
-        expose Flashlight::light;
+    view recoveryBasis : GeneralView {
+        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
+        filter @SysML::RequirementUsage;
+        expose BlueDogRequirements::safeRecovery;
+        expose BlueDogRequirements::recoveryPropulsion;
+        expose BlueDogRequirements::recoveryEnergy;
     }
-    view operation : ActionFlowView {
-        expose Flashlight::turnOn;
+    view capsizeQualification : GeneralView {
+        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
+        filter @SysML::RequirementUsage;
+        expose BlueDogRequirements::capsizeControlRecovery;
+        expose BlueDogRequirements::capsizeQualificationRetention;
+    }
+    view capsizeDecision : ActionFlowView {
+        expose BlueDogMissionLogic::CapsizeDisposition;
+    }
+    view supervisorDecision : ActionFlowView {
+        expose BlueDogMissionLogic::SupervisoryCycle;
     }
 }

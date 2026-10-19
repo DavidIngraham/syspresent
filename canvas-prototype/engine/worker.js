@@ -1,13 +1,14 @@
 /* OpenSysML Go runs here: semantic requests never block the canvas thread. */
 let engineReady;
 
-async function initialize({ assetBase }) {
+async function initialize({ assetBase, assetVersion }) {
   if (engineReady) return engineReady;
   engineReady = (async () => {
     const base = new URL(assetBase);
-    importScripts(new URL('wasm_exec.js', base).href);
+    const asset=name=>{const url=new URL(name,base);if(assetVersion)url.searchParams.set('v',assetVersion);return url.href;};
+    importScripts(asset('wasm_exec.js'));
     const go = new Go();
-    const response = await fetch(new URL('sysml-wasm.wasm', base));
+    const response = await fetch(asset('sysml-wasm.wasm'));
     if (!response.ok) throw new Error(`Cannot load semantic engine: HTTP ${response.status}`);
     // ArrayBuffer also works on static hosts that do not serve application/wasm.
     const { instance } = await WebAssembly.instantiate(await response.arrayBuffer(), go.importObject);
