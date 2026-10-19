@@ -4,6 +4,7 @@
  */
 import {ENGINEERING_RELATIONSHIPS} from './core/index.mjs';
 import {graphView} from './graph.mjs';
+import {edgeLayoutHints} from './notation.mjs';
 
 const allowedKinds=new Set(ENGINEERING_RELATIONSHIPS);
 const forbiddenKinds=new Set(['type','typing','specialization','owner','owningMembership','ownedMembership','documentation','membership','succession','transition']);
@@ -106,18 +107,29 @@ const overlap=(a,b,gap=0)=>a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.h
 const center=rect=>({x:rect.x+rect.width/2,y:rect.y+rect.height/2});
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
+/** Reading order is a presentation policy; native relationship direction is unchanged.
+ * Derivation, satisfaction and verification are decisions grounded in their target.
+ */
+export function decisionOrder(edge) {
+ const {rank}=edgeLayoutHints(edge,{viewKind:'general'});
+ if(rank==='target-above-source')return {above:edge.target,below:edge.source};
+ if(rank==='source-above-target')return {above:edge.source,below:edge.target};
+ return null;
+}
+
+
 /** Place decorative context only; active geometry and its camera bounds stay untouched.
  * All inputs use the same coordinate system. Cards fit entirely inside area. When
  * no card fits, its real connection ends at an explicit small boundary marker.
  * Return cards and boundaryMarkers separately: markers are not ordinary model cards.
  */
 export function positionSurrounding(context,activePositionedNodes,area,options={}) {
- const {width=108,height=52,gap=12}=options;
+ const {width=108,height=52,gap=12,obstacles=[]}=options;
  if(![area?.x,area?.y,area?.width,area?.height,width,height,gap].every(Number.isFinite)||area.width<=0||area.height<=0||width<=0||height<=0||gap<0)throw new Error('Invalid surrounding context geometry');
  const active=activePositionedNodes??[],known=new Map(active.map(node=>[node.id,node]));
  const left=area.x,top=area.y,right=left+area.width,bottom=top+area.height;
  const hull=active.length?{x:Math.min(...active.map(n=>n.x)),y:Math.min(...active.map(n=>n.y)),width:Math.max(...active.map(n=>n.x+n.width))-Math.min(...active.map(n=>n.x)),height:Math.max(...active.map(n=>n.y+n.height))-Math.min(...active.map(n=>n.y))}:area;
- const nodes=[],boundaryMarkers=[],omissions=[...context.omissions],occupied=[...active];
+ const nodes=[],boundaryMarkers=[],omissions=[...context.omissions],occupied=[...active,...obstacles];
  const anchorFor=node=>{
   const links=context.view.edges.filter(edge=>edge.source===node.id||edge.target===node.id);
   const anchors=links.map(edge=>known.get(edge.source===node.id?edge.target:edge.source)).filter(Boolean);
@@ -132,12 +144,20 @@ export function positionSurrounding(context,activePositionedNodes,area,options={
    const candidate={x,y,width,height};
    if(x<left||y<top||x+width>right||y+height>bottom)continue;
    if(occupied.some(other=>overlap(candidate,other,gap)))continue;
+   // A faint contextual card still participates in the same decision chain as
+   // the active diagram. Do not place a child above its grounding requirement.
+   const ordered=context.view.edges.filter(edge=>edge.source===node.id||edge.target===node.id).every(edge=>{
+    const order=decisionOrder(edge);if(!order)return true;
+    const other=known.get(edge.source===node.id?edge.target:edge.source);if(!other)return true;
+    return order.above===node.id?candidate.y+candidate.height+gap<=other.y:other.y+other.height+gap<=candidate.y;
+   });
+   if(!ordered)continue;
    candidatePoints.push(candidate);
   }
   // Prefer the outside of the active hull, then the shortest connection. Interior
   // holes may be used if they are the only readable space left on a narrow canvas.
   candidatePoints.sort((a,b)=>Number(overlap(a,hull))-Number(overlap(b,hull))||Math.hypot(center(a).x-anchor.x,center(a).y-anchor.y)-Math.hypot(center(b).x-anchor.x,center(b).y-anchor.y)||a.y-b.y||a.x-b.x);
-  if(candidatePoints.length){const placed={...node,...candidatePoints[0]};nodes.push(placed);occupied.push(placed);continue;}
+  if(candidatePoints.length){const placed={...node,...candidatePoints[0]};nodes.push(placed);occupied.push(placed);known.set(placed.id,placed);continue;}
   const points=[{x:left,y:clamp(anchor.y,top,bottom)},{x:right,y:clamp(anchor.y,top,bottom)},{x:clamp(anchor.x,left,right),y:top},{x:clamp(anchor.x,left,right),y:bottom}];
   points.sort((a,b)=>Math.hypot(a.x-anchor.x,a.y-anchor.y)-Math.hypot(b.x-anchor.x,b.y-anchor.y)||a.y-b.y||a.x-b.x);
   const point=points[index%points.length];

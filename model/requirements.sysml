@@ -88,7 +88,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-032'> responsiveLayout {
-            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. Joint tile placement and connection routing shall reserve unobstructed corridors and measured labels. Connections shall not cross unrelated tiles, container headers or prose. Distinct relationships shall keep distinct terminal attachments and recognizable native notation. Settled connection labels shall avoid cards and other labels; an impossible route or label fit shall be disclosed rather than drawn through an obstacle. During transitions invalid intermediate paths shall not be drawn. */
+            doc /* Markdown context panels shall occupy measured regions of the graph canvas. Diagram layout shall account for their actual occupied display space, labels and viewport dimensions. Panel size and placement may vary between scenes for efficient space use and shall remain steady while the scene is read unless resizing or an explicit action requires adjustment. Joint tile placement and connection routing shall reserve unobstructed corridors and measured labels. Connections shall not cross unrelated tiles, container headers or prose. Distinct relationships shall keep distinct terminal attachments and recognizable native notation. Settled connection labels shall avoid cards and other labels; an impossible route or label fit shall be disclosed rather than drawn through an obstacle. Placement and routing shall minimize unnecessary path length and bends while preserving distinct readable connections. Peripheral continuations shall identify their native relationship and shall not imply a junction between separate links. During transitions invalid intermediate paths or paths detached from their current endpoints shall not be drawn. */
             comment scope /* First release */
         }
         requirement <'SP-033'> explorationHandoff {
@@ -104,7 +104,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-036'> purposefulMotion {
-            doc /* Camera motion shall communicate location or correspondence. Changes between incompatible notations shall not imply false spatial or causal equivalence. Reduced-motion presentation shall preserve the same information. A multi-stage journey shall use continuous motion through intermediate viewpoints without repeated stop-and-restart easing; entering and leaving content shall fade. */
+            doc /* Camera motion shall communicate location or correspondence. Changes between incompatible notations shall not imply false spatial or causal equivalence. Reduced-motion presentation shall preserve the same information. A multi-stage journey shall use continuous motion through intermediate viewpoints without repeated stop-and-restart easing; entering and leaving content shall fade. If an entering or retained tile will occupy a departing tile's region, the departing tile shall move out of the frame while fading before the replacement enters that region. Visible departing motion shall avoid retained tiles and measured prose; when no clear exit exists it shall fade before contact. Replacement movement shall start smoothly after its hold. */
             comment scope /* First release */
         }
         requirement <'SP-037'> accessibleControls {
@@ -174,7 +174,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-055'> generalToSpecific {
-            doc /* General structural views shall place general classifiers above their specializations and typed usages by default. The layout shall preserve native relationship directions and shall not change behavioral ordering. Explicit authored placement may override the default. */
+            doc /* General structural views shall place general classifiers above their specializations and typed usages by default. Requirement views shall read top down from source obligations to derived or refined requirements, with satisfying parts and verifying cases below the requirements they address. This visual ordering shall not assert ownership or alter native arrows. The layout shall preserve native relationship directions and shall not change behavioral ordering. Explicit authored placement may override the default. */
             comment scope /* First release */
         }
     }

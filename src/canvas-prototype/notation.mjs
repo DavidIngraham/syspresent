@@ -56,12 +56,15 @@ export function edgeAppearance(edge, {viewKind = edge.viewKind} = {}) {
  * Placement preferences are separate from semantic endpoint order. A rank may
  * guide placement only; it must never reverse native arrows or action order.
  * Target-above-source implements general-above-specific for derivation,
- * specialization and typing. Other dependencies do not imply a hierarchy.
+ * specialization and typing, and a decision chain with requirements above their
+ * satisfying parts and verification cases. The arrows retain their native
+ * source-to-target direction; vertical reading order is a presentation policy.
+ * Generic dependencies and allocations do not imply an endpoint hierarchy.
  */
 export function edgeLayoutHints(edge, options) {
   const appearance = edgeAppearance(edge, options);
   const caseReference = appearance.family === 'dependency' && edge.kind === 'reference';
-  const rank = ['specialization', 'typing', 'derive'].includes(edge.kind)
+  const rank = ['specialization', 'typing', 'derive', 'refine', 'satisfy', 'verify'].includes(edge.kind)
     ? 'target-above-source'
     : ['composition', 'containment', 'reference'].includes(edge.kind) && !caseReference
       ? 'source-above-target'

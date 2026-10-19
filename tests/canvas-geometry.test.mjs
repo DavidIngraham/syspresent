@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {layoutScene} from '../src/canvas-prototype/core/index.mjs';
-import {graphArea,fitNodes,fitDiagram,routeEdges,routeIsClear} from '../src/canvas-prototype/geometry.mjs';
+import {graphArea,fitNodes,fitDiagram,routeEdges,routeIsClear,routeConnectsEndpoints} from '../src/canvas-prototype/geometry.mjs';
 const overlap=(a,b)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;
 const fixture=()=>({kind:'requirement',nodes:[{id:'traffic',semanticId:'native-traffic',width:280,height:185},...['tracking','assessment','command','fault'].map(id=>({id,semanticId:'native-'+id,width:160,height:76}))],edges:['tracking','assessment','command','fault'].map(id=>({id:'derive-'+id,source:id,target:'traffic',kind:'derive',label:'derive'}))});
 const segmentCrosses=(a,b,n)=>a.x===b.x?a.x>n.x+.01&&a.x<n.x+n.width-.01&&Math.max(a.y,b.y)>n.y+.01&&Math.min(a.y,b.y)<n.y+n.height-.01:a.y===b.y&&a.y>n.y+.01&&a.y<n.y+n.height-.01&&Math.max(a.x,b.x)>n.x+.01&&Math.min(a.x,b.x)<n.x+n.width-.01;
@@ -85,4 +85,11 @@ test('moving routes cannot cross an unrelated tile, a header or a real port owne
  assert.equal(routeIsClear([{x:206,y:136},{x:280,y:136}],edge,nodes),true);
  assert.equal(routeIsClear([{x:194,y:136},{x:150,y:136},{x:150,y:80},{x:300,y:80},{x:300,y:100}],edge,nodes),false);
  assert.equal(routeIsClear([{x:206,y:136},{x:230,y:136},{x:230,y:20},{x:300,y:20},{x:300,y:100}],edge,nodes),false);
+});
+
+test('a route touching stale coordinates cannot impersonate a connection to a held or departing tile',()=>{
+ const nodes=[{id:'a',x:0,y:0,width:100,height:60},{id:'b',x:0,y:200,width:100,height:60}],edge={source:'a',target:'b'};
+ assert.equal(routeConnectsEndpoints([{x:50,y:60},{x:50,y:200}],edge,nodes),true);
+ assert.equal(routeConnectsEndpoints([{x:50,y:100},{x:50,y:180}],edge,nodes),false);
+ const marker={id:'more',x:50,y:90,width:0,height:0};assert.equal(routeConnectsEndpoints([{x:50,y:60},{x:50,y:90}],{source:'a',target:'more'},[...nodes,marker]),true);
 });

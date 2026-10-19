@@ -59,10 +59,10 @@ test('unknown notation is disclosed and labels cannot invent direction or relati
 });
 
 test('ranking follows engineering structure without reversing native endpoints or behavior order', () => {
-  for (const kind of ['derive', 'specialization', 'typing']) assert.equal(edgeLayoutHints({kind}).rank, 'target-above-source');
+  for (const kind of ['derive', 'specialization', 'typing', 'refine', 'satisfy', 'verify']) assert.equal(edgeLayoutHints({kind}).rank, 'target-above-source');
   for (const kind of ['composition', 'containment', 'reference']) assert.equal(edgeLayoutHints({kind}).rank, 'source-above-target');
   for (const kind of ['transition', 'succession', 'flow']) assert.equal(edgeLayoutHints({kind}).rank, 'source-before-target');
-  for (const kind of ['connection', 'binding', 'association', 'dependency', 'satisfy', 'verify', 'allocate']) assert.equal(edgeLayoutHints({kind}).rank, 'free');
+  for (const kind of ['connection', 'binding', 'association', 'dependency', 'allocate']) assert.equal(edgeLayoutHints({kind}).rank, 'free');
   assert.equal(edgeLayoutHints({kind: 'reference'}, {viewKind: 'case'}).rank, 'free');
   assert.equal(edgeLayoutHints({kind: 'derive'}).preserveEndpoints, true);
 });

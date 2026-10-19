@@ -50,3 +50,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #selection details{border-top:1px solid #dce5e2;margin-top:.5rem;padding-top:.3rem}
 #selection .projection-note{font-size:.73rem;color:#526e70}
 #presentation-emphasis{min-height:120px}
+
+.continuation-glyph{display:block;transform-origin:center;font:700 20px/1 system-ui}
+#connections g.traced,.node.trace-endpoint{opacity:1!important}

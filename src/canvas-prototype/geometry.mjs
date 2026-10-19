@@ -23,7 +23,7 @@ const simplify=points=>points.filter((p,i)=>!i||p.x!==points[i-1].x||p.y!==point
 function segmentBlocked(a,b,obstacles){return obstacles.some(n=>a.x===b.x?a.x>n.x&&a.x<n.x+n.width&&Math.max(a.y,b.y)>n.y&&Math.min(a.y,b.y)<n.y+n.height:a.y>n.y&&a.y<n.y+n.height&&Math.max(a.x,b.x)>n.x&&Math.min(a.x,b.x)<n.x+n.width);}
 /** Rectilinear visibility grid. Obstacles include endpoint cards, so a wrapped
  * edge cannot run back through its source, target or an intervening peer. */
-function orthogonal(start,end,obstacles){
+export function routeOrthogonal(start,end,obstacles,{bendPenalty=14,segmentCost=()=>0}={}){
  const xs=[...new Set([start.x,end.x,...obstacles.flatMap(n=>[n.x,n.x+n.width])])].sort((a,b)=>a-b);
  const ys=[...new Set([start.y,end.y,...obstacles.flatMap(n=>[n.y,n.y+n.height])])].sort((a,b)=>a-b);
  const points=[],byXY=new Map();
@@ -35,7 +35,7 @@ function orthogonal(start,end,obstacles){
   for(const group of groups.values()){group.sort((a,b)=>points[a][axis==='x'?'y':'x']-points[b][axis==='x'?'y':'x']);for(let j=1;j<group.length;j++){const a=group[j-1],b=group[j];if(!segmentBlocked(points[a],points[b],obstacles)){const length=Math.abs(points[a].x-points[b].x)+Math.abs(points[a].y-points[b].y);links[a].push([b,length,axis]);links[b].push([a,length,axis]);}}}
  }
  const queue=[{id:first,cost:0,axis:'',path:[first]}],best=new Map();
- while(queue.length){queue.sort((a,b)=>a.cost-b.cost);const current=queue.shift(),key=current.id+current.axis;if(best.has(key)&&best.get(key)<current.cost)continue;if(current.id===last)return current.path.map(i=>points[i]);for(const [id,length,axis]of links[current.id]){const cost=current.cost+length+(current.axis&&current.axis!==axis?14:0),key=id+axis;if(best.has(key)&&best.get(key)<=cost)continue;best.set(key,cost);queue.push({id,cost,axis,path:[...current.path,id]});}}
+ while(queue.length){queue.sort((a,b)=>a.cost-b.cost);const current=queue.shift(),key=current.id+current.axis;if(best.has(key)&&best.get(key)<current.cost)continue;if(current.id===last)return current.path.map(i=>points[i]);for(const [id,length,axis]of links[current.id]){const cost=current.cost+length+(current.axis&&current.axis!==axis?bendPenalty:0)+Math.max(0,Number(segmentCost(points[current.id],points[id]))||0),key=id+axis;if(best.has(key)&&best.get(key)<=cost)continue;best.set(key,cost);queue.push({id,cost,axis,path:[...current.path,id]});}}
  return null;
 }
 function endpoints(a,b,sourceFraction=.5,targetFraction=.5){
@@ -55,12 +55,12 @@ function route(a,b,nodes,options={}){
  const [start,end,direction,targetDirection]=endpoints(a,b,options.sourceFraction,options.targetFraction),clearance=options.clearance??8;
  let stub={x:start.x+direction.x*clearance,y:start.y+direction.y*clearance},finish={x:end.x+targetDirection.x*clearance,y:end.y+targetDirection.y*clearance};
  const obstacles=connectionObstacles({source:a.id,target:b.id},nodes).map(n=>({x:n.x-4,y:n.y-4,width:n.width+8,height:n.height+8}));
- let middle=orthogonal(stub,finish,obstacles);
+ let middle=routeOrthogonal(stub,finish,obstacles);
  // Scaled peer gaps can be narrower than a normal eight-pixel port stub.
  // Keep the stub outside its own four-pixel obstacle without overshooting
  // into a neighboring card. Zero-size boundary markers remain free points.
  if(!middle&&clearance>4.1){
-  stub={x:start.x+direction.x*4.1,y:start.y+direction.y*4.1};finish={x:end.x+targetDirection.x*4.1,y:end.y+targetDirection.y*4.1};middle=orthogonal(stub,finish,obstacles);
+  stub={x:start.x+direction.x*4.1,y:start.y+direction.y*4.1};finish={x:end.x+targetDirection.x*4.1,y:end.y+targetDirection.y*4.1};middle=routeOrthogonal(stub,finish,obstacles);
  }
  // A malformed native containment drawing may not expose a free port. Retain
  // the actual directed endpoints and disclose the routing limitation.
@@ -150,4 +150,17 @@ export function routeIsClear(points,edge,nodes,{orthogonalOnly=false}={}){
   if(obstacles.some(n=>lineCrossesRect(a,b,{x:n.x+.05,y:n.y+.05,width:Math.max(0,n.width-.1),height:Math.max(0,n.height-.1)})))return false;
  }
  return true;
+}
+
+/** Each visible route must touch its own current endpoint glyphs, never a stale
+ * sampled position or an unrelated nearby tile. Zero-size continuations are points. */
+export function routeConnectsEndpoints(points,edge,nodes,tolerance=.7){
+ const byID=new Map(nodes.map(n=>[n.id,n]));
+ const touches=(point,node)=>{
+  if(!point||!node)return false;
+  if(!node.width&&!node.height)return Math.hypot(point.x-node.x,point.y-node.y)<=tolerance;
+  const insideX=point.x>=node.x-tolerance&&point.x<=node.x+node.width+tolerance,insideY=point.y>=node.y-tolerance&&point.y<=node.y+node.height+tolerance;
+  return insideX&&insideY&&(Math.abs(point.x-node.x)<=tolerance||Math.abs(point.x-node.x-node.width)<=tolerance||Math.abs(point.y-node.y)<=tolerance||Math.abs(point.y-node.y-node.height)<=tolerance);
+ };
+ return points.length>=2&&touches(points[0],byID.get(edge.source))&&touches(points.at(-1),byID.get(edge.target));
 }

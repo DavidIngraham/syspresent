@@ -78,8 +78,8 @@ test('viewport changes during a journey rebuild and settle the intended destinat
  await until(()=>d.getElementById('stage').dataset.motionProgress===undefined&&d.getElementById('scenes').value==='1');
  assert.equal(d.querySelector('.node[data-context="false"]').dataset.semanticId,'orphan');assert.equal(d.getElementById('connections').getAttribute('viewBox'),'0 0 390 650');h.window.close();
 });
-test('space-limited peripheral context has visible boundary markers and retains its directed native link',async()=>{
- const h=await harness({contextNeighbor:true,size:{width:120,height:140}}),d=h.document;
+test('space-limited peripheral context uses a short labeled continuation with its directed native link',async()=>{
+ const h=await harness({contextNeighbor:true,size:{width:180,height:240}}),d=h.document;
  const marker=d.querySelector('.context-boundary');assert.ok(marker,d.getElementById('nodes').outerHTML+' STATUS '+d.getElementById('status').textContent);assert.equal(marker.hidden,false);assert.equal(marker.getAttribute('aria-hidden'),'false');
  const edge=d.querySelector('#connections g[data-context="true"]');assert.equal(edge.dataset.source,'req');assert.equal(edge.dataset.target,'orphan');assert.ok(Number(edge.style.opacity)>0&&Number(edge.style.opacity)<1);const coordinates=[...edge.querySelector('.edge-line:not(.edge-outgoing)').getAttribute('d').matchAll(/[ML]([\d.-]+),([\d.-]+)/g)].map(m=>({x:Number(m[1]),y:Number(m[2])}));assert.ok(coordinates.length>=2,'context path must remain visible');for(let i=1;i<coordinates.length;i++)assert.ok(coordinates[i].x===coordinates[i-1].x||coordinates[i].y===coordinates[i-1].y,'settled context routes retain exact orthogonal bends');h.window.close();
 });
@@ -137,4 +137,23 @@ test('history restores the matching context disclosure instead of leaving a late
 
 test('viewport changes during verification preserve the matching verification disclosure',async()=>{
  const h=await harness({traceFixture:true,reducedMotion:false}),d=h.document;d.querySelector('[data-semantic-id="req"]').click();action(d,'Verification (1)').click();await until(()=>d.getElementById('stage').dataset.motionProgress!==undefined);h.resize(390,650);await new Promise(r=>setTimeout(r,130));d.getElementById('reduce').click();await until(()=>d.getElementById('stage').dataset.motionProgress===undefined&&activeIDs(d).join(',')==='case,req'&&d.getElementById('status').textContent.includes('not executed'));h.window.close();
+});
+
+test('an impossible peripheral continuation is disclosed instead of drawing a misleading wire',async()=>{
+ const h=await harness({contextNeighbor:true,size:{width:120,height:140}}),d=h.document;assert.equal(d.querySelector('.context-boundary'),null);assert.equal(d.querySelector('#connections g[data-context="true"]'),null);assert.equal(d.getElementById('context-details').hidden,false);d.getElementById('context-details').click();assert.ok(d.getElementById('information-text').textContent.includes('context-continuation-space'));h.window.close();
+});
+
+
+test('faded transition connections cannot retain invisible pointer or keyboard targets',async()=>{
+ const h=await harness({reducedMotion:false,secondScene:true}),d=h.document;d.getElementById('next').click();
+ await until(()=>d.getElementById('stage').dataset.motionProgress!==undefined);
+ let hidden=0;
+ for(let i=0;i<180;i++){
+  for(const edge of d.querySelectorAll('#connections g[data-relationship]'))if(Number(edge.style.opacity)<.05){
+   hidden++;assert.equal(edge.style.pointerEvents,'none');assert.equal(edge.getAttribute('aria-hidden'),'true');assert.equal(edge.getAttribute('tabindex'),'-1');
+  }
+  if(d.getElementById('stage').dataset.motionProgress===undefined)break;
+  await new Promise(resolve=>setTimeout(resolve,10));
+ }
+ assert.ok(hidden>0,'exercise an actually faded connection during the journey');h.window.close();
 });
