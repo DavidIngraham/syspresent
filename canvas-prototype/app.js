@@ -333,50 +333,65 @@ function exitPosition(node, width, height, obstacles) {
   }
   return candidates2.sort((a, b) => a.obstructions - b.obstructions || a.distance - b.distance)[0];
 }
-function planDepartures(frames, { width, height, panels = [], clearAt = 0.28, arriveAfter = 0.31, contextAfter = 0.78 } = {}) {
+function planDepartures(frames, { width, height, panels = [], offsets, clearAt = 0.28, arriveAfter = 0.31, contextAfter = 0.78 } = {}) {
   if (!Array.isArray(frames) || !frames.length) throw new TypeError("Departure planning requires frames");
   const first = frames[0], last = frames.at(-1);
   width = width ?? last.width ?? first.width;
   height = height ?? last.height ?? first.height;
   if (!(width > 0 && height > 0)) throw new RangeError("Departure planning requires a positive viewport");
   if (!(clearAt > 0 && clearAt < arriveAfter && arriveAfter < contextAfter && contextAfter < 1)) throw new RangeError("Departure phases must be ordered within the journey");
-  const finalByKey = new Map(last.nodes.map((node) => [node.key, node]));
-  const arrivals = /* @__PURE__ */ new Set(), departures = [];
-  for (const node of first.nodes) {
-    const final = finalByKey.get(node.key);
-    if (!active(node) || active(final)) continue;
-    const replacements = last.nodes.filter((next) => active(next) && identity(next) !== identity(node) && overlaps(node, next, 4));
-    if (!replacements.length) continue;
-    const exit = exitPosition(node, width, height, [...panels, ...nativeObstacles(node, first.nodes)]);
-    departures.push({ key: node.key, semanticId: identity(node), from: rectangle(node), exit: { x: exit.x, y: exit.y }, side: exit.side, fadeUntil: exit.fadeUntil, clearAt, arriveAfter, replacements: replacements.map((next) => next.key) });
-    for (const next of replacements) arrivals.add(next.key);
+  offsets = offsets ?? frames.map((_, index) => index / (frames.length - 1 || 1));
+  if (offsets.length !== frames.length || offsets[0] !== 0 || frames.length > 1 && offsets.at(-1) !== 1 || offsets.some((value, index) => !Number.isFinite(value) || index > 0 && value <= offsets[index - 1])) throw new RangeError("Departure offsets must match frames and increase from zero to one");
+  const departures = [], arrivals = /* @__PURE__ */ new Set(), contextReturns = /* @__PURE__ */ new Set(), intervals = [];
+  for (let interval = 0; interval < frames.length - 1; interval++) {
+    const startFrame = frames[interval], endFrame = frames[interval + 1], finalByKey = new Map(endFrame.nodes.map((node) => [node.key, node]));
+    const localDepartures = [], localArrivals = /* @__PURE__ */ new Set();
+    for (const node of startFrame.nodes) {
+      const final = finalByKey.get(node.key);
+      if (!active(node) || active(final)) continue;
+      const replacements = endFrame.nodes.filter((next) => active(next) && identity(next) !== identity(node) && overlaps(node, next, 4));
+      if (!replacements.length) continue;
+      const occupiedPanels = [...panels, ...startFrame.panels ?? [], ...endFrame.panels ?? []];
+      const exit = exitPosition(node, width, height, [...occupiedPanels, ...nativeObstacles(node, startFrame.nodes)]);
+      localDepartures.push({ key: node.key, semanticId: identity(node), from: rectangle(node), exit: { x: exit.x, y: exit.y }, side: exit.side, fadeUntil: exit.fadeUntil, clearAt, arriveAfter, replacements: replacements.map((next) => next.key), interval, startAt: offsets[interval], endAt: offsets[interval + 1] });
+      for (const next of replacements) {
+        localArrivals.add(next.key);
+        arrivals.add(next.key);
+      }
+    }
+    const identities = new Set(localDepartures.map((item) => item.semanticId));
+    const localReturns = new Set(endFrame.nodes.filter((node) => !active(node) && visible(node) && identities.has(identity(node))).map((node) => node.key));
+    for (const key of localReturns) contextReturns.add(key);
+    departures.push(...localDepartures);
+    intervals.push({ startAt: offsets[interval], endAt: offsets[interval + 1], byKey: new Map(localDepartures.map((item) => [item.key, item])), arrivals: localArrivals, contextReturns: localReturns });
   }
-  const byKey = new Map(departures.map((item) => [item.key, item]));
-  const departingIdentities = new Set(departures.map((item) => item.semanticId));
-  const contextReturns = new Map(last.nodes.filter((node) => !active(node) && visible(node) && departingIdentities.has(identity(node))).map((node) => [node.key, node]));
   function sampleNode(key, progress, sampleAt) {
     if (progress <= 0) return sampleAt(0);
     if (progress >= 1) return sampleAt(1);
-    const departure = byKey.get(key);
+    if (offsets.some((offset) => Math.abs(progress - offset) < 1e-12)) return sampleAt(progress);
+    const interval = intervals.find((item) => progress > item.startAt && progress < item.endAt);
+    if (!interval) return sampleAt(progress);
+    const span = interval.endAt - interval.startAt, local = (progress - interval.startAt) / span;
+    const departure = interval.byKey.get(key);
     if (departure) {
-      const base = sampleAt(progress), start2 = sampleAt(0), finish = sampleAt(1);
-      if (progress <= clearAt) {
-        const t = smooth(progress / clearAt);
+      const base = sampleAt(progress), start2 = sampleAt(interval.startAt), finish = sampleAt(interval.endAt);
+      if (local <= clearAt) {
+        const t = smooth(local / clearAt);
         return { ...base, ...rectangle(start2), scale: start2.scale, x: start2.x + (departure.exit.x - start2.x) * t, y: start2.y + (departure.exit.y - start2.y) * t, opacity: (start2.opacity ?? 1) * (1 - smooth(departure.fadeUntil > 0 ? t / departure.fadeUntil : 1)) };
       }
-      return { ...base, ...rectangle(finish), scale: finish.scale, opacity: (finish.opacity ?? 0) * smooth((progress - contextAfter) / (1 - contextAfter)) };
+      return { ...base, ...rectangle(finish), scale: finish.scale, opacity: (finish.opacity ?? 0) * smooth((local - contextAfter) / (1 - contextAfter)) };
     }
-    if (contextReturns.has(key)) {
-      const finish = sampleAt(1);
-      return { ...finish, opacity: (finish.opacity ?? 0) * smooth((progress - contextAfter) / (1 - contextAfter)) };
+    if (interval.contextReturns.has(key)) {
+      const finish = sampleAt(interval.endAt);
+      return { ...finish, opacity: (finish.opacity ?? 0) * smooth((local - contextAfter) / (1 - contextAfter)) };
     }
-    if (arrivals.has(key)) {
-      const start2 = sampleAt(0), t = clamp((progress - arriveAfter) / (1 - arriveAfter));
-      return { ...sampleAt(smooth(t)), ...progress <= arriveAfter ? start2 : {} };
+    if (interval.arrivals.has(key)) {
+      const start2 = sampleAt(interval.startAt), t = clamp((local - arriveAfter) / (1 - arriveAfter));
+      return { ...sampleAt(interval.startAt + smooth(t) * span), ...local <= arriveAfter ? start2 : {} };
     }
     return sampleAt(progress);
   }
-  return { departures, arrivals: [...arrivals], contextReturns: [...contextReturns.keys()], sampleNode };
+  return { departures, arrivals: [...arrivals], contextReturns: [...contextReturns], sampleNode };
 }
 
 // src/canvas-prototype/core/index.mjs
@@ -494,6 +509,110 @@ function findEngineeringRoute(graph, options = {}) {
   }
   return copy({ found: false, elements: [], relationships: [], omissions });
 }
+var UPWARD_KINDS = /* @__PURE__ */ new Set(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification"]);
+var DOWNWARD_KINDS = /* @__PURE__ */ new Set(["composition", "containment"]);
+function hierarchyPolicy(graph, options, includeOwnership) {
+  const policy = graphPolicy(graph, options), omissions = [], seen = /* @__PURE__ */ new Set(), upward = /* @__PURE__ */ new Map();
+  const omit = (edge, target, reason) => {
+    const key = JSON.stringify([edge?.id, target, reason]);
+    if (!seen.has(key)) {
+      seen.add(key);
+      omissions.push({ relationshipId: edge?.id ?? null, target, reason });
+    }
+  };
+  const allowed = (id) => {
+    const reason = policy.allowedElement(id);
+    if (reason) return reason;
+    const element2 = policy.elements.get(id);
+    if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
+    return element2.layer === "library" ? "library-boundary" : null;
+  };
+  const ownershipIds = new Set((graph.containment ?? []).map((edge) => edge.id));
+  const links = [...policy.edges, ...includeOwnership ? (graph.containment ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") })) : []];
+  for (const edge of links) {
+    const ownership = includeOwnership && ownershipIds.has(edge.id) && ["owner", "ownership", "containment"].includes(edge.kind);
+    if (!ownership && !UPWARD_KINDS.has(edge.kind) && !DOWNWARD_KINDS.has(edge.kind)) continue;
+    if (!ownership && !policy.kinds.has(edge.kind)) continue;
+    const [child, parent] = DOWNWARD_KINDS.has(edge.kind) ? [edge.target, edge.source] : [edge.source, edge.target];
+    if (!upward.has(child)) upward.set(child, []);
+    upward.get(child).push({ parent, edge, ownership });
+  }
+  for (const links2 of upward.values()) links2.sort((a, b) => a.parent.localeCompare(b.parent) || String(a.edge.id).localeCompare(String(b.edge.id)));
+  return { ...policy, allowed, upward, omissions, omit };
+}
+function findHierarchyRoute(graph, options = {}) {
+  const { from, to, maxHops = 12 } = options;
+  if (!Number.isInteger(maxHops) || maxHops < 0) throw Error("Invalid route hop limit");
+  function search(includeOwnership) {
+    const policy = hierarchyPolicy(graph, options, includeOwnership);
+    for (const id of [from, to]) {
+      const reason = policy.allowed(id);
+      if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
+    }
+    function ancestors(root) {
+      const found = /* @__PURE__ */ new Map([[root, { ids: [root], edges: [], ownership: false }]]), queue = [root];
+      for (let cursor = 0; cursor < queue.length; cursor++) {
+        const current = queue[cursor], path = found.get(current);
+        for (const { parent, edge, ownership } of policy.upward.get(current) ?? []) {
+          const reason = policy.allowed(parent);
+          if (reason) {
+            policy.omit(edge, parent, reason);
+            continue;
+          }
+          if (found.has(parent)) continue;
+          if (path.edges.length >= maxHops) {
+            policy.omit(edge, parent, "hop-limit");
+            continue;
+          }
+          found.set(parent, { ids: [...path.ids, parent], edges: [...path.edges, edge], ownership: path.ownership || ownership });
+          queue.push(parent);
+        }
+      }
+      return found;
+    }
+    const left = ancestors(from), right = ancestors(to), common = [...left.keys()].filter((id) => right.has(id));
+    const bounded = common.filter((id) => left.get(id).edges.length + right.get(id).edges.length <= maxHops);
+    bounded.sort((a, b) => {
+      const lengths = (id) => [left.get(id).edges.length, right.get(id).edges.length];
+      const [al, ar] = lengths(a), [bl, br] = lengths(b);
+      return al + ar - bl - br || Math.max(al, ar) - Math.max(bl, br) || a.localeCompare(b);
+    });
+    if (!bounded.length) {
+      if (common.length) policy.omit(null, to, "hop-limit");
+      policy.omit(null, to, "no-common-ancestor");
+      return { found: false, elements: [], relationships: [], omissions: policy.omissions };
+    }
+    const ancestor = bounded[0], ascent = left.get(ancestor), descent = right.get(ancestor), ids = [...ascent.ids, ...descent.ids.slice(0, -1).reverse()];
+    return copy({
+      found: true,
+      strategy: ascent.ownership || descent.ownership ? "ownership-ancestor" : "common-ancestor",
+      commonAncestor: ancestor,
+      ascentIds: ascent.ids,
+      descentIds: [...descent.ids].reverse(),
+      elements: ids.map((id) => policy.elements.get(id)),
+      relationships: [...ascent.edges, ...[...descent.edges].reverse()],
+      omissions: policy.omissions
+    });
+  }
+  const engineering = search(false);
+  return engineering.found || !(graph.containment ?? []).length ? engineering : search(true);
+}
+function findExplicitRoute(graph, ids, options = {}) {
+  const policy = graphPolicy(graph, options), relationships = [], elements = [], omissions = [];
+  if (!Array.isArray(ids) || !ids.length) return { found: false, elements: [], relationships: [], omissions: [{ reason: "empty-route" }] };
+  const ownership = new Set((graph.containment ?? []).map((edge) => edge.id));
+  const edges = [...policy.edges, ...(graph.containment ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") }))];
+  for (const [index, id] of ids.entries()) {
+    const reason = policy.allowedElement(id);
+    if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
+    elements.push(policy.elements.get(id));
+    if (!index) continue;
+    const previous = ids[index - 1], edge = edges.find((edge2) => (policy.kinds.has(edge2.kind) || ownership.has(edge2.id)) && (edge2.source === previous && edge2.target === id || edge2.target === previous && edge2.source === id));
+    if (!edge) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason: "missing-explicit-link" }] };
+    relationships.push(edge);
+  }
+  return copy({ found: true, strategy: "explicit", elements, relationships, omissions });
+}
 function directTypingContext(graph, id) {
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
   const relationships = nativeEdges(graph).filter((edge) => ["type", "typing"].includes(edge.kind) && (edge.source === id || edge.target === id));
@@ -520,16 +639,27 @@ function planTransition(fromScene, toScene, options = {}) {
   const previous = fromScene.view ?? fromScene, next = toScene.view ?? toScene;
   const oldIds = semanticIds(previous), newIds = semanticIds(next), duration = options.reducedMotion ? 0 : 360;
   const correspondence = oldIds.filter((id) => newIds.includes(id)).map((semanticId) => ({ semanticId, fromRepresentationIds: previous.nodes.filter((node) => node.semanticId === semanticId).map((node) => node.id), toRepresentationIds: next.nodes.filter((node) => node.semanticId === semanticId).map((node) => node.id) }));
-  if (previous.kind === next.kind) return { mode: "same-kind", correspondence, stages: [{ kind: "reflow", viewKind: next.kind, semanticIds: newIds, duration }] };
-  const route2 = options.graph && fromScene.focus && toScene.focus ? findEngineeringRoute(options.graph, { ...options, from: fromScene.focus, to: toScene.focus }) : null;
-  const journey = route2?.found ? route2.elements.map((element2) => element2.id) : [];
-  const all = [.../* @__PURE__ */ new Set([...oldIds, ...journey, ...newIds])];
-  return { mode: "cross-kind", correspondence, route: route2, stages: [
-    { kind: "gv-bridge", viewKind: "gv", semanticIds: oldIds, duration },
-    { kind: "gv-journey", viewKind: "gv", semanticIds: all, route: route2?.found ? route2.relationships : [], disconnected: route2?.found === false, duration },
-    { kind: "gv-gather", viewKind: "gv", semanticIds: newIds, duration },
-    { kind: "morph", viewKind: next.kind, semanticIds: newIds, duration }
-  ] };
+  if (previous.kind === next.kind && correspondence.length && !options.journey?.length) return { mode: "same-kind", journeyRequired: false, correspondence, stages: [{ kind: "reflow", viewKind: next.kind, semanticIds: newIds, focusId: toScene.focus, duration }] };
+  const route2 = options.graph && fromScene.focus && toScene.focus ? options.journey?.length ? options.journey[0] === fromScene.focus && options.journey.at(-1) === toScene.focus ? findExplicitRoute(options.graph, options.journey, options) : { found: false, elements: [], relationships: [], omissions: [{ reason: "explicit-route-endpoints" }] } : findHierarchyRoute(options.graph, { ...options, from: fromScene.focus, to: toScene.focus }) : { found: false, elements: [], relationships: [], omissions: [{ reason: "missing-route-context" }] };
+  const journey = route2.found ? route2.elements.map((element2) => element2.id) : [], stages = [{ kind: "gv-bridge", viewKind: "gv", semanticIds: oldIds, focusId: fromScene.focus, duration }];
+  if (route2.found) {
+    if (journey.length === 1) stages.push({ kind: "gv-journey", viewKind: "gv", semanticIds: journey, focusId: journey[0], route: [], routeIndex: 0, duration });
+    else for (let index = 1; index < journey.length; index++) {
+      const start2 = Math.max(0, index - 1), end = Math.min(journey.length, index + 2);
+      stages.push({
+        kind: "gv-journey",
+        viewKind: "gv",
+        semanticIds: journey.slice(start2, end),
+        focusId: journey[index],
+        route: route2.relationships.slice(start2, end - 1),
+        routeIndex: index,
+        phase: route2.commonAncestor ? index <= journey.indexOf(route2.commonAncestor) ? "ascent" : "descent" : "explicit",
+        duration
+      });
+    }
+  } else stages.push({ kind: "gv-journey", viewKind: "gv", semanticIds: [], focusId: toScene.focus, route: [], disconnected: true, duration });
+  stages.push({ kind: "gv-gather", viewKind: "gv", semanticIds: newIds, focusId: toScene.focus, duration }, { kind: "morph", viewKind: next.kind, semanticIds: newIds, focusId: toScene.focus, duration });
+  return { mode: previous.kind === next.kind ? "same-kind-journey" : "cross-kind", journeyRequired: true, correspondence, route: route2, stages };
 }
 
 // src/canvas-prototype/exploration.mjs
@@ -813,13 +943,17 @@ function adaptNativeView(raw, name) {
 }
 function modelGraph(raw, views = []) {
   const elements = raw.map((e) => ({ id: e["@id"], kind: e["@type"], name: e.declaredName || e.qualifiedName || e["@id"], qualifiedName: e.qualifiedName, description: e.body || "", native: e, layer: e["sysx:sourceLine"] ? "project" : "library" }));
-  const index = new Map(elements.map((e) => [e.id, e])), relationships = [];
+  const index = new Map(elements.map((e) => [e.id, e])), relationships = [], containment = [];
+  const declaration = (e) => e?.layer === "project" && /^(Package|Namespace|(?:Part|Item|Action|State|Requirement|UseCase|VerificationCase|AnalysisCase|Case|Concern|Constraint|Calculation|Port|Attribute|Interface|Connection|Occurrence|Enumeration)(?:Usage|Definition))$/.test(e.kind);
   const add = (source, target, kind, id, nativeRelationship) => {
     if (!source || !target) return;
     relationships.push({ id, source, target, kind, label: kind, authority: "native-api", nativeRelationship });
   };
   for (const item of raw) {
     const id = item["@id"];
+    if (declaration(index.get(id))) {
+      for (const owner of refs(item.owner)) if (declaration(index.get(owner))) containment.push({ id: `owner:${owner}:${id}`, source: owner, target: id, kind: "containment", label: "owns", authority: "native-api", nativeRelationship: refs(item.owningMembership)[0] ?? refs(item.owningRelationship)[0] ?? null, nativeRole: "owner", navigationOnly: true });
+    }
     if (item["@type"] === "Dependency") for (const client of refs(item.client)) for (const supplier of refs(item.supplier)) add(client, supplier, "dependency", "api:" + id + ":" + client + ":" + supplier, id);
     if (["PartUsage", "PartDefinition"].includes(item["@type"])) {
       for (const child of refs(item.ownedMember)) if (index.get(child)?.kind === "PartUsage") add(id, child, "composition", `part:${id}:${child}`);
@@ -838,7 +972,7 @@ function modelGraph(raw, views = []) {
     }
   }
   const seen = /* @__PURE__ */ new Set();
-  return { elements, relationships: relationships.filter((e) => {
+  return { elements, containment, relationships: relationships.filter((e) => {
     const key = JSON.stringify([e.source, e.target, e.kind]);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -1743,11 +1877,18 @@ async function layoutDiagram(nativeView, options = {}) {
       const data = makeGraph(view, options, profile), laid = await elk.layout(data.graph), candidate = readLayout(view, data, laid, options, profile);
       scoreLayout(candidate, area);
       candidates2.push(candidate);
-      const anchorSides = !behavioral && profile.capacity ? facingSides(candidate) : null;
-      if (anchorSides?.size) {
+      let previous = candidate;
+      const seen = /* @__PURE__ */ new Set();
+      for (let retry = 0; !behavioral && profile.capacity && retry < 3; retry++) {
+        const anchorSides = facingSides(previous);
+        if (!anchorSides.size) break;
+        const key = JSON.stringify([...anchorSides]);
+        if (seen.has(key)) break;
+        seen.add(key);
         const alternate = { ...profile, anchorSides }, joint = makeGraph(view, options, alternate), result = readLayout(view, joint, await elk.layout(joint.graph), options, alternate);
         scoreLayout(result, area);
         candidates2.push(result);
+        previous = result;
       }
     } catch (error) {
       candidates2.push({ ...view, nodes: [], edges: view.edges.map((e) => ({ ...e, points: [], routingBlocked: true })), ports: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered", layoutScore: 1e9, diagnostics: [{ reason: "layout-failed", message: error.message }] });
@@ -1758,17 +1899,17 @@ async function layoutDiagram(nativeView, options = {}) {
   return candidates2[0];
 }
 function requirementFanout(view) {
-  if (view.kind !== "requirement" || view.nodes.some((n) => n.parentId) || view.edges.length !== view.nodes.length - 1) return false;
+  if (!["requirement", "definition", "general"].includes(view.kind) || view.nodes.some((n) => n.parentId) || view.edges.length !== view.nodes.length - 1) return false;
   const oriented = view.edges.map((edge) => edgeLayoutHints(edge, { viewKind: view.kind }).rank === "target-above-source" ? orientation(edge, false, view.kind) : null);
   return oriented.every(Boolean) && oriented.every(([source]) => source === oriented[0][0]) && new Set(oriented.map(([, target]) => target)).size === view.nodes.length - 1;
 }
 function facingSides(view) {
-  const nodes = new Map(view.nodes.map((n) => [n.id, n])), sides = /* @__PURE__ */ new Map(), rows = [...new Set(view.nodes.filter((n) => !n.parentId).map((n) => n.y))].sort((a, b) => a - b);
+  const nodes = new Map(view.nodes.map((n) => [n.id, n])), sides = /* @__PURE__ */ new Map();
   for (const edge of view.edges) {
     if (edgeLayoutHints(edge, { viewKind: view.kind }).rank === "free") continue;
     const [from, to] = orientation(edge, false, view.kind), a = nodes.get(from), b = nodes.get(to);
     if (!a || !b || a.parentId || b.parentId || a.kind === "port" || b.kind === "port") continue;
-    if (rows.indexOf(b.y) - rows.indexOf(a.y) < 2) continue;
+    if (!view.nodes.some((n) => n !== a && n !== b && !n.parentId && n.y >= a.y + a.height - 0.01 && n.y + n.height <= b.y + 0.01)) continue;
     const side = b.x + b.width / 2 < a.x + a.width / 2 ? "WEST" : "EAST";
     sides.set(edge.id, [side, side]);
   }
@@ -1802,7 +1943,7 @@ function scoreLayout(candidate, area) {
   candidate.layoutFitScale = scale;
   const extent = candidate.nodes.reduce((sum, n) => sum + n.width + n.height, 0);
   candidate.layoutMetrics = { pathLength: length, bends, pathStretch: stretch, crossings };
-  candidate.layoutScore = candidate.diagnostics.length * 1e4 + 3 / Math.max(0.01, scale) + length / Math.max(1, extent) * 0.45 + stretch * 0.3 + bends * 0.035 + crossings * 0.12 + candidate.bounds.width * candidate.bounds.height / 1e8;
+  candidate.layoutScore = candidate.diagnostics.length * 1e4 + 3 / Math.max(0.01, scale) + length / Math.max(1, extent) * 0.45 + stretch * 0.3 + bends * 0.05 + crossings * 0.6 + candidate.bounds.width * candidate.bounds.height / 1e8;
 }
 function optimizeRoutes(edges, nodes) {
   const inflated = (n, padding) => ({ x: n.x - padding, y: n.y - padding, width: n.width + padding * 2, height: n.height + padding * 2 });
@@ -1847,7 +1988,8 @@ function relocateLabels(edges, nodes, allEdges = edges) {
     const box = edge.labelBox;
     if (!box) continue;
     const crossed = edge.points.slice(1).some((p, i) => segmentHits(edge.points[i], p, box));
-    if (!crossed && distance(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
+    const left = Math.min(...nodes.map((n) => n.x)), right = Math.max(...nodes.map((n) => n.x + n.width));
+    if (!crossed && box.x >= left && box.x + box.width <= right && distance(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
     const candidates2 = [];
     for (let i = 1; i < edge.points.length; i++) {
       const a = edge.points[i - 1], b = edge.points[i], length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -1857,7 +1999,7 @@ function relocateLabels(edges, nodes, allEdges = edges) {
         else candidates2.push({ ...box, x: x + 5, y: y - box.height / 2, score: length }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length - 1 });
       }
     }
-    const left = Math.min(...nodes.map((n) => n.x)), right = Math.max(...nodes.map((n) => n.x + n.width)), labelScore = (candidate) => candidate.score - 4 * (Math.max(0, left - candidate.x) + Math.max(0, candidate.x + candidate.width - right));
+    const labelScore = (candidate) => candidate.score - 12 * (Math.max(0, left - candidate.x) + Math.max(0, candidate.x + candidate.width - right));
     const replacement = candidates2.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap2(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap2(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
     if (replacement) {
       delete replacement.score;
@@ -3137,12 +3279,13 @@ async function compile(project) {
     if (!byName(item.focus)) throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);
     for (let i = 1; i < (item.journey ?? []).length; i++) {
       const from = byName(item.journey[i - 1]), to = byName(item.journey[i]);
-      if (!from || !to || !findEngineeringRoute(graph, { from, to, maxHops: 1 }).found) throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);
+      if (!from || !to || !findEngineeringRoute(graph, { from, to, maxHops: 1 }).found && !findHierarchyRoute(graph, { from, to, maxHops: 1 }).found) throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);
     }
   }
   const scoped = graph.elements.filter((e) => project.manifest.systemOfInterest.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id);
   for (let i = 1; i < scenes.length; i++) {
-    const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: scoped });
+    const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: scoped, journey: b.journey?.map(byName) });
+    if (b.journey?.length && !plan.route.found) throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);
     if (plan.mode === "cross-kind" && !plan.route.found) throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);
   }
   return { project, modelHash: parsed.modelHash, exported, graph, views, scenes, coverage, availableViews };
@@ -3263,7 +3406,7 @@ function labelSize(text) {
   span.remove();
   return { width: Math.ceil(rect.width) + 4, height: 16 };
 }
-async function prepareFrame(view, focus, panels) {
+async function prepareFrame(view, focus, panels, { journey = false } = {}) {
   const stage = $("stage"), area = graphArea(stage.clientWidth, stage.clientHeight, panels);
   const layoutFor = (compact) => layoutDiagram(sizeView(view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize, grouping: displayPreferences().grouping });
   let layout = await layoutFor(false), fitted = fitDiagram(layout, area);
@@ -3289,7 +3432,7 @@ async function prepareFrame(view, focus, panels) {
   const edgeCounts = /* @__PURE__ */ new Map(), edges = [...routed, ...peripheral].map((e) => {
     const a = byID.get(e.sourceAttachment ?? e.source), b = byID.get(e.targetAttachment ?? e.target), ownerA = byID.get(e.source), ownerB = byID.get(e.target), base = [a?.semanticId || a?.key, b?.semanticId || b?.key, e.kind, e.label || ""].join("|"), ordinal = edgeCounts.get(base) ?? 0;
     edgeCounts.set(base, ordinal + 1);
-    return { ...e, sourceClipped: a?.kind === "context-boundary", targetClipped: b?.kind === "context-boundary", key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
+    return { ...e, journey: journey && !e.context, sourceClipped: a?.kind === "context-boundary", targetClipped: b?.kind === "context-boundary", key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : !journey && displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: edgeAppearance(e, { viewKind: view.kind }) })).filter((p) => !p.appearance.supported).map((p) => ({ reason: "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
   const omissions = [...layout.omissions ?? view.omissions ?? [], ...notationNotices, ...fringe.omissions, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
@@ -3361,9 +3504,9 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     defs.append(marker);
   }
   svg.append(defs);
-  const departurePlan = planDepartures(frames, { width: stage.clientWidth, height: stage.clientHeight, panels: destination.panels ?? [] });
-  stage.dataset.departureCount = String(departurePlan.departures.length);
   const offsets = frames.length === 5 ? [0, 0.18, 0.5, 0.74, 1] : frames.map((_, i) => i / (frames.length - 1 || 1));
+  const departurePlan = planDepartures(frames, { width: stage.clientWidth, height: stage.clientHeight, panels: destination.panels ?? [], offsets });
+  stage.dataset.departureCount = String(departurePlan.departures.length);
   const nodeKeys = visibleTrackKeys(frames, "nodes"), edgeKeys = visibleTrackKeys(frames, "edges").sort((a, b) => {
     const edge = (key) => destination.edges.find((e) => e.key === key) ?? frames.flatMap((f) => f.edges).find((e) => e.key === key);
     return Number(!!edge(b)?.context) - Number(!!edge(a)?.context);
@@ -3411,7 +3554,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     };
     svg.append(group);
     const numeric = track.map((e) => {
-      const r = { opacity: e.opacity ?? 1, x: e.x ?? 0, y: e.y ?? 0, labelOpacity: e.label && !e.labelOmitted ? 1 : 0 };
+      const r = { opacity: e.opacity ?? 1, x: e.x ?? 0, y: e.y ?? 0, labelOpacity: e.label && !e.labelOmitted ? 1 : 0, journey: e.journey ? 1 : 0 };
       for (const [i, p] of e.points.entries()) {
         r["x" + i] = p.x;
         r["y" + i] = p.y;
@@ -3446,12 +3589,25 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
       }
       nodes.push({ ...item.latest, ...r });
     }
-    for (const item of edgeTracks) {
-      const r = sampleTrack(item.track, offsets, progress), interpolated = Array.from({ length: 20 }, (_, i) => ({ x: r["x" + i], y: r["y" + i] }));
-      const currentNodes = nodes.map((n) => ({ ...n, id: n.key, parentId: n.parentId ? nodes.find((p) => p.id === n.parentId)?.key : void 0 }));
+    const currentNodes = nodes.map((n) => ({ ...n, id: n.key, parentId: n.parentId ? nodes.find((p) => p.id === n.parentId)?.key : void 0 }));
+    const sampledEdges = edgeTracks.map((item) => ({ item, r: sampleTrack(item.track, offsets, progress) })), journeySizes = /* @__PURE__ */ new Map();
+    const liveEdges = sampledEdges.filter(({ r }) => clock !== 1 && r.journey > 0.5 && r.opacity > 0.01).map(({ item }) => {
+      const text = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text.length * 7), height: 16 }, old = journeySizes.get(text);
+      journeySizes.set(text, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
+      return { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, label: text };
+    });
+    const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text) => journeySizes.get(text) }).map((route2) => [route2.id, route2]));
+    for (const { item, r } of sampledEdges) {
+      const interpolated = Array.from({ length: 20 }, (_, i) => ({ x: r["x" + i], y: r["y" + i] }));
       const edge = { ...item.latest, source: item.latest.sourceKey, target: item.latest.targetKey };
-      let points = clock === 1 ? item.latest.routePoints ?? [] : interpolated;
-      if (clock !== 1 && (!routeIsClear(points, edge, currentNodes, { orthogonalOnly: true }) || !routeConnectsEndpoints(points, edge, currentNodes))) {
+      let points = clock === 1 ? item.latest.routePoints ?? [] : interpolated, liveLabel;
+      const journeyEdge = clock !== 1 && r.journey > 0.5;
+      if (journeyEdge) {
+        const live = liveRoutes.get(item.key);
+        points = live?.points ?? [];
+        if (live?.labelBox && !live.labelLeader && ![...liveRoutes.values()].some((other) => other.points.length > 1 && !routeIsClear(other.points, other, currentNodes.concat([{ ...live.labelBox, id: "journey-label:" + item.key }]), { orthogonalOnly: true }))) liveLabel = live;
+      }
+      if (!journeyEdge && clock !== 1 && (!routeIsClear(points, edge, currentNodes, { orthogonalOnly: true }) || !routeConnectsEndpoints(points, edge, currentNodes))) {
         points = routeEdges([{ ...edge, label: "" }], currentNodes)[0]?.points ?? [];
       }
       if (!routeIsClear(points, edge, currentNodes) || !routeConnectsEndpoints(points, edge, currentNodes)) points = [];
@@ -3480,7 +3636,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
       item.hit.setAttribute("d", path);
       item.signature = signature;
       item.drawnPoints = points;
-      const traveling = duration && clock > 0 && clock < 1, emphasis = traveling ? 0.2 + 0.8 * Math.abs(Math.cos(Math.PI * clock)) : 1;
+      const traveling = duration && clock > 0 && clock < 1, emphasis = traveling && !journeyEdge ? 0.2 + 0.8 * Math.abs(Math.cos(Math.PI * clock)) : 1;
       const endpoints2 = [currentNodes.find((n) => n.id === edge.source), currentNodes.find((n) => n.id === edge.target)], presence = Math.min(1, ...endpoints2.map((n) => n ? (n.opacity ?? 1) / (n.context ? 0.22 : 1) : 0));
       const effectiveOpacity = points.length ? r.opacity * emphasis * presence : 0;
       item.group.style.opacity = effectiveOpacity;
@@ -3488,9 +3644,9 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
       item.group.setAttribute("aria-hidden", String(effectiveOpacity < 0.05));
       item.group.setAttribute("tabindex", effectiveOpacity > 0.1 ? "0" : "-1");
       if (item.text) {
-        item.text.setAttribute("x", r.x);
-        item.text.setAttribute("y", r.y);
-        item.text.style.opacity = traveling ? Math.max(0, (clock - 0.85) / 0.15) : r.labelOpacity;
+        item.text.setAttribute("x", liveLabel?.x ?? r.x);
+        item.text.setAttribute("y", liveLabel?.y ?? r.y);
+        item.text.style.opacity = journeyEdge ? liveLabel ? r.labelOpacity * routeFade : 0 : traveling ? Math.max(0, (clock - 0.85) / 0.15) : r.labelOpacity;
       }
       edges.push({ ...item.latest, points, opacity: effectiveOpacity, x: r.x, y: r.y });
     }
@@ -3535,29 +3691,16 @@ async function frame(view, caption = "", duration = 0, focus = state.focus) {
   if (revision !== state.revision) return;
   return paintFrames(duration && previous ? [previous, destination] : [destination], { duration, caption });
 }
-function gather(ids) {
+function gather(ids, relationships) {
   const set = new Set(ids), elements = state.graph.elements.filter((e) => set.has(e.id));
-  return graphView(state.graph, { elements, relationships: state.graph.relationships.filter((e) => set.has(e.source) && set.has(e.target)) }, "General View journey");
+  return graphView(state.graph, { elements, relationships: (relationships ?? state.graph.relationships).filter((e) => set.has(e.source) && set.has(e.target)) }, "General View journey");
 }
 async function transitionTo(view, focus, { animate = true, journey, allowDisconnected = false } = {}) {
   const revision = ++state.revision, previous = state.view;
-  const plan = previous ? planTransition({ view: previous, focus: state.previousFocus }, { view, focus }, { graph: state.graph, scopeIds: state.exploring ? void 0 : scopeIds(), reducedMotion: state.reduce }) : null;
-  if (journey?.length > 1 && plan?.route && resolve(journey[0]) === state.previousFocus && resolve(journey.at(-1)) === focus) {
-    const ids = journey.map(resolve);
-    const routeEdges2 = [];
-    for (let i = 1; i < ids.length; i++) {
-      const route2 = findEngineeringRoute(state.graph, { from: ids[i - 1], to: ids[i], scopeIds: scopeIds(), maxHops: 1 });
-      if (!route2.found) throw Error("Saved journey no longer resolves within the presentation boundary");
-      routeEdges2.push(...route2.relationships);
-    }
-    plan.route = { found: true, elements: ids.map(element), relationships: routeEdges2 };
-    const stage = plan.stages.find((s) => s.kind === "gv-journey");
-    if (stage) {
-      stage.route = routeEdges2;
-      stage.semanticIds = ids;
-    }
-  }
-  const disconnected = plan?.mode === "cross-kind" && plan.route?.found === false;
+  const savedJourney = journey?.length > 1 && resolve(journey[0]) === state.previousFocus && resolve(journey.at(-1)) === focus ? journey.map(resolve) : void 0;
+  const plan = previous ? planTransition({ view: previous, focus: state.previousFocus }, { view, focus }, { graph: state.graph, scopeIds: state.exploring ? void 0 : scopeIds(), reducedMotion: state.reduce, journey: savedJourney }) : null;
+  if (savedJourney && !plan?.route?.found) throw Error("Saved journey no longer resolves within the presentation boundary");
+  const disconnected = plan?.journeyRequired && plan.route?.found === false;
   if (disconnected && !state.exploring && !allowDisconnected) throw Error("No engineering route connects these viewpoints within the presentation system. Explore the model to open a disconnected viewpoint explicitly.");
   cancelAnimations();
   for (const p of $("stage").querySelectorAll(".narrative-outgoing")) p.remove();
@@ -3581,8 +3724,14 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
     }
     if (state.visualSnapshot && animate && !state.reduce) {
       frames.push(state.visualSnapshot);
-      if (plan?.mode === "cross-kind" && !disconnected) {
-        for (const step of plan.stages.slice(0, -1)) frames.push(await prepareFrame(gather(step.semanticIds), focus, panels));
+      if (plan?.journeyRequired && !disconnected) {
+        for (const step of plan.stages.filter((step2) => step2.viewKind === "gv")) {
+          frames.push(await prepareFrame(gather(step.semanticIds, step.route), step.focusId ?? focus, panels, { journey: true }));
+          if (revision !== state.revision) {
+            oldPanel?.remove();
+            return;
+          }
+        }
       }
       frames.push(target);
     } else frames.push(target);
@@ -3590,7 +3739,7 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
       oldPanel?.remove();
       return;
     }
-    const result = await paintFrames(frames, { duration: frames.length > 2 ? 1700 : frames.length > 1 ? 780 : 0, caption: disconnected ? "No engineering route \xB7 explicit view jump" : "", outgoingPanel: oldPanel });
+    const result = await paintFrames(frames, { duration: frames.length > 2 ? Math.max(1700, (frames.length - 1) * 420) : frames.length > 1 ? 780 : 0, caption: disconnected ? "No engineering route \xB7 explicit view jump" : plan?.route?.strategy === "ownership-ancestor" ? "Model ownership route \xB7 location, not derivation" : "", outgoingPanel: oldPanel });
     if (result.cancelled || revision !== state.revision) return;
     state.view = view;
     state.focus = focus;
