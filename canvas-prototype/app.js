@@ -394,6 +394,62 @@ function planDepartures(frames, { width, height, panels = [], offsets, clearAt =
   return { departures, arrivals: [...arrivals], contextReturns: [...contextReturns], sampleNode };
 }
 
+// src/canvas-prototype/graph.mjs
+var refs = (value) => Array.isArray(value) ? value.flatMap(refs) : value && typeof value === "object" && typeof value["@id"] === "string" ? [value["@id"]] : [];
+var camel = (value) => Array.isArray(value) ? value.map(camel) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camel(v)])) : value;
+function adaptNativeView(raw, name) {
+  const v = camel(raw);
+  return { ...v, id: name, title: name, nodes: v.nodes ?? [], edges: v.edges ?? [], notices: v.notices ?? [] };
+}
+var isDeclarationKind = (kind) => /^(Package|Namespace|[A-Za-z]+(?:Usage|Definition))$/.test(kind ?? "");
+function modelGraph(raw, views = []) {
+  const elements = raw.map((e) => ({ id: e["@id"], kind: e["@type"], name: e.declaredName || e.qualifiedName || e["@id"], qualifiedName: e.qualifiedName, description: e.body || "", native: e, layer: e["sysx:sourceLine"] ? "project" : "library" }));
+  const index = new Map(elements.map((e) => [e.id, e])), relationships = [], containment = [];
+  const declaration = (e) => e?.layer === "project" && isDeclarationKind(e.kind);
+  const add = (source, target, kind, id, nativeRelationship) => {
+    if (!source || !target) return;
+    relationships.push({ id, source, target, kind, label: kind, authority: "native-api", nativeRelationship });
+  };
+  for (const item of raw) {
+    const id = item["@id"];
+    if (declaration(index.get(id))) {
+      for (const owner of refs(item.owner)) if (declaration(index.get(owner))) containment.push({ id: `owner:${owner}:${id}`, source: owner, target: id, kind: "containment", label: "owns", authority: "native-api", nativeRelationship: refs(item.owningMembership)[0] ?? refs(item.owningRelationship)[0] ?? null, nativeRole: "owner", navigationOnly: true });
+    }
+    if (item["@type"] === "Dependency") for (const client of refs(item.client)) for (const supplier of refs(item.supplier)) add(client, supplier, "dependency", "api:" + id + ":" + client + ":" + supplier, id);
+    if (["PartUsage", "PartDefinition"].includes(item["@type"])) {
+      for (const child of refs(item.ownedMember)) if (index.get(child)?.kind === "PartUsage") add(id, child, "composition", `part:${id}:${child}`);
+    }
+    if (item["@type"]?.endsWith("Usage")) for (const type of refs(item.type)) add(id, type, "typing", `typing:${id}:${type}`);
+    if (item["@type"] === "Documentation") for (const owner of refs(item.owner)) {
+      const target = index.get(owner);
+      if (target && !target.description) target.description = item.body || "";
+    }
+  }
+  for (const view of views) {
+    const nodes = new Map(view.nodes.map((n) => [n.id, n.semanticId]));
+    for (const [i, edge] of view.edges.entries()) {
+      const source = nodes.get(edge.fromId ?? edge.from ?? edge.source), target = nodes.get(edge.toId ?? edge.to ?? edge.target);
+      add(source, target, edge.kind, `view:${view.id}:${i}`);
+    }
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return { elements, containment, relationships: relationships.filter((e) => {
+    const key = JSON.stringify([e.source, e.target, e.kind]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }) };
+}
+function graphView(graph, context, name = "Focused General View") {
+  const known = new Map(graph.elements.map((e) => [e.id, e]));
+  return { id: "explore:" + context.elements.map((e) => e.id).join(","), kind: "definition", title: name, omissions: context.omissions ?? [], nodes: context.elements.map((e) => ({ id: "gv:" + e.id, semanticId: e.id, name: e.name, kind: e.kind.replace(/(Usage|Definition)$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(), qualifiedName: e.qualifiedName, detail: e.description || "", type: refs(e.native?.type).map((id) => known.get(id)?.name || id).join(", ") })), edges: context.relationships.map((e) => ({ ...e, semanticSource: e.source, semanticTarget: e.target, source: "gv:" + e.source, target: "gv:" + e.target })) };
+}
+function requireNativeIdentity(view) {
+  const missing = view.nodes.filter((n) => !n.semanticId && !["synthetic", "control", "notation"].includes(n.identityStatus));
+  if (missing.length) throw Error("Native semantic identity missing for " + missing.map((n) => n.name || n.id).join(", "));
+  return view;
+}
+
 // src/canvas-prototype/core/index.mjs
 var copy = (value) => structuredClone(value);
 var ENGINEERING_RELATIONSHIPS = Object.freeze([
@@ -665,6 +721,11 @@ function planTransition(fromScene, toScene, options = {}) {
 // src/canvas-prototype/exploration.mjs
 var engineeringKinds = new Set(ENGINEERING_RELATIONSHIPS);
 var requirementKinds = /* @__PURE__ */ new Set(["RequirementDefinition", "RequirementUsage"]);
+var structuralKinds = /* @__PURE__ */ new Set(["PartDefinition", "PartUsage", "Package", "Namespace"]);
+var packageKinds = /* @__PURE__ */ new Set(["Package", "Namespace"]);
+var structuralModes = /* @__PURE__ */ new Set(["contents", "container"]);
+var structuralEdges = /* @__PURE__ */ new Set(["composition", "reference", "containment"]);
+var isStructuralElement = (element2) => structuralKinds.has(element2?.kind);
 var engineeringElement = /^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
 var origins = /* @__PURE__ */ new Set(["derive", "derivation", "refine", "refinement"]);
 var satisfaction = /* @__PURE__ */ new Set(["satisfy", "satisfaction"]);
@@ -678,10 +739,18 @@ var modes = Object.freeze({
   derived: { label: "Derived requirements", empty: "No downstream derivation or refinement links are known in the loaded model." },
   impact: { label: "Design impact", empty: "No satisfaction or allocation links are known in the loaded model." },
   verification: { label: "Verification", empty: "No verification links are known in the loaded model." },
+  contents: { label: "Parts / contents", empty: "No direct contents are known in the loaded model." },
+  container: { label: "Containing element", empty: "No containing element is known in the loaded model." },
   context: { label: "Explore connections", empty: "No engineering neighbors are known in the loaded model." }
 });
 var endpoint2 = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
-function accepts(edge, anchor, mode) {
+function accepts(edge, anchor, mode, { root, elements, bridge } = {}) {
+  const structural = isStructuralElement(root);
+  const ownership = edge.kind === "containment" && (packageKinds.has(elements?.get(edge.source)?.kind) || packageKinds.has(elements?.get(edge.target)?.kind));
+  const structure = structuralEdges.has(edge.kind) && (edge.kind !== "containment" || ownership);
+  if (structuralModes.has(mode)) return structural && structure && (mode === "contents" ? edge.source === anchor : edge.target === anchor) && (!bridge || mode === "contents" && edge.kind !== "containment");
+  if (bridge && root.kind === "PartUsage") return mode === "context" && ["composition", "reference"].includes(edge.kind) && edge.source === anchor;
+  if (mode === "context" && structural && ownership) return true;
   if (mode === "origins") return origins.has(edge.kind) && edge.source === anchor;
   if (mode === "derived") return origins.has(edge.kind) && edge.target === anchor;
   if (mode === "impact") return satisfaction.has(edge.kind) && edge.target === anchor || allocation.has(edge.kind);
@@ -690,7 +759,9 @@ function accepts(edge, anchor, mode) {
 }
 function prepare(graph) {
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
-  const keyed = new Map((graph.relationships ?? []).map((edge) => {
+  const compositionPairs = new Set((graph.relationships ?? []).filter((e) => ["composition", "reference"].includes(e.kind)).map((e) => JSON.stringify([endpoint2(e, "source"), endpoint2(e, "target")])));
+  const ownership = (graph.containment ?? []).filter((e) => e.kind === "containment" && e.nativeRole === "owner" && !compositionPairs.has(JSON.stringify([e.source, e.target])));
+  const keyed = new Map([...graph.relationships ?? [], ...ownership].map((edge) => {
     const value = { ...edge, source: endpoint2(edge, "source"), target: endpoint2(edge, "target") };
     return [edgeKey(value), value];
   }));
@@ -705,6 +776,7 @@ function prepare(graph) {
 function projection(graph, focus, mode, options = {}, prepared = prepare(graph)) {
   if (!modes[mode]) throw new Error("Unknown exploration mode: " + mode);
   const { elements, edges, incident } = prepared;
+  const root = elements.get(focus), structural = isStructuralElement(root) && ["context", "contents", "container"].includes(mode);
   const omissions = [], seen = /* @__PURE__ */ new Set(), anchors = /* @__PURE__ */ new Map([[focus, null]]), candidates2 = /* @__PURE__ */ new Map(), unavailable = /* @__PURE__ */ new Set(), filtered = /* @__PURE__ */ new Set();
   const kinds2 = options.relationshipKinds ? new Set(options.relationshipKinds) : null;
   const nodeKinds = options.elementKinds ? new Set(options.elementKinds) : null;
@@ -721,19 +793,20 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
     if (!element2) return "unavailable";
     if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
     if (scope && !scope.has(id)) return "outside-scope";
-    if (!engineeringElement.test(element2.kind ?? "") && !(id === focus && mode === "context" && element2.kind === "Package")) return "element-policy";
+    if (!engineeringElement.test(element2.kind ?? "") && !((structural || id === focus) && isDeclarationKind(element2.kind))) return "element-policy";
     if (nodeKinds && !nodeKinds.has(element2.kind)) return "element-filter";
     return null;
   };
-  const root = elements.get(focus), rootReason = reason(focus);
+  const rootReason = reason(focus);
   if (rootReason) {
     omit(null, focus, rootReason, null);
     return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason, root };
   }
-  if (requirementKinds.has(root.kind)) for (const edge of incident.get(focus) ?? []) {
+  if (requirementKinds.has(root.kind) || root.kind === "PartUsage" && ["context", "contents"].includes(mode)) for (const edge of incident.get(focus) ?? []) {
     if (!["type", "typing"].includes(edge.kind) || edge.source !== focus && edge.target !== focus) continue;
     const target = edge.source === focus ? edge.target : edge.source, other = elements.get(target);
-    const opposite = root.kind === "RequirementUsage" ? "RequirementDefinition" : "RequirementUsage";
+    if (root.kind === "PartUsage" && edge.source !== focus) continue;
+    const opposite = root.kind === "PartUsage" ? "PartDefinition" : root.kind === "RequirementUsage" ? "RequirementDefinition" : "RequirementUsage";
     const excluded = reason(target);
     if (excluded) {
       omit(edge, target, excluded, focus);
@@ -745,13 +818,15 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
       continue;
     }
     if (!anchors.has(target)) anchors.set(target, edge);
+    if (root.kind === "PartUsage" && mode === "context" && (!kinds2 || kinds2.has(edge.kind))) candidates2.set(target, [{ edge, anchor: focus, bridge: null }]);
   }
-  if (mode !== "context" && !requirementKinds.has(root.kind)) return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: "not-requirement", root };
+  if (structuralModes.has(mode) && !isStructuralElement(root)) return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: "not-structural", root };
+  if (mode !== "context" && !structuralModes.has(mode) && !requirementKinds.has(root.kind)) return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: "not-requirement", root };
   for (const [anchor, bridge] of anchors) for (const edge of incident.get(anchor) ?? []) {
     if (edge.source !== anchor && edge.target !== anchor) continue;
     const target = edge.source === anchor ? edge.target : edge.source;
     if (anchors.has(target)) continue;
-    if (!accepts(edge, anchor, mode)) {
+    if (!accepts(edge, anchor, mode, { root, elements, bridge })) {
       omit(edge, target, "relationship-policy", anchor);
       continue;
     }
@@ -771,19 +846,20 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
 function summaryFor(data, mode, shown, total) {
   const unavailable = data.unavailable.size, filtered = data.filtered.size;
   let status2 = shown ? "shown" : unavailable ? "unavailable" : filtered ? "filtered" : "no-known-links";
-  let message = shown ? `${shown} of ${total} matching engineering neighbors shown.` : modes[mode].empty;
+  let message = shown ? `${shown} of ${total} matching ${isStructuralElement(data.root) ? "structural / engineering" : "engineering"} neighbors shown.` : modes[mode].empty;
   if (data.rootReason) {
-    status2 = data.rootReason === "not-requirement" ? "filtered" : "missing-focus";
-    message = data.rootReason === "not-requirement" ? "This action applies to requirement definitions and usages." : "The focused element is unavailable or excluded from engineering exploration.";
+    status2 = ["not-requirement", "not-structural"].includes(data.rootReason) ? "filtered" : "missing-focus";
+    message = data.rootReason === "not-requirement" ? "This action applies to requirement definitions and usages." : data.rootReason === "not-structural" ? "This action applies to parts and packages." : "The focused element is unavailable or excluded from engineering exploration.";
   }
   if (unavailable) message += ` ${unavailable} referenced element${unavailable === 1 ? " is" : "s are"} unavailable; missing context is not evidence that a link is absent.`;
   if (filtered) message += ` ${filtered} matching neighbor${filtered === 1 ? " is" : "s are"} excluded by the active exploration policy.`;
+  if (isStructuralElement(data.root) && shown) message += " Package ownership is location context; part definition contents retain their explicit typing link.";
   if (mode === "verification" && shown) message += " These are modeled verification links, not executed results or acceptance verdicts.";
   return { status: status2, message, shown, total, unavailable, filtered };
 }
 function requirementActions(graph, focus) {
   const prepared = prepare(graph);
-  return Object.entries(modes).map(([mode, definition]) => {
+  return Object.entries(modes).filter(([mode]) => !structuralModes.has(mode)).map(([mode, definition]) => {
     const data = projection(graph, focus, mode, {}, prepared), count = data.candidates.size;
     return { mode, label: definition.label, count, total: count + data.unavailable.size + data.filtered.size, unavailable: data.unavailable.size, filtered: data.filtered.size, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
   });
@@ -794,8 +870,16 @@ function traceContext(graph, options = {}) {
   if (!Number.isInteger(page) || page < 0) throw new Error("Invalid exploration page");
   const effectiveBudget = Math.max(3, Math.min(24, budget)), data = projection(graph, focus, mode, options);
   const priorities = new Map(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification", "allocate", "allocation", "composition", "connection", "reference", "flow", "dependency"].map((kind, index) => [kind, index]));
-  const priority = (id) => mode === "context" ? Math.min(...data.candidates.get(id).map((link) => priorities.get(link.edge.kind) ?? 99)) : 0;
-  const targets = [...data.candidates.keys()].sort((a, b) => priority(a) - priority(b) || compare(a, b)), pages = [];
+  const priority = (id) => Math.min(...data.candidates.get(id).map(({ edge, anchor, bridge }) => {
+    if (isStructuralElement(data.root) && ["context", "contents", "container"].includes(mode)) {
+      if (structuralEdges.has(edge.kind)) return edge.target === anchor ? 0 : bridge ? 3 : 2;
+      if (["type", "typing"].includes(edge.kind)) return 1;
+      if (["connection", "flow", "binding"].includes(edge.kind)) return 4;
+      return 10 + (priorities.get(edge.kind) ?? 99);
+    }
+    return mode === "context" ? priorities.get(edge.kind) ?? 99 : 0;
+  }));
+  const targets = [...data.candidates.keys()].sort((a, b) => priority(a) - priority(b) || (isStructuralElement(data.root) ? compare(data.elements.get(a)?.qualifiedName ?? data.elements.get(a)?.name ?? a, data.elements.get(b)?.qualifiedName ?? data.elements.get(b)?.name ?? b) : 0) || compare(a, b)), pages = [];
   let group = [], ids = /* @__PURE__ */ new Set([focus]);
   for (const target of targets) {
     const best = data.candidates.get(target)[0], addition = [target, ...best.bridge ? [best.anchor] : []];
@@ -829,6 +913,9 @@ function traceContext(graph, options = {}) {
       if (bridge) relationships.set(edgeKey(bridge), bridge);
     }
   }
+  if (isStructuralElement(data.root) && ["context", "contents"].includes(mode)) {
+    for (const edge of data.edges) if (["connection", "flow", "binding"].includes(edge.kind) && wanted.has(edge.source) && wanted.has(edge.target) && (!options.relationshipKinds || options.relationshipKinds.includes(edge.kind))) relationships.set(edgeKey(edge), edge);
+  }
   return clone({
     elements: [...wanted].map((id) => data.elements.get(id)),
     relationships: [...relationships.values()].sort((a, b) => compare(edgeKey(a), edgeKey(b))),
@@ -842,6 +929,13 @@ function traceContext(graph, options = {}) {
     targets: shown,
     typingBridges: [...bridges.values()].map((edge) => edge.id),
     budget: effectiveBudget
+  });
+}
+function structuralActions(graph, focus) {
+  const prepared = prepare(graph);
+  return [...structuralModes].map((mode) => {
+    const data = projection(graph, focus, mode, {}, prepared), count = data.candidates.size;
+    return { mode, label: modes[mode].label, count, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
   });
 }
 
@@ -932,61 +1026,6 @@ function resolvePresentation(config = {}, { width = 1024, resolve: resolve2 } = 
     if (!expandedIds.includes(id)) expandedIds.push(id);
   }
   return { ...presentation, contextBudget: presentation.contextBudget ?? (width < 700 ? 4 : 6), expandedIds };
-}
-
-// src/canvas-prototype/graph.mjs
-var refs = (value) => Array.isArray(value) ? value.flatMap(refs) : value && typeof value === "object" && typeof value["@id"] === "string" ? [value["@id"]] : [];
-var camel = (value) => Array.isArray(value) ? value.map(camel) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camel(v)])) : value;
-function adaptNativeView(raw, name) {
-  const v = camel(raw);
-  return { ...v, id: name, title: name, nodes: v.nodes ?? [], edges: v.edges ?? [], notices: v.notices ?? [] };
-}
-function modelGraph(raw, views = []) {
-  const elements = raw.map((e) => ({ id: e["@id"], kind: e["@type"], name: e.declaredName || e.qualifiedName || e["@id"], qualifiedName: e.qualifiedName, description: e.body || "", native: e, layer: e["sysx:sourceLine"] ? "project" : "library" }));
-  const index = new Map(elements.map((e) => [e.id, e])), relationships = [], containment = [];
-  const declaration = (e) => e?.layer === "project" && /^(Package|Namespace|(?:Part|Item|Action|State|Requirement|UseCase|VerificationCase|AnalysisCase|Case|Concern|Constraint|Calculation|Port|Attribute|Interface|Connection|Occurrence|Enumeration)(?:Usage|Definition))$/.test(e.kind);
-  const add = (source, target, kind, id, nativeRelationship) => {
-    if (!source || !target) return;
-    relationships.push({ id, source, target, kind, label: kind, authority: "native-api", nativeRelationship });
-  };
-  for (const item of raw) {
-    const id = item["@id"];
-    if (declaration(index.get(id))) {
-      for (const owner of refs(item.owner)) if (declaration(index.get(owner))) containment.push({ id: `owner:${owner}:${id}`, source: owner, target: id, kind: "containment", label: "owns", authority: "native-api", nativeRelationship: refs(item.owningMembership)[0] ?? refs(item.owningRelationship)[0] ?? null, nativeRole: "owner", navigationOnly: true });
-    }
-    if (item["@type"] === "Dependency") for (const client of refs(item.client)) for (const supplier of refs(item.supplier)) add(client, supplier, "dependency", "api:" + id + ":" + client + ":" + supplier, id);
-    if (["PartUsage", "PartDefinition"].includes(item["@type"])) {
-      for (const child of refs(item.ownedMember)) if (index.get(child)?.kind === "PartUsage") add(id, child, "composition", `part:${id}:${child}`);
-    }
-    if (item["@type"]?.endsWith("Usage")) for (const type of refs(item.type)) add(id, type, "typing", `typing:${id}:${type}`);
-    if (item["@type"] === "Documentation") for (const owner of refs(item.owner)) {
-      const target = index.get(owner);
-      if (target && !target.description) target.description = item.body || "";
-    }
-  }
-  for (const view of views) {
-    const nodes = new Map(view.nodes.map((n) => [n.id, n.semanticId]));
-    for (const [i, edge] of view.edges.entries()) {
-      const source = nodes.get(edge.fromId ?? edge.from ?? edge.source), target = nodes.get(edge.toId ?? edge.to ?? edge.target);
-      add(source, target, edge.kind, `view:${view.id}:${i}`);
-    }
-  }
-  const seen = /* @__PURE__ */ new Set();
-  return { elements, containment, relationships: relationships.filter((e) => {
-    const key = JSON.stringify([e.source, e.target, e.kind]);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }) };
-}
-function graphView(graph, context, name = "Focused General View") {
-  const known = new Map(graph.elements.map((e) => [e.id, e]));
-  return { id: "explore:" + context.elements.map((e) => e.id).join(","), kind: "definition", title: name, omissions: context.omissions ?? [], nodes: context.elements.map((e) => ({ id: "gv:" + e.id, semanticId: e.id, name: e.name, kind: e.kind.replace(/(Usage|Definition)$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(), qualifiedName: e.qualifiedName, detail: e.description || "", type: refs(e.native?.type).map((id) => known.get(id)?.name || id).join(", ") })), edges: context.relationships.map((e) => ({ ...e, semanticSource: e.source, semanticTarget: e.target, source: "gv:" + e.source, target: "gv:" + e.target })) };
-}
-function requireNativeIdentity(view) {
-  const missing = view.nodes.filter((n) => !n.semanticId && !["synthetic", "control", "notation"].includes(n.identityStatus));
-  if (missing.length) throw Error("Native semantic identity missing for " + missing.map((n) => n.name || n.id).join(", "));
-  return view;
 }
 
 // src/canvas-prototype/notation.mjs
@@ -4062,7 +4101,7 @@ function updateExplorationControls() {
   $("return").hidden = !exploring || !state.scenes.length;
   $("standalone").hidden = exploring;
   const request = state.traceRequest, info = state.traceInfo;
-  $("exploration-label").textContent = exploring ? request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
+  $("exploration-label").textContent = exploring ? request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification", contents: "Parts / contents", container: "Containing element" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
   $("exploration-label").title = $("exploration-label").textContent;
   $("trace-previous").hidden = !request || !info || info.pages < 2;
   $("trace-next").hidden = !request || !info || info.pages < 2;
@@ -4171,6 +4210,16 @@ function select(id, node) {
     select(id, node);
   }));
   const e = element(id);
+  if (isStructuralElement(e)) {
+    const actions = el("div", void 0, "requirement-actions");
+    for (const action of structuralActions(state.graph, id)) {
+      const control = button(`${action.label} (${action.count})`, () => followTrace(id, action.mode));
+      control.disabled = !action.enabled;
+      control.title = action.summary.message;
+      actions.append(control);
+    }
+    menu.append(actions);
+  }
   if (["PartUsage", "PartDefinition", "Package"].includes(e?.kind)) menu.append(button("Internal view", () => explore(id, "interconnection")));
   if (["ActionUsage", "ActionDefinition"].includes(e?.kind)) menu.append(button("Activity view", () => explore(id, "action")));
   if (["RequirementUsage", "RequirementDefinition"].includes(e?.kind)) {

@@ -5,14 +5,24 @@
       "imports": [],
       "format": "esm"
     },
+    "src/canvas-prototype/graph.mjs": {
+      "bytes": 4250,
+      "imports": [],
+      "format": "esm"
+    },
     "src/canvas-prototype/core/index.mjs": {
       "bytes": 24014,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/exploration.mjs": {
-      "bytes": 10817,
+      "bytes": 15137,
       "imports": [
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
         {
           "path": "src/canvas-prototype/core/index.mjs",
           "kind": "import-statement",
@@ -23,11 +33,6 @@
     },
     "src/canvas-prototype/preferences.mjs": {
       "bytes": 4635,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/graph.mjs": {
-      "bytes": 4257,
       "imports": [],
       "format": "esm"
     },
@@ -163,7 +168,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 59176,
+      "bytes": 59620,
       "imports": [
         {
           "path": "src/canvas-prototype/departures.mjs",
@@ -249,7 +254,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 508306
+      "bytes": 516441
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -262,17 +267,17 @@
         "src/canvas-prototype/departures.mjs": {
           "bytesInOutput": 7888
         },
+        "src/canvas-prototype/graph.mjs": {
+          "bytesInOutput": 4277
+        },
         "src/canvas-prototype/core/index.mjs": {
           "bytesInOutput": 15627
         },
         "src/canvas-prototype/exploration.mjs": {
-          "bytesInOutput": 11147
+          "bytesInOutput": 15336
         },
         "src/canvas-prototype/preferences.mjs": {
           "bytesInOutput": 3812
-        },
-        "src/canvas-prototype/graph.mjs": {
-          "bytesInOutput": 4374
         },
         "src/canvas-prototype/notation.mjs": {
           "bytesInOutput": 3893
@@ -308,10 +313,10 @@
           "bytesInOutput": 7521
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 67164
+          "bytesInOutput": 67642
         }
       },
-      "bytes": 241953
+      "bytes": 246523
     }
   }
 }
