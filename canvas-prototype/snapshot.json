@@ -1,14 +1,14 @@
 {
   "schemaVersion": "syspresent.canvas-prototype.v1",
-  "revision": "8b6386583cea9c74a0ec5db0cd735d9defb36b38",
+  "revision": "dd8cd8643c552a8656a7521cc4c44e230b35d558",
   "dirty": false,
   "assets": {
-    "app.js": "b9a8c3dcd847afefc85033626b94d74468d5e387180102e866d74d1ce5f8ba15",
-    "app.js.map": "5ffedc317f5dc465c0ef19feaaeed00f56718f5cf5131a8947920312d47f8f8a",
-    "index.html": "fd013b03cb1deac6d9796019ff48ecd0feef8b873f70e83c5db5abe251494f7c",
-    "canvas.css": "37f1a9b65e359ca970a1b9ab408d019c1e48b7303cf3ddd46fbfbf27bc8a9ea1",
+    "app.js": "803c1261f91d4186d223c7cbb84e04df75206ce2585bed4a79bdb14595c1b655",
+    "app.js.map": "4ac7cfd93f4b85ead76354fcf14a90d6034643647a3b3ece60792155eaa30ad3",
+    "index.html": "61c551759a4e5d4a808f1e988303b7a1ffa5f0b47508dd79b6dcb621f8044056",
+    "canvas.css": "6580bc93025f7760a49c8c52588512a06b7d16a8c25ee811dad8b483ca7605c3",
     "LICENSE": "ddd8327daa7878abe8284332d97059ff64738ef747356c8d8997c77533f968e4",
-    "THIRD_PARTY_NOTICES": "c587e0045410f431fc4bf4e5263d2e9b19e7f03280f6803ab767150261e1cd4c",
+    "THIRD_PARTY_NOTICES": "3d96ebb51ec88c36a1616fce291977d3c1c3edcb19fe7caa9071dffabe667aee",
     "engine/sysml-wasm.wasm": "f3bfacd95afe70551d39cfbc119ea7455a77d1e421f27a7ebb264d3a2cf2d0fe",
     "engine/wasm_exec.js": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
     "engine/provenance.json": "8e743deb8739313fefcec8fb059fdedd7da8f155c54afe5cb3dd33dd07d30e57",
@@ -16,6 +16,12 @@
     "engine/GO-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
     "engine/worker.js": "633e2f8dbd7b7797dbdaaac3261fda7bf7676d24096f62613259f6d4c270a517",
     "notices/fflate-LICENSE": "805f6cb28bb8b6d3a0badd83c93bccd9671fa01a3b4b92b7042b0743325ac243",
+    "notices/elkjs-LICENSE": "637e81f4a1b6b4079535c499fca05e238cf7605c1ff5b76d60d7da7ce96700c9",
+    "layout/elk-worker.js": "e4f5c51c6f2fd564bb64e52e81c4a85a316ef2f24f8b90e1db5eb886c765b030",
+    "notices/elk-api.js": "ccca46175c05bbd280b5de6c9853103711e52c666a101f145b717e345363e24d",
+    "notices/elkjs-package.json": "4614a8db12f1c46a1d988d55e92012286c5a25dde3ea69be7695013f4d23cf02",
+    "notices/package-lock.json": "3d2dd121c9e7cc00bb8edc81495d58a450825c50dffa1b1fd99fbf0a8471f830",
+    "notices/elk-worker-source.js": "f7617e622f565748e1c88a9f45d97b458bc9c3f4299c0fdc6ed778a92ef30683",
     "example/project.json": "5530961e76d08d3932fe25c30fdb26dc25dd6fb81bf23f3d0f3c24463ea0039b",
     "example/models/analyses/actuation.sysml": "ea0190502c8245b34d2b9b15116de1fed500e3ccc6ed3069f56c5f756bb434d1",
     "example/models/analyses/aerodynamic-policy.sysml": "ea5ec771f7dbf0b31863352efc991b97816e641571588eb1b423a9ec6430b02a",
@@ -109,7 +115,7 @@
     "example/models/README.md": "54f9c9133c9ad61e109eb603817d2244b2608370f2b55992cba975dc2e9334f2",
     "example/runtime-cache.json": "82eaf3f782ed6f9ce93e1a45085b5008ca5af80f208c65882be421f67313ec9b",
     "project.zip": "374a222f4275f7b802c507cf330dea53e2705beb3ca4afc08dfb42cebc16c2bb",
-    "build-inputs.json": "520091335b7fb512ddea17e24be3516e97febec0460fafc1278bfe0c6224b9e8"
+    "build-inputs.json": "d45a60d195091a88bb58eac6c0450f4382c779a60c3ebb1e1d0e3cd39b6669c0"
   },
   "engine": {
     "schemaVersion": 1,

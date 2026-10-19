@@ -32,13 +32,55 @@
       "format": "esm"
     },
     "src/canvas-prototype/documentation.mjs": {
-      "bytes": 1519,
+      "bytes": 1564,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/geometry.mjs": {
-      "bytes": 11188,
+      "bytes": 13887,
       "imports": [],
+      "format": "esm"
+    },
+    "node_modules/elkjs/lib/elk-api.js": {
+      "bytes": 9782,
+      "imports": [
+        {
+          "path": "<runtime>",
+          "kind": "import-statement",
+          "external": true
+        }
+      ],
+      "format": "cjs"
+    },
+    "src/canvas-prototype/notation.mjs": {
+      "bytes": 5940,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/elk-layout.mjs": {
+      "bytes": 15642,
+      "imports": [
+        {
+          "path": "node_modules/elkjs/lib/elk-api.js",
+          "kind": "import-statement",
+          "original": "elkjs/lib/elk-api.js"
+        },
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        }
+      ],
       "format": "esm"
     },
     "src/canvas-prototype/engine/client.mjs": {
@@ -63,7 +105,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 39557,
+      "bytes": 45806,
       "imports": [
         {
           "path": "src/canvas-prototype/context.mjs",
@@ -84,6 +126,16 @@
           "path": "src/canvas-prototype/geometry.mjs",
           "kind": "import-statement",
           "original": "./geometry.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/elk-layout.mjs",
+          "kind": "import-statement",
+          "original": "./elk-layout.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
         },
         {
           "path": "src/canvas-prototype/engine/client.mjs",
@@ -114,15 +166,18 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 298116
+      "bytes": 362345
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
       "exports": [],
       "entryPoint": "src/canvas-prototype/app.mjs",
       "inputs": {
+        "node_modules/elkjs/lib/elk-api.js": {
+          "bytesInOutput": 9829
+        },
         "src/canvas-prototype/core/index.mjs": {
-          "bytesInOutput": 17621
+          "bytesInOutput": 8230
         },
         "src/canvas-prototype/graph.mjs": {
           "bytesInOutput": 3658
@@ -134,10 +189,16 @@
           "bytesInOutput": 3230
         },
         "src/canvas-prototype/documentation.mjs": {
-          "bytesInOutput": 1541
+          "bytesInOutput": 1587
         },
         "src/canvas-prototype/geometry.mjs": {
-          "bytesInOutput": 11939
+          "bytesInOutput": 14734
+        },
+        "src/canvas-prototype/elk-layout.mjs": {
+          "bytesInOutput": 17246
+        },
+        "src/canvas-prototype/notation.mjs": {
+          "bytesInOutput": 3862
         },
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 1698
@@ -149,10 +210,10 @@
           "bytesInOutput": 7438
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 45303
+          "bytesInOutput": 52434
         }
       },
-      "bytes": 128145
+      "bytes": 161506
     }
   }
 }
