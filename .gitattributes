@@ -1,0 +1,2 @@
+# Unified patch context and mail trailers intentionally retain whitespace.
+scripts/wasm-prototype/*.patch -whitespace

@@ -60,4 +60,3 @@ package Flashlight {
     dependency operatingDesign from turnOn to light;
     comment teachingAssumption /* The mass values are deliberately simple teaching inputs; no measured specimen or test result is implied. */
 }
-
