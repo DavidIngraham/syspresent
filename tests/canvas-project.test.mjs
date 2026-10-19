@@ -92,3 +92,9 @@ test('native project ownership is a separate location graph without namespace or
  assert.equal(graph.containment[1].nativeRelationship,'req-membership');assert.ok(graph.containment.every(e=>e.navigationOnly&&e.nativeRole==='owner'&&e.authority==='native-api'));
  assert.equal(graph.relationships.some(e=>e.kind==='containment'),false);assert.equal(graph.containment.some(e=>e.target==='fake'),false);
 });
+
+test('package ownership includes source declarations beyond the engineering subset',()=>{
+ const kinds=['EnumerationDefinition','ConcernUsage','MetadataDefinition','MetadataUsage','ViewUsage','ReferenceUsage','SatisfyRequirementUsage'];
+ const raw=[{'@id':'package','@type':'Package','sysx:sourceLine':1},...kinds.map((kind,i)=>({'@id':kind,'@type':kind,owner:{'@id':'package'},'sysx:sourceLine':i+2})),...['Documentation','OwningMembership','FeatureReferenceExpression'].map(kind=>({'@id':kind,'@type':kind,owner:{'@id':'package'},'sysx:sourceLine':20}))];
+ const g=modelGraph(raw);assert.deepEqual(g.containment.map(e=>e.target),kinds);assert.deepEqual(g.relationships,[]);
+});

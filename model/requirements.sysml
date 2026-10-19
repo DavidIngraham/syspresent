@@ -114,7 +114,7 @@ package SyspresentRequirements {
     }
     package Exploration {
         requirement <'SP-040'> localContext {
-            doc /* The explorer shall start from a focused element or authored view and allow search and selective relationship-directed expansion instead of requiring a full-model overview. Requirement exploration shall default to engineering relationships, including explicit definition-to-usage context and modeled constraints, while retaining documentation and ownership internals as opt-in context. */
+            doc /* The explorer shall start from a focused element or authored view and allow search and selective relationship-directed expansion instead of requiring a full-model overview. Requirement exploration shall default to engineering relationships, including explicit definition-to-usage context and modeled constraints, while retaining documentation and ownership internals as opt-in context. Part exploration shall prioritize its containing assembly, explicit direct type and declared subparts; package exploration shall prioritize its containing package and directly owned declarations. Part composition and package ownership shall remain distinct. Definition-declared parts shall retain their native identities and an explicit direct typing bridge rather than appear as fabricated children of a usage. Structural expansion shall remain bounded, offer separate contents and container actions, and preserve native connections among selected contents. */
             comment scope /* First release */
         }
         requirement <'SP-041'> typedFilters {
@@ -174,7 +174,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-055'> generalToSpecific {
-            doc /* General structural views shall place general classifiers above their specializations and typed usages by default. Requirement views shall read top down from source obligations to derived or refined requirements, with satisfying parts and verifying cases below the requirements they address. This visual ordering shall not assert ownership or alter native arrows. The layout shall preserve native relationship directions and shall not change behavioral ordering. Explicit authored placement may override the default. */
+            doc /* General structural views shall place general classifiers above their specializations and typed usages, and containing parts or packages above their contents, by default. Requirement views shall read top down from source obligations to derived or refined requirements, with satisfying parts and verifying cases below the requirements they address. This visual ordering shall not assert ownership or alter native arrows. The layout shall preserve native relationship directions and shall not change behavioral ordering. Explicit authored placement may override the default. */
             comment scope /* First release */
         }
     }

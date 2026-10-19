@@ -14,9 +14,11 @@ const coverage={kind:'requirement',nodes:native.nodes,edges:native.edges};
 const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfInterest:['Model'],modelSources:['model.sysml'],viewSources:['views.sysml'],story:'story.md',assets:[],publication:{scope:'complete'}};
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
-async function harness({reducedMotion=true,secondScene=false,contextNeighbor=false,traceFixture=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,size={width:1000,height:700}}={}){
+async function harness({reducedMotion=true,secondScene=false,contextNeighbor=false,traceFixture=false,structuralFixture=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,size={width:1000,height:700}}={}){
  let resizeCallback;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:'Model::orphan'})+'\n```\n\nOther context.';
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
+ const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
+ const fixtureRaw=raw.map(e=>structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
  let pendingRender,holdLayout=false;const heldLayouts=[];
  const window=new JSDOM(html,{url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole()}).window;
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};const ownRealm=value=>{if(value===null||typeof value!=='object')return value;if(ArrayBuffer.isView(value))return new window.Uint8Array(value);if(Array.isArray(value))return window.Array.from(value,ownRealm);if(value instanceof Set)return new window.Set([...value].map(ownRealm));if(value instanceof Map)return new window.Map([...value].map(([k,v])=>[ownRealm(k),ownRealm(v)]));return window.Object.fromEntries(Object.entries(value).map(([k,v])=>[k,ownRealm(v)]));};window.structuredClone=value=>ownRealm(structuredClone(value));window.ResizeObserver=class{constructor(fn){resizeCallback=fn;}observe(){}};
@@ -26,7 +28,7 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
  window.Worker=class{constructor(url){this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout){holdLayout=false;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else reply();});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
-  else if(method==='ExportModel')respond({elements:structuredClone([...raw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
+  else if(method==='ExportModel')respond({elements:structuredClone([...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
   else if(method==='RenderView'&&params.view==='Views::other')respond({kind:'requirement',nodes:[{id:'o',semanticId:'orphan',identityStatus:'mapped',name:'orphan',kind:'part'}],edges:[]});
   else if(method==='RenderView'&&params.view.startsWith('#'))pendingRender=()=>respond({kind:'interconnection',nodes:[native.nodes[1]],edges:[]});
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(native));
@@ -197,4 +199,30 @@ test('fading old context paths cannot reintroduce crossings against current cont
   if(d.getElementById('stage').dataset.motionProgress===undefined)break;await new Promise(resolve=>setTimeout(resolve,10));
  }
  assert.ok(sampled>0,'exercise multiple faint paths during motion');h.window.close();
+});
+
+test('part and package actions expose structural context on the canvas and history restores it',async()=>{
+ const h=await harness({structuralFixture:true,size:{width:390,height:720}}),d=h.document;
+ const active=()=>[...d.querySelectorAll('.node[data-context="false"]')];
+ const clickAction=text=>{const control=[...d.querySelectorAll('#selection button')].find(b=>b.textContent===text);assert.ok(control,text);control.click();};
+ d.querySelector('[data-semantic-id="part"]').click();clickAction('Focus');
+ await until(()=>active().length===5&&d.getElementById('status').textContent.includes('matching structural'));
+ assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['part','Model','definition','sensor','processor']));
+ assert.equal(d.querySelectorAll('#connections g[data-kind="typing"][data-context="false"]').length,1);
+ assert.equal(d.querySelectorAll('#connections g[data-kind="composition"][data-context="false"]').length,2);
+ // Actual positions are CSS transforms, inspected below rather than DOM order.
+ const rect=id=>d.querySelector('.node[data-context="false"][data-semantic-id="'+id+'"]').style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px/).slice(1).map(Number);
+ assert.ok(rect('definition')[1]<rect('sensor')[1]);assert.ok(rect('Model')[1]<rect('part')[1]);
+ d.querySelector('.node[data-context="false"][data-semantic-id="part"]').click();clickAction('Parts / contents (2)');
+ await until(()=>active().length===4&&d.getElementById('exploration-label').textContent.startsWith('Parts / contents'));
+ assert.ok(!active().some(n=>n.dataset.semanticId==='Model'));
+ d.querySelector('.node[data-context="false"][data-semantic-id="part"]').click();clickAction('Containing element (1)');
+ await until(()=>active().length===2&&d.getElementById('exploration-label').textContent.startsWith('Containing element'));
+ d.getElementById('explore-back').click();await until(()=>active().length===4&&d.getElementById('exploration-label').textContent.startsWith('Parts / contents'));
+ d.getElementById('explore-back').click();await until(()=>active().length===5);
+ d.querySelector('.node[data-context="false"][data-semantic-id="Model"]').click();clickAction('Parts / contents (3)');
+ await until(()=>d.getElementById('exploration-label').textContent.startsWith('Parts / contents · Model')&&active().length===4&&active().some(n=>n.dataset.semanticId==='nested'));
+ assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['Model','part','definition','nested']));
+ const owned=[...d.querySelectorAll('#connections g[data-kind="containment"][data-context="false"]')];assert.equal(owned.length,3);assert.ok(owned.every(g=>g.dataset.source==='Model'));
+ assert.ok(d.getElementById('status').textContent.includes('Package ownership is location context'));h.window.close();
 });

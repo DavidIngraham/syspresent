@@ -1,11 +1,18 @@
 /** Focused display projections over native engineering relationships.
  * No relationship or identity is inferred from labels, documentation or ancestry.
- * A requirement definition/usage bridge is explicit typing, at most one hop.
+ * Definition/usage bridges are explicit typing, at most one hop.
+ * Package ownership remains location context, distinct from part composition.
  */
+import {isDeclarationKind} from './graph.mjs';
 import {ENGINEERING_RELATIONSHIPS} from './core/index.mjs';
 
 const engineeringKinds=new Set(ENGINEERING_RELATIONSHIPS);
 const requirementKinds=new Set(['RequirementDefinition','RequirementUsage']);
+const structuralKinds=new Set(['PartDefinition','PartUsage','Package','Namespace']);
+const packageKinds=new Set(['Package','Namespace']);
+const structuralModes=new Set(['contents','container']);
+const structuralEdges=new Set(['composition','reference','containment']);
+export const isStructuralElement=element=>structuralKinds.has(element?.kind);
 const engineeringElement=/^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
 const origins=new Set(['derive','derivation','refine','refinement']);
 const satisfaction=new Set(['satisfy','satisfaction']);
@@ -19,10 +26,20 @@ const modes=Object.freeze({
  derived:{label:'Derived requirements',empty:'No downstream derivation or refinement links are known in the loaded model.'},
  impact:{label:'Design impact',empty:'No satisfaction or allocation links are known in the loaded model.'},
  verification:{label:'Verification',empty:'No verification links are known in the loaded model.'},
+ contents:{label:'Parts / contents',empty:'No direct contents are known in the loaded model.'},
+ container:{label:'Containing element',empty:'No containing element is known in the loaded model.'},
  context:{label:'Explore connections',empty:'No engineering neighbors are known in the loaded model.'}
 });
 const endpoint=(edge,side)=>side==='source'?edge.source??edge.fromId??edge.from_id??edge.from:edge.target??edge.toId??edge.to_id??edge.to;
-function accepts(edge,anchor,mode){
+function accepts(edge,anchor,mode,{root,elements,bridge}={}){
+ const structural=isStructuralElement(root);
+ const ownership=edge.kind==='containment'&&(packageKinds.has(elements?.get(edge.source)?.kind)||packageKinds.has(elements?.get(edge.target)?.kind));
+ const structure=structuralEdges.has(edge.kind)&&(edge.kind!=='containment'||ownership);
+ if(structuralModes.has(mode))return structural&&structure&&(mode==='contents'?edge.source===anchor:edge.target===anchor)&&(!bridge||mode==='contents'&&edge.kind!=='containment');
+ // Only children declared on the direct part definition are reached through
+ // its typing bridge. Do not inherit the definition's owner or requirements.
+ if(bridge&&root.kind==='PartUsage')return mode==='context'&&['composition','reference'].includes(edge.kind)&&edge.source===anchor;
+ if(mode==='context'&&structural&&ownership)return true;
  if(mode==='origins')return origins.has(edge.kind)&&edge.source===anchor;
  if(mode==='derived')return origins.has(edge.kind)&&edge.target===anchor;
  if(mode==='impact')return satisfaction.has(edge.kind)&&edge.target===anchor||allocation.has(edge.kind);
@@ -33,7 +50,9 @@ function prepare(graph){
  const elements=new Map((graph.elements??[]).map(element=>[element.id,element]));
  // Compute sort keys once; sorting large native graphs must not repeatedly
  // serialize the same relationship during every comparison or action mode.
- const keyed=new Map((graph.relationships??[]).map(edge=>{const value={...edge,source:endpoint(edge,'source'),target:endpoint(edge,'target')};return [edgeKey(value),value];}));
+ const compositionPairs=new Set((graph.relationships??[]).filter(e=>['composition','reference'].includes(e.kind)).map(e=>JSON.stringify([endpoint(e,'source'),endpoint(e,'target')])));
+ const ownership=(graph.containment??[]).filter(e=>e.kind==='containment'&&e.nativeRole==='owner'&&!compositionPairs.has(JSON.stringify([e.source,e.target])));
+ const keyed=new Map([...(graph.relationships??[]),...ownership].map(edge=>{const value={...edge,source:endpoint(edge,'source'),target:endpoint(edge,'target')};return [edgeKey(value),value];}));
  const edges=[...keyed].sort((a,b)=>compare(a[0],b[0])).map(([,edge])=>edge);
  const incident=new Map();
  for(const edge of edges)for(const id of new Set([edge.source,edge.target])){if(!incident.has(id))incident.set(id,[]);incident.get(id).push(edge);}
@@ -42,6 +61,7 @@ function prepare(graph){
 function projection(graph,focus,mode,options={},prepared=prepare(graph)){
  if(!modes[mode])throw new Error('Unknown exploration mode: '+mode);
  const {elements,edges,incident}=prepared;
+ const root=elements.get(focus),structural=isStructuralElement(root)&&['context','contents','container'].includes(mode);
  const omissions=[],seen=new Set(),anchors=new Map([[focus,null]]),candidates=new Map(),unavailable=new Set(),filtered=new Set();
  const kinds=options.relationshipKinds?new Set(options.relationshipKinds):null;
  const nodeKinds=options.elementKinds?new Set(options.elementKinds):null;
@@ -52,29 +72,33 @@ function projection(graph,focus,mode,options={},prepared=prepare(graph)){
   if(!element)return 'unavailable';
   if(element.layer==='metamodel'||element.metamodel===true)return 'metamodel-boundary';
   if(scope&&!scope.has(id))return 'outside-scope';
-  if(!engineeringElement.test(element.kind??'')&&!(id===focus&&mode==='context'&&element.kind==='Package'))return 'element-policy';
+  if(!engineeringElement.test(element.kind??'')&&!((structural||id===focus)&&isDeclarationKind(element.kind)))return 'element-policy';
   if(nodeKinds&&!nodeKinds.has(element.kind))return 'element-filter';
   return null;
  };
- const root=elements.get(focus),rootReason=reason(focus);
+ const rootReason=reason(focus);
  if(rootReason){omit(null,focus,rootReason,null);return {elements,edges,anchors,candidates,omissions,unavailable,filtered,rootReason,root};}
- // Only a direct RequirementUsage <-> RequirementDefinition typing link can
- // expose links authored on the other representation. Never recurse through it.
- if(requirementKinds.has(root.kind))for(const edge of incident.get(focus)??[]){
+ // Requirements may bridge either representation; parts follow only their
+ // direct declared type. Never recurse or pull sibling typed usages into view.
+ if(requirementKinds.has(root.kind)||root.kind==='PartUsage'&&['context','contents'].includes(mode))for(const edge of incident.get(focus)??[]){
   if(!['type','typing'].includes(edge.kind)||edge.source!==focus&&edge.target!==focus)continue;
   const target=edge.source===focus?edge.target:edge.source,other=elements.get(target);
-  const opposite=root.kind==='RequirementUsage'?'RequirementDefinition':'RequirementUsage';
+  if(root.kind==='PartUsage'&&edge.source!==focus)continue;
+  const opposite=root.kind==='PartUsage'?'PartDefinition':root.kind==='RequirementUsage'?'RequirementDefinition':'RequirementUsage';
   const excluded=reason(target);
   if(excluded){omit(edge,target,excluded,focus);if(excluded==='unavailable')unavailable.add(target);continue;}
   if(other.kind!==opposite){omit(edge,target,'typing-boundary',focus);continue;}
   if(!anchors.has(target))anchors.set(target,edge);
+  // A part's classifier is useful structure even if it declares no children.
+  if(root.kind==='PartUsage'&&mode==='context'&&(!kinds||kinds.has(edge.kind)))candidates.set(target,[{edge,anchor:focus,bridge:null}]);
  }
- if(mode!=='context'&&!requirementKinds.has(root.kind))return {elements,edges,anchors,candidates,omissions,unavailable,filtered,rootReason:'not-requirement',root};
+ if(structuralModes.has(mode)&&!isStructuralElement(root))return {elements,edges,anchors,candidates,omissions,unavailable,filtered,rootReason:'not-structural',root};
+ if(mode!=='context'&&!structuralModes.has(mode)&&!requirementKinds.has(root.kind))return {elements,edges,anchors,candidates,omissions,unavailable,filtered,rootReason:'not-requirement',root};
  for(const [anchor,bridge]of anchors)for(const edge of incident.get(anchor)??[]){
   if(edge.source!==anchor&&edge.target!==anchor)continue;
   const target=edge.source===anchor?edge.target:edge.source;
   if(anchors.has(target))continue;
-  if(!accepts(edge,anchor,mode)){omit(edge,target,'relationship-policy',anchor);continue;}
+  if(!accepts(edge,anchor,mode,{root,elements,bridge})){omit(edge,target,'relationship-policy',anchor);continue;}
   const excluded=kinds&&!kinds.has(edge.kind)?'relationship-filter':reason(target);
   if(excluded){omit(edge,target,excluded,anchor);(excluded==='unavailable'?unavailable:filtered).add(target);continue;}
   if(!candidates.has(target))candidates.set(target,[]);
@@ -89,10 +113,11 @@ function projection(graph,focus,mode,options={},prepared=prepare(graph)){
 function summaryFor(data,mode,shown,total){
  const unavailable=data.unavailable.size,filtered=data.filtered.size;
  let status=shown?'shown':unavailable?'unavailable':filtered?'filtered':'no-known-links';
- let message=shown?`${shown} of ${total} matching engineering neighbors shown.`:modes[mode].empty;
- if(data.rootReason){status=data.rootReason==='not-requirement'?'filtered':'missing-focus';message=data.rootReason==='not-requirement'?'This action applies to requirement definitions and usages.':'The focused element is unavailable or excluded from engineering exploration.';}
+ let message=shown?`${shown} of ${total} matching ${isStructuralElement(data.root)?'structural / engineering':'engineering'} neighbors shown.`:modes[mode].empty;
+ if(data.rootReason){status=['not-requirement','not-structural'].includes(data.rootReason)?'filtered':'missing-focus';message=data.rootReason==='not-requirement'?'This action applies to requirement definitions and usages.':data.rootReason==='not-structural'?'This action applies to parts and packages.':'The focused element is unavailable or excluded from engineering exploration.';}
  if(unavailable)message+=` ${unavailable} referenced element${unavailable===1?' is':'s are'} unavailable; missing context is not evidence that a link is absent.`;
  if(filtered)message+=` ${filtered} matching neighbor${filtered===1?' is':'s are'} excluded by the active exploration policy.`;
+ if(isStructuralElement(data.root)&&shown)message+=' Package ownership is location context; part definition contents retain their explicit typing link.';
  if(mode==='verification'&&shown)message+=' These are modeled verification links, not executed results or acceptance verdicts.';
  return {status,message,shown,total,unavailable,filtered};
 }
@@ -101,14 +126,14 @@ function summaryFor(data,mode,shown,total){
  */
 export function requirementActions(graph,focus){
  const prepared=prepare(graph);
- return Object.entries(modes).map(([mode,definition])=>{
+ return Object.entries(modes).filter(([mode])=>!structuralModes.has(mode)).map(([mode,definition])=>{
   const data=projection(graph,focus,mode,{},prepared),count=data.candidates.size;
   return {mode,label:definition.label,count,total:count+data.unavailable.size+data.filtered.size,unavailable:data.unavailable.size,filtered:data.filtered.size,enabled:count>0,summary:summaryFor(data,mode,count,count)};
  });
 }
 /** Bounded active context. The budget includes focus, required typing bridges
  * and targets. Stable independent pages cannot accumulate unbounded context.
- * Only one engineering hop beyond focus or an explicit direct typing bridge is
+ * Only one engineering/structural hop beyond focus or a direct typing bridge is
  * selected. Native source/target direction, IDs and relationship kinds survive.
  */
 export function traceContext(graph,options={}){
@@ -117,8 +142,16 @@ export function traceContext(graph,options={}){
  if(!Number.isInteger(page)||page<0)throw new Error('Invalid exploration page');
  const effectiveBudget=Math.max(3,Math.min(24,budget)),data=projection(graph,focus,mode,options);
  const priorities=new Map(['derive','derivation','refine','refinement','satisfy','satisfaction','verify','verification','allocate','allocation','composition','connection','reference','flow','dependency'].map((kind,index)=>[kind,index]));
- const priority=id=>mode==='context'?Math.min(...data.candidates.get(id).map(link=>priorities.get(link.edge.kind)??99)):0;
- const targets=[...data.candidates.keys()].sort((a,b)=>priority(a)-priority(b)||compare(a,b)),pages=[];
+ const priority=id=>Math.min(...data.candidates.get(id).map(({edge,anchor,bridge})=>{
+  if(isStructuralElement(data.root)&&['context','contents','container'].includes(mode)){
+   if(structuralEdges.has(edge.kind))return edge.target===anchor?0:bridge?3:2;
+   if(['type','typing'].includes(edge.kind))return 1;
+   if(['connection','flow','binding'].includes(edge.kind))return 4;
+   return 10+(priorities.get(edge.kind)??99);
+  }
+  return mode==='context'?priorities.get(edge.kind)??99:0;
+ }));
+ const targets=[...data.candidates.keys()].sort((a,b)=>priority(a)-priority(b)||(isStructuralElement(data.root)?compare(data.elements.get(a)?.qualifiedName??data.elements.get(a)?.name??a,data.elements.get(b)?.qualifiedName??data.elements.get(b)?.name??b):0)||compare(a,b)),pages=[];
  let group=[],ids=new Set([focus]);
  for(const target of targets){
   const best=data.candidates.get(target)[0],addition=[target,...(best.bridge?[best.anchor]:[])];
@@ -137,6 +170,15 @@ export function traceContext(graph,options={}){
    if(bridge)relationships.set(edgeKey(bridge),bridge);
   }
  }
+ // Native peer connections may join the selected contents; this neither
+ // expands the page nor synthesizes connectivity from common ownership.
+ if(isStructuralElement(data.root)&&['context','contents'].includes(mode))for(const edge of data.edges)if(['connection','flow','binding'].includes(edge.kind)&&wanted.has(edge.source)&&wanted.has(edge.target)&&(!options.relationshipKinds||options.relationshipKinds.includes(edge.kind)))relationships.set(edgeKey(edge),edge);
  return clone({elements:[...wanted].map(id=>data.elements.get(id)),relationships:[...relationships.values()].sort((a,b)=>compare(edgeKey(a),edgeKey(b))),omissions,
   summary:summaryFor(data,mode,shown.length,targets.length),mode,page:actualPage,total:targets.length,pages:pages.length,shown:shown.length,targets:shown,typingBridges:[...bridges.values()].map(edge=>edge.id),budget:effectiveBudget});
+}
+
+/** Structural actions share exactly the same bounded projection as Focus. */
+export function structuralActions(graph,focus){
+ const prepared=prepare(graph);
+ return [...structuralModes].map(mode=>{const data=projection(graph,focus,mode,{},prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
 }

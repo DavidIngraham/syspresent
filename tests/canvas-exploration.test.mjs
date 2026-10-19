@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {requirementActions,traceContext} from '../src/canvas-prototype/exploration.mjs';
+import {requirementActions,structuralActions,traceContext} from '../src/canvas-prototype/exploration.mjs';
 const element=(id,kind='RequirementUsage',extra={})=>({id,kind,name:id,description:'Native documentation for '+id,...extra});
 const edge=(id,source,target,kind,extra={})=>({id,source,target,kind,label:'Native label '+id,authority:'native-api',...extra});
 const graph=(elements,relationships)=>({elements,relationships});
@@ -119,4 +119,65 @@ test('different necessary bridge nodes consume separate page slots and direct pa
 test('default context prioritizes requirement traces over incidental dependencies within its node budget',()=>{
  const g=graph([element('r'),element('z-origin'),element('z-part','PartUsage'),element('z-case','VerificationCaseUsage'),...['a','b','c','d'].map(id=>element(id,'PartUsage'))],[edge('origin','r','z-origin','derive'),edge('impact','z-part','r','satisfy'),edge('verify','z-case','r','verify'),...['a','b','c','d'].map(id=>edge(id,id,'r','dependency'))]);
  const result=traceContext(g,{focus:'r',mode:'context',budget:4});assert.deepEqual(result.targets,['z-origin','z-part','z-case']);assert.equal(result.total,7);assert.ok(result.omissions.some(o=>o.reason==='budget'&&o.target==='a'));assert.deepEqual(traceContext(graph([...g.elements].reverse(),[...g.relationships].reverse()),{focus:'r',mode:'context',budget:4}),result);
+});
+
+const owns=(source,target)=>edge('owns:'+source+':'+target,source,target,'containment',{nativeRole:'owner',navigationOnly:true});
+const structureFixture=()=>({
+ elements:[element('package','Package'),element('nested','Package'),element('assembly','PartDefinition'),element('part','PartUsage'),element('type','PartDefinition'),element('subpart','PartUsage'),element('peer','PartUsage'),element('other-instance','PartUsage'),element('base','PartDefinition'),element('deep','PartUsage'),...Array.from({length:6},(_,i)=>element('requirement'+i))],
+ containment:[owns('package','nested'),owns('package','assembly'),owns('package','type'),owns('assembly','part'),owns('type','subpart')],
+ relationships:[edge('composition','assembly','part','composition'),edge('typing','part','type','typing'),edge('declared-child','type','subpart','composition'),edge('declared-peer','type','peer','composition'),edge('wire','subpart','peer','connection'),edge('other-type','other-instance','type','typing'),edge('base-type','type','base','typing'),edge('deeper','base','deep','composition'),...Array.from({length:6},(_,i)=>edge('satisfy'+i,'part','requirement'+i,'satisfy'))]
+});
+test('part focus prioritizes its whole, explicit classifier and declared parts ahead of requirements',()=>{
+ const g=structureFixture(),before=structuredClone(g),result=traceContext(g,{focus:'part',budget:5});
+ assert.deepEqual(result.targets,['assembly','type','peer','subpart']);
+ assert.deepEqual(new Set(result.relationships.map(e=>e.id)),new Set(['composition','typing','declared-child','declared-peer','wire']));
+ assert.deepEqual(result.typingBridges,['typing']);assert.equal(result.elements.length,5);
+ assert.ok(!ids(result).includes('other-instance'));assert.ok(!ids(result).includes('base'));assert.ok(!ids(result).includes('deep'));
+ assert.ok(result.omissions.some(o=>o.target==='requirement0'&&o.reason==='budget'));
+ assert.deepEqual(g,before);result.elements[0].name='mutated';assert.deepEqual(g,before);
+});
+test('part contents and container are directional, retaining native owners and definition identities',()=>{
+ const g=structureFixture(),contents=traceContext(g,{focus:'part',mode:'contents',budget:5}),container=traceContext(g,{focus:'part',mode:'container'});
+ assert.deepEqual(contents.targets,['peer','subpart']);assert.deepEqual(new Set(ids(contents)),new Set(['part','type','peer','subpart']));
+ assert.deepEqual(container.targets,['assembly']);assert.deepEqual(container.relationships,[g.relationships[0]]);
+ assert.deepEqual(structuralActions(g,'part').map(a=>[a.mode,a.count]),[['contents',2],['container',1]]);
+ assert.ok(!ids(contents).includes('package'));assert.ok(!ids(contents).includes('requirement0'));
+});
+test('package focus exposes native containing package and declaration contents without membership plumbing',()=>{
+ const g=structureFixture();g.elements.push(element('doc','Documentation'),element('fake','PartUsage',{qualifiedName:'package::fake'}));g.containment.push(owns('package','doc'));
+ const root=traceContext(g,{focus:'package',budget:5});
+ assert.deepEqual(root.targets,['assembly','nested','type']);assert.ok(root.relationships.every(e=>e.kind==='containment'&&e.navigationOnly&&e.nativeRole==='owner'));
+ assert.ok(!ids(root).includes('doc'));assert.ok(!ids(root).includes('fake'));
+ assert.deepEqual(traceContext(g,{focus:'nested',mode:'container'}).targets,['package']);
+ assert.deepEqual(traceContext(g,{focus:'package',mode:'contents'}).targets,['assembly','nested','type']);
+ const definition=traceContext(g,{focus:'assembly'});assert.deepEqual(definition.targets,['package','part']);
+ assert.match(root.summary.message,/Package ownership is location context/);
+});
+test('structural pages bound every type bridge and expose remaining children deterministically',()=>{
+ const g=structureFixture();for(let i=0;i<6;i++){g.elements.push(element('child'+i,'PartUsage'));g.relationships.push(edge('child-link'+i,'type','child'+i,'composition'));}
+ const pages=[];for(let page=0;page<6;page++){const result=traceContext(g,{focus:'part',mode:'contents',budget:3,page});pages.push(result);assert.equal(result.elements.length,3);assert.ok(result.relationships.some(e=>e.id==='typing'));}
+ assert.equal(new Set(pages.flatMap(p=>p.targets)).size,6);assert.equal(pages[0].total,8);assert.equal(pages[0].pages,8);
+ const reversed={elements:[...g.elements].reverse(),relationships:[...g.relationships].reverse(),containment:[...g.containment].reverse()};
+ assert.deepEqual(traceContext(reversed,{focus:'part',mode:'contents',budget:3}),pages[0]);
+});
+test('structural filters and unavailable contents are disclosed without type or namespace shortcuts',()=>{
+ const g=structureFixture();g.containment.push(owns('package','missing'));g.elements.push(element('meta','Package',{metamodel:true}));g.containment.push(owns('package','meta'));
+ const contents=traceContext(g,{focus:'package',mode:'contents'});assert.equal(contents.summary.unavailable,1);assert.ok(contents.omissions.some(o=>o.target==='meta'&&o.reason==='metamodel-boundary'));
+ const filtered=traceContext(g,{focus:'part',mode:'contents',relationshipKinds:['connection']});assert.deepEqual(ids(filtered),['part']);assert.ok(filtered.omissions.some(o=>o.reason==='relationship-filter'));
+ const scope=traceContext(g,{focus:'part',mode:'contents',scopeIds:['part','peer','subpart']});assert.deepEqual(ids(scope),['part']);assert.ok(scope.omissions.some(o=>o.target==='type'&&o.reason==='outside-scope'));
+ const types=traceContext(g,{focus:'part',elementKinds:['PartUsage']});assert.ok(!ids(types).includes('type'));assert.ok(!ids(types).includes('subpart'));
+});
+test('requirement default context never exposes package ownership and part definitions never expand all typed instances',()=>{
+ const g=structureFixture();g.containment.push(owns('package','requirement0'));
+ assert.deepEqual(traceContext(g,{focus:'requirement0'}).targets,['part']);
+ const definition=traceContext(g,{focus:'type',mode:'contents'});assert.deepEqual(definition.targets,['peer','subpart']);assert.deepEqual(definition.typingBridges,[]);
+ assert.ok(structuralActions(g,'requirement0').every(a=>!a.enabled));
+});
+
+test('package contents include native enumeration and concern declarations without broadening requirement context',()=>{
+ const declarations=['EnumerationDefinition','EnumerationUsage','ConcernDefinition','ConcernUsage','MetadataDefinition','ViewUsage'];
+ const g={elements:[element('p','Package'),element('r'),...declarations.map(kind=>element(kind,kind))],containment:declarations.map(kind=>owns('p',kind)),relationships:declarations.map(kind=>edge(kind,'r',kind,'dependency'))};
+ const result=traceContext(g,{focus:'p',mode:'contents',budget:7});assert.deepEqual(new Set(result.targets),new Set(declarations));assert.equal(result.summary.filtered,0);
+ assert.deepEqual(traceContext(g,{focus:'r'}).targets,[]);
+ assert.deepEqual(ids(traceContext(g,{focus:'EnumerationDefinition'})),['EnumerationDefinition','r']);
 });

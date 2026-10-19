@@ -2,13 +2,15 @@
 const refs=value=>Array.isArray(value)?value.flatMap(refs):value&&typeof value==='object'&&typeof value['@id']==='string'?[value['@id']]:[];
 const camel=value=>Array.isArray(value)?value.map(camel):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k.replace(/_([a-z])/g,(_,c)=>c.toUpperCase()),camel(v)])):value;
 export function adaptNativeView(raw,name){const v=camel(raw);return {...v,id:name,title:name,nodes:v.nodes??[],edges:v.edges??[],notices:v.notices??[]};}
+// Native declaration categories, excluding relationship/membership/expression plumbing.
+export const isDeclarationKind=kind=>/^(Package|Namespace|[A-Za-z]+(?:Usage|Definition))$/.test(kind??'');
 export function modelGraph(raw,views=[]){
  const elements=raw.map(e=>({id:e['@id'],kind:e['@type'],name:e.declaredName||e.qualifiedName||e['@id'],qualifiedName:e.qualifiedName,description:e.body||'',native:e,layer:e['sysx:sourceLine']?'project':'library'}));
  const index=new Map(elements.map(e=>[e.id,e])),relationships=[],containment=[];
  // Navigation-only ownership comes from the native API role, never qname
  // truncation or a membership/type/library walk. Keep it outside engineering
  // context so namespace location cannot masquerade as a design dependency.
- const declaration=e=>e?.layer==='project'&&/^(Package|Namespace|(?:Part|Item|Action|State|Requirement|UseCase|VerificationCase|AnalysisCase|Case|Concern|Constraint|Calculation|Port|Attribute|Interface|Connection|Occurrence|Enumeration)(?:Usage|Definition))$/.test(e.kind);
+ const declaration=e=>e?.layer==='project'&&isDeclarationKind(e.kind);
  const add=(source,target,kind,id,nativeRelationship)=>{if(!source||!target)return;relationships.push({id,source,target,kind,label:kind,authority:'native-api',nativeRelationship});};
  for(const item of raw){const id=item['@id'];
   if(declaration(index.get(id)))for(const owner of refs(item.owner))if(declaration(index.get(owner)))containment.push({id:`owner:${owner}:${id}`,source:owner,target:id,kind:'containment',label:'owns',authority:'native-api',nativeRelationship:refs(item.owningMembership)[0]??refs(item.owningRelationship)[0]??null,nativeRole:'owner',navigationOnly:true});
