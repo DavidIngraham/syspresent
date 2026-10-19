@@ -64,3 +64,25 @@ The canvas uses pinned elkjs 0.12.0 in a separate browser worker for joint tile,
 Structural sibling ordering and staggered rows may vary with available space. General requirements remain above their derived requirements; action fork/join branches retain concurrency. One camera transform fits tiles, paths, actual port labels and relationship labels together. Translucent context is placed afterward, avoiding active corridors and labels, and never expands that camera fit. Failed routes are explicit omissions, with no line through an obstacle as a fallback.
 
 Select a connection by touch or keyboard to emphasize its complete path, label and both endpoints. Selection does not relayout. Moving routes are checked against current tiles; an unsafe interpolated path uses a clear orthogonal route or remains hidden. Travel lowers relationship emphasis and restores it continuously as the scene settles. This is a prototype implementation, not proof of arbitrary-model readability or complete notation coverage.
+
+## Focused requirement traversal
+
+Selection exposes Origins, Derived requirements, Design impact and Verification on the existing diagram canvas. These are display projections over native relationship kinds and directions, not new model queries inferred from names or prose. A single explicit requirement definition/usage typing link may bridge to links recorded on the other representation; both identities and that typing edge remain visible. Definition inheritance and KerML ancestry do not become traversal shortcuts. Generic engineering context remains available for other elements, with requirement traces prioritized over generic dependencies when competing for the first bounded page.
+
+Focus plus required typing bridges and neighboring targets share a bounded active budget (five on narrow screens, seven otherwise). Stable pages replace the neighbor set rather than accumulating an unbounded diagram. The canvas discloses shown/total targets and unavailable or policy-hidden context. Verification links identify modeled cases and never imply executed tests or passed verdicts. The loaded declaration/coverage graph is a projection, even when the complete source model is loaded in WASM; a zero link count is not proof that none exists in the model.
+
+Exploration history restores the actual viewpoint, focus, expanded/collapsed statements, result page, story position and display preferences. Back/Forward appear only after an exploration action. Return to scene restores the authored scene and is itself reversible through history. First selection stays stationary. Slow or rejected obsolete layout responses cannot commit over newer navigation.
+
+A scene may supply presentation-only settings in its existing Markdown JSON block:
+
+```json
+"presentation": {
+  "compartments": "compact",
+  "expanded": ["Example::requirement"],
+  "emphasis": ["derive", "verify"],
+  "contextBudget": 3,
+  "grouping": "owner"
+}
+```
+
+`compartments` accepts `auto`, `compact` or `expanded`; explicit expanded references resolve by native ID or qualified name. `emphasis` dims other active relationship kinds without filtering them out. `contextBudget` controls 0–8 peripheral elements; omission preserves responsive defaults. `grouping: owner` is a soft ordering preference among structural siblings using their actual native owners, not a synthetic containment diagram, and never changes behavior order. Invalid settings or unresolved references fail before scene edits are applied. The editor exposes these under Diagram presentation, and Markdown/project export retains them. Native view definitions still own model membership. Capturing an arbitrary focused projection as a new exact native view remains unsupported; use a declared native view or the existing native internal/activity capture path.

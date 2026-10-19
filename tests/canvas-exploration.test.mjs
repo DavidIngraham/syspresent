@@ -1,0 +1,122 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {requirementActions,traceContext} from '../src/canvas-prototype/exploration.mjs';
+const element=(id,kind='RequirementUsage',extra={})=>({id,kind,name:id,description:'Native documentation for '+id,...extra});
+const edge=(id,source,target,kind,extra={})=>({id,source,target,kind,label:'Native label '+id,authority:'native-api',...extra});
+const graph=(elements,relationships)=>({elements,relationships});
+const action=(g,id,mode)=>requirementActions(g,id).find(a=>a.mode===mode);
+const ids=result=>result.elements.map(e=>e.id);
+const fixture=()=>graph([
+ element('req'),element('origin','RequirementDefinition'),element('child'),element('part','PartUsage'),element('case','VerificationCaseUsage'),element('allocation','ActionUsage'),element('constraint','ConstraintUsage'),element('dependency')
+],[edge('origin-link','req','origin','derive'),edge('child-link','child','req','derivation'),edge('satisfaction','part','req','satisfaction'),edge('verification','case','req','verification'),edge('allocated','req','allocation','allocate'),edge('constraint','constraint','req','dependency'),edge('not-origin','req','dependency','dependency')]);
+
+test('requirement actions expose directed native traces without inferring origins from dependency',()=>{
+ const g=fixture();
+ assert.deepEqual(requirementActions(g,'req').map(a=>[a.mode,a.count,a.enabled]),[['origins',1,true],['derived',1,true],['impact',2,true],['verification',1,true],['context',7,true]]);
+ assert.deepEqual(ids(traceContext(g,{focus:'req',mode:'origins'})),['req','origin']);
+ assert.deepEqual(traceContext(g,{focus:'req',mode:'derived'}).relationships,[g.relationships[1]]);
+ const impact=traceContext(g,{focus:'req',mode:'impact'});
+ assert.deepEqual(impact.relationships.map(e=>[e.source,e.target,e.kind]),[['req','allocation','allocate'],['part','req','satisfaction']]);
+ assert.ok(ids(traceContext(g,{focus:'req',budget:24})).includes('constraint'));
+ assert.ok(!ids(traceContext(g,{focus:'req',mode:'origins'})).includes('dependency'));
+});
+
+test('all explicit aliases preserve original kinds and direction',()=>{
+ const kinds=['derive','derivation','refine','refinement','satisfy','satisfaction','verify','verification','allocate','allocation'];
+ const g=graph([element('r'),...kinds.map(k=>element(k))],kinds.map(k=>edge(k,['derive','derivation','refine','refinement'].includes(k)?'r':k,['derive','derivation','refine','refinement'].includes(k)?k:'r',k)));
+ assert.equal(action(g,'r','origins').count,4);assert.equal(action(g,'r','impact').count,4);assert.equal(action(g,'r','verification').count,2);
+ assert.deepEqual(traceContext(g,{focus:'r',mode:'verification'}).relationships,g.relationships.filter(e=>['verify','verification'].includes(e.kind)).sort((a,b)=>a.id.localeCompare(b.id)));
+});
+
+test('definition/usage typing bridges work in both directions without merging identities',()=>{
+ for(const focus of ['usage','definition']){
+  const other=focus==='usage'?'definition':'usage';
+  const typing=edge('typing','usage','definition','typing'),verify=edge('verify','case',other,'verify');
+  const g=graph([element('usage'),element('definition','RequirementDefinition'),element('case','VerificationCaseUsage')],[typing,verify]);
+  const result=traceContext(g,{focus,mode:'verification',budget:3});
+  assert.deepEqual(ids(result),[focus,'case',other]);assert.equal(result.elements.length,3);
+  assert.deepEqual(result.relationships,[typing,verify]);assert.deepEqual(result.typingBridges,['typing']);
+  assert.equal(action(g,focus,'verification').count,1);
+  assert.match(result.summary.message,/not executed results/);
+ }
+});
+
+test('typing bridges are not included unless needed by a selected neighbor',()=>{
+ const g=graph([element('r'),element('d','RequirementDefinition'),element('a'),element('b')],[edge('t','r','d','typing'),edge('direct','a','r','derive'),edge('indirect','b','d','derive')]);
+ const first=traceContext(g,{focus:'r',mode:'derived',budget:3});
+ assert.deepEqual(ids(first),['r','a']);assert.deepEqual(first.typingBridges,[]);assert.equal(first.pages,2);
+ const second=traceContext(g,{focus:'r',mode:'derived',budget:3,page:1});
+ assert.deepEqual(ids(second),['r','b','d']);assert.deepEqual(second.relationships.map(e=>e.id),['indirect','t']);
+});
+
+test('pagination bounds active elements including shared typing bridges and counts unique targets',()=>{
+ const g=graph([element('r'),element('d','RequirementDefinition'),...['a','b','c','e','f'].map(id=>element(id))],[edge('t','r','d','type'),...['a','b','c','e','f'].map(id=>edge(id,id,'d','derive')),edge('duplicate','a','d','refine')]);
+ assert.equal(action(g,'r','derived').count,5);
+ const p0=traceContext(g,{focus:'r',mode:'derived',budget:4}),p1=traceContext(g,{focus:'r',mode:'derived',budget:4,page:1}),p2=traceContext(g,{focus:'r',mode:'derived',budget:4,page:2});
+ assert.equal(p0.pages,3);assert.equal(p0.total,5);assert.deepEqual(p0.targets,['a','b']);assert.deepEqual(p1.targets,['c','e']);assert.deepEqual(p2.targets,['f']);
+ for(const p of [p0,p1,p2])assert.ok(p.elements.length<=4);
+ assert.equal(p0.omissions.filter(o=>o.reason==='budget').length,3);
+ const reversed=graph([...g.elements].reverse(),[...g.relationships].reverse());
+ assert.deepEqual(traceContext(reversed,{focus:'r',mode:'derived',budget:4}),p0);
+ assert.equal(traceContext(g,{focus:'r',mode:'derived',budget:4,page:99}).page,2);
+});
+
+test('available, filtered, missing links and unavailable targets stay distinct',()=>{
+ const empty=graph([element('r'),element('other')],[edge('dependency','r','other','dependency')]);
+ assert.equal(traceContext(empty,{focus:'r',mode:'origins'}).summary.status,'no-known-links');
+ const unavailable=traceContext(graph([element('r')],[edge('missing','r','absent','derive')]),{focus:'r',mode:'origins'});
+ assert.equal(unavailable.summary.status,'unavailable');assert.equal(unavailable.summary.unavailable,1);assert.equal(unavailable.total,0);assert.deepEqual(unavailable.omissions,[{relationshipId:'missing',target:'absent',reason:'unavailable',anchor:'r'}]);
+ const filtered=traceContext(graph([element('r'),element('meta','RequirementDefinition',{layer:'metamodel'})],[edge('meta','r','meta','derive')]),{focus:'r',mode:'origins'});
+ assert.equal(filtered.summary.status,'filtered');assert.equal(filtered.omissions[0].reason,'metamodel-boundary');
+ const elementFiltered=traceContext(fixture(),{focus:'req',mode:'impact',elementKinds:['RequirementUsage']});
+ assert.equal(elementFiltered.summary.status,'filtered');assert.equal(elementFiltered.summary.filtered,2);
+ const missing=traceContext(empty,{focus:'missing'});assert.equal(missing.summary.status,'missing-focus');assert.deepEqual(missing.elements,[]);
+});
+
+test('no metamodel, definition ancestry, second-hop requirement or document wormholes',()=>{
+ const g=graph([element('r'),element('d','RequirementDefinition'),element('ancestor','RequirementDefinition'),element('a'),element('further'),element('doc','Documentation'),element('part','PartDefinition'),element('meta','RequirementDefinition',{metamodel:true})],[edge('t','r','d','typing'),edge('ancestry','d','ancestor','typing'),edge('a','a','d','derive'),edge('further','further','a','derive'),edge('bad','r','doc','dependency'),edge('part','r','part','typing'),edge('meta','r','meta','typing'),edge('meta-origin','meta','ancestor','derive')]);
+ const result=traceContext(g,{focus:'r',mode:'derived',budget:24});assert.deepEqual(ids(result),['r','a','d']);assert.deepEqual(result.relationships.map(e=>e.id),['a','t']);
+ assert.ok(!ids(traceContext(g,{focus:'r',budget:24})).includes('doc'));
+ assert.ok(result.omissions.some(o=>o.reason==='typing-boundary'&&o.target==='part'));
+});
+
+test('generic context works for engineering components and non-requirement trace actions stay disabled',()=>{
+ const g=graph([element('part','PartUsage'),element('constraint','ConstraintUsage'),element('r')],[edge('constraint','constraint','part','dependency'),edge('satisfy','part','r','satisfy')]);
+ assert.deepEqual(ids(traceContext(g,{focus:'part',mode:'context'})),['part','r','constraint']);
+ assert.ok(requirementActions(g,'part').filter(a=>a.mode!=='context').every(a=>!a.enabled));
+ assert.equal(action(g,'part','context').count,2);
+});
+
+test('model input is immutable, returned data is isolated and native evidence is not fabricated',()=>{
+ const g=fixture(),original=structuredClone(g),result=traceContext(g,{focus:'req',mode:'verification'});
+ result.elements[0].description='changed';result.relationships[0].label='changed';
+ assert.deepEqual(g,original);requirementActions(g,'req');assert.deepEqual(g,original);
+ assert.equal('verdict' in result,false);assert.equal('executed' in result,false);
+});
+
+test('invalid options fail explicitly and effective budgets are bounded',()=>{
+ const g=fixture();
+ assert.throws(()=>traceContext(g,{focus:'req',budget:0}),/budget/);assert.throws(()=>traceContext(g,{focus:'req',budget:2.5}),/budget/);
+ assert.throws(()=>traceContext(g,{focus:'req',page:-1}),/page/);assert.throws(()=>traceContext(g,{focus:'req',mode:'guessed'}),/mode/);
+ assert.equal(traceContext(g,{focus:'req',budget:1}).budget,3);assert.equal(traceContext(g,{focus:'req',budget:100}).budget,24);
+});
+
+
+test('an explicitly focused package remains visible without opening ownership or metamodel plumbing',()=>{
+ const g=graph([element('project','Package'),element('part','PartUsage'),element('owned','RequirementUsage'),element('meta','Package',{layer:'metamodel'})],[edge('engineering','project','part','dependency'),edge('owned','project','owned','owningMembership'),edge('meta','project','meta','typing')]);
+ const result=traceContext(g,{focus:'project'});assert.deepEqual(ids(result),['project','part']);assert.deepEqual(result.relationships.map(e=>e.id),['engineering']);
+ assert.ok(result.omissions.some(o=>o.relationshipId==='owned'&&o.reason==='relationship-policy'));
+ const alone=traceContext(graph([element('project','Package')],[]),{focus:'project'});assert.deepEqual(ids(alone),['project']);assert.equal(alone.summary.status,'no-known-links');
+});
+
+test('different necessary bridge nodes consume separate page slots and direct parallel links do not add nodes',()=>{
+ const g=graph([element('r','RequirementDefinition'),element('u1'),element('u2'),element('a','PartUsage'),element('b','PartUsage')],[edge('t1','u1','r','typing'),edge('t2','u2','r','typing'),edge('a','a','u1','satisfy'),edge('a2','a','u1','satisfaction'),edge('b','b','u2','satisfy')]);
+ assert.equal(action(g,'r','impact').count,2);
+ const first=traceContext(g,{focus:'r',mode:'impact',budget:3}),second=traceContext(g,{focus:'r',mode:'impact',budget:3,page:1});
+ assert.deepEqual(ids(first),['r','a','u1']);assert.deepEqual(ids(second),['r','b','u2']);assert.equal(first.relationships.length,3);assert.equal(first.pages,2);
+});
+
+test('default context prioritizes requirement traces over incidental dependencies within its node budget',()=>{
+ const g=graph([element('r'),element('z-origin'),element('z-part','PartUsage'),element('z-case','VerificationCaseUsage'),...['a','b','c','d'].map(id=>element(id,'PartUsage'))],[edge('origin','r','z-origin','derive'),edge('impact','z-part','r','satisfy'),edge('verify','z-case','r','verify'),...['a','b','c','d'].map(id=>edge(id,id,'r','dependency'))]);
+ const result=traceContext(g,{focus:'r',mode:'context',budget:4});assert.deepEqual(result.targets,['z-origin','z-part','z-case']);assert.equal(result.total,7);assert.ok(result.omissions.some(o=>o.reason==='budget'&&o.target==='a'));assert.deepEqual(traceContext(graph([...g.elements].reverse(),[...g.relationships].reverse()),{focus:'r',mode:'context',budget:4}),result);
+});

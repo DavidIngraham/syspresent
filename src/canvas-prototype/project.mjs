@@ -1,3 +1,4 @@
+import {validatePresentation} from './preferences.mjs';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 const SCHEMA='syspresent.project.v1';
 export function projectPath(name){if(typeof name!=='string'||!name||name.startsWith('/')||name.includes('\\')||name.includes(':')||name.split('/').some(x=>x==='..'||x==='.'||!x))throw Error('Invalid project path: '+name);return name;}
@@ -21,6 +22,7 @@ export function parseStory(markdown){
   for(const key of ['id','title','view','focus'])if(typeof config[key]!=='string'||!config[key])throw Error('Scene requires '+key);
   if(scenes.some(s=>s.id===config.id))throw Error('Duplicate scene '+config.id);
   if(config.journey!==undefined&&(!Array.isArray(config.journey)||!config.journey.every(x=>typeof x==='string'&&x)))throw Error('Invalid scene journey');
+  if(config.presentation!==undefined)validatePresentation(config.presentation);
   if(!['right','bottom','left'].includes(config.panel?.placement??'right'))throw Error('Unsupported panel placement');
   previous={...config,bodyStart:match.index+match[0].length,markdown:''};scenes.push(previous);
  }

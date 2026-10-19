@@ -130,7 +130,7 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
         requirement <'SP-044'> focusHistory {
-            doc /* The explorer shall provide focus, pin, collapse, reset and Back/Forward operations that restore the prior view and its context. */
+            doc /* The explorer shall provide focus, pin, collapse, reset and Back/Forward operations that restore the prior view and its context. History restoration shall include scene handoff, expanded statements, active result page and display preferences. */
             comment scope /* First release */
         }
         requirement <'SP-045'> shareableState {
@@ -144,7 +144,7 @@ package SyspresentRequirements {
     }
     package RequirementReading {
         requirement <'SP-047'> requirementQuestions {
-            doc /* Requirement diagrams and contextual exploration actions shall reveal the requirement statement, rationale, upstream origins, affected system elements and verification cases within the graph. Definitions and usages shall retain distinct semantic identities through explicit typing. A separate question-reader interface shall not replace diagram exploration. */
+            doc /* Requirement diagrams and contextual exploration actions shall reveal the requirement statement, rationale, upstream origins, affected system elements and verification cases within the graph. Definitions and usages shall retain distinct semantic identities through explicit typing. Directional actions shall distinguish upstream origins from downstream derived requirements, and preserve explicit native links through any direct definition-to-usage bridge. Large result sets shall be traversable in bounded pages. A separate question-reader interface shall not replace diagram exploration. */
             comment scope /* First release */
         }
         requirement <'SP-048'> traceEvidence {

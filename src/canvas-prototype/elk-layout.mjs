@@ -48,6 +48,7 @@ function makeGraph(view,options,profile){
  const nodes=new Map(view.nodes.map(n=>[n.id,n])),behavioral=behavioralKinds.has(view.kind),actualPorts=new Set(view.nodes.filter(n=>isPort(n,nodes)).map(n=>n.id)),children=new Map(view.nodes.map(n=>[n.id,[]]));
  for(const node of view.nodes)if(node.parentId&&nodes.has(node.parentId)&&!actualPorts.has(node.id))children.get(node.parentId).push(node.id);
  const roots=view.nodes.filter(n=>!actualPorts.has(n.id)&&(!n.parentId||!nodes.has(n.parentId)));
+ if(options.grouping==='owner'&&!behavioral)roots.sort((a,b)=>String(a.layoutGroup||a.id).localeCompare(String(b.layoutGroup||b.id))||a.id.localeCompare(b.id));
  const rootOf=id=>{let node=nodes.get(id),seen=new Set();while(node?.parentId&&nodes.has(node.parentId)){if(seen.has(node.id))throw Error('Cyclic native drawing containment');seen.add(node.id);node=nodes.get(node.parentId);}return node?.id;};
  const rows=profile.capacity?partitions(roots,view.edges.filter(e=>edgeLayoutHints(e,{viewKind:view.kind}).rank!=='free').map(e=>{const [a,b]=orientation(e,behavioral,view.kind);return [rootOf(a),rootOf(b)];}),profile.capacity):null;
  const elkNodes=new Map(),anchors=new Map(),edgeMap=new Map(),gap=profile.gap;
@@ -64,7 +65,8 @@ function makeGraph(view,options,profile){
   'elk.layered.spacing.nodeNodeBetweenLayers':String(gap),'elk.layered.spacing.edgeEdgeBetweenLayers':'12','elk.layered.spacing.edgeNodeBetweenLayers':'12',
   'elk.layered.mergeEdges':'false','elk.layered.mergeHierarchyEdges':'false','elk.layered.unnecessaryBendpoints':'true',
   'elk.layered.crossingMinimization.strategy':'LAYER_SWEEP','elk.layered.nodePlacement.strategy':profile.capacity?'SIMPLE':'BRANDES_KOEPF',
-  ...(rows?{'elk.partitioning.activate':'true'}:{})
+  ...(rows?{'elk.partitioning.activate':'true'}:{}),
+  ...(options.grouping==='owner'&&!behavioral?{'elk.layered.considerModelOrder.strategy':'NODES_AND_EDGES'}:{})
  }};
  for(const native of view.nodes.filter(n=>actualPorts.has(n.id))){
   const owner=elkNodes.get(native.parentId),incoming=view.edges.find(e=>(e.sourceAttachment??e.source)===native.id||(e.targetAttachment??e.target)===native.id),specified=String(native.portSide??native.side??'').toUpperCase();
