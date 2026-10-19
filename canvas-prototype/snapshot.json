@@ -1,12 +1,12 @@
 {
   "schemaVersion": "syspresent.canvas-prototype.v1",
-  "revision": "6268132a1bf19b8baf0b675f250c6d34a768b1e4",
+  "revision": "8b6386583cea9c74a0ec5db0cd735d9defb36b38",
   "dirty": false,
   "assets": {
-    "app.js": "4e15fdeaa71151d332d6e036b80cd286d82e65ae777e6b634819e2b71950553e",
-    "app.js.map": "bcb7a75c56cdec07b59da4d0493b9d1e0da899a7bfe255eb4482b5a75f55ff54",
-    "index.html": "59d0266fc21fe1027780599ce2c2b22cd6d0d60247249b915e1df828e854035b",
-    "canvas.css": "b600324e951512eb0d23b85fd4ffd7060afa5ab154a5ca1b41eeed7c4c0d35ee",
+    "app.js": "b9a8c3dcd847afefc85033626b94d74468d5e387180102e866d74d1ce5f8ba15",
+    "app.js.map": "5ffedc317f5dc465c0ef19feaaeed00f56718f5cf5131a8947920312d47f8f8a",
+    "index.html": "fd013b03cb1deac6d9796019ff48ecd0feef8b873f70e83c5db5abe251494f7c",
+    "canvas.css": "37f1a9b65e359ca970a1b9ab408d019c1e48b7303cf3ddd46fbfbf27bc8a9ea1",
     "LICENSE": "ddd8327daa7878abe8284332d97059ff64738ef747356c8d8997c77533f968e4",
     "THIRD_PARTY_NOTICES": "c587e0045410f431fc4bf4e5263d2e9b19e7f03280f6803ab767150261e1cd4c",
     "engine/sysml-wasm.wasm": "f3bfacd95afe70551d39cfbc119ea7455a77d1e421f27a7ebb264d3a2cf2d0fe",
@@ -109,7 +109,7 @@
     "example/models/README.md": "54f9c9133c9ad61e109eb603817d2244b2608370f2b55992cba975dc2e9334f2",
     "example/runtime-cache.json": "82eaf3f782ed6f9ce93e1a45085b5008ca5af80f208c65882be421f67313ec9b",
     "project.zip": "374a222f4275f7b802c507cf330dea53e2705beb3ca4afc08dfb42cebc16c2bb",
-    "build-inputs.json": "269d05ca809d35c666d28eff93a031c3c752d0d44e901e0ed1ab13bcb8f5461c"
+    "build-inputs.json": "520091335b7fb512ddea17e24be3516e97febec0460fafc1278bfe0c6224b9e8"
   },
   "engine": {
     "schemaVersion": 1,

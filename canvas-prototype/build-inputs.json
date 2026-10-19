@@ -1,27 +1,48 @@
 {
   "inputs": {
+    "src/canvas-prototype/core/index.mjs": {
+      "bytes": 16564,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/graph.mjs": {
+      "bytes": 3373,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/context.mjs": {
+      "bytes": 11031,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/motion.mjs": {
+      "bytes": 3030,
+      "imports": [],
+      "format": "esm"
+    },
     "src/canvas-prototype/documentation.mjs": {
       "bytes": 1519,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/geometry.mjs": {
-      "bytes": 2956,
+      "bytes": 11188,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/engine/client.mjs": {
       "bytes": 1750,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/core/index.mjs": {
-      "bytes": 16334,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/graph.mjs": {
-      "bytes": 3373,
       "imports": [],
       "format": "esm"
     },
@@ -42,8 +63,18 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 31469,
+      "bytes": 39557,
       "imports": [
+        {
+          "path": "src/canvas-prototype/context.mjs",
+          "kind": "import-statement",
+          "original": "./context.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/motion.mjs",
+          "kind": "import-statement",
+          "original": "./motion.mjs"
+        },
         {
           "path": "src/canvas-prototype/documentation.mjs",
           "kind": "import-statement",
@@ -83,27 +114,33 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 239579
+      "bytes": 298116
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
       "exports": [],
       "entryPoint": "src/canvas-prototype/app.mjs",
       "inputs": {
+        "src/canvas-prototype/core/index.mjs": {
+          "bytesInOutput": 17621
+        },
+        "src/canvas-prototype/graph.mjs": {
+          "bytesInOutput": 3658
+        },
+        "src/canvas-prototype/context.mjs": {
+          "bytesInOutput": 10610
+        },
+        "src/canvas-prototype/motion.mjs": {
+          "bytesInOutput": 3230
+        },
         "src/canvas-prototype/documentation.mjs": {
           "bytesInOutput": 1541
         },
         "src/canvas-prototype/geometry.mjs": {
-          "bytesInOutput": 3547
+          "bytesInOutput": 11939
         },
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 1698
-        },
-        "src/canvas-prototype/core/index.mjs": {
-          "bytesInOutput": 17674
-        },
-        "src/canvas-prototype/graph.mjs": {
-          "bytesInOutput": 3658
         },
         "node_modules/fflate/esm/browser.js": {
           "bytesInOutput": 24695
@@ -112,10 +149,10 @@
           "bytesInOutput": 7438
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 35898
+          "bytesInOutput": 45303
         }
       },
-      "bytes": 96488
+      "bytes": 128145
     }
   }
 }
