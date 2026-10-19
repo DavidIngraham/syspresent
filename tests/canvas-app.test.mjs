@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM,VirtualConsole} from 'jsdom';
+import {packProject} from '../src/canvas-prototype/project.mjs';
 const {outputFiles}=await build({entryPoints:['src/canvas-prototype/app.mjs'],bundle:true,format:'iife',write:false,logLevel:'silent'});
 const html=await readFile('src/canvas-prototype/index.html','utf8');
 const raw=[{'@id':'orphan','@type':'PartUsage',qualifiedName:'Model::orphan',declaredName:'orphan','sysx:sourceLine':4},{'@id':'Model','@type':'Package',qualifiedName:'Model',declaredName:'Model','sysx:sourceLine':1},{'@id':'req','@type':'RequirementUsage',qualifiedName:'Model::req',declaredName:'req','sysx:sourceLine':2},{'@id':'part','@type':'PartUsage',qualifiedName:'Model::part',declaredName:'part','sysx:sourceLine':3},{'@id':'view','@type':'ViewUsage',qualifiedName:'Views::requirements','sysx:sourceLine':1}];
@@ -17,7 +18,7 @@ async function harness({reducedMotion=true}={}){
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};window.structuredClone=structuredClone;window.ResizeObserver=class{observe(){}};
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return 1000;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return 700;}});
- window.fetch=async url=>({ok:true,json:async()=>String(url).includes('project.json')?manifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});
+ window.fetch=async url=>({ok:true,arrayBuffer:async()=>packProject({manifest,files}).buffer,json:async()=>String(url).includes('project.json')?manifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});
  window.Worker=class{postMessage({id,method,params}){const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});

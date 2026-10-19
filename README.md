@@ -27,7 +27,7 @@ npm run build:canvas
 python3 -m http.server 8783 --directory build/canvas-prototype/site
 ```
 
-The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783. The build also produces a complete static-site ZIP and retains a content-addressed archive. Project > Export project ZIP saves ordinary model, view and Markdown files. Activity/internal-view capture preserves native notation; arbitrary focused-graph capture is explicitly unsupported for now.
+The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783. The default example includes the complete Blue Dog model with six focused story scenes. The build prepares the initial native graph and views for faster mobile startup; the browser still loads all sources into WASM for exploration. The build also produces a complete static-site ZIP and retains a content-addressed archive. Project > Export project ZIP saves ordinary model, view and Markdown files. Activity/internal-view capture preserves native notation; arbitrary focused-graph capture is explicitly unsupported for now.
 
 ## Previous viewer examples
 

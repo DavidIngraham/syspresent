@@ -51,3 +51,35 @@ test('narrow activity layout keeps parallel branches beside each other instead o
  const view={kind:'action',nodes:[{id:'root',kind:'action'},{id:'fork',kind:'fork',parent:'root'},{id:'power',kind:'action',parent:'root'},{id:'temperature',kind:'action',parent:'root'},{id:'join',kind:'join',parent:'root'}],edges:[{from:'fork',to:'power',kind:'succession'},{from:'fork',to:'temperature',kind:'succession'},{from:'power',to:'join',kind:'succession'},{from:'temperature',to:'join',kind:'succession'}]};
  const layout=layoutScene(view,{width:390,height:700,panels:[{x:12,y:500,width:366,height:140}]});const power=layout.nodes.find(n=>n.id==='power'),temperature=layout.nodes.find(n=>n.id==='temperature');assert.equal(power.y,temperature.y);assert.notEqual(power.x,temperature.x);
 });
+
+import {documentationFor} from '../src/canvas-prototype/documentation.mjs';
+test('requirement usages retain the complete native definition statement and its origin',()=>{
+ const body='The autonomous vessel shall keep its safety functions available. '.repeat(12);
+ const graph={elements:[{id:'usage',native:{type:[{'@id':'definition'}]}},{id:'definition',qualifiedName:'System::Safety',description:body}]};
+ const statement=documentationFor(graph,'usage');assert.equal(statement.text,body);assert.equal(statement.source.id,'definition');assert.equal(documentationFor(graph,'missing').text,'');
+});
+
+import {webcrypto,createHash} from 'node:crypto';
+import {sourceDigest,verifiedRuntimeCache} from '../src/canvas-prototype/project.mjs';
+test('prepared native cache requires publisher hash, exact sources, engine and native model identity',async()=>{
+ const originalCrypto=globalThis.crypto;globalThis.crypto=webcrypto;
+ try{
+  const documents=[{name:'model.sysml',content:'package Test {}'}];
+  const cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:'pinned-engine',engineFingerprint:'binary-hash',modelHash:'native-model',sourceDigest:await sourceDigest(documents),exported:{elements:[]}};
+  const bytes=new TextEncoder().encode(JSON.stringify(cache));
+  const project={manifest:{runtimeCache:'runtime-cache.json'},files:{'runtime-cache.json':bytes}};
+  const options={trustedHash:createHash('sha256').update(bytes).digest('hex'),engineVersion:'pinned-engine',engineFingerprint:'binary-hash',modelHash:'native-model',documents};
+  assert.deepEqual(await verifiedRuntimeCache(project,options),cache);
+  for(const change of [{trustedHash:undefined},{trustedHash:'forged'},{engineVersion:'other'},{engineFingerprint:'different-binary'},{modelHash:'changed'},{documents:[{...documents[0],content:'package Changed {}'}]}])assert.equal(await verifiedRuntimeCache(project,{...options,...change}),null);
+  project.files['runtime-cache.json']=new TextEncoder().encode(JSON.stringify({...cache,exported:{elements:[{'@id':'forged'}]}}));
+  assert.equal(await verifiedRuntimeCache(project,options),null);
+ }finally{globalThis.crypto=originalCrypto;}
+});
+
+import {edgeRoute} from '../src/canvas-prototype/geometry.mjs';
+test('wrapped requirement edges detour around intervening cards without reversing endpoints',()=>{
+ const parent={id:'parent',x:26,y:30,width:280,height:170},upper={id:'upper',x:26,y:224,width:160,height:76},lower={id:'lower',x:26,y:324,width:160,height:76};
+ const route=edgeRoute(lower,parent,[parent,upper,lower]);
+ assert.deepEqual(route.points[0],{x:106,y:324});assert.deepEqual(route.points.at(-1),{x:166,y:200});assert.ok(route.points.some(p=>p.x<26));
+ for(let i=1;i<route.points.length;i++){const a=route.points[i-1],b=route.points[i];assert.ok(!(a.x===b.x&&a.x>26&&a.x<186&&Math.min(a.y,b.y)<300&&Math.max(a.y,b.y)>224));}
+});

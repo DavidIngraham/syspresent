@@ -6,6 +6,7 @@ import { webcrypto } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { modelGraph, adaptNativeView } from '../../src/canvas-prototype/graph.mjs';
 import { engineeringContext } from '../../src/canvas-prototype/core/index.mjs';
 
@@ -80,6 +81,21 @@ try {
   const exported = await native.call('ExportModel', { modelHash });
   const wasmExported = await wasm.call('ExportModel', { modelHash });
   assert.deepEqual(wasmExported, exported, 'Native and WASM API graph must be identical');
+  const declarations = await native.call('ExportModel', { modelHash, projection: 'declarations' });
+  const wasmDeclarations = await wasm.call('ExportModel', { modelHash, projection: 'declarations' });
+  assert.deepEqual(wasmDeclarations, declarations, 'Declaration projection must agree in native and WASM');
+  assert.equal(declarations.projection, 'declarations');
+  const sourceDeclarations = exported.elements.filter(element => Object.hasOwn(element, 'sysx:sourceLine'));
+  if(!isDeepStrictEqual(declarations.elements,sourceDeclarations)) {
+    const expected=new Map(sourceDeclarations.map(element=>[element['@id'],element]));
+    const differences=declarations.elements.filter(element=>!isDeepStrictEqual(element,expected.get(element['@id']))).map(element=>({id:element['@id'],properties:[...new Set([...Object.keys(element),...Object.keys(expected.get(element['@id'])||{})])].filter(key=>!isDeepStrictEqual(element[key],expected.get(element['@id'])?.[key])).map(key=>({key,actual:element[key],expected:expected.get(element['@id'])?.[key]}))}));
+    await writeFile(resolve(dirname(output),'projection-differences.json'),JSON.stringify(differences,null,2));
+    assert.fail('Projected declaration objects changed; see projection-differences.json: '+JSON.stringify(differences.slice(0,3)));
+  }
+  assert.equal(declarations.elementCount, sourceDeclarations.length);
+  assert.equal(declarations.omittedElementCount, exported.elements.length - sourceDeclarations.length);
+  assert.ok(declarations.coverageNotice);
+
   const views = {};
   for (const view of ['CanvasViews::requirements', 'CanvasViews::structure', 'CanvasViews::assembly', 'CanvasViews::operation']) {
     const params = { modelHash, view, includeSemanticIdentity: true, show: ['compartments'] };
@@ -98,6 +114,17 @@ try {
     }
     views[view] = a;
   }
+  const boundedSource = "package BoundedViews { private import StandardViewDefinitions::*; view portable : GeneralView { @OpenSysMLRenderings::RequirementContext { relationshipDepth = 1; } filter @SysML::RequirementUsage; expose Flashlight::portable; } }";
+  const boundedDocuments = [...documents, { name: 'bounded.sysml', content: boundedSource }];
+  const boundedParsed = await native.call('ParseSources', { documents: boundedDocuments });
+  assert.deepEqual(await wasm.call('ParseSources', { documents: boundedDocuments }), boundedParsed);
+  assert.equal(boundedParsed.diagnostics?.length || 0, 0);
+  const boundedParams = { modelHash: boundedParsed.modelHash, view: 'BoundedViews::portable', includeSemanticIdentity: true };
+  const boundedRequirementView = await native.call('RenderView', boundedParams);
+  assert.deepEqual(await wasm.call('RenderView', boundedParams), boundedRequirementView, 'Bounded native context must agree in WASM');
+  const boundedIDs = new Set(boundedRequirementView.nodes.map(node => node.semanticId));
+  assert.ok(boundedIDs.has('Flashlight__light') && boundedIDs.has('Flashlight__massCheck'));
+  assert.ok(!boundedIDs.has('Flashlight__controllable'), 'Depth-one context must not follow a newly added satisfier into another requirement');
   const capturedViews = {};
   const captureCases = [
     { pseudo: '#action:Flashlight::turnOn', root: ['Flashlight', 'turnOn'], name: 'operation', definition: 'ActionFlowView' },
@@ -139,8 +166,8 @@ try {
   const contextIDs = new Set(portableContext.elements.map(element => element.id));
   for (const id of ['Flashlight__light', 'Flashlight__MassCheck', 'Flashlight__massCheck']) assert.ok(contextIDs.has(id), `Standalone requirement context lost native endpoint: ${id}`);
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, views, capturedViews, requirementCoverage }, null, 2) + '\n');
-  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, captures: Object.keys(capturedViews),
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView }, null, 2) + '\n');
+  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews),
     views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: view.edges.length }])) }, null, 2));
 } finally { native.close(); }
 // Go remains resident by design. This harness owns the process lifetime.

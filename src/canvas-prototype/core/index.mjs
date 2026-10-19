@@ -130,7 +130,7 @@ export function layoutScene(nativeView, options={}) {
     const lines=[node.label??node.name??'',...(node.compartments??[]).map(value=>typeof value==='string'?value:JSON.stringify(value))].join('\n').split('\n');
     const symbol=controlSizes.get(node.kind);
     const ownHeight=symbol?symbol[1]:Math.max(76,Math.min(16,lines.length)*18+24,Number(node.height)||0);
-    const ownWidth=symbol?symbol[0]:Math.max(160,Math.min(280,Math.max(0,...lines.map(line=>line.length))*7+32),Number(node.width)||0);
+    const ownWidth=symbol?symbol[0]:Number(node.width)>0?Number(node.width):Math.max(160,Math.min(280,Math.max(0,...lines.map(line=>line.length))*7+32));
     for(const child of items)measure(child);
     const behavioral=['action','activity','state'].includes(view.kind);
     const edges=view.edges.filter(edge=>!behavioral||flowKinds.has(edge.kind)).map(edge=>[directChildOf(edge.source,id),directChildOf(edge.target,id)]).filter(([a,b])=>a&&b&&a!==b);

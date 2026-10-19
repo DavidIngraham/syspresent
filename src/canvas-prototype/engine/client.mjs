@@ -1,5 +1,5 @@
 /** Start the OpenSysML semantic engine in an isolated browser worker. */
-export function createSemanticEngine({ assetBase, workerURL = new URL('./worker.js', import.meta.url), WorkerClass = globalThis.Worker } = {}) {
+export function createSemanticEngine({ assetBase, assetVersion, workerURL = new URL('./worker.js', import.meta.url), WorkerClass = globalThis.Worker } = {}) {
   if (!assetBase) throw new TypeError('assetBase must locate the pinned Go/WASM engine assets');
   const worker = new WorkerClass(workerURL);
   const pending = new Map();
@@ -33,7 +33,7 @@ export function createSemanticEngine({ assetBase, workerURL = new URL('./worker.
     worker.terminate();
   };
   const base = new URL(assetBase, globalThis.location?.href || import.meta.url).href;
-  const ready = request('Initialize', { assetBase: base });
+  const ready = request('Initialize', { assetBase: base, assetVersion });
   return {
     ready,
     async call(method, params = {}) {

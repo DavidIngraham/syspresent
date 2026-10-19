@@ -22,6 +22,8 @@ The adapter exposes a versioned browser-friendly contract with:
 
 A scoped RenderView payload alone is too narrow for unrestricted exploration. A raw metamodel dump alone contains incidental relationships unsuitable for default engineering navigation. The contract must support an intentional engineering graph as well as native notation projections. Actual native relationships remain authoritative in both; a shared classifier or KerML ancestor is not a system connection.
 
+The default full Blue Dog publication prepares native declaration/requirement/view data during its build. The browser verifies the publisher hash, exact sources, native parse identity and engine fingerprint before reuse, while retaining the complete model in WASM for fresh queries and views. An explicit native declaration projection reduces metamodel-expression serialization; omitted objects are disclosed, never silently replaced by inferred links. See the prototype evidence for mobile memory limits.
+
 No permanent wire schema is implied by these conceptual fields. A narrow adapter contains native API changes. The prototype must demonstrate actual identity and view parity before this boundary is treated as stable. Browser-worker request identities and stale-result handling should keep a slow earlier response from replacing a newer scene.
 
 ## Rendering and transition boundary

@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
-    "build:canvas": "node scripts/build_canvas_prototype.mjs",
+    "build:canvas": "node scripts/build_canvas_cache.mjs && node scripts/build_canvas_prototype.mjs --runtime-cache build/canvas-prototype/runtime-cache.json",
     "test:canvas": "node --test tests/canvas-*.test.mjs tests/wasm-prototype/*.test.mjs"
   },
   "dependencies": {

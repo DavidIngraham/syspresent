@@ -5,6 +5,8 @@ export const fileText=(project,name)=>{const value=project.files[projectPath(nam
 export function validateProject(project){
  const m=project.manifest;if(m?.schemaVersion!==SCHEMA)throw Error('Unsupported project manifest');
  for(const key of ['modelSources','viewSources','systemOfInterest'])if(!Array.isArray(m[key])||!m[key].length||!m[key].every(x=>typeof x==='string'&&x))throw Error('Project requires '+key);
+ if(m.requirementSeeds!==undefined&&(!Array.isArray(m.requirementSeeds)||!m.requirementSeeds.length||!m.requirementSeeds.every(x=>typeof x==='string'&&x)))throw Error('Invalid native requirement seeds');
+ if(m.modelRoots!==undefined&&(!Array.isArray(m.modelRoots)||!m.modelRoots.length||!m.modelRoots.every(x=>typeof x==='string'&&x)))throw Error('Invalid native model roots');
  for(const name of [...m.modelSources,...m.viewSources,m.story,...(m.assets??[])])fileText(project,name);
  if(new Set([...m.modelSources,...m.viewSources]).size!==m.modelSources.length+m.viewSources.length)throw Error('Model and view source files must be separate');
  if(!['complete','scoped'].includes(m.publication?.scope))throw Error('Publication scope must be complete or scoped');
@@ -48,14 +50,25 @@ export function captureViewSource({packageName='CanvasCaptured',name,qualifiedNa
  return `package ${packageName} {\n    private import StandardViewDefinitions::*;\n    view ${name} : ${definition} {\n${refs.map(q=>'        expose '+reference(q)+';').join('\n')}\n    }\n}\n`;
 }
 
-export function requirementCoverageSource(qualifiedRoots,packageName='SyspresentRuntimeContext'){
+export function requirementCoverageSource(qualifiedRoots,packageName='SyspresentRuntimeContext',seeds){
  const quoted=s=>"'"+s.replaceAll('\\','\\\\').replaceAll("'","\\'")+"'";
  return `package ${packageName} {
  private import StandardViewDefinitions::*;
  view coverage : GeneralView {
-  filter @SysML::RequirementUsage or @SysML::RequirementDefinition;
-${qualifiedRoots.map(q=>'  expose '+q.split('::').map(quoted).join('::')+'::**;').join('\n')}
+${seeds?'  @OpenSysMLRenderings::RequirementContext { relationshipDepth = 1; }\n':''}  filter @SysML::RequirementUsage or @SysML::RequirementDefinition;
+${(seeds??qualifiedRoots).map(q=>'  expose '+q.split('::').map(quoted).join('::')+(seeds?';':'::**;')).join('\n')}
  }
 }
 `;
+}
+
+export async function sourceDigest(documents){const bytes=new TextEncoder().encode(JSON.stringify(documents));return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');}
+export async function verifiedRuntimeCache(project,{trustedHash,engineVersion,engineFingerprint,documents,modelHash}){
+ const filename=project.manifest.runtimeCache;if(!filename||!trustedHash)return null;
+ const value=project.files[filename],bytes=typeof value==='string'?new TextEncoder().encode(value):value;
+ if(!bytes)return null;const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
+ if(hash!==trustedHash)return null;
+ const cache=JSON.parse(fileText(project,filename));
+ if(cache.schemaVersion!=='syspresent.native-cache.v1'||cache.engineVersion!==engineVersion||cache.engineFingerprint!==engineFingerprint||cache.modelHash!==modelHash||cache.sourceDigest!==await sourceDigest(documents))return null;
+ return cache;
 }
