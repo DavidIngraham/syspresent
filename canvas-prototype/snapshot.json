@@ -1,17 +1,21 @@
 {
   "schemaVersion": "syspresent.canvas-prototype.v1",
-  "revision": "8ab3de046ab8b547deb5916d5640bf6c8d702ea4",
+  "revision": "60119bf4dc57d3f47811e0ba49602c31397077dd",
   "dirty": false,
   "assets": {
-    "app.js": "4091f401dcd1fceab81bb2ab107f7f40507f04a5394d8c66b4d3fda03b2c8607",
-    "app.js.map": "a165aabb87ec22ca812f0edc5311d9752c686287da6e140b171c9fafe7f36382",
-    "index.html": "3e901c38f141606002ae9d9ea5e31429c9102fd8e69f798fe2491e6d7c6d8836",
-    "canvas.css": "c9e0ec8167eb23c382262aee006d046d519c047707f49a5a6d6e4d41734ad90f",
+    "app.js": "f3212b983ee4268cfaf74bf455e2f2c6859128cecffb63873086be60e1efd60c",
+    "app.js.map": "527b2bf715134118c349df8fdb51c7f9b77f11d2a1ac2a5d7f076aed68b315c9",
+    "grid-view.css": "ffe65bbe7e7cc450f91b8e974a65a45ced1bfd3c33a31e4c47cc09d52af4ea3c",
+    "sequence-view.css": "c18f0e729a55a61e9fa97a1fd68b51dc551aac6b1011e38d07433d00d1b62e47",
+    "behavior-view.css": "6494406e52d093e6846eb55c5f2906cddba2936d00b2c44947d794aef56488ac",
+    "scene-regions.css": "84b487e209b0d8eccb65f4137e9c41373b4b29fc9920504ebd76cb279b1bc9eb",
+    "index.html": "e027482f5f228e2d61b5b6d6b3785ac810c43af6fb6156a8245742fa79494583",
+    "canvas.css": "2d93f2b08f46022ba11f802055e4da6a02b221413e5c9e7b904454ef4520aed8",
     "LICENSE": "ddd8327daa7878abe8284332d97059ff64738ef747356c8d8997c77533f968e4",
     "THIRD_PARTY_NOTICES": "3d96ebb51ec88c36a1616fce291977d3c1c3edcb19fe7caa9071dffabe667aee",
-    "engine/sysml-wasm.wasm": "f3bfacd95afe70551d39cfbc119ea7455a77d1e421f27a7ebb264d3a2cf2d0fe",
+    "engine/sysml-wasm.wasm": "42ff4f59aa4ecc9a00718d4f85e625b8c9e28f5fff5adcbfea8353c8b169cfbe",
     "engine/wasm_exec.js": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
-    "engine/provenance.json": "8e743deb8739313fefcec8fb059fdedd7da8f155c54afe5cb3dd33dd07d30e57",
+    "engine/provenance.json": "6bc7011bb40f97408576348d5f84a301bf191f65079acbf73269bcab58b79114",
     "engine/OPENSYSML-LICENSE": "88bb6635d016ec5c3fd1e00f55930f5b710cc092e7503e7f356188ecd2526bd6",
     "engine/GO-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
     "engine/worker.js": "633e2f8dbd7b7797dbdaaac3261fda7bf7676d24096f62613259f6d4c270a517",
@@ -113,34 +117,35 @@
     "example/story.md": "7f29953cc7831ba0fdb18ca673ee3e7d51071f7fedbca65a6915073d90e154ea",
     "example/tools/publishing/reference.sysml": "368bbeee73f050d8a612662906399db3842e1896717a1c8ee1d0c5b91d7618ab",
     "example/views.sysml": "629be1e3d5344e5b1846c27bd93a619c75d5a62a76f6bbdec317aaf84bef909e",
-    "example/runtime-cache.json": "d16d446235313877cfad75806c781a2da633a897c1e3d085a9a00910c76f005c",
-    "project.zip": "4259ca71ab75d1cd1734c1e9336e586966738218dff8bcce1328dbf9eb9f4d6f",
+    "example/runtime-cache.json": "78fad0d479070bf2a4a2354573edb328a8323e7fbeda281c37a7446f9f382874",
+    "project.zip": "a4950295932b00c150217c23e61d515905eb3135de485a368a6ab6656786e98d",
     "demos/flashlight.zip": "652add08d42b83568d5157a60d0c2adbcde4d422225f0e24d52ecc53b4d290e5",
-    "demos.json": "80b933e533c4634e725b9db462708547269fe93bf4755ecb4558d9386f0aceea",
-    "build-inputs.json": "a34e78d23e931f0158f015960d1f1552ec20754dc8645c95b42105f5f61583b7"
+    "demos/views.zip": "c10ea62a1ed522f350dc982bf4194ab81eebbf81f097213b632ce15e592278a2",
+    "demos.json": "cc416a963f0e2a531f4988e88dfe17aca00305678e9daeedfcabae88737d6b63",
+    "build-inputs.json": "059adb16dfdbce5320614c87eaddf293899b8dfec48fd981e84d01a766f40c03"
   },
   "engine": {
     "schemaVersion": 1,
-    "sourceCommit": "19eaec64755ff229794bda0193d4be9db9ca1b10",
+    "sourceCommit": "761d37ebd01ce37b69a46e0b9fc71671f46ac310",
     "sourceDirty": false,
-    "version": "syspresent-19eaec64755f",
+    "version": "syspresent-761d37ebd01c",
     "sourceDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "carriedPatchSha256": "cad3368db036e3e7ce2098102d2cabac92ad2353eacdb07895c55d252d9357ec",
+    "carriedPatchSha256": "fdfcc7b7677019189f2bb8e5d9e40e6b2ebf9803cbb80e471e359ae9ee6af15d",
     "goVersion": "go version go1.25.11 linux/amd64",
     "license": "Apache-2.0",
     "runtimeLicense": "BSD-3-Clause",
     "assets": {
       "sysml-wasm.wasm": {
-        "sha256": "f3bfacd95afe70551d39cfbc119ea7455a77d1e421f27a7ebb264d3a2cf2d0fe",
-        "bytes": 36720537
+        "sha256": "42ff4f59aa4ecc9a00718d4f85e625b8c9e28f5fff5adcbfea8353c8b169cfbe",
+        "bytes": 36750701
       },
       "wasm_exec.js": {
         "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
         "bytes": 16992
       },
       "sysml-native": {
-        "sha256": "e23a0ace4bb4b8e46b059b0a9b15bbad5e1c71269b082248d488db6c2f043e6c",
-        "bytes": 23335096
+        "sha256": "b5c092c4ad14b1a43a721876fd3d23e5f0eeea57dc93fcf16988da766537220a",
+        "bytes": 23351480
       }
     },
     "experimentalMapping": true

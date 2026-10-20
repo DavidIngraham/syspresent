@@ -6,7 +6,13 @@
       "title": "Blue Dog: river traffic and recovery",
       "description": "Explore the complete Blue Dog model through river traffic, requirements and recovery.",
       "project": "project.zip",
-      "runtimeCacheHash": "d16d446235313877cfad75806c781a2da633a897c1e3d085a9a00910c76f005c"
+      "runtimeCacheHash": "78fad0d479070bf2a4a2354573edb328a8323e7fbeda281c37a7446f9f382874"
+    },
+    {
+      "id": "views",
+      "title": "A desk fan: behavior, grids and shared failures",
+      "description": "Inspect matrices, tables, sequences, states, cases, mixed views and shared fault causes.",
+      "project": "demos/views.zip"
     },
     {
       "id": "flashlight",

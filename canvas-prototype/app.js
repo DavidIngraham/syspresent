@@ -15,9 +15,9 @@ var __commonJS = (cb, mod) => function __require2() {
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    for (let key2 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key2) && key2 !== except)
+        __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
   }
   return to;
 };
@@ -286,6 +286,2033 @@ function showLanding(document2, visible2) {
   document2.body.classList.toggle("landing-mode", isLanding);
 }
 
+// src/canvas-prototype/reader-settings.mjs
+var key = "syspresent.reader.v1";
+var defaults = Object.freeze({ compartments: "all", routing: "square" });
+function readerSettings(value = {}) {
+  return {
+    compartments: ["all", "none", "focused"].includes(value?.compartments) ? value.compartments : defaults.compartments,
+    routing: ["square", "mind-map"].includes(value?.routing) ? value.routing : defaults.routing
+  };
+}
+function loadReaderSettings(storage) {
+  try {
+    return readerSettings(JSON.parse(storage.getItem(key) || "{}"));
+  } catch {
+    return { ...defaults };
+  }
+}
+function saveReaderSettings(storage, value) {
+  const settings = readerSettings(value);
+  try {
+    storage.setItem(key, JSON.stringify(settings));
+  } catch {
+  }
+  return settings;
+}
+function compartmentVisible(node, { mode = "all", focus, expanded = /* @__PURE__ */ new Set(), collapsed = /* @__PURE__ */ new Set() } = {}) {
+  if (collapsed.has(node.semanticId)) return false;
+  if (expanded.has(node.semanticId)) return true;
+  return mode === "all" || mode === "focused" && !!node.semanticId && node.semanticId === focus;
+}
+
+// src/canvas-prototype/geometry.mjs
+var overlaps = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var centre = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
+function graphArea(width, height, panels = []) {
+  const left = 16, top = 16, right = Math.max(left + 1, width - 16), bottom = Math.max(top + 1, height - 60);
+  const xs = [left, right, ...panels.flatMap((p) => [Math.max(left, p.x - 16), Math.min(right, p.x + p.width + 16)])];
+  const ys = [top, bottom, ...panels.flatMap((p) => [Math.max(top, p.y - 16), Math.min(bottom, p.y + p.height + 16)])];
+  const candidates = [];
+  for (const x of xs) for (const r of xs) for (const y of ys) for (const b of ys) {
+    const rect = { x, y, width: r - x, height: b - y };
+    if (rect.width > 0 && rect.height > 0 && !panels.some((p) => overlaps(rect, p))) candidates.push(rect);
+  }
+  return candidates.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? { x: left, y: top, width: right - left, height: bottom - top };
+}
+function fitNodes(nodes, area) {
+  const minX = nodes.length ? Math.min(...nodes.map((n) => n.x)) : 0, minY = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 0;
+  const maxX = nodes.length ? Math.max(...nodes.map((n) => n.x + n.width)) : 1, maxY = nodes.length ? Math.max(...nodes.map((n) => n.y + n.height)) : 1;
+  const scale = Math.min(1.4, area.width / (maxX - minX + 20), area.height / (maxY - minY + 20));
+  const offsetX = area.x + (area.width - (maxX - minX) * scale) / 2 - minX * scale, offsetY = area.y + (area.height - (maxY - minY) * scale) / 2 - minY * scale;
+  return { scale, nodes: nodes.map((n) => ({ ...n, x: n.x * scale + offsetX, y: n.y * scale + offsetY, width: n.width * scale, height: n.height * scale })) };
+}
+var simplify = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
+function segmentBlocked(a, b, obstacles) {
+  return obstacles.some((n) => a.x === b.x ? a.x > n.x && a.x < n.x + n.width && Math.max(a.y, b.y) > n.y && Math.min(a.y, b.y) < n.y + n.height : a.y > n.y && a.y < n.y + n.height && Math.max(a.x, b.x) > n.x && Math.min(a.x, b.x) < n.x + n.width);
+}
+function routeOrthogonal(start2, end, obstacles, { bendPenalty = 14, segmentCost = () => 0 } = {}) {
+  const xs = [.../* @__PURE__ */ new Set([start2.x, end.x, ...obstacles.flatMap((n) => [n.x, n.x + n.width])])].sort((a, b) => a - b);
+  const ys = [.../* @__PURE__ */ new Set([start2.y, end.y, ...obstacles.flatMap((n) => [n.y, n.y + n.height])])].sort((a, b) => a - b);
+  const points = [], byXY = /* @__PURE__ */ new Map();
+  for (const x of xs) for (const y of ys) if (!obstacles.some((n) => x > n.x && x < n.x + n.width && y > n.y && y < n.y + n.height)) {
+    byXY.set(x + "," + y, points.length);
+    points.push({ x, y });
+  }
+  const first = byXY.get(start2.x + "," + start2.y), last = byXY.get(end.x + "," + end.y);
+  if (first === void 0 || last === void 0) return null;
+  const links = points.map(() => []);
+  for (const axis of ["x", "y"]) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const [i, p] of points.entries()) {
+      const value = p[axis];
+      if (!groups.has(value)) groups.set(value, []);
+      groups.get(value).push(i);
+    }
+    for (const group of groups.values()) {
+      group.sort((a, b) => points[a][axis === "x" ? "y" : "x"] - points[b][axis === "x" ? "y" : "x"]);
+      for (let j = 1; j < group.length; j++) {
+        const a = group[j - 1], b = group[j];
+        if (!segmentBlocked(points[a], points[b], obstacles)) {
+          const length2 = Math.abs(points[a].x - points[b].x) + Math.abs(points[a].y - points[b].y);
+          links[a].push([b, length2, axis]);
+          links[b].push([a, length2, axis]);
+        }
+      }
+    }
+  }
+  const queue = [{ id: first, cost: 0, axis: "", path: [first] }], best = /* @__PURE__ */ new Map();
+  while (queue.length) {
+    queue.sort((a, b) => a.cost - b.cost);
+    const current = queue.shift(), key2 = current.id + current.axis;
+    if (best.has(key2) && best.get(key2) < current.cost) continue;
+    if (current.id === last) return current.path.map((i) => points[i]);
+    for (const [id, length2, axis] of links[current.id]) {
+      const cost = current.cost + length2 + (current.axis && current.axis !== axis ? bendPenalty : 0) + Math.max(0, Number(segmentCost(points[current.id], points[id])) || 0), key3 = id + axis;
+      if (best.has(key3) && best.get(key3) <= cost) continue;
+      best.set(key3, cost);
+      queue.push({ id, cost, axis, path: [...current.path, id] });
+    }
+  }
+  return null;
+}
+function endpoints(a, b, sourceFraction = 0.5, targetFraction = 0.5) {
+  const ac = centre(a), bc = centre(b), vertical = Math.abs(ac.y - bc.y) > Math.abs(ac.x - bc.x) * 0.5;
+  const normal = (side) => ({ NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } })[side];
+  const defaultDirection = vertical ? { x: 0, y: bc.y > ac.y ? 1 : -1 } : { x: bc.x > ac.x ? 1 : -1, y: 0 };
+  const sourceDirection = normal(a.kind === "port" ? a.portSide ?? a.side : "") ?? defaultDirection, targetDirection = normal(b.kind === "port" ? b.portSide ?? b.side : "") ?? { x: -defaultDirection.x, y: -defaultDirection.y };
+  const attachment = (node, direction, fraction) => direction.x ? { x: node.x + (direction.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (direction.y > 0 ? node.height : 0) };
+  return [attachment(a, sourceDirection, sourceFraction), attachment(b, targetDirection, targetFraction), sourceDirection, targetDirection];
+}
+function connectionObstacles(edge, nodes) {
+  const byID = new Map(nodes.map((n) => [n.id, n])), ancestors = /* @__PURE__ */ new Set(), leafPortOwners = /* @__PURE__ */ new Set();
+  for (const id of [edge.source, edge.target]) {
+    let node = byID.get(id);
+    if (node?.kind === "port" && node.parentId && !byID.get(node.parentId)?.headerHeight) leafPortOwners.add(node.parentId);
+    const seen = /* @__PURE__ */ new Set();
+    while (node?.parentId && !seen.has(node.parentId)) {
+      seen.add(node.parentId);
+      ancestors.add(node.parentId);
+      node = byID.get(node.parentId);
+    }
+  }
+  return nodes.filter((n) => (n.opacity ?? 1) > 0.08 && n.width > 0 && n.height > 0).flatMap((n) => ancestors.has(n.id) && !leafPortOwners.has(n.id) ? n.headerHeight ? [{ ...n, height: n.headerHeight }] : [] : [n]);
+}
+function route(a, b, nodes, options = {}) {
+  const [start2, end, direction, targetDirection] = endpoints(a, b, options.sourceFraction, options.targetFraction), clearance = options.clearance ?? 8;
+  let stub = { x: start2.x + direction.x * clearance, y: start2.y + direction.y * clearance }, finish = { x: end.x + targetDirection.x * clearance, y: end.y + targetDirection.y * clearance };
+  const obstacles = connectionObstacles({ source: a.id, target: b.id }, nodes).map((n) => ({ x: n.x - 4, y: n.y - 4, width: n.width + 8, height: n.height + 8 }));
+  let middle = routeOrthogonal(stub, finish, obstacles);
+  if (!middle && clearance > 4.1) {
+    stub = { x: start2.x + direction.x * 4.1, y: start2.y + direction.y * 4.1 };
+    finish = { x: end.x + targetDirection.x * 4.1, y: end.y + targetDirection.y * 4.1 };
+    middle = routeOrthogonal(stub, finish, obstacles);
+  }
+  const points = middle ? simplify([start2, ...middle, end]) : [];
+  return { points, d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), routingBlocked: !middle };
+}
+function lineCrossesRect(a, b, rect, padding = 0) {
+  const left = rect.x - padding, top = rect.y - padding, right = rect.x + rect.width + padding, bottom = rect.y + rect.height + padding;
+  let lo = 0, hi = 1;
+  for (const [origin, delta, min, max2] of [[a.x, b.x - a.x, left, right], [a.y, b.y - a.y, top, bottom]]) {
+    if (Math.abs(delta) < 1e-9) {
+      if (origin <= min || origin >= max2) return false;
+      continue;
+    }
+    let first = (min - origin) / delta, last = (max2 - origin) / delta;
+    if (first > last) [first, last] = [last, first];
+    lo = Math.max(lo, first);
+    hi = Math.min(hi, last);
+    if (lo >= hi) return false;
+  }
+  return hi > 0 && lo < 1;
+}
+function clearLeader(box, points, nodes, labels) {
+  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 }, targets = [...points, ...points.slice(1).map((p, i) => ({ x: (p.x + points[i].x) / 2, y: (p.y + points[i].y) / 2 }))];
+  targets.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
+  const to = targets.find((target) => !nodes.some((n) => n.width > 0 && n.height > 0 && lineCrossesRect(from, target, n, 2)) && !labels.some((label2) => lineCrossesRect(from, target, label2, 2)));
+  return to ? { from, to } : null;
+}
+function labelCandidates(points, width, height) {
+  const candidates = [];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    if (length2 < 8) continue;
+    for (const t of [0.5, 0.25, 0.75]) {
+      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      if (a.y === b.y) {
+        candidates.push({ x: x - width / 2, y: y - height - 3, score: length2 }, { x: x - width / 2, y: y + 3, score: length2 - 1 });
+      } else candidates.push({ x: x + 5, y: y - height / 2, score: length2 - 2 }, { x: x - width - 5, y: y - height / 2, score: length2 - 3 });
+    }
+  }
+  return candidates.sort((a, b) => b.score - a.score);
+}
+function routeEdges(edges, nodes, options = {}) {
+  const byID = new Map(nodes.map((n) => [n.id, n])), labels = [], ports = /* @__PURE__ */ new Map();
+  const measured = (text2) => {
+    const size = options.measureLabel?.(text2);
+    return { width: Math.max(1, size?.width ?? String(text2).length * 7.2 + 4), height: Math.max(1, size?.height ?? 16) };
+  };
+  const ordered = [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  for (const edge of ordered) for (const side of ["source", "target"]) {
+    const key2 = edge[side];
+    if (!ports.has(key2)) ports.set(key2, []);
+    ports.get(key2).push({ edge, side });
+  }
+  const fraction = (edge, side) => {
+    const group = ports.get(edge[side]), index = group.findIndex((item) => item.edge === edge && item.side === side);
+    return group.length === 1 ? 0.5 : 0.2 + 0.6 * (index + 0.5) / group.length;
+  };
+  const area = options.area;
+  return edges.map((edge) => {
+    const a = byID.get(edge.source), b = byID.get(edge.target);
+    if (!a || !b) return null;
+    const result = { ...edge, ...route(a, b, nodes, { ...options, sourceFraction: fraction(edge, "source"), targetFraction: fraction(edge, "target") }) };
+    if (!edge.label || result.routingBlocked) return result;
+    const size = measured(edge.label), valid = (box) => !nodes.some((n) => n.width > 0 && n.height > 0 && overlaps(box, n, 3)) && !labels.some((other) => overlaps(box, other, 4)) && (!area || box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height);
+    let labelBox = labelCandidates(result.points, size.width, size.height).map((candidate) => ({ ...candidate, ...size })).find(valid);
+    if (!labelBox) {
+      const mid = result.points[1] ?? result.points[0], region = area ?? { x: Math.min(...nodes.map((n) => n.x)) - 80, y: Math.min(...nodes.map((n) => n.y)) - 40, width: Math.max(...nodes.map((n) => n.x + n.width)) - Math.min(...nodes.map((n) => n.x)) + 160, height: Math.max(...nodes.map((n) => n.y + n.height)) - Math.min(...nodes.map((n) => n.y)) + 80 };
+      const cards = nodes.filter((n) => n.width > 0 && n.height > 0);
+      const xs = [region.x, ...cards.flatMap((n) => [n.x + n.width / 2 - size.width / 2, n.x - size.width - 4, n.x + n.width + 4]), ...result.points.map((p) => p.x - size.width / 2)];
+      const ys = [region.y, ...cards.flatMap((n) => [n.y + n.height + 4, n.y - size.height - 4]), ...result.points.map((p) => p.y - size.height / 2)];
+      for (let y = region.y; y + size.height <= region.y + region.height; y += size.height + 5) ys.push(y);
+      for (let x = region.x; x + size.width <= region.x + region.width; x += Math.max(12, size.width / 2)) xs.push(x);
+      const slots = [];
+      for (const y of new Set(ys)) for (const x of new Set(xs)) {
+        const box = { x, y, ...size };
+        if (valid(box)) slots.push(box);
+      }
+      slots.sort((a2, b3) => Math.hypot(a2.x + a2.width / 2 - mid.x, a2.y + a2.height / 2 - mid.y) - Math.hypot(b3.x + b3.width / 2 - mid.x, b3.y + b3.height / 2 - mid.y));
+      for (const slot of slots) {
+        const leader = clearLeader(slot, result.points, nodes, labels);
+        if (leader) {
+          labelBox = slot;
+          result.labelLeader = leader;
+          break;
+        }
+      }
+    }
+    if (labelBox) {
+      labels.push(labelBox);
+      result.labelBox = labelBox;
+      result.x = labelBox.x;
+      result.y = labelBox.y + labelBox.height * 0.78;
+    } else result.labelOmitted = true;
+    return result;
+  }).filter(Boolean);
+}
+function fitDiagram(layout, area) {
+  const occupied = [...layout.nodes, ...layout.nodes.flatMap((n) => n.portLabelBox ? [n.portLabelBox] : []), ...layout.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], fit = fitNodes(occupied, area), scale = fit.scale;
+  const origin = occupied[0], fitted = fit.nodes[0], dx = origin ? fitted.x - origin.x * scale : area.x, dy = origin ? fitted.y - origin.y * scale : area.y;
+  const point2 = (p) => ({ x: p.x * scale + dx, y: p.y * scale + dy }), box = (n) => ({ ...n, ...point2(n), width: n.width * scale, height: n.height * scale });
+  return { ...layout, scale, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point2), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point2(p) })) };
+}
+function routeIsClear(points, edge, nodes, { orthogonalOnly = false } = {}) {
+  if (points.length < 2 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
+  const obstacles = connectionObstacles(edge, nodes);
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    if (orthogonalOnly && Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01) return false;
+    if (obstacles.some((n) => lineCrossesRect(a, b, { x: n.x + 0.05, y: n.y + 0.05, width: Math.max(0, n.width - 0.1), height: Math.max(0, n.height - 0.1) }))) return false;
+  }
+  return true;
+}
+function routeConnectsEndpoints(points, edge, nodes, tolerance = 0.7) {
+  const byID = new Map(nodes.map((n) => [n.id, n]));
+  const touches = (point2, node) => {
+    if (!point2 || !node) return false;
+    if (!node.width && !node.height) return Math.hypot(point2.x - node.x, point2.y - node.y) <= tolerance;
+    const insideX = point2.x >= node.x - tolerance && point2.x <= node.x + node.width + tolerance, insideY = point2.y >= node.y - tolerance && point2.y <= node.y + node.height + tolerance;
+    return insideX && insideY && (Math.abs(point2.x - node.x) <= tolerance || Math.abs(point2.x - node.x - node.width) <= tolerance || Math.abs(point2.y - node.y) <= tolerance || Math.abs(point2.y - node.y - node.height) <= tolerance);
+  };
+  return points.length >= 2 && touches(points[0], byID.get(edge.source)) && touches(points.at(-1), byID.get(edge.target));
+}
+
+// src/canvas-prototype/routing-style.mjs
+var point = (p) => `${p.x},${p.y}`;
+var line = (points) => points.map((p, i) => (i ? "L" : "M") + point(p)).join(" ");
+var mix = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+var distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function cubic(a, b, c, d, t) {
+  return mix(mix(mix(a, b, t), mix(b, c, t), t), mix(mix(b, c, t), mix(c, d, t), t), t);
+}
+function connectionPath(points, { style = "square", edge = {}, nodes = [] } = {}) {
+  if (!points?.length) return "";
+  if (style !== "mind-map" || points.length < 3) return line(points);
+  const a = points[0], d = points.at(-1), start2 = points[1], end = points.at(-2);
+  const handle = Math.min(140, distance(a, d) * 0.45), l1 = distance(a, start2) || 1, l2 = distance(d, end) || 1;
+  const b = { x: a.x + (start2.x - a.x) / l1 * handle, y: a.y + (start2.y - a.y) / l1 * handle };
+  const c = { x: d.x + (end.x - d.x) / l2 * handle, y: d.y + (end.y - d.y) / l2 * handle };
+  const xmin = Math.min(a.x, b.x, c.x, d.x), xmax = Math.max(a.x, b.x, c.x, d.x);
+  const ymin = Math.min(a.y, b.y, c.y, d.y), ymax = Math.max(a.y, b.y, c.y, d.y);
+  const blocks = connectionObstacles(edge, nodes);
+  const hullClear = !blocks.some((n) => xmin < n.x + n.width && xmax > n.x && ymin < n.y + n.height && ymax > n.y);
+  const samples = Array.from({ length: 33 }, (_, i) => cubic(a, b, c, d, i / 32));
+  if (hullClear && routeIsClear(samples, edge, nodes)) return `M${point(a)} C${point(b)} ${point(c)} ${point(d)}`;
+  let path = "M" + point(a);
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i], prev = points[i - 1], next = points[i + 1];
+    let r = Math.min(28, distance(prev, p) / 3, distance(p, next) / 3);
+    let before, after;
+    while (r > 0.5) {
+      before = mix(p, prev, r / (distance(prev, p) || 1));
+      after = mix(p, next, r / (distance(p, next) || 1));
+      const x = Math.min(before.x, p.x, after.x), y = Math.min(before.y, p.y, after.y), right = Math.max(before.x, p.x, after.x), bottom = Math.max(before.y, p.y, after.y);
+      if (!blocks.some((n) => x < n.x + n.width && right > n.x && y < n.y + n.height && bottom > n.y)) break;
+      r /= 2;
+    }
+    path += r > 0.5 ? ` L${point(before)} Q${point(p)} ${point(after)}` : ` L${point(p)}`;
+  }
+  return path + " L" + point(d);
+}
+
+// src/canvas-prototype/view-contract.mjs
+var supportedViewKinds = Object.freeze([
+  "requirement",
+  "definition",
+  "tree",
+  "package",
+  "interconnection",
+  "action",
+  "state",
+  "sequence",
+  "fault-tree",
+  "table",
+  "matrix",
+  "case",
+  "mixed"
+]);
+var supportsView = (view) => supportedViewKinds.includes(typeof view === "string" ? view : view?.kind);
+var isGridView = (view) => view?.kind === "table" || view?.kind === "matrix";
+function rendererFamily(view) {
+  if (isGridView(view)) return "grid";
+  if (view?.kind === "sequence") return "sequence";
+  return supportsView(view) ? "graph" : "unsupported";
+}
+var identity = (value) => typeof value === "string" && value.length ? value : void 0;
+function representations(view) {
+  const result = [];
+  const add = (record, item) => result.push({
+    ...record,
+    semanticId: identity(item?.semanticId),
+    identityStatus: item?.identityStatus ?? (identity(item?.semanticId) ? "native" : "unknown"),
+    label: item?.name ?? item?.label ?? "",
+    qualifiedName: item?.qualifiedName
+  });
+  for (const [index, node] of (view?.nodes ?? []).entries()) add({ role: "node", index, representationId: node.id }, node);
+  for (const [index, edge] of (view?.edges ?? []).entries()) add({
+    role: "edge",
+    index,
+    representationId: edge.id,
+    sourceSemanticId: edge.sourceSemanticId ?? edge.semanticSource,
+    targetSemanticId: edge.targetSemanticId ?? edge.semanticTarget,
+    kind: edge.kind
+  }, edge);
+  for (const [row, item] of (view?.rows ?? []).entries()) add({
+    role: "row",
+    row,
+    representationId: `row:${row}`
+  }, { ...item, name: item.name ?? item.cells?.[0] });
+  for (const item of view?.columnElements ?? []) add({
+    role: "column",
+    column: item.index,
+    representationId: `column:${item.index}`
+  }, { ...item, name: item.name ?? view.columns?.[item.index] });
+  for (const cell of view?.relationshipCells ?? []) {
+    for (const [index, relationship] of (cell.relationships ?? []).entries()) add({
+      role: "cell",
+      row: cell.row,
+      column: cell.column,
+      index,
+      representationId: `cell:${cell.row}:${cell.column}:${index}`,
+      sourceSemanticId: relationship.sourceSemanticId,
+      targetSemanticId: relationship.targetSemanticId,
+      kind: relationship.kind
+    }, relationship);
+  }
+  return result;
+}
+var representedIdentities = (view) => [...new Set(representations(view).map((r) => r.semanticId).filter(Boolean))];
+
+// src/canvas-prototype/grid-view.mjs
+var copy = (value) => value === void 0 ? void 0 : structuredClone(value);
+var text = (value) => value === null || value === void 0 ? "" : String(value);
+var hasIdentity = (value) => typeof value === "string" && value.length > 0;
+var positionKey = (row, column) => `${row}:${column}`;
+function gridRowOrder(view, sort) {
+  const indices = (view.rows ?? []).map((_, index) => index);
+  if (view.kind === "matrix" || !sort || !Number.isInteger(sort.column) || sort.column < 0 || sort.column >= (view.columns ?? []).length) return indices;
+  const direction = sort.direction === "descending" ? -1 : 1;
+  return indices.sort((a, b) => {
+    const left = text(view.rows[a].cells?.[sort.column]), right = text(view.rows[b].cells?.[sort.column]);
+    return direction * left.localeCompare(right, void 0, { numeric: true }) || a - b;
+  });
+}
+function mountGrid(host, view, options = {}) {
+  if (!isGridView(view)) throw Error(`Grid renderer cannot render ${view?.kind}`);
+  const doc = host.ownerDocument, matrix = view.kind === "matrix";
+  const rows = view.rows ?? [], columns = view.columns ?? [];
+  const columnElements = new Map((view.columnElements ?? []).map((item) => [item.index, item]));
+  const relationships = /* @__PURE__ */ new Map();
+  for (const cell of view.relationshipCells ?? []) {
+    const key2 = positionKey(cell.row, cell.column);
+    relationships.set(key2, [...relationships.get(key2) ?? [], ...copy(cell.relationships ?? [])]);
+  }
+  const nativeIds = new Set(representedIdentities(view));
+  const semanticIdsFor = (selection) => [...new Set([
+    selection?.semanticId,
+    ...(selection?.relationships ?? []).map((item) => item.semanticId)
+  ].filter(hasIdentity))];
+  const incoming = copy(options.state ?? {});
+  const initialIds = options.selectedIds ?? (hasIdentity(options.selectedId) ? [options.selectedId] : incoming.selectedIds ?? (hasIdentity(incoming.selectedId) ? [incoming.selectedId] : []));
+  const sharedSelectionExplicit = Array.isArray(options.selectedIds) || hasIdentity(options.selectedId);
+  const initialIdentities = [...new Set(initialIds.filter(hasIdentity))];
+  const savedSelectionIdentities = semanticIdsFor(incoming.selection);
+  const selectionMatchesShared = initialIdentities.length === savedSelectionIdentities.length && initialIdentities.every((id) => savedSelectionIdentities.includes(id));
+  let state2 = {
+    scrollTop: Math.max(0, Number(incoming.scrollTop) || 0),
+    scrollLeft: Math.max(0, Number(incoming.scrollLeft) || 0),
+    sort: matrix ? null : incoming.sort ?? null,
+    widths: { ...incoming.widths },
+    selection: sharedSelectionExplicit && !selectionMatchesShared ? null : incoming.selection ?? null,
+    selectedId: initialIdentities.length === 1 ? initialIdentities[0] : null,
+    selectedIds: initialIdentities
+  };
+  let destroyed = false;
+  const listeners = [];
+  const listen = (target, event, handler, settings2) => {
+    target.addEventListener(event, handler, settings2);
+    listeners.push(() => target.removeEventListener(event, handler, settings2));
+  };
+  const el2 = (tag, className, content) => {
+    const node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (content !== void 0) node.textContent = text(content);
+    return node;
+  };
+  const labelFor2 = (id) => text(options.labelFor?.(id) || id);
+  const button2 = (label2, action, className = "") => {
+    const result = el2("button", className, label2);
+    result.type = "button";
+    result.addEventListener("click", (event) => {
+      event.stopPropagation();
+      action();
+    });
+    return result;
+  };
+  const shell = el2("section", "canvas-grid-view");
+  shell.setAttribute("aria-label", view.title ?? view.id ?? (matrix ? "Relationship matrix" : "Model table"));
+  const toolbar = el2("div", "canvas-grid-toolbar");
+  const settings = el2("details", "canvas-grid-settings");
+  settings.append(el2("summary", null, "Columns"));
+  const widthFields = el2("div", "canvas-grid-widths");
+  settings.append(widthFields);
+  toolbar.append(settings);
+  const summary = el2("span", "canvas-grid-summary", `${rows.length} rows \xB7 ${columns.length} columns`);
+  toolbar.append(summary);
+  const viewport = el2("div", "canvas-grid-scroll");
+  viewport.tabIndex = 0;
+  viewport.setAttribute("role", "region");
+  viewport.setAttribute("aria-label", `${matrix ? "Matrix" : "Table"} contents; scroll to read all rows and columns`);
+  const table = el2("table", "canvas-grid-table");
+  table.setAttribute("aria-label", view.title ?? view.id ?? "Native model view");
+  const colgroup = el2("colgroup"), thead = el2("thead"), tbody = el2("tbody");
+  table.append(colgroup, thead, tbody);
+  viewport.append(table);
+  const inspector = el2("div", "canvas-grid-inspector");
+  inspector.setAttribute("role", "status");
+  inspector.setAttribute("aria-live", "polite");
+  const disclosure = el2("p", "canvas-grid-disclosure");
+  shell.append(toolbar, viewport, inspector, disclosure);
+  host.append(shell);
+  const bindings = [];
+  const getState = () => copy({ ...state2, scrollTop: viewport.scrollTop, scrollLeft: viewport.scrollLeft });
+  const changed = () => {
+    if (!destroyed) options.onStateChange?.(getState());
+  };
+  const samePosition = (a, b) => a && b && a.kind === b.kind && a.row === b.row && a.column === b.column;
+  const rowSelection = (row) => ({
+    kind: "row",
+    row,
+    semanticId: rows[row].semanticId,
+    label: text(rows[row].cells?.[0] ?? rows[row].name ?? `Row ${row + 1}`),
+    identityStatus: rows[row].identityStatus ?? (hasIdentity(rows[row].semanticId) ? "native" : "unknown")
+  });
+  const columnSelection = (column) => ({
+    kind: "column",
+    column,
+    semanticId: columnElements.get(column)?.semanticId,
+    label: text(columns[column]),
+    identityStatus: columnElements.get(column)?.identityStatus ?? (hasIdentity(columnElements.get(column)?.semanticId) ? "native" : "unknown")
+  });
+  const cellSelection = (row, column) => {
+    const links = copy(relationships.get(positionKey(row, column)) ?? []);
+    return {
+      kind: matrix ? "relationship-cell" : "value-cell",
+      row,
+      column,
+      ...links.length === 1 && hasIdentity(links[0].semanticId) ? { semanticId: links[0].semanticId } : {},
+      label: text(rows[row].cells?.[column]),
+      rowSemanticId: rows[row].semanticId,
+      columnSemanticId: columnElements.get(column)?.semanticId,
+      relationships: links
+    };
+  };
+  const bind2 = (node, selection) => {
+    bindings.push({ node, selection });
+    const id = semanticIdsFor(selection)[0];
+    if (id) node.dataset.semanticId = id;
+    node.dataset.gridKind = selection.kind;
+    if (selection.row !== void 0) node.dataset.gridRow = String(selection.row);
+    if (selection.column !== void 0) node.dataset.gridColumn = String(selection.column);
+    return node;
+  };
+  const renderInspector = () => {
+    inspector.replaceChildren();
+    const selection = state2.selection;
+    if (!selection) {
+      inspector.append(el2("span", null, "Select a row, heading or cell to inspect it. Explore is a separate action."));
+      return;
+    }
+    const description = el2("div", "canvas-grid-selection");
+    if (selection.kind === "relationship-cell") {
+      description.append(el2("strong", null, `${text(rows[selection.row]?.cells?.[0])} \xD7 ${text(columns[selection.column])}`));
+      const links = selection.relationships ?? [];
+      if (!links.length) {
+        description.append(el2("p", null, selection.label ? "Relationship provenance is unavailable for this cell. Its displayed value is retained." : "No matching relationship in this view."));
+        if (selection.label) description.append(el2("p", null, selection.label));
+      } else {
+        description.append(el2("p", null, `${links.length} native relationship${links.length === 1 ? "" : "s"}. Direction is shown for each relationship.`));
+        const list = el2("ul");
+        for (const relationship of links) {
+          const item = el2("li");
+          item.append(el2("span", null, `${relationship.kind ?? "Relationship"}: ${hasIdentity(relationship.sourceSemanticId) ? labelFor2(relationship.sourceSemanticId) : "Unknown source identity"} \u2192 ${hasIdentity(relationship.targetSemanticId) ? labelFor2(relationship.targetSemanticId) : "Unknown target identity"}${relationship.label ? ` \xB7 ${relationship.label}` : ""}`));
+          if (hasIdentity(relationship.semanticId)) {
+            const provenance = el2("details", "canvas-grid-provenance");
+            provenance.append(el2("summary", null, "Native identity"));
+            provenance.append(el2("small", null, `Relationship: ${relationship.semanticId}`));
+            if (relationship.qualifiedName) provenance.append(el2("small", null, `Qualified name: ${relationship.qualifiedName}`));
+            provenance.append(el2("small", null, `Source: ${relationship.sourceSemanticId ?? "unavailable"}`), el2("small", null, `Target: ${relationship.targetSemanticId ?? "unavailable"}`));
+            item.append(provenance);
+          } else item.append(el2("small", null, "Relationship identity unavailable."));
+          list.append(item);
+        }
+        description.append(list);
+      }
+    } else {
+      description.append(el2("strong", null, selection.label || "Empty value"));
+      if (selection.kind === "value-cell") description.append(el2("p", null, "Native displayed value. This cell has no exported property identity."));
+      else if (!hasIdentity(selection.semanticId)) description.append(el2("p", null, "Native semantic identity unavailable; model exploration is unavailable for this representation."));
+    }
+    const canExplore = hasIdentity(selection.semanticId) || (selection.relationships ?? []).some((item) => hasIdentity(item.sourceSemanticId) && hasIdentity(item.targetSemanticId));
+    if (canExplore) description.append(button2(selection.kind === "relationship-cell" ? "Explore relationship" : "Explore element", () => options.onExplore?.(copy(state2.selection)), "canvas-grid-explore"));
+    inspector.append(description);
+  };
+  const highlight = () => {
+    for (const { node, selection } of bindings) {
+      const selected = samePosition(selection, state2.selection) || state2.selectedIds.some((id) => semanticIdsFor(selection).includes(id));
+      node.classList.toggle("is-selected", !!selected);
+      if (node.tagName === "BUTTON") node.setAttribute("aria-pressed", String(!!selected));
+      const crosshair = matrix && state2.selection?.kind === "relationship-cell" && (selection.row === state2.selection.row || selection.column === state2.selection.column);
+      node.classList.toggle("is-axis-highlight", !!crosshair);
+    }
+    const unknownRows = rows.filter((row) => !hasIdentity(row.semanticId)).length;
+    const missing = state2.selectedIds.some((id) => !nativeIds.has(id));
+    disclosure.textContent = [
+      ...missing ? ["The selected element is not represented in this view. Your semantic selection is retained."] : [],
+      ...unknownRows ? [`${unknownRows} row${unknownRows === 1 ? " has" : "s have"} no exported semantic identity.`] : []
+    ].join(" ");
+    disclosure.hidden = !disclosure.textContent;
+  };
+  const selectSelection = (selection) => {
+    state2.selection = copy(selection);
+    state2.selectedId = hasIdentity(selection.semanticId) ? selection.semanticId : null;
+    state2.selectedIds = semanticIdsFor(selection);
+    highlight();
+    renderInspector();
+    changed();
+    options.onSelect?.(copy(selection));
+  };
+  const applyWidths = () => {
+    let totalWidth = 0;
+    for (const [index, col] of [...colgroup.children].entries()) {
+      const width = Number(state2.widths[index]);
+      const appliedWidth = Number.isFinite(width) && width >= 80 && width <= 900 ? width : 200;
+      col.style.width = `${appliedWidth}px`;
+      totalWidth += appliedWidth;
+    }
+    table.style.width = `${totalWidth}px`;
+  };
+  for (const [column, label2] of columns.entries()) {
+    colgroup.append(el2("col"));
+    const field = el2("label", null, `${text(label2) || `Column ${column + 1}`} width`);
+    const input = el2("input");
+    input.type = "number";
+    input.min = "80";
+    input.max = "900";
+    input.step = "20";
+    input.value = String(state2.widths[column] ?? 200);
+    input.setAttribute("aria-label", `${text(label2) || `Column ${column + 1}`} width in pixels`);
+    input.addEventListener("change", () => {
+      const width = Number(input.value);
+      if (!Number.isFinite(width) || width < 80 || width > 900) {
+        input.value = String(state2.widths[column] ?? 200);
+        return;
+      }
+      state2.widths[column] = width;
+      applyWidths();
+      changed();
+    });
+    field.append(input);
+    widthFields.append(field);
+  }
+  const renderTable = () => {
+    const scrollTop = viewport.scrollTop, scrollLeft = viewport.scrollLeft;
+    bindings.length = 0;
+    thead.replaceChildren();
+    tbody.replaceChildren();
+    const heading = el2("tr");
+    for (const [column, label2] of columns.entries()) {
+      const th = el2("th");
+      th.scope = "col";
+      const selection = columnSelection(column);
+      const select2 = bind2(button2(text(label2) || `Column ${column + 1}`, () => selectSelection(selection), "canvas-grid-heading"), selection);
+      select2.setAttribute("aria-label", `Inspect column ${text(label2) || column + 1}`);
+      th.append(select2);
+      if (!matrix) {
+        th.setAttribute("aria-sort", state2.sort?.column === column ? state2.sort.direction : "none");
+        const sort = button2("\u2195", () => {
+          state2.sort = { column, direction: state2.sort?.column === column && state2.sort.direction === "ascending" ? "descending" : "ascending" };
+          renderTable();
+          thead.querySelectorAll(".canvas-grid-sort")[column]?.focus({ preventScroll: true });
+          changed();
+        }, "canvas-grid-sort");
+        sort.setAttribute("aria-label", `Sort by ${text(label2) || `column ${column + 1}`} ${state2.sort?.column === column && state2.sort.direction === "ascending" ? "descending" : "ascending"}`);
+        th.append(sort);
+      }
+      heading.append(bind2(th, selection));
+    }
+    thead.append(heading);
+    for (const row of gridRowOrder(view, state2.sort)) {
+      const tr = el2("tr");
+      tr.dataset.nativeRow = String(row);
+      for (const [column] of columns.entries()) {
+        const cell = el2(column === 0 ? "th" : "td");
+        if (column === 0) cell.scope = "row";
+        const selection = column === 0 ? rowSelection(row) : cellSelection(row, column);
+        const displayed = text(rows[row].cells?.[column]);
+        const label2 = displayed || (matrix && column > 0 ? "\u2014" : "Empty");
+        const select2 = bind2(button2(label2, () => selectSelection(selection), "canvas-grid-value"), selection);
+        select2.setAttribute("aria-label", column === 0 ? `Inspect row ${label2}` : `Inspect ${text(columns[column])} for ${text(rows[row].cells?.[0])}: ${displayed || (matrix ? "no matching relationship in this view" : "empty value")}`);
+        cell.append(select2);
+        tr.append(bind2(cell, selection));
+      }
+      tbody.append(tr);
+    }
+    viewport.scrollTop = scrollTop;
+    viewport.scrollLeft = scrollLeft;
+    applyWidths();
+    highlight();
+  };
+  renderTable();
+  renderInspector();
+  viewport.scrollTop = state2.scrollTop;
+  viewport.scrollLeft = state2.scrollLeft;
+  listen(viewport, "scroll", changed, { passive: true });
+  for (const event of ["wheel", "pointerdown", "pointermove", "pointerup", "touchstart", "touchmove", "touchend", "keydown"]) {
+    listen(shell, event, (event2) => event2.stopPropagation(), { passive: true });
+  }
+  const selectMany = (ids) => {
+    state2.selectedIds = [...new Set((ids ?? []).filter(hasIdentity))];
+    state2.selectedId = state2.selectedIds.length === 1 ? state2.selectedIds[0] : null;
+    state2.selection = null;
+    highlight();
+    renderInspector();
+  };
+  return {
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      for (const remove of listeners) remove();
+      shell.remove();
+    },
+    getState,
+    select(id) {
+      selectMany(hasIdentity(id) ? [id] : []);
+    },
+    selectMany,
+    reveal(id) {
+      const match = bindings.find((binding) => binding.node.tagName === "BUTTON" && semanticIdsFor(binding.selection).includes(id));
+      if (!match) return false;
+      match.node.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      return true;
+    },
+    anchors() {
+      const clip = viewport.getBoundingClientRect(), origin = host.getBoundingClientRect();
+      return bindings.filter(({ node }) => node.tagName === "BUTTON").flatMap(({ node, selection }) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || rect.bottom <= clip.top || rect.top >= clip.bottom || rect.right <= clip.left || rect.left >= clip.right) return [];
+        const left = Math.max(clip.left, rect.left), top = Math.max(clip.top, rect.top);
+        const right = Math.min(clip.right, rect.right), bottom = Math.min(clip.bottom, rect.bottom);
+        return semanticIdsFor(selection).map((semanticId2, index) => ({
+          semanticId: semanticId2,
+          role: selection.kind,
+          row: selection.row,
+          column: selection.column,
+          representationId: `grid:${selection.kind}:${selection.row ?? ""}:${selection.column ?? ""}:${index}`,
+          x: left - origin.left,
+          y: top - origin.top,
+          width: right - left,
+          height: bottom - top
+        }));
+      });
+    }
+  };
+}
+
+// src/canvas-prototype/core/index.mjs
+var copy2 = (value) => structuredClone(value);
+var ENGINEERING_RELATIONSHIPS = Object.freeze([
+  "derive",
+  "derivation",
+  "refine",
+  "refinement",
+  "satisfy",
+  "satisfaction",
+  "verify",
+  "verification",
+  "allocate",
+  "allocation",
+  "dependency",
+  "composition",
+  "reference",
+  "connection",
+  "flow",
+  "item-flow",
+  "control-flow",
+  "causation"
+]);
+var FORBIDDEN_SHORTCUTS = /* @__PURE__ */ new Set(["type", "typing", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership"]);
+var endpoint = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
+var nativeEdges = (graph) => (graph.relationships ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") }));
+var allowedKinds = (options) => new Set((options.relationshipKinds ?? ENGINEERING_RELATIONSHIPS).filter((kind) => !FORBIDDEN_SHORTCUTS.has(kind)));
+function graphPolicy(graph, options) {
+  const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
+  const scope = options.scopeIds ? /* @__PURE__ */ new Set([...options.scopeIds, ...options.includedIds ?? []]) : null;
+  const explicit = new Set(options.includedIds ?? []);
+  const allowedElement = (id) => {
+    const element2 = elements.get(id);
+    if (!element2) return "unavailable";
+    if (scope && !scope.has(id)) return "outside-scope";
+    if ((element2.layer === "metamodel" || element2.metamodel === true) && !explicit.has(id)) return "metamodel-boundary";
+    return null;
+  };
+  return { elements, edges: nativeEdges(graph), kinds: allowedKinds(options), allowedElement };
+}
+function engineeringContext(graph, options = {}) {
+  const { focus, depth = 1, budget = 24 } = options;
+  if (!Number.isInteger(depth) || depth < 0 || !Number.isInteger(budget) || budget < 1) throw new Error("Invalid context depth or budget");
+  const policy = graphPolicy(graph, options), wanted = /* @__PURE__ */ new Set(), omissions = [], seenOmissions = /* @__PURE__ */ new Set();
+  const omit = (edge, target, reason) => {
+    const key2 = `${edge?.id}:${target}:${reason}`;
+    if (!seenOmissions.has(key2)) {
+      seenOmissions.add(key2);
+      omissions.push({ relationshipId: edge?.id ?? null, target, reason });
+    }
+  };
+  const rootReason = policy.allowedElement(focus);
+  if (rootReason) {
+    omit(null, focus, rootReason);
+    return { elements: [], relationships: [], omissions };
+  }
+  wanted.add(focus);
+  const queue = [[focus, 0]];
+  while (queue.length) {
+    const [id, distance3] = queue.shift();
+    for (const edge of policy.edges) {
+      if (edge.source !== id && edge.target !== id) continue;
+      const target = edge.source === id ? edge.target : edge.source;
+      if (!policy.kinds.has(edge.kind)) {
+        omit(edge, target, "relationship-policy");
+        continue;
+      }
+      const reason = policy.allowedElement(target);
+      if (reason) {
+        omit(edge, target, reason);
+        continue;
+      }
+      if (wanted.has(target)) continue;
+      if (distance3 >= depth) {
+        omit(edge, target, "depth");
+        continue;
+      }
+      if (wanted.size >= budget) {
+        omit(edge, target, "budget");
+        continue;
+      }
+      wanted.add(target);
+      queue.push([target, distance3 + 1]);
+    }
+  }
+  return copy2({ elements: [...wanted].map((id) => policy.elements.get(id)), relationships: policy.edges.filter((edge) => policy.kinds.has(edge.kind) && wanted.has(edge.source) && wanted.has(edge.target)), omissions });
+}
+function findEngineeringRoute(graph, options = {}) {
+  const { from, to, maxHops = 12 } = options, policy = graphPolicy(graph, options), omissions = [];
+  for (const id of [from, to]) {
+    const reason = policy.allowedElement(id);
+    if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
+  }
+  const visited = /* @__PURE__ */ new Set([from]), queue = [{ id: from, path: [from], edges: [] }];
+  while (queue.length) {
+    const current = queue.shift();
+    if (current.id === to) return copy2({ found: true, elements: current.path.map((id) => policy.elements.get(id)), relationships: current.edges, omissions });
+    for (const edge of policy.edges) {
+      if (edge.source !== current.id && edge.target !== current.id) continue;
+      const target = edge.source === current.id ? edge.target : edge.source;
+      const reason = !policy.kinds.has(edge.kind) ? "relationship-policy" : policy.allowedElement(target);
+      if (reason) {
+        omissions.push({ relationshipId: edge.id, target, reason });
+        continue;
+      }
+      if (visited.has(target)) continue;
+      if (current.edges.length >= maxHops) {
+        omissions.push({ relationshipId: edge.id, target, reason: "hop-limit" });
+        continue;
+      }
+      visited.add(target);
+      queue.push({ id: target, path: [...current.path, target], edges: [...current.edges, edge] });
+    }
+  }
+  return copy2({ found: false, elements: [], relationships: [], omissions });
+}
+var UPWARD_KINDS = /* @__PURE__ */ new Set(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification"]);
+var DOWNWARD_KINDS = /* @__PURE__ */ new Set(["composition", "containment"]);
+function hierarchyPolicy(graph, options, includeOwnership) {
+  const policy = graphPolicy(graph, options), omissions = [], seen = /* @__PURE__ */ new Set(), upward = /* @__PURE__ */ new Map();
+  const omit = (edge, target, reason) => {
+    const key2 = JSON.stringify([edge?.id, target, reason]);
+    if (!seen.has(key2)) {
+      seen.add(key2);
+      omissions.push({ relationshipId: edge?.id ?? null, target, reason });
+    }
+  };
+  const allowed = (id) => {
+    const reason = policy.allowedElement(id);
+    if (reason) return reason;
+    const element2 = policy.elements.get(id);
+    if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
+    return element2.layer === "library" ? "library-boundary" : null;
+  };
+  const ownershipIds = new Set((graph.containment ?? []).map((edge) => edge.id));
+  const links = [...policy.edges, ...includeOwnership ? (graph.containment ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") })) : []];
+  for (const edge of links) {
+    const ownership = includeOwnership && ownershipIds.has(edge.id) && ["owner", "ownership", "containment"].includes(edge.kind);
+    if (!ownership && !UPWARD_KINDS.has(edge.kind) && !DOWNWARD_KINDS.has(edge.kind)) continue;
+    if (!ownership && !policy.kinds.has(edge.kind)) continue;
+    const [child, parent] = DOWNWARD_KINDS.has(edge.kind) ? [edge.target, edge.source] : [edge.source, edge.target];
+    if (!upward.has(child)) upward.set(child, []);
+    upward.get(child).push({ parent, edge, ownership });
+  }
+  for (const links2 of upward.values()) links2.sort((a, b) => a.parent.localeCompare(b.parent) || String(a.edge.id).localeCompare(String(b.edge.id)));
+  return { ...policy, allowed, upward, omissions, omit };
+}
+function findHierarchyRoute(graph, options = {}) {
+  const { from, to, maxHops = 12 } = options;
+  if (!Number.isInteger(maxHops) || maxHops < 0) throw Error("Invalid route hop limit");
+  function search(includeOwnership) {
+    const policy = hierarchyPolicy(graph, options, includeOwnership);
+    for (const id of [from, to]) {
+      const reason = policy.allowed(id);
+      if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
+    }
+    function ancestors(root) {
+      const found = /* @__PURE__ */ new Map([[root, { ids: [root], edges: [], ownership: false }]]), queue = [root];
+      for (let cursor = 0; cursor < queue.length; cursor++) {
+        const current = queue[cursor], path = found.get(current);
+        for (const { parent, edge, ownership } of policy.upward.get(current) ?? []) {
+          const reason = policy.allowed(parent);
+          if (reason) {
+            policy.omit(edge, parent, reason);
+            continue;
+          }
+          if (found.has(parent)) continue;
+          if (path.edges.length >= maxHops) {
+            policy.omit(edge, parent, "hop-limit");
+            continue;
+          }
+          found.set(parent, { ids: [...path.ids, parent], edges: [...path.edges, edge], ownership: path.ownership || ownership });
+          queue.push(parent);
+        }
+      }
+      return found;
+    }
+    const left = ancestors(from), right = ancestors(to), common = [...left.keys()].filter((id) => right.has(id));
+    const bounded = common.filter((id) => left.get(id).edges.length + right.get(id).edges.length <= maxHops);
+    bounded.sort((a, b) => {
+      const lengths = (id) => [left.get(id).edges.length, right.get(id).edges.length];
+      const [al, ar] = lengths(a), [bl, br] = lengths(b);
+      return al + ar - bl - br || Math.max(al, ar) - Math.max(bl, br) || a.localeCompare(b);
+    });
+    if (!bounded.length) {
+      if (common.length) policy.omit(null, to, "hop-limit");
+      policy.omit(null, to, "no-common-ancestor");
+      return { found: false, elements: [], relationships: [], omissions: policy.omissions };
+    }
+    const ancestor = bounded[0], ascent = left.get(ancestor), descent = right.get(ancestor), ids = [...ascent.ids, ...descent.ids.slice(0, -1).reverse()];
+    return copy2({
+      found: true,
+      strategy: ascent.ownership || descent.ownership ? "ownership-ancestor" : "common-ancestor",
+      commonAncestor: ancestor,
+      ascentIds: ascent.ids,
+      descentIds: [...descent.ids].reverse(),
+      elements: ids.map((id) => policy.elements.get(id)),
+      relationships: [...ascent.edges, ...[...descent.edges].reverse()],
+      omissions: policy.omissions
+    });
+  }
+  const engineering = search(false);
+  return engineering.found || !(graph.containment ?? []).length ? engineering : search(true);
+}
+function findExplicitRoute(graph, ids, options = {}) {
+  const policy = graphPolicy(graph, options), relationships = [], elements = [], omissions = [];
+  if (!Array.isArray(ids) || !ids.length) return { found: false, elements: [], relationships: [], omissions: [{ reason: "empty-route" }] };
+  const ownership = new Set((graph.containment ?? []).map((edge) => edge.id));
+  const edges = [...policy.edges, ...(graph.containment ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") }))];
+  for (const [index, id] of ids.entries()) {
+    const reason = policy.allowedElement(id);
+    if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
+    elements.push(policy.elements.get(id));
+    if (!index) continue;
+    const previous = ids[index - 1], edge = edges.find((edge2) => (policy.kinds.has(edge2.kind) || ownership.has(edge2.id)) && (edge2.source === previous && edge2.target === id || edge2.target === previous && edge2.source === id));
+    if (!edge) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason: "missing-explicit-link" }] };
+    relationships.push(edge);
+  }
+  return copy2({ found: true, strategy: "explicit", elements, relationships, omissions });
+}
+function directTypingContext(graph, id) {
+  const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
+  const relationships = nativeEdges(graph).filter((edge) => ["type", "typing"].includes(edge.kind) && (edge.source === id || edge.target === id));
+  const ids = /* @__PURE__ */ new Set([id]);
+  for (const edge of relationships) {
+    ids.add(edge.source);
+    ids.add(edge.target);
+  }
+  return copy2({ elements: [...ids].filter((key2) => elements.has(key2)).map((key2) => elements.get(key2)), relationships });
+}
+function projectView(view) {
+  const nodes = (view.nodes ?? []).map((node) => ({ ...copy2(node), id: node.id, semanticId: node.semanticId ?? node.semantic_id ?? null, parentId: node.parentId ?? node.parent ?? null }));
+  if (nodes.some((node) => typeof node.id !== "string")) throw new Error("Native drawing node lacks a representation ID");
+  if (new Set(nodes.map((node) => node.id)).size !== nodes.length) throw new Error("Duplicate representation ID");
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = (view.edges ?? []).map((edge, index) => ({ ...copy2(edge), id: edge.id ?? `${view.id ?? "view"}:edge:${index}`, source: endpoint(edge, "source"), target: endpoint(edge, "target") }));
+  if (edges.some((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target))) throw new Error("Native edge references an unavailable drawing node");
+  return { ...copy2(view), nodes, edges };
+}
+function semanticIds(scene2) {
+  return representedIdentities(scene2.view ?? scene2);
+}
+function planTransition(fromScene, toScene, options = {}) {
+  const previous = fromScene.view ?? fromScene, next = toScene.view ?? toScene;
+  const oldIds = semanticIds(previous), newIds = semanticIds(next), duration = options.reducedMotion ? 0 : 360;
+  const correspondence = oldIds.filter((id) => newIds.includes(id)).map((semanticId2) => ({ semanticId: semanticId2, fromRepresentationIds: representations(previous).filter((node) => node.semanticId === semanticId2).map((node) => node.representationId), toRepresentationIds: representations(next).filter((node) => node.semanticId === semanticId2).map((node) => node.representationId) }));
+  if (previous.kind === next.kind && correspondence.length && !options.journey?.length) return { mode: "same-kind", journeyRequired: false, correspondence, stages: [{ kind: "reflow", viewKind: next.kind, semanticIds: newIds, focusId: toScene.focus, duration }] };
+  const route2 = options.graph && fromScene.focus && toScene.focus ? options.journey?.length ? options.journey[0] === fromScene.focus && options.journey.at(-1) === toScene.focus ? findExplicitRoute(options.graph, options.journey, options) : { found: false, elements: [], relationships: [], omissions: [{ reason: "explicit-route-endpoints" }] } : findHierarchyRoute(options.graph, { ...options, from: fromScene.focus, to: toScene.focus }) : { found: false, elements: [], relationships: [], omissions: [{ reason: "missing-route-context" }] };
+  const bounded = (ids, focus) => [...new Set([focus, ...ids].filter(Boolean))].slice(0, 24);
+  const journey = route2.found ? route2.elements.map((element2) => element2.id) : [], stages = [{ kind: "gv-bridge", viewKind: "gv", semanticIds: bounded(oldIds, fromScene.focus), focusId: fromScene.focus, duration }];
+  if (route2.found) {
+    if (journey.length === 1) stages.push({ kind: "gv-journey", viewKind: "gv", semanticIds: journey, focusId: journey[0], route: [], routeIndex: 0, duration });
+    else for (let index = 1; index < journey.length; index++) {
+      const start2 = Math.max(0, index - 1), end = Math.min(journey.length, index + 2);
+      stages.push({
+        kind: "gv-journey",
+        viewKind: "gv",
+        semanticIds: journey.slice(start2, end),
+        focusId: journey[index],
+        route: route2.relationships.slice(start2, end - 1),
+        routeIndex: index,
+        phase: route2.commonAncestor ? index <= journey.indexOf(route2.commonAncestor) ? "ascent" : "descent" : "explicit",
+        duration
+      });
+    }
+  } else stages.push({ kind: "gv-journey", viewKind: "gv", semanticIds: [], focusId: toScene.focus, route: [], disconnected: true, duration });
+  stages.push({ kind: "gv-gather", viewKind: "gv", semanticIds: bounded(newIds, toScene.focus), focusId: toScene.focus, duration }, { kind: "morph", viewKind: next.kind, semanticIds: bounded(newIds, toScene.focus), focusId: toScene.focus, duration });
+  return { mode: previous.kind === next.kind ? "same-kind-journey" : "cross-kind", journeyRequired: true, correspondence, route: route2, stages };
+}
+
+// src/canvas-prototype/sequence-view.mjs
+var serial = 0;
+var semanticId = (record) => record.semanticId ?? record.semantic_id ?? null;
+var labelOf = (node) => [node.nameSynthesized ?? node.name_synthesized ? "" : node.name, node.type].filter(Boolean).join(" : ") || node.kind;
+function sequenceLayout(nativeView) {
+  const view = projectView(nativeView);
+  if (view.kind !== "sequence") throw Error("Sequence renderer requires a native sequence view");
+  const notices = [...view.notices ?? []];
+  for (const node of view.nodes) if (node.parentId) notices.push(`Nested sequence participant ${labelOf(node)} is shown as a lifeline; its native nesting is not represented.`);
+  for (const note of view.notes ?? []) notices.push(typeof note === "string" ? note : note.text ?? JSON.stringify(note));
+  const columnWidth = Math.max(210, ...view.nodes.map((node) => Math.min(360, 80 + labelOf(node).length * 7)));
+  const participantHeight = Math.max(72, ...view.nodes.map((node) => 40 + [labelOf(node), node.text, node.detail].filter(Boolean).join("\n").split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length * 7 / (columnWidth - 50))) * 19, 0)));
+  const nodes = view.nodes.map((node, index) => ({ ...node, semanticId: semanticId(node), x: 30 + index * columnWidth, y: 16, width: columnWidth - 30, height: participantHeight }));
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  let y = participantHeight + 70;
+  const edges = view.edges.map((edge, index) => {
+    const from = byId.get(edge.source), to = byId.get(edge.target), a = from.x + from.width / 2, b = to.x + to.width / 2, self2 = a === b;
+    const width = self2 ? Math.max(150, columnWidth - 40) : Math.max(140, Math.abs(b - a) - 24);
+    const label2 = edge.label ?? "", detail = [edge.fromLabel ?? edge.from_label, edge.toLabel ?? edge.to_label].filter(Boolean).join(" \u2192 ");
+    const text2 = [label2, detail].filter(Boolean).join("\n");
+    const labelHeight = Math.max(30, text2.split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length * 7 / (width - 12))) * 19, 0) + 8);
+    const points = self2 ? [{ x: a, y }, { x: a + Math.max(65, columnWidth * 0.37), y }, { x: a + Math.max(65, columnWidth * 0.37), y: y + 30 }, { x: a, y: y + 30 }] : [{ x: a, y }, { x: b, y }];
+    const supported = ["flow", "succession", "transition"].includes(edge.kind);
+    if (!supported) notices.push(`Unsupported sequence message kind: ${edge.kind}. Its native record remains available; no message arrow is inferred.`);
+    const result = {
+      ...edge,
+      semanticId: semanticId(edge),
+      sourceSemanticId: from.semanticId,
+      targetSemanticId: to.semanticId,
+      order: index,
+      points,
+      supported,
+      self: self2,
+      labelBox: { x: self2 ? a + 12 : Math.min(a, b) + 12, y: y - labelHeight - 5, width, height: labelHeight },
+      text: text2
+    };
+    y += Math.max(78, labelHeight + 38) + (self2 ? 30 : 0);
+    return result;
+  });
+  if (view.fragments?.length) notices.push("Native interaction fragments are not supported by this renderer; their ordering and concurrency are not inferred.");
+  return { ...view, nodes, edges, notices, width: Math.max(340, 30 + nodes.length * columnWidth), height: Math.max(220, y + 20) };
+}
+function mountSequence(host, nativeView, { onSelect = () => {
+}, onExplore = () => {
+}, selectedId = null, selectedIds, state: state2 = {}, onStateChange = () => {
+} } = {}) {
+  const document2 = host.ownerDocument, layout = sequenceLayout(nativeView), records = [], selected = { value: null, ids: [] };
+  const make = (tag, text2, cls) => {
+    const e = document2.createElement(tag);
+    if (text2 !== void 0) e.textContent = text2;
+    if (cls) e.className = cls;
+    return e;
+  };
+  const svg = (tag, attrs = {}) => {
+    const e = document2.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    return e;
+  };
+  const root = make("section", void 0, "sequence-view");
+  root.setAttribute("aria-label", "Sequence view");
+  const toolbar = make("div", void 0, "sequence-toolbar");
+  const evidence = make("p", "Modeled interaction \xB7 vertical spacing does not represent elapsed time.", "sequence-evidence");
+  const explore2 = make("button", "Explore selection");
+  explore2.type = "button";
+  explore2.disabled = true;
+  explore2.onclick = () => {
+    if (selected.value) onExplore(selected.value);
+  };
+  toolbar.append(evidence, explore2);
+  root.append(toolbar);
+  const selectionNotice = make("p", "", "sequence-selection-notice");
+  selectionNotice.hidden = true;
+  selectionNotice.setAttribute("role", "status");
+  root.append(selectionNotice);
+  if (layout.notices.length) {
+    const notices = make("details", void 0, "sequence-notices");
+    notices.append(make("summary", `${layout.notices.length} native or rendering notices`));
+    const list = make("ul");
+    for (const notice of layout.notices) list.append(make("li", typeof notice === "string" ? notice : notice.message ?? JSON.stringify(notice)));
+    notices.append(list);
+    root.append(notices);
+  }
+  const viewport = make("div", void 0, "sequence-viewport");
+  viewport.tabIndex = 0;
+  viewport.setAttribute("aria-label", "Sequence participants and ordered messages; scroll to reveal more");
+  const canvas = make("div", void 0, "sequence-canvas");
+  canvas.style.width = layout.width + "px";
+  canvas.style.height = layout.height + "px";
+  const drawing = svg("svg", { width: layout.width, height: layout.height, "aria-hidden": "true", class: "sequence-lines" });
+  const markerId = `sequence-arrow-${++serial}`, defs = svg("defs"), marker = svg("marker", { id: markerId, viewBox: "0 0 12 12", refX: 11, refY: 6, markerWidth: 9, markerHeight: 9, orient: "auto" });
+  marker.append(svg("path", { d: "M1 1 L11 6 L1 11 Z", fill: "currentColor" }));
+  defs.append(marker);
+  drawing.append(defs);
+  canvas.append(drawing);
+  const currentState = () => ({ scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop, selectedId: selected.ids.length === 1 ? selected.ids[0] : null, ...selected.ids.length > 1 ? { selectedIds: [...selected.ids] } : {} });
+  const highlight = () => {
+    for (const item of records) {
+      const active2 = selected.ids.includes(item.selection.semanticId);
+      item.button.classList.toggle("selected", active2);
+      item.button.setAttribute("aria-pressed", String(active2));
+      item.path?.classList.toggle("selected", active2);
+    }
+    explore2.disabled = !selected.value?.semanticId;
+    const missing = selected.ids.filter((id) => !records.some((item) => item.selection.semanticId === id));
+    selectionNotice.textContent = missing.length ? `${missing.length} selected element${missing.length === 1 ? " is" : "s are"} not represented in this sequence. Your semantic selection is retained.` : "";
+    selectionNotice.hidden = !missing.length;
+  };
+  const select2 = (id, { notify = false, record = null } = {}) => {
+    selected.ids = id ? [id] : [];
+    selected.value = record ?? records.find((item) => item.selection.semanticId === id)?.selection ?? null;
+    highlight();
+    if (notify) {
+      onSelect(selected.value);
+      onStateChange(currentState());
+    }
+  };
+  const selectMany = (ids) => {
+    selected.ids = [...new Set((ids ?? []).filter((id) => typeof id === "string" && id))];
+    selected.value = selected.ids.length === 1 ? records.find((item) => item.selection.semanticId === selected.ids[0])?.selection ?? null : null;
+    highlight();
+  };
+  const register = (button2, selection, box, path) => {
+    button2.type = "button";
+    button2.dataset.representation = selection.id;
+    if (selection.semanticId) button2.dataset.semanticId = selection.semanticId;
+    button2.setAttribute("aria-pressed", "false");
+    button2.onclick = (event) => {
+      event.stopPropagation();
+      select2(selection.semanticId, { notify: true, record: selection });
+    };
+    Object.assign(button2.style, { left: box.x + "px", top: box.y + "px", width: box.width + "px", minHeight: box.height + "px" });
+    records.push({ button: button2, selection, box, path });
+    canvas.append(button2);
+  };
+  for (const node of layout.nodes) {
+    const x = node.x + node.width / 2;
+    drawing.append(svg("line", { x1: x, x2: x, y1: node.y + node.height, y2: layout.height - 15, class: "sequence-lifeline" }));
+    const button2 = make("button", void 0, "sequence-participant");
+    button2.append(make("span", `\xAB${node.kind}\xBB`, "sequence-kind"), make("span", labelOf(node)));
+    if (node.detail || node.text) {
+      button2.append(make("span", [node.text, node.detail].filter(Boolean).join("\n"), "sequence-detail"));
+    }
+    register(button2, { ...node, label: labelOf(node) }, node);
+  }
+  for (const edge of layout.edges) {
+    let path = null;
+    if (edge.supported) {
+      path = svg("path", { d: edge.points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" "), class: "sequence-message-line", "marker-end": `url(#${markerId})` });
+      drawing.append(path);
+    }
+    const button2 = make("button", edge.text || "(unnamed message)", "sequence-message");
+    button2.setAttribute("aria-label", `Message ${edge.order + 1}: ${edge.text || "unnamed"}, ${labelOf(layout.nodes.find((n) => n.id === edge.source))} to ${labelOf(layout.nodes.find((n) => n.id === edge.target))}${edge.self ? ", self-message" : ""}`);
+    register(button2, { ...edge, kind: "relationship", relationshipKind: edge.kind, label: edge.label, relationships: [{ semanticId: edge.semanticId, sourceSemanticId: edge.sourceSemanticId, targetSemanticId: edge.targetSemanticId, kind: edge.kind, label: edge.label }] }, edge.labelBox, path);
+  }
+  viewport.append(canvas);
+  root.append(viewport);
+  host.replaceChildren(root);
+  viewport.scrollLeft = state2.scrollLeft ?? 0;
+  viewport.scrollTop = state2.scrollTop ?? 0;
+  viewport.addEventListener("scroll", () => onStateChange(currentState()));
+  for (const type of ["wheel", "pointerdown", "touchstart"]) viewport.addEventListener(type, (event) => event.stopPropagation(), { passive: true });
+  if (selectedIds) selectMany(selectedIds);
+  else if (selectedId) select2(selectedId);
+  else if (state2.selectedIds) selectMany(state2.selectedIds);
+  else select2(state2.selectedId);
+  return {
+    destroy() {
+      root.remove();
+    },
+    getState: currentState,
+    select: select2,
+    selectMany,
+    reveal(id) {
+      const item = records.find((item2) => item2.selection.semanticId === id);
+      if (item) item.button.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    },
+    anchors() {
+      const hostBox = host.getBoundingClientRect();
+      return records.filter((item) => item.selection.semanticId).flatMap((item) => {
+        const box = item.button.getBoundingClientRect(), area = viewport.getBoundingClientRect();
+        if (box.right < area.left || box.left > area.right || box.bottom < area.top || box.top > area.bottom) return [];
+        return [{ semanticId: item.selection.semanticId, representationId: item.selection.id, x: box.x - hostBox.x, y: box.y - hostBox.y, width: box.width, height: box.height }];
+      });
+    }
+  };
+}
+
+// src/canvas-prototype/behavior-view.mjs
+var cases = /* @__PURE__ */ new Set(["case", "case def", "use case", "use case def", "analysis", "analysis def", "verification", "verification def", "analysis case", "analysis case def", "verification case", "verification case def"]);
+var events = /* @__PURE__ */ new Set(["event", "basic event", "house event", "undeveloped event", "AND", "OR"]);
+var controls = /* @__PURE__ */ new Set(["start", "initial", "final", "end", "terminate", "terminate action", "fork", "join", "decision", "merge", "choice", "junction", "shallow history", "deep history"]);
+var behaviors = /* @__PURE__ */ new Set(["state", "state def", "region", "action", "action def", "accept", "send", "perform action", "exhibit state"]);
+var behaviorNodeDetail = (node) => behaviorNotation(node) ? [...new Set([node.text, node.detail].filter(Boolean))].join("\n") : "";
+var visibleDetail = (node) => {
+  const native = behaviorNodeDetail(node), shown = node.displayDetail ?? "";
+  return shown.includes(native) ? shown : [native, shown].filter(Boolean).join("\n");
+};
+function behaviorNotation(node) {
+  if (cases.has(node.kind)) return { family: "case", shape: "ellipse" };
+  if (node.kind === "objective") return { family: "case", shape: "note" };
+  if (["actor", "subject"].includes(node.kind)) return { family: "case", shape: "box" };
+  if (events.has(node.kind)) return { family: "fault-tree", shape: node.kind };
+  if (controls.has(node.kind)) return { family: "control", shape: node.kind };
+  if (behaviors.has(node.kind)) return { family: "behavior", shape: node.kind === "region" ? "region" : "rounded" };
+  return null;
+}
+function behaviorFace(document2, node) {
+  const notation = behaviorNotation(node);
+  if (!notation) return null;
+  const make = (tag, text2, cls) => {
+    const e = document2.createElement(tag);
+    if (text2) e.textContent = text2;
+    if (cls) e.className = cls;
+    return e;
+  };
+  const face2 = make("span", null, `node-face behavior-face behavior-${notation.family}`);
+  face2.dataset.shape = notation.shape;
+  if (notation.family === "control") {
+    const glyph = make("span", { "shallow history": "H", "deep history": "H*" }[node.kind] ?? "", "behavior-control");
+    glyph.setAttribute("aria-hidden", "true");
+    face2.append(glyph);
+    const name2 = node.nameSynthesized ?? node.name_synthesized ? "" : node.name;
+    const label2 = [name2, behaviorNodeDetail(node)].filter(Boolean).join("\n");
+    if (label2) face2.append(make("span", label2, "control-caption"));
+    return face2;
+  }
+  if (notation.family === "fault-tree") {
+    const svg = document2.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 80 60");
+    svg.setAttribute("aria-hidden", "true");
+    svg.classList.add("fault-symbol");
+    const path = document2.createElementNS(svg.namespaceURI, "path");
+    path.setAttribute("d", {
+      AND: "M16 54 V30 A24 24 0 0 1 64 30 V54 Z",
+      OR: "M16 54 Q20 20 40 6 Q60 20 64 54 Q40 43 16 54 Z",
+      "basic event": "M64 30 A24 24 0 1 1 16 30 A24 24 0 1 1 64 30 Z",
+      "undeveloped event": "M40 6 L70 30 L40 54 L10 30 Z",
+      "house event": "M12 54 V24 L40 6 L68 24 V54 Z",
+      event: "M10 10 H70 V50 H10 Z"
+    }[node.kind]);
+    svg.append(path);
+    face2.append(svg);
+  }
+  face2.append(make("span", `\xAB${node.kind}\xBB${node.type ? " : " + node.type : ""}`, "kind"));
+  const name = node.nameSynthesized ?? node.name_synthesized ? "" : node.name;
+  if (name) face2.append(make("span", name, "name"));
+  const detail = visibleDetail(node);
+  if (detail) face2.append(make("span", detail, "detail"));
+  return face2;
+}
+function applyBehaviorLayout(view) {
+  return { ...view, nodes: view.nodes.map((node) => {
+    const notation = behaviorNotation(node);
+    if (!notation || notation.family === "control") return node;
+    const text2 = visibleDetail(node), lines = text2.split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length / 28)), 0);
+    const base = notation.family === "fault-tree" ? 132 : notation.family === "case" ? 110 : 80;
+    return { ...node, width: Math.max(node.width ?? 0, notation.shape === "ellipse" ? 200 : 170), height: Math.max(node.height ?? 0, base + (text2 ? lines * 18 : 0)), behaviorFamily: notation.family };
+  }) };
+}
+
+// src/canvas-prototype/elk-layout.mjs
+var import_elk_api = __toESM(require_elk_api(), 1);
+
+// src/canvas-prototype/notation.mjs
+var profiles = Object.freeze({
+  connection: ["solid", "none", "none", false, "connector"],
+  transition: ["solid", "none", "filled-arrow", true, "behavior"],
+  succession: ["solid", "none", "filled-arrow", true, "behavior"],
+  flow: ["dashed", "none", "filled-arrow", true, "behavior"],
+  binding: ["solid", "none", "none", false, "connector"],
+  specialization: ["solid", "none", "hollow-triangle", true, "classifier"],
+  typing: ["dashed", "none", "hollow-triangle", true, "classifier"],
+  composition: ["solid", "diamond", "none", true, "ownership"],
+  reference: ["solid", "hollow-diamond", "none", true, "ownership"],
+  containment: ["solid", "containment", "none", true, "ownership"],
+  import: ["dashed", "none", "open-arrow", true, "dependency"],
+  satisfy: ["dashed", "none", "open-arrow", true, "dependency"],
+  verify: ["dashed", "none", "open-arrow", true, "dependency"],
+  derive: ["dashed", "none", "open-arrow", true, "derivation"],
+  refine: ["dashed", "none", "open-arrow", true, "dependency"],
+  allocate: ["dashed", "none", "open-arrow", true, "dependency"],
+  association: ["solid", "none", "none", false, "connector"],
+  include: ["dashed", "none", "filled-arrow", true, "dependency"],
+  anchor: ["dashed", "none", "none", false, "annotation"],
+  dependency: ["dashed", "none", "open-arrow", true, "dependency"]
+});
+function edgeAppearance(edge, { viewKind = edge.viewKind } = {}) {
+  const profile = Object.hasOwn(profiles, edge.kind) ? profiles[edge.kind] : null;
+  if (!profile) return {
+    line: "solid",
+    sourceMarker: "none",
+    targetMarker: "none",
+    directed: false,
+    label: edge.label ?? "",
+    supported: false,
+    family: "unsupported",
+    notice: `Unsupported relationship notation: ${String(edge.kind ?? "(missing kind)")}. Shown as a neutral line; direction is not inferred.`
+  };
+  let [line2, sourceMarker, targetMarker, directed, family] = profile;
+  if (["case", "mixed"].includes(viewKind) && ["typing", "reference"].includes(edge.kind)) {
+    line2 = "dashed";
+    sourceMarker = "none";
+    targetMarker = "open-arrow";
+    directed = true;
+    family = "dependency";
+  }
+  return {
+    line: line2,
+    sourceMarker,
+    targetMarker,
+    directed,
+    family,
+    label: edge.label ?? "",
+    supported: true,
+    notice: ""
+  };
+}
+function edgeLayoutHints(edge, options) {
+  const appearance = edgeAppearance(edge, options);
+  const caseReference = appearance.family === "dependency" && edge.kind === "reference";
+  const rank = ["specialization", "typing", "derive", "refine", "satisfy", "verify"].includes(edge.kind) ? "target-above-source" : ["composition", "containment", "reference"].includes(edge.kind) && !caseReference ? "source-above-target" : ["transition", "succession", "flow"].includes(edge.kind) ? "source-before-target" : "free";
+  return {
+    family: appearance.family,
+    rank,
+    preserveEndpoints: true,
+    supported: appearance.supported
+  };
+}
+function markerDefinition(name) {
+  const common = {
+    viewBox: "0 0 12 12",
+    refX: 11,
+    refY: 6,
+    markerWidth: 12,
+    markerHeight: 12,
+    orient: "auto-start-reverse"
+  };
+  switch (name) {
+    case "open-arrow":
+      return { ...common, path: "M1,1 L11,6 L1,11", fill: "none" };
+    case "filled-arrow":
+      return { ...common, path: "M1,1 L11,6 L1,11 Z", fill: "line" };
+    case "hollow-triangle":
+      return { ...common, path: "M1,1 L11,6 L1,11 Z", fill: "background" };
+    case "diamond":
+      return { ...common, path: "M1,6 L6,1 L11,6 L6,11 Z", fill: "line" };
+    case "hollow-diamond":
+      return { ...common, path: "M1,6 L6,1 L11,6 L6,11 Z", fill: "background" };
+    case "containment":
+      return { ...common, path: "M11,6 A5,5 0 1,1 1,6 A5,5 0 1,1 11,6 Z", fill: "background" };
+    case "continuation-chevron":
+      return { ...common, path: "M2,1 L7,6 L2,11 M6,1 L11,6 L6,11", fill: "none" };
+    default:
+      return null;
+  }
+}
+
+// src/canvas-prototype/elk-layout.mjs
+var createLayoutEngine = (options) => new import_elk_api.default({ algorithms: ["layered"], ...options });
+var behavioralKinds = /* @__PURE__ */ new Set(["action", "activity", "state", "sequence", "fault-tree", "mixed"]);
+var sizes = /* @__PURE__ */ new Map([["initial", [28, 28]], ["final", [32, 32]], ["fork", [80, 8]], ["join", [80, 8]], ["decision", [44, 44]], ["merge", [44, 44]], ["choice", [44, 44]], ["junction", [20, 20]], ["shallow history", [36, 36]], ["deep history", [36, 36]], ["terminate action", [32, 32]], ["start", [28, 28]], ["end", [32, 32]]]);
+var overlap = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var segmentHits = (a, b, n) => a.x === b.x ? a.x > n.x + 0.01 && a.x < n.x + n.width - 0.01 && Math.max(a.y, b.y) > n.y + 0.01 && Math.min(a.y, b.y) < n.y + n.height - 0.01 : a.y === b.y && a.y > n.y + 0.01 && a.y < n.y + n.height - 0.01 && Math.max(a.x, b.x) > n.x + 0.01 && Math.min(a.x, b.x) < n.x + n.width - 0.01;
+var simplify2 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
+var num = (value, fallback) => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
+function dimensions(node) {
+  const symbol = sizes.get(node.kind);
+  return { width: symbol?.[0] ?? num(node.width, 160), height: symbol?.[1] ?? num(node.height, 76) };
+}
+function isPort(node, nodes) {
+  return node.kind === "port" && nodes.has(node.parentId);
+}
+function projectEmbeddedPorts(view) {
+  const nodes = [...view.nodes], attachments = /* @__PURE__ */ new Map(), usedIDs = new Set(nodes.map((n) => n.id));
+  for (const owner of view.nodes) for (const port of owner.ports ?? []) {
+    if (typeof port.id !== "string" || !port.id) throw Error("Native embedded port lacks a rendering ID");
+    const key2 = JSON.stringify([owner.id, port.id]);
+    if (attachments.has(key2)) throw Error("Duplicate native port on " + owner.id + ": " + port.id);
+    let id = "syspresent-native-port:" + key2;
+    while (usedIDs.has(id)) id += ":";
+    usedIDs.add(id);
+    attachments.set(key2, id);
+    const name = port.nameSynthesized ? "" : port.name ?? "", label2 = port.type ? name + " : " + port.type : name;
+    nodes.push({ id, kind: "port", name, label: label2, parentId: owner.id, width: 12, height: 12, semanticId: null, identityStatus: "modeled-pin", nativePortId: port.id, nativePort: structuredClone(port), direction: port.direction, parameter: port.parameter, origin: structuredClone(port.origin ?? null) });
+  }
+  const edges = view.edges.map((edge) => {
+    const result = { ...edge };
+    for (const [endpoint3, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
+      const pin = edge[field] ?? edge[field === "fromPort" ? "from_port" : "to_port"];
+      if (!pin) continue;
+      const id = attachments.get(JSON.stringify([edge[endpoint3], pin]));
+      if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint3]);
+      result[attachment] = id;
+    }
+    return result;
+  });
+  return { ...view, nodes, edges };
+}
+function orientation(edge, behavioral, viewKind) {
+  return viewKind === "fault-tree" || !behavioral && edgeLayoutHints(edge, { viewKind }).rank === "target-above-source" ? [edge.target, edge.source, true] : [edge.source, edge.target, false];
+}
+function partitions(nodes, edges, capacity) {
+  const ranks = new Map(nodes.map((n) => [n.id, 0]));
+  for (let i = 0; i < nodes.length; i++) {
+    let changed = false;
+    for (const [a, b] of edges) {
+      if (a !== b && ranks.has(a) && ranks.has(b) && ranks.get(b) <= ranks.get(a)) {
+        ranks.set(b, ranks.get(a) + 1);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+    if (i === nodes.length - 1) return null;
+  }
+  const groups = /* @__PURE__ */ new Map();
+  for (const node of nodes) {
+    const rank = ranks.get(node.id);
+    if (!groups.has(rank)) groups.set(rank, []);
+    groups.get(rank).push(node);
+  }
+  const result = /* @__PURE__ */ new Map();
+  let row = 0;
+  for (const [, group] of [...groups].sort((a, b) => a[0] - b[0])) {
+    group.sort((a, b) => a.id.localeCompare(b.id));
+    for (let i = 0; i < group.length; i++) result.set(group[i].id, row + Math.floor(i / capacity));
+    row += Math.ceil(group.length / capacity);
+  }
+  return result;
+}
+function makeGraph(view, options, profile) {
+  const nodes = new Map(view.nodes.map((n) => [n.id, n])), behavioral = behavioralKinds.has(view.kind), actualPorts = new Set(view.nodes.filter((n) => isPort(n, nodes)).map((n) => n.id)), children = new Map(view.nodes.map((n) => [n.id, []]));
+  for (const node of view.nodes) if (node.parentId && nodes.has(node.parentId) && !actualPorts.has(node.id)) children.get(node.parentId).push(node.id);
+  const roots = view.nodes.filter((n) => !actualPorts.has(n.id) && (!n.parentId || !nodes.has(n.parentId)));
+  if (options.grouping === "owner" && !behavioral) roots.sort((a, b) => String(a.layoutGroup || a.id).localeCompare(String(b.layoutGroup || b.id)) || a.id.localeCompare(b.id));
+  const rootOf = (id) => {
+    let node = nodes.get(id), seen = /* @__PURE__ */ new Set();
+    while (node?.parentId && nodes.has(node.parentId)) {
+      if (seen.has(node.id)) throw Error("Cyclic native drawing containment");
+      seen.add(node.id);
+      node = nodes.get(node.parentId);
+    }
+    return node?.id;
+  };
+  const rows = profile.capacity ? partitions(roots, view.edges.filter((e) => edgeLayoutHints(e, { viewKind: view.kind }).rank !== "free").map((e) => {
+    const [a, b] = orientation(e, behavioral, view.kind);
+    return [rootOf(a), rootOf(b)];
+  }), profile.capacity) : null;
+  const elkNodes = /* @__PURE__ */ new Map(), anchors = /* @__PURE__ */ new Map(), edgeMap = /* @__PURE__ */ new Map(), gap = profile.gap;
+  function build(node) {
+    const { width, height } = dimensions(node), nested = children.get(node.id), result = { id: node.id, width, height, children: nested.map((id) => build(nodes.get(id))), ports: [], layoutOptions: { "elk.portConstraints": "FIXED_SIDE", "elk.portLabels.placement": "[OUTSIDE]", "elk.padding": `[top=${height + 20},left=24,bottom=24,right=24]` } };
+    if (!nested.length) delete result.children;
+    if (rows?.has(node.id)) result.layoutOptions["elk.partitioning.partition"] = String(rows.get(node.id));
+    elkNodes.set(node.id, result);
+    return result;
+  }
+  const graph = { id: "syspresent-layout-root", children: roots.map(build), edges: [], layoutOptions: {
+    "elk.algorithm": "layered",
+    "elk.direction": "DOWN",
+    "elk.edgeRouting": "ORTHOGONAL",
+    "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+    "elk.randomSeed": "1",
+    "elk.padding": "[top=12,left=12,bottom=12,right=12]",
+    "elk.spacing.nodeNode": String(gap),
+    "elk.spacing.edgeEdge": "12",
+    "elk.spacing.edgeNode": "12",
+    "elk.spacing.labelNode": "8",
+    "elk.spacing.edgeLabel": "7",
+    "elk.layered.spacing.nodeNodeBetweenLayers": String(gap),
+    "elk.layered.spacing.edgeEdgeBetweenLayers": "12",
+    "elk.layered.spacing.edgeNodeBetweenLayers": "12",
+    "elk.layered.mergeEdges": "false",
+    "elk.layered.mergeHierarchyEdges": "false",
+    "elk.layered.unnecessaryBendpoints": "true",
+    "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+    "elk.layered.nodePlacement.strategy": profile.capacity ? "SIMPLE" : "BRANDES_KOEPF",
+    ...profile.balanced ? { "elk.layered.nodePlacement.favorStraightEdges": "false", "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED" } : {},
+    ...rows ? { "elk.partitioning.activate": "true" } : {},
+    ...options.grouping === "owner" && !behavioral ? { "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES" } : {}
+  } };
+  for (const native of view.nodes.filter((n) => actualPorts.has(n.id))) {
+    const owner = elkNodes.get(native.parentId), incoming = view.edges.find((e) => (e.sourceAttachment ?? e.source) === native.id || (e.targetAttachment ?? e.target) === native.id), specified = String(native.portSide ?? native.side ?? "").toUpperCase();
+    const side = ["NORTH", "SOUTH", "EAST", "WEST"].includes(specified) ? specified : (incoming?.sourceAttachment ?? incoming?.source) === native.id ? "SOUTH" : "NORTH";
+    const text2 = native.label ?? native.name, label2 = text2 ? options.measureLabel?.(text2) ?? { width: String(text2).length * 6.5, height: 16 } : null;
+    owner.ports.push({ id: native.id, width: num(native.width, 12), height: num(native.height, 12), ...label2 ? { labels: [{ id: native.id + ":port-label", text: text2, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {}, layoutOptions: { "elk.port.side": side, "elk.port.borderOffset": String(-Math.min(num(native.width, 12), num(native.height, 12)) / 2) } });
+    anchors.set(native.id, { identityStatus: native.semanticId ? "actual-model-port" : "modeled-pin", semanticId: native.semanticId ?? null, representationId: native.id, ownerId: native.parentId, ...native.nativePortId ? { nativePortId: native.nativePortId, nativePort: structuredClone(native.nativePort) } : {} });
+  }
+  function anchor(id, edgeId, side, preferredSide) {
+    if (actualPorts.has(id)) return id;
+    const portId = `syspresent-anchor:${edgeId}:${side}`, owner = elkNodes.get(id);
+    if (!owner) throw Error("Native endpoint has no drawing owner: " + id);
+    owner.ports.push({ id: portId, width: 0, height: 0, layoutOptions: { "elk.port.side": preferredSide ?? (side === "source" ? "SOUTH" : "NORTH") } });
+    anchors.set(portId, { identityStatus: "drawing-anchor", semanticId: null, representationId: null, ownerId: id });
+    return portId;
+  }
+  for (const [i, edge] of [...view.edges].sort((a, b) => a.id.localeCompare(b.id)).entries()) {
+    const [source, target, reversed] = orientation(edge, behavioral, view.kind), id = `syspresent-edge:${i}`, label2 = edge.label ? options.measureLabel?.(edge.label) ?? { width: String(edge.label).length * 7.2 + 4, height: 16 } : null;
+    const sourcePin = reversed ? edge.targetAttachment : edge.sourceAttachment, targetPin = reversed ? edge.sourceAttachment : edge.targetAttachment, sides = profile.anchorSides?.get(edge.id);
+    graph.edges.push({ id, sources: [anchor(sourcePin ?? source, id, "source", sides?.[0])], targets: [anchor(targetPin ?? target, id, "target", sides?.[1])], ...label2 ? { labels: [{ id: id + ":label", text: edge.label, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {} });
+    edgeMap.set(id, { edge, reversed });
+  }
+  return { graph, nodes, children, actualPorts, anchors, edgeMap };
+}
+function readLayout(view, data, laid, options, profile) {
+  const positions = /* @__PURE__ */ new Map(), routes = /* @__PURE__ */ new Map(), diagnostics = [], ports = [], nativeRoutes = [];
+  function walk(item, ox = 0, oy = 0) {
+    const x = ox + (item.x ?? 0), y = oy + (item.y ?? 0);
+    if (data.nodes.has(item.id)) {
+      const native = data.nodes.get(item.id);
+      positions.set(item.id, { ...native, x, y, width: item.width, height: item.height, ...item.children?.length ? { headerHeight: dimensions(native).height } : {} });
+    }
+    for (const port of item.ports ?? []) {
+      const anchor = data.anchors.get(port.id), position = { ...anchor, id: port.id, x: x + port.x + port.width / 2, y: y + port.y + port.height / 2, side: port.layoutOptions?.["elk.port.side"] };
+      ports.push(position);
+      if (data.actualPorts.has(port.id)) {
+        const native = data.nodes.get(port.id), label2 = port.labels?.[0], portLabelBox = label2 ? { x: x + port.x + label2.x, y: y + port.y + label2.y, width: label2.width, height: label2.height } : null;
+        positions.set(port.id, { ...native, portSide: port.layoutOptions?.["elk.port.side"], x: x + port.x, y: y + port.y, width: port.width, height: port.height, ...portLabelBox ? { portLabelBox } : {} });
+        position.portLabelBox = portLabelBox;
+      }
+    }
+    for (const edge of item.edges ?? []) nativeRoutes.push({ edge, x, y });
+    for (const child of item.children ?? []) walk(child, x, y);
+  }
+  walk(laid);
+  for (const record of nativeRoutes) {
+    const { edge } = record, native = data.edgeMap.get(edge.id);
+    if (!native) continue;
+    const container = positions.get(edge.container), x = container?.x ?? record.x, y = container?.y ?? record.y;
+    const points = simplify2((edge.sections ?? []).flatMap((s) => [s.startPoint, ...s.bendPoints ?? [], s.endPoint]).map((p) => ({ x: p.x + x, y: p.y + y })));
+    const label2 = edge.labels?.[0], labelBox = label2 ? { x: label2.x + x, y: label2.y + y, width: label2.width, height: label2.height } : void 0;
+    const first = data.anchors.get(edge.sources?.[0]), last = data.anchors.get(edge.targets?.[0]);
+    routes.set(native.edge.id, { ...native.edge, points: native.reversed ? [...points].reverse() : points, ...labelBox ? { labelBox, x: labelBox.x, y: labelBox.y + labelBox.height * 0.78 } : {}, sourceAnchor: native.reversed ? last : first, targetAnchor: native.reversed ? first : last, routingEngine: "elk-layered" });
+  }
+  const nodes = view.nodes.map((n) => positions.get(n.id)).filter(Boolean);
+  if (!behavioralKinds.has(view.kind) && nodes.length <= 24 && !nodes.some((n) => n.parentId)) optimizeRoutes([...routes.values()], nodes);
+  const ancestors = (id) => {
+    const result = /* @__PURE__ */ new Set();
+    let node = data.nodes.get(id);
+    while (node?.parentId && data.nodes.has(node.parentId)) {
+      if (result.has(node.parentId)) throw Error("Cyclic native drawing containment");
+      result.add(node.parentId);
+      node = data.nodes.get(node.parentId);
+    }
+    return result;
+  };
+  if (nodes.length !== view.nodes.length || nodes.some((n) => ![n.x, n.y, n.width, n.height].every(Number.isFinite))) throw Error("ELK returned invalid tile geometry");
+  const edges = view.edges.map((native) => {
+    const edge = routes.get(native.id) ?? { ...native, points: [] }, anc = /* @__PURE__ */ new Set([...ancestors(native.sourceAttachment ?? native.source), ...ancestors(native.targetAttachment ?? native.target)]);
+    const obstacles = nodes.flatMap((n) => data.children.get(n.id)?.length ? anc.has(n.id) ? [{ ...n, height: n.headerHeight }] : [n] : data.actualPorts.has(n.id) && [native.sourceAttachment ?? native.source, native.targetAttachment ?? native.target].includes(n.id) ? [] : [n]);
+    const blocked = edge.points.length < 2 || edge.points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y)) || edge.points.slice(1).some((point2, i) => obstacles.some((n) => segmentHits(edge.points[i], point2, n)));
+    if (blocked) {
+      diagnostics.push({ reason: "unroutable-connection", relationshipId: native.id, message: "No unobstructed native connection route was found." });
+      edge.points = [];
+      edge.routingBlocked = true;
+    }
+    if (edge.labelBox && (![edge.labelBox.x, edge.labelBox.y, edge.labelBox.width, edge.labelBox.height].every(Number.isFinite) || obstacles.some((n) => overlap(edge.labelBox, n, 2)))) {
+      delete edge.labelBox;
+      edge.labelOmitted = true;
+      diagnostics.push({ reason: "unplaceable-connection-label", relationshipId: native.id });
+    }
+    return edge;
+  });
+  for (let i = 0; i < edges.length; i++) for (let j = 0; j < i; j++) if (edges[i].labelBox && edges[j].labelBox && overlap(edges[i].labelBox, edges[j].labelBox, 2)) {
+    delete edges[i].labelBox;
+    edges[i].labelOmitted = true;
+    diagnostics.push({ reason: "unplaceable-connection-label", relationshipId: edges[i].id });
+  }
+  return { ...view, nodes, edges, ports, diagnostics, omissions: [...view.omissions ?? [], ...diagnostics], bounds: { x: 0, y: 0, width: laid.width, height: laid.height }, layoutEngine: "elk-layered", layoutProfile: (profile.capacity ? "responsive-partitions-" + profile.capacity : "layered") + (profile.anchorSides ? "-facing-sides" : "") + (profile.balanced ? "-balanced" : ""), panels: structuredClone(options.panels ?? []) };
+}
+async function layoutDiagram(nativeView, options = {}) {
+  const { width = 1e3, height = 700, elk } = options;
+  if (!elk?.layout) throw Error("layoutDiagram requires an ELK engine");
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) throw Error("Invalid viewport");
+  const view = applyBehaviorLayout(projectEmbeddedPorts(projectView(nativeView))), area = options.panels?.length ? graphArea(width, height, options.panels) : { width, height };
+  if (!view.nodes.length) return { ...view, nodes: [], edges: [], ports: [], diagnostics: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered" };
+  const rootCount = view.nodes.filter((n) => !n.parentId).length, behavioral = behavioralKinds.has(view.kind), profiles2 = [{ gap: 32 }];
+  if (!behavioral && rootCount > 2 && area.width < 700) for (const capacity of [2, 1]) profiles2.push({ gap: 28, capacity });
+  if (!behavioral && rootCount >= 3 && rootCount <= 9 && requirementFanout(view)) profiles2.push({ gap: 32, balanced: true });
+  const candidates = [];
+  for (const profile of profiles2) {
+    try {
+      const data = makeGraph(view, options, profile), laid = await elk.layout(data.graph), candidate = readLayout(view, data, laid, options, profile);
+      scoreLayout(candidate, area);
+      candidates.push(candidate);
+      let previous = candidate;
+      const seen = /* @__PURE__ */ new Set();
+      for (let retry = 0; !behavioral && profile.capacity && retry < 3; retry++) {
+        const anchorSides = facingSides(previous);
+        if (!anchorSides.size) break;
+        const key2 = JSON.stringify([...anchorSides]);
+        if (seen.has(key2)) break;
+        seen.add(key2);
+        const alternate = { ...profile, anchorSides }, joint = makeGraph(view, options, alternate), result = readLayout(view, joint, await elk.layout(joint.graph), options, alternate);
+        scoreLayout(result, area);
+        candidates.push(result);
+        previous = result;
+      }
+    } catch (error) {
+      candidates.push({ ...view, nodes: [], edges: view.edges.map((e) => ({ ...e, points: [], routingBlocked: true })), ports: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered", layoutScore: 1e9, diagnostics: [{ reason: "layout-failed", message: error.message }] });
+    }
+  }
+  candidates.sort((a, b) => a.layoutScore - b.layoutScore);
+  if (!candidates.some((candidate) => candidate.nodes.length)) throw Error(candidates[0]?.diagnostics[0]?.message ?? "ELK could not lay out the native diagram");
+  return candidates[0];
+}
+function requirementFanout(view) {
+  if (!["requirement", "definition", "general"].includes(view.kind) || view.nodes.some((n) => n.parentId) || view.edges.length !== view.nodes.length - 1) return false;
+  const oriented = view.edges.map((edge) => edgeLayoutHints(edge, { viewKind: view.kind }).rank === "target-above-source" ? orientation(edge, false, view.kind) : null);
+  return oriented.every(Boolean) && oriented.every(([source]) => source === oriented[0][0]) && new Set(oriented.map(([, target]) => target)).size === view.nodes.length - 1;
+}
+function facingSides(view) {
+  const nodes = new Map(view.nodes.map((n) => [n.id, n])), sides = /* @__PURE__ */ new Map();
+  for (const edge of view.edges) {
+    if (edgeLayoutHints(edge, { viewKind: view.kind }).rank === "free") continue;
+    const [from, to] = orientation(edge, false, view.kind), a = nodes.get(from), b = nodes.get(to);
+    if (!a || !b || a.parentId || b.parentId || a.kind === "port" || b.kind === "port") continue;
+    if (!view.nodes.some((n) => n !== a && n !== b && !n.parentId && n.y >= a.y + a.height - 0.01 && n.y + n.height <= b.y + 0.01)) continue;
+    const side = b.x + b.width / 2 < a.x + a.width / 2 ? "WEST" : "EAST";
+    sides.set(edge.id, [side, side]);
+  }
+  return sides;
+}
+function scoreLayout(candidate, area) {
+  let length2 = 0, bends = 0, stretch = 0, crossings = 0;
+  for (const edge of candidate.edges) {
+    const points = edge.points;
+    let route2 = 0;
+    for (let i = 1; i < points.length; i++) route2 += Math.abs(points[i].x - points[i - 1].x) + Math.abs(points[i].y - points[i - 1].y);
+    length2 += route2;
+    bends += Math.max(0, points.length - 2);
+    if (points.length > 1) {
+      const direct = Math.abs(points[0].x - points.at(-1).x) + Math.abs(points[0].y - points.at(-1).y);
+      stretch += Math.max(0, route2 / Math.max(1, direct) - 1);
+    }
+  }
+  for (let i = 0; i < candidate.edges.length; i++) for (let j = 0; j < i; j++) {
+    const a = candidate.edges[i].points, b = candidate.edges[j].points;
+    for (let ai = 1; ai < a.length; ai++) for (let bi = 1; bi < b.length; bi++) {
+      const aa = a[ai - 1], ab = a[ai], ba = b[bi - 1], bb = b[bi], horizontal = aa.y === ab.y, otherHorizontal = ba.y === bb.y;
+      if (horizontal === otherHorizontal) continue;
+      const h = horizontal ? [aa, ab] : [ba, bb], v = horizontal ? [ba, bb] : [aa, ab];
+      if (v[0].x > Math.min(h[0].x, h[1].x) + 0.01 && v[0].x < Math.max(h[0].x, h[1].x) - 0.01 && h[0].y > Math.min(v[0].y, v[1].y) + 0.01 && h[0].y < Math.max(v[0].y, v[1].y) - 0.01) crossings++;
+    }
+  }
+  const occupied = [...candidate.nodes, ...candidate.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], minX = Math.min(...occupied.map((n) => n.x)), minY = Math.min(...occupied.map((n) => n.y)), maxX = Math.max(...occupied.map((n) => n.x + n.width)), maxY = Math.max(...occupied.map((n) => n.y + n.height));
+  candidate.bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  const scale = Math.min(1, area.width / (candidate.bounds.width + 20), area.height / (candidate.bounds.height + 20));
+  candidate.layoutFitScale = scale;
+  const extent = candidate.nodes.reduce((sum, n) => sum + n.width + n.height, 0);
+  candidate.layoutMetrics = { pathLength: length2, bends, pathStretch: stretch, crossings };
+  candidate.layoutScore = candidate.diagnostics.length * 1e4 + 3 / Math.max(0.01, scale) + length2 / Math.max(1, extent) * 0.45 + stretch * 0.3 + bends * 0.05 + crossings * 0.6 + candidate.bounds.width * candidate.bounds.height / 1e8;
+}
+function optimizeRoutes(edges, nodes) {
+  const inflated = (n, padding) => ({ x: n.x - padding, y: n.y - padding, width: n.width + padding * 2, height: n.height + padding * 2 });
+  const tileObstacles = nodes.map((n) => inflated(n, 4)), settled = [];
+  for (const edge of [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
+    const original = edge.points;
+    if (original.length < 2) continue;
+    const obstacles = [...tileObstacles, ...edges.flatMap((other) => other !== edge && other.labelBox ? [inflated(other.labelBox, 3)] : [])];
+    const start2 = original[0], end = original.at(-1), normal = (from, to) => ({ x: Math.sign(to.x - from.x), y: Math.sign(to.y - from.y) }), a = normal(start2, original[1]), b = normal(end, original.at(-2));
+    if (a.x && a.y || b.x && b.y) continue;
+    const stub = { x: start2.x + a.x * 8, y: start2.y + a.y * 8 }, finish = { x: end.x + b.x * 8, y: end.y + b.y * 8 };
+    const middle = routeOrthogonal(stub, finish, obstacles, { bendPenalty: 24, segmentCost: (from, to) => {
+      let cost = 0;
+      for (const points of settled) for (let i = 1; i < points.length; i++) {
+        const a2 = points[i - 1], b3 = points[i];
+        if (from.y === to.y && a2.y === b3.y && from.y === a2.y) cost += Math.max(0, Math.min(Math.max(from.x, to.x), Math.max(a2.x, b3.x)) - Math.max(Math.min(from.x, to.x), Math.min(a2.x, b3.x))) * 4;
+        else if (from.x === to.x && a2.x === b3.x && from.x === a2.x) cost += Math.max(0, Math.min(Math.max(from.y, to.y), Math.max(a2.y, b3.y)) - Math.max(Math.min(from.y, to.y), Math.min(a2.y, b3.y))) * 4;
+        else {
+          const h = from.y === to.y ? [from, to] : [a2, b3], v = from.x === to.x ? [from, to] : [a2, b3];
+          if (h[0].y === h[1].y && v[0].x === v[1].x && v[0].x > Math.min(h[0].x, h[1].x) && v[0].x < Math.max(h[0].x, h[1].x) && h[0].y > Math.min(v[0].y, v[1].y) && h[0].y < Math.max(v[0].y, v[1].y)) cost += 80;
+        }
+      }
+      return cost;
+    } });
+    if (middle) {
+      const points = simplify2([start2, ...middle, end]), length2 = (ps) => ps.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - ps[i].x) + Math.abs(p.y - ps[i].y), 0);
+      if (length2(points) + Math.max(0, points.length - 2) * 24 < length2(original) + Math.max(0, original.length - 2) * 24) edge.points = points;
+    }
+    if (!relocateLabels([edge], nodes, edges)) edge.points = original;
+    settled.push(edge.points);
+  }
+}
+function relocateLabels(edges, nodes, allEdges = edges) {
+  const distance3 = (box, points) => {
+    const center2 = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    return Math.min(...points.slice(1).map((b, i) => {
+      const a = points[i];
+      return a.x === b.x ? Math.hypot(center2.x - a.x, center2.y - Math.max(Math.min(a.y, b.y), Math.min(Math.max(a.y, b.y), center2.y))) : Math.hypot(center2.y - a.y, center2.x - Math.max(Math.min(a.x, b.x), Math.min(Math.max(a.x, b.x), center2.x)));
+    }));
+  };
+  for (const edge of edges) {
+    const box = edge.labelBox;
+    if (!box) continue;
+    const crossed = edge.points.slice(1).some((p, i) => segmentHits(edge.points[i], p, box));
+    const left = Math.min(...nodes.map((n) => n.x)), right = Math.max(...nodes.map((n) => n.x + n.width));
+    if (!crossed && box.x >= left && box.x + box.width <= right && distance3(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
+    const candidates = [];
+    for (let i = 1; i < edge.points.length; i++) {
+      const a = edge.points[i - 1], b = edge.points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+      for (const t of [0.5, 0.25, 0.75]) {
+        const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+        if (a.y === b.y) candidates.push({ ...box, x: x - box.width / 2, y: y - box.height - 5, score: length2 }, { ...box, x: x - box.width / 2, y: y + 5, score: length2 - 1 });
+        else candidates.push({ ...box, x: x + 5, y: y - box.height / 2, score: length2 }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length2 - 1 });
+      }
+    }
+    const labelScore = (candidate) => candidate.score - 12 * (Math.max(0, left - candidate.x) + Math.max(0, candidate.x + candidate.width - right));
+    const replacement = candidates.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
+    if (replacement) {
+      delete replacement.score;
+      edge.labelBox = replacement;
+      edge.x = replacement.x;
+      edge.y = replacement.y + replacement.height * 0.78;
+    } else return false;
+  }
+  return true;
+}
+
+// src/canvas-prototype/camera.mjs
+var CAMERA_LIMITS = Object.freeze({ minScale: 5e-3, maxScale: 4 });
+var finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
+function limits(options = {}) {
+  const minScale = clamp(finite(options.minScale, CAMERA_LIMITS.minScale), CAMERA_LIMITS.minScale, CAMERA_LIMITS.maxScale);
+  return { minScale, maxScale: clamp(finite(options.maxScale, CAMERA_LIMITS.maxScale), minScale, CAMERA_LIMITS.maxScale) };
+}
+var clamp = (value, min, max2) => Math.max(min, Math.min(max2, value));
+function createCamera(camera = {}, options = {}) {
+  const { minScale, maxScale } = limits(options);
+  return { x: finite(camera?.x, 0), y: finite(camera?.y, 0), scale: clamp(finite(camera?.scale, 1), minScale, maxScale) };
+}
+function panCamera(camera, dx, dy) {
+  const c = createCamera(camera);
+  return { ...c, x: c.x + finite(dx, 0), y: c.y + finite(dy, 0) };
+}
+function zoomCameraAt(camera, point2, factor, options = {}) {
+  const c = createCamera(camera, options), { minScale, maxScale } = limits(options);
+  const scale = clamp(c.scale * Math.max(1e-4, finite(factor, 1)), minScale, maxScale);
+  const world = { x: (point2.x - c.x) / c.scale, y: (point2.y - c.y) / c.scale };
+  return { x: point2.x - world.x * scale, y: point2.y - world.y * scale, scale };
+}
+function fitCameraToBounds(bounds2, area, padding = 24, options = {}) {
+  if (!bounds2 || !area || ![bounds2.x, bounds2.y, bounds2.width, bounds2.height, area.x, area.y, area.width, area.height].every(Number.isFinite) || bounds2.width < 0 || bounds2.height < 0 || area.width <= 0 || area.height <= 0) return createCamera({}, options);
+  const inset = Math.max(0, finite(padding, 24)), { minScale, maxScale } = limits(options);
+  const scale = clamp(Math.min(Math.max(1, area.width - inset * 2) / Math.max(1, bounds2.width), Math.max(1, area.height - inset * 2) / Math.max(1, bounds2.height)), minScale, maxScale);
+  return { x: area.x + area.width / 2 - (bounds2.x + bounds2.width / 2) * scale, y: area.y + area.height / 2 - (bounds2.y + bounds2.height / 2) * scale, scale };
+}
+function graphTarget(target, element2) {
+  if (!target || !element2.contains(target)) return false;
+  if (target.closest?.("article,aside,dialog,#selection,#canvas-tools,#loading,[data-camera-ignore]")) return false;
+  if (target.closest?.(".node,[data-relationship],[data-camera-surface]")) return true;
+  return !target.closest?.('button,a,input,textarea,select,summary,[contenteditable="true"],[role="button"]');
+}
+var midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+var distance2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function bindCameraControls({ element: element2, getCamera, setCamera, onChange, onGestureStart, getViewportArea, shouldHandleTarget = graphTarget, minScale = 5e-3, maxScale = 4, dragThreshold = 5 }) {
+  if (!element2 || typeof getCamera !== "function" || typeof setCamera !== "function") throw new TypeError("Camera controls require element, getCamera and setCamera");
+  const options = { minScale, maxScale }, points = /* @__PURE__ */ new Map(), listeners = [], captures = /* @__PURE__ */ new Set();
+  const pointerHost = element2.ownerDocument ?? element2;
+  let gesture = null, moved = false, suppressClick = false, disposed = false;
+  const local = (event) => {
+    const r = element2.getBoundingClientRect();
+    return { x: event.clientX - r.left, y: event.clientY - r.top };
+  };
+  const accept = (event) => shouldHandleTarget(event.target, element2, event);
+  const listen = (host, type, fn, options2) => {
+    host.addEventListener(type, fn, options2);
+    listeners.push(() => host.removeEventListener(type, fn, options2));
+  };
+  const emit = (camera, source) => {
+    const next = createCamera(camera, options), current = createCamera(getCamera(), options);
+    if (next.x === current.x && next.y === current.y && next.scale === current.scale) return;
+    setCamera(next, { source });
+    onChange?.(next, { source });
+  };
+  const rebase = () => {
+    gesture = { camera: createCamera(getCamera(), options), points: [...points.values()].map((p) => ({ ...p })) };
+  };
+  const capture2 = () => {
+    for (const id of points.keys()) if (!captures.has(id)) {
+      try {
+        element2.setPointerCapture?.(id);
+        captures.add(id);
+      } catch {
+      }
+    }
+  };
+  const begin = (source) => {
+    if (!moved) {
+      moved = true;
+      suppressClick = true;
+      onGestureStart?.({ source });
+      if (gesture) gesture.camera = createCamera(getCamera(), options);
+    }
+    capture2();
+  };
+  const down = (event) => {
+    if (disposed || event.button > 0 || points.has(event.pointerId) || points.size >= 2 || !accept(event)) return;
+    if (!points.size) {
+      moved = false;
+      suppressClick = false;
+    }
+    points.set(event.pointerId, local(event));
+    rebase();
+    if (points.size === 2) {
+      begin("pinch");
+      event.preventDefault();
+    }
+  };
+  const move = (event) => {
+    if (!points.has(event.pointerId) || !gesture) return;
+    points.set(event.pointerId, local(event));
+    const current = [...points.values()], base = gesture.points;
+    if (current.length === 2 && base.length === 2) {
+      begin("pinch");
+      event.preventDefault();
+      const origin = midpoint(...base), now = midpoint(...current), ratio = distance2(...current) / Math.max(1, distance2(...base));
+      const zoomed = zoomCameraAt(gesture.camera, origin, ratio, options);
+      emit({ ...zoomed, x: zoomed.x + now.x - origin.x, y: zoomed.y + now.y - origin.y }, "pinch");
+    } else if (current.length === 1 && base.length === 1) {
+      const dx = current[0].x - base[0].x, dy = current[0].y - base[0].y;
+      if (!moved && Math.hypot(dx, dy) < dragThreshold) return;
+      begin("pan");
+      event.preventDefault();
+      emit(panCamera(gesture.camera, dx, dy), "pan");
+    }
+  };
+  const release = (id) => {
+    if (captures.delete(id)) try {
+      element2.releasePointerCapture?.(id);
+    } catch {
+    }
+  };
+  const up = (event) => {
+    if (!points.has(event.pointerId)) return;
+    points.delete(event.pointerId);
+    release(event.pointerId);
+    if (points.size) rebase();
+    else gesture = null;
+  };
+  const cancel = (event) => {
+    if (!points.has(event.pointerId)) return;
+    suppressClick = true;
+    points.clear();
+    gesture = null;
+    for (const id of [...captures]) release(id);
+  };
+  const click = (event) => {
+    if (suppressClick && event.detail !== 0 && accept(event)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressClick = false;
+    }
+  };
+  const wheel = (event) => {
+    if (!accept(event) || !Number.isFinite(event.deltaY) || !event.deltaY) return;
+    event.preventDefault();
+    onGestureStart?.({ source: "wheel" });
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element2.getBoundingClientRect().height : 1;
+    emit(zoomCameraAt(getCamera(), local(event), Math.exp(clamp(-event.deltaY * unit * 2e-3, -2, 2)), options), "wheel");
+  };
+  const key2 = (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !accept(event) || !["+", "=", "-", "0", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    onGestureStart?.({ source: "keyboard" });
+    const r = element2.getBoundingClientRect(), area = getViewportArea?.();
+    const usable = area && [area.x, area.y, area.width, area.height].every(Number.isFinite) && area.width > 0 && area.height > 0;
+    const center2 = usable ? { x: area.x + area.width / 2, y: area.y + area.height / 2 } : { x: r.width / 2, y: r.height / 2 };
+    let next;
+    if (event.key === "+" || event.key === "=") next = zoomCameraAt(getCamera(), center2, 1.25, options);
+    else if (event.key === "-") next = zoomCameraAt(getCamera(), center2, 0.8, options);
+    else if (event.key === "0") next = createCamera({}, options);
+    else if (event.key === "ArrowLeft") next = panCamera(getCamera(), 48, 0);
+    else if (event.key === "ArrowRight") next = panCamera(getCamera(), -48, 0);
+    else if (event.key === "ArrowUp") next = panCamera(getCamera(), 0, 48);
+    else if (event.key === "ArrowDown") next = panCamera(getCamera(), 0, -48);
+    if (next) emit(next, "keyboard");
+  };
+  listen(element2, "pointerdown", down);
+  listen(pointerHost, "pointermove", move, { passive: false });
+  listen(pointerHost, "pointerup", up);
+  listen(pointerHost, "pointercancel", cancel);
+  listen(element2, "lostpointercapture", cancel);
+  listen(element2, "click", click, true);
+  listen(element2, "wheel", wheel, { passive: false });
+  listen(element2, "keydown", key2);
+  return () => {
+    disposed = true;
+    points.clear();
+    gesture = null;
+    for (const id of [...captures]) release(id);
+    for (const remove of listeners) remove();
+  };
+}
+
+// src/canvas-prototype/scene-regions.mjs
+function regionAreas(area, regions, active2 = "primary") {
+  if (regions.length < 2) return regions.map((region) => ({ ...region, area: { ...area }, visible: true }));
+  const narrow = area.width < 760, gap = 16, header = 36, width = (area.width - gap * (regions.length - 1)) / regions.length;
+  return regions.map((region, i) => ({
+    ...region,
+    visible: !narrow || region.id === active2,
+    area: { x: narrow ? area.x : area.x + i * (width + gap), y: area.y + header, width: narrow ? area.width : width, height: Math.max(80, area.height - header) }
+  }));
+}
+var serial2 = 0;
+function updateRegionReferences(previous, names) {
+  const remaining = [...previous], used = new Set(previous.map((r) => r.id)), result = [];
+  for (const view of names) {
+    const index = remaining.findIndex((r) => r.view === view);
+    if (index >= 0) {
+      result.push({ ...remaining.splice(index, 1)[0], view });
+      continue;
+    }
+    let i = 1;
+    while (used.has("region-" + i)) i++;
+    const id = "region-" + i;
+    used.add(id);
+    result.push({ id, view });
+  }
+  return result;
+}
+async function mountGraphRegion(host, view, { onSelect, onExplore, selectedId, selectedIds: sharedIds, state: state2 = {}, onStateChange, elk, routing = "square", measureLabel } = {}) {
+  const doc = host.ownerDocument, ns = "http://www.w3.org/2000/svg";
+  const svg = (name, attrs = {}) => {
+    const node = doc.createElementNS(ns, name);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    return node;
+  };
+  const width = host.clientWidth || 480, height = host.clientHeight || 400;
+  const layout = await layoutDiagram(view, { width, height, elk, measureLabel });
+  const fitted = fitDiagram(layout, { x: 0, y: 0, width, height });
+  const viewport = doc.createElement("div");
+  viewport.className = "region-graph";
+  viewport.tabIndex = 0;
+  viewport.setAttribute("aria-label", view.title || "Model graph");
+  const world = doc.createElement("div");
+  world.className = "region-world";
+  viewport.append(world);
+  const drawing = svg("svg", { width, height, "aria-label": "Model relationships" }), defs = svg("defs"), prefix = "region-" + ++serial2 + "-";
+  for (const name of ["open-arrow", "filled-arrow", "hollow-triangle", "diamond", "hollow-diamond", "containment"]) {
+    const { path, fill, ...attrs } = markerDefinition(name), marker = svg("marker", { ...attrs, id: prefix + name, markerUnits: "userSpaceOnUse" });
+    marker.append(svg("path", { d: path, fill: fill === "line" ? "#426869" : fill === "background" ? "#fff" : "none", stroke: "#426869" }));
+    defs.append(marker);
+  }
+  drawing.append(defs);
+  world.append(drawing);
+  const targets = [], edgeTargets = [], notices = [...view.notices ?? [], ...(layout.diagnostics ?? []).map((d) => d.message || d.reason)];
+  for (const edge of fitted.edges) {
+    const appearance = edgeAppearance(edge, { viewKind: view.kind }), a = fitted.nodes.find((n) => n.id === edge.source), b = fitted.nodes.find((n) => n.id === edge.target);
+    if (!appearance.supported) notices.push(appearance.notice);
+    const record = { semanticId: edge.semanticId, kind: "relationship", label: edge.label || edge.kind, relationships: [{ semanticId: edge.semanticId, sourceSemanticId: a?.semanticId, targetSemanticId: b?.semanticId, kind: edge.kind, label: edge.label }] };
+    if (!edge.points?.length || edge.routingBlocked) {
+      notices.push(`Connection route unavailable: ${edge.label || edge.kind}`);
+      continue;
+    }
+    const g = svg("g", { tabindex: 0, role: "button", "aria-label": record.label });
+    const path = svg("path", { d: connectionPath(edge.points, { style: routing, edge, nodes: fitted.nodes }), fill: "none", stroke: "#426869", "stroke-width": 1.5 });
+    for (const [side, marker] of [["start", appearance.sourceMarker], ["end", appearance.targetMarker]]) if (marker !== "none") path.setAttribute("marker-" + side, `url(#${prefix + marker})`);
+    if (appearance.line === "dashed") path.setAttribute("stroke-dasharray", "5 3");
+    const hit = path.cloneNode();
+    hit.setAttribute("stroke", "transparent");
+    hit.setAttribute("stroke-width", 16);
+    g.append(hit, path);
+    if (edge.label && !edge.labelOmitted && Number.isFinite(edge.x) && Number.isFinite(edge.y)) {
+      const label2 = svg("text", { x: edge.x, y: edge.y, "font-size": 12, fill: "#355e60", "paint-order": "stroke", stroke: "white", "stroke-width": 3 });
+      label2.textContent = edge.label;
+      g.append(label2);
+    }
+    const choose = () => {
+      select2(record.semanticId);
+      changed();
+      onSelect?.(record);
+    };
+    g.onclick = (e) => {
+      e.stopPropagation();
+      choose();
+    };
+    g.onkeydown = (e) => {
+      if (["Enter", " "].includes(e.key)) {
+        e.preventDefault();
+        choose();
+      }
+    };
+    drawing.append(g);
+    edgeTargets.push({ node: g, semanticId: edge.semanticId });
+  }
+  for (const n of fitted.nodes) {
+    const node = doc.createElement("button");
+    node.className = `node ${n.kind}${n.container ? " container" : ""}`;
+    node.dataset.semanticId = n.semanticId ?? "";
+    const scale = fitted.scale || 1;
+    node.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.width / scale}px;height:${n.height / scale}px;transform:scale(${scale});z-index:${n.container ? 1 : 3}`;
+    const face2 = behaviorFace(doc, n);
+    if (face2) node.append(face2);
+    else {
+      for (const [cls, text2] of [["kind", `\xAB${n.kind}\xBB`], ["name", n.name], ["detail", n.displayDetail]]) if (text2) {
+        const span = doc.createElement("span");
+        span.className = cls;
+        span.textContent = text2;
+        node.append(span);
+      }
+    }
+    node.onclick = (e) => {
+      e.stopPropagation();
+      select2(n.semanticId);
+      changed();
+      onSelect?.({ semanticId: n.semanticId, name: n.name, label: n.name, kind: "element" });
+    };
+    world.append(node);
+    targets.push({ node, n });
+  }
+  host.replaceChildren(viewport);
+  if (notices.length) {
+    const details = doc.createElement("details");
+    details.className = "region-notices";
+    const summary = doc.createElement("summary");
+    summary.textContent = `View notices (${notices.length})`;
+    details.append(summary);
+    for (const notice of notices) {
+      const p = doc.createElement("p");
+      p.textContent = typeof notice === "string" ? notice : JSON.stringify(notice);
+      details.append(p);
+    }
+    host.append(details);
+  }
+  let camera = createCamera(state2.camera), selected = selectedId, selectedIds = sharedIds ?? state2.selectedIds ?? [selectedId].filter(Boolean);
+  const changed = () => onStateChange?.({ camera, selectedId: selected, selectedIds: [...selectedIds] });
+  const update = (value) => {
+    camera = createCamera(value);
+    world.style.transform = `translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
+    changed();
+  };
+  const cleanup = bindCameraControls({ element: viewport, getCamera: () => camera, setCamera: update, shouldHandleTarget: (target) => target === viewport || target === world || target === drawing });
+  function selectMany(ids) {
+    selectedIds = [...new Set(ids.filter(Boolean))];
+    selected = selectedIds.length === 1 ? selectedIds[0] : null;
+    for (const { node, n } of targets) node.classList.toggle("selected", selectedIds.includes(n.semanticId));
+    for (const target of edgeTargets) {
+      const active2 = selectedIds.includes(target.semanticId);
+      target.node.classList.toggle("selected", active2);
+      target.node.setAttribute("aria-pressed", String(active2));
+    }
+  }
+  function select2(id) {
+    selectMany([id]);
+  }
+  world.style.transform = `translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
+  selectMany(selectedIds);
+  return {
+    destroy() {
+      cleanup();
+      viewport.remove();
+    },
+    getState: () => ({ camera: { ...camera }, selectedId: selected, selectedIds: [...selectedIds] }),
+    select: select2,
+    selectMany,
+    reveal(id) {
+      const n = targets.find((t) => t.n.semanticId === id)?.n;
+      if (n) update({ ...camera, x: width / 2 - (n.x + n.width / 2) * camera.scale, y: height / 2 - (n.y + n.height / 2) * camera.scale });
+    },
+    anchors: () => targets.filter((t) => t.n.semanticId).map(({ n }) => ({ semanticId: n.semanticId, representationId: n.id, x: n.x * camera.scale + camera.x, y: n.y * camera.scale + camera.y, width: n.width * camera.scale, height: n.height * camera.scale }))
+  };
+}
+
 // src/canvas-prototype/preferences.mjs
 var PRESENTATION_RELATIONSHIP_KINDS = Object.freeze([
   "connection",
@@ -311,18 +2338,18 @@ var PRESENTATION_RELATIONSHIP_KINDS = Object.freeze([
 ]);
 var keys = /* @__PURE__ */ new Set(["compartments", "expanded", "emphasis", "contextBudget", "grouping"]);
 var kinds = new Set(PRESENTATION_RELATIONSHIP_KINDS);
-var own = (value, key) => Object.hasOwn(value, key);
+var own = (value, key2) => Object.hasOwn(value, key2);
 var fail = (message) => {
   throw new TypeError(`Scene presentation: ${message}`);
 };
-function stringList(value, key, allowed) {
-  if (!Array.isArray(value)) fail(`${key} must be an array`);
+function stringList(value, key2, allowed) {
+  if (!Array.isArray(value)) fail(`${key2} must be an array`);
   const result = [];
   for (const entry of value) {
     if (typeof entry !== "string" || !entry.trim() || entry !== entry.trim()) {
-      fail(`${key} entries must be nonempty strings without surrounding whitespace`);
+      fail(`${key2} entries must be nonempty strings without surrounding whitespace`);
     }
-    if (allowed && !allowed.has(entry)) fail(`unsupported ${key} relationship kind "${entry}"`);
+    if (allowed && !allowed.has(entry)) fail(`unsupported ${key2} relationship kind "${entry}"`);
     if (!result.includes(entry)) result.push(entry);
   }
   return result;
@@ -332,10 +2359,10 @@ function validatePresentation(config = {}) {
     fail("configuration must be a plain object");
   }
   if (Object.getOwnPropertySymbols(config).length) fail("symbol keys are not supported");
-  for (const key of Object.getOwnPropertyNames(config)) {
-    if (!keys.has(key)) fail(`unknown option "${key}"`);
-    const descriptor = Object.getOwnPropertyDescriptor(config, key);
-    if (!descriptor.enumerable || !own(descriptor, "value")) fail(`${key} must be an ordinary JSON property`);
+  for (const key2 of Object.getOwnPropertyNames(config)) {
+    if (!keys.has(key2)) fail(`unknown option "${key2}"`);
+    const descriptor = Object.getOwnPropertyDescriptor(config, key2);
+    if (!descriptor.enumerable || !own(descriptor, "value")) fail(`${key2} must be an ordinary JSON property`);
   }
   const compartments = own(config, "compartments") ? config.compartments : "auto";
   if (!["auto", "compact", "expanded"].includes(compartments)) fail("compartments must be auto, compact or expanded");
@@ -1391,7 +3418,7 @@ function normalizeProject(project, { title } = {}) {
   const navigation = author.navigation ?? {};
   if (!navigation || typeof navigation !== "object" || Array.isArray(navigation)) throw Error("Invalid project navigation");
   const roots = navigation.roots === void 0 ? [] : strings(navigation.roots, "navigation roots");
-  for (const key of ["view", "focus"]) if (navigation[key] !== void 0 && (typeof navigation[key] !== "string" || !navigation[key])) throw Error("Invalid navigation " + key);
+  for (const key2 of ["view", "focus"]) if (navigation[key2] !== void 0 && (typeof navigation[key2] !== "string" || !navigation[key2])) throw Error("Invalid navigation " + key2);
   const scope = author.publication?.scope ?? "complete";
   if (!["complete", "scoped"].includes(scope)) throw Error("Publication scope must be complete or scoped");
   const allSources = /* @__PURE__ */ new Set([...sources, ...viewSources]);
@@ -1403,7 +3430,7 @@ function validateProject(project) {
   const m = project.manifest;
   if (m?.schemaVersion !== SCHEMA) throw Error("Unsupported project manifest");
   for (const name of Object.keys(project.files)) projectPath(name);
-  for (const key of ["modelSources", "viewSources", "systemOfInterest"]) strings(m[key], "project " + key, { empty: !!project.authorManifest });
+  for (const key2 of ["modelSources", "viewSources", "systemOfInterest"]) strings(m[key2], "project " + key2, { empty: !!project.authorManifest });
   if (!m.modelSources.length && !m.viewSources.length) throw Error("Project requires source files");
   if (m.requirementSeeds !== void 0) strings(m.requirementSeeds, "native requirement seeds", { empty: !!project.authorManifest });
   if (m.modelRoots !== void 0) strings(m.modelRoots, "native model roots", { empty: false });
@@ -1440,10 +3467,18 @@ function parseStory(markdown2) {
       throw Error("Invalid scene JSON near character " + match.index);
     }
     if (config.type !== "scene") throw Error("Canvas prototype requires scene blocks");
-    for (const key of ["id", "title", "view", "focus"]) if (typeof config[key] !== "string" || !config[key]) throw Error("Scene requires " + key);
+    for (const key2 of ["id", "title", "view", "focus"]) if (typeof config[key2] !== "string" || !config[key2]) throw Error("Scene requires " + key2);
     if (scenes.some((s) => s.id === config.id)) throw Error("Duplicate scene " + config.id);
     if (config.journey !== void 0 && (!Array.isArray(config.journey) || !config.journey.every((x) => typeof x === "string" && x))) throw Error("Invalid scene journey");
     if (config.presentation !== void 0) validatePresentation(config.presentation);
+    if (config.regions !== void 0) {
+      if (!Array.isArray(config.regions) || config.regions.length > 3) throw Error("A scene supports up to three additional view regions");
+      const ids = /* @__PURE__ */ new Set(["primary", "comparison"]);
+      for (const r of config.regions) {
+        if (!r || typeof r.id !== "string" || !r.id || ids.has(r.id) || typeof r.view !== "string" || !r.view || r.focus !== void 0 && (typeof r.focus !== "string" || !r.focus)) throw Error("Invalid or duplicate scene region");
+        ids.add(r.id);
+      }
+    }
     if (!["right", "bottom", "left"].includes(config.panel?.placement ?? "right")) throw Error("Unsupported panel placement");
     previous = { ...config, bodyStart: match.index + match[0].length, markdown: "" };
     scenes.push(previous);
@@ -1580,16 +3615,294 @@ function discoverNativeIndex(parsed, exported, { modelDocumentCount = parsed.roo
   return { modelRoots, requirementSeeds };
 }
 
+// src/canvas-prototype/prominence.mjs
+var DESCENDANT_CAP = 256;
+var DESCENDANT_WORK_CAP = 4096;
+var MAX_OVERVIEW_TILES = 10;
+var defaultIndexes = /* @__PURE__ */ new WeakMap();
+var scopedIndexes = /* @__PURE__ */ new WeakMap();
+var packageKind = (kind) => kind === "Package";
+var engineeringCategory = /^(?:Package|Namespace)$|^(?:Requirement|Concern|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Enumeration|Actor)(?:Definition|Usage)$/;
+var excludedConnections = /* @__PURE__ */ new Set(["containment", "composition", "owner", "owningMembership", "ownedMembership", "membership", "documentation", "typing", "type", "specialization"]);
+var compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var idText = (id) => typeof id === "string" && id.length > 0;
+var copy3 = (value) => structuredClone(value);
+var named = (element2) => idText(element2.native?.declaredName) || idText(element2.native?.declaredShortName);
+var eligible = (element2) => element2?.layer === "project" && named(element2) && engineeringCategory.test(element2.kind ?? "");
+var edgeKey = (edge) => JSON.stringify([edge.semanticId ?? edge.nativeRelationship ?? edge.id ?? null, edge.source, edge.target, edge.kind]);
+function nativeStructure(graph) {
+  const children = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map();
+  const add = (edge) => {
+    if (!idText(edge.source) || !idText(edge.target) || edge.source === edge.target) return;
+    if (!children.has(edge.source)) children.set(edge.source, /* @__PURE__ */ new Set());
+    if (!parents.has(edge.target)) parents.set(edge.target, /* @__PURE__ */ new Set());
+    children.get(edge.source).add(edge.target);
+    parents.get(edge.target).add(edge.source);
+  };
+  for (const edge of graph.containment ?? []) if (edge.nativeRole === "owner") add(edge);
+  for (const edge of graph.relationships ?? []) if (edge.kind === "composition") add(edge);
+  return { children, parents };
+}
+function descendantClosure(children, rootIds) {
+  const seen = new Set((rootIds ?? []).filter(idText));
+  const queue = [...seen];
+  for (let i = 0; i < queue.length; i++) for (const child of children.get(queue[i]) ?? []) {
+    if (!seen.has(child)) {
+      seen.add(child);
+      queue.push(child);
+    }
+  }
+  return [...seen].sort(compareText);
+}
+function nativeScopeIds(graph, rootIds) {
+  return descendantClosure(nativeStructure(graph).children, rootIds);
+}
+function prepare(graph, scopeIds2) {
+  const scope = scopeIds2 === void 0 ? null : new Set(scopeIds2);
+  const elements = new Map((graph.elements ?? []).filter((element2) => eligible(element2) && (!scope || scope.has(element2.id))).map((element2) => [element2.id, element2]));
+  const keys2 = new Map((graph.elements ?? []).map((element2) => [element2.id, element2.qualifiedName ?? element2.native?.declaredName ?? element2.native?.declaredShortName ?? element2.name ?? element2.id]));
+  const compareNames = (a, b) => compareText(keys2.get(a) ?? a, keys2.get(b) ?? b) || compareText(a, b);
+  const native = nativeStructure(graph), children = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map();
+  for (const id of elements.keys()) {
+    children.set(id, [...native.children.get(id) ?? []].filter((child) => elements.has(child)).sort(compareNames));
+    parents.set(id, [...native.parents.get(id) ?? []].filter((parent) => elements.has(parent)).sort(compareNames));
+  }
+  return { elements, children, parents, compareNames };
+}
+function descendantsOf(id, children) {
+  const seen = /* @__PURE__ */ new Set([id]), queue = [id];
+  let work = 0, capped = false;
+  outer: for (let i = 0; i < queue.length; i++) for (const child of children.get(queue[i]) ?? []) {
+    if (++work > DESCENDANT_WORK_CAP) {
+      capped = true;
+      break outer;
+    }
+    if (seen.has(child)) continue;
+    seen.add(child);
+    queue.push(child);
+    if (seen.size - 1 >= DESCENDANT_CAP) {
+      capped = true;
+      break outer;
+    }
+  }
+  return { descendants: seen.size - 1, descendantsCapped: capped };
+}
+function promotedRoot(id, data) {
+  const visited = /* @__PURE__ */ new Set();
+  while (packageKind(data.elements.get(id)?.kind) && data.children.get(id)?.length === 1) {
+    visited.add(id);
+    const next = data.children.get(id)[0];
+    if (visited.has(next)) break;
+    id = next;
+  }
+  return id;
+}
+function branchIdentities(data) {
+  const ids = [...data.elements.keys()].sort(data.compareNames), assigned = /* @__PURE__ */ new Map(), queue = [];
+  const seedRoot = (root) => {
+    if (assigned.has(root)) return;
+    assigned.set(root, root);
+    const promoted = promotedRoot(root, data);
+    let current = root;
+    const visited = /* @__PURE__ */ new Set();
+    while (current !== promoted && !visited.has(current)) {
+      visited.add(current);
+      assigned.set(current, root);
+      current = data.children.get(current)?.[0];
+    }
+    assigned.set(promoted, root);
+    for (const child of data.children.get(promoted) ?? []) if (!assigned.has(child)) {
+      assigned.set(child, child);
+      queue.push(child);
+    }
+  };
+  const drain = () => {
+    for (let i = 0; i < queue.length; i++) {
+      const id = queue[i];
+      for (const child of data.children.get(id) ?? []) if (!assigned.has(child)) {
+        assigned.set(child, assigned.get(id));
+        queue.push(child);
+      }
+    }
+    queue.length = 0;
+  };
+  for (const id of ids) if (!data.parents.get(id).length) seedRoot(id);
+  drain();
+  for (const id of ids) if (!assigned.has(id)) {
+    seedRoot(id);
+    drain();
+  }
+  return assigned;
+}
+function createProminenceIndex(graph, { scopeIds: scopeIds2 } = {}) {
+  if (scopeIds2 === void 0 && defaultIndexes.has(graph)) return defaultIndexes.get(graph);
+  const cacheableScope = scopeIds2 !== null && typeof scopeIds2 === "object";
+  if (cacheableScope && scopedIndexes.get(graph)?.has(scopeIds2)) return scopedIndexes.get(graph).get(scopeIds2);
+  const data = prepare(graph, scopeIds2), branches = branchIdentities(data), neighbors = /* @__PURE__ */ new Map();
+  for (const id of data.elements.keys()) neighbors.set(id, /* @__PURE__ */ new Set());
+  for (const edge of graph.relationships ?? []) {
+    if (edge.navigationOnly || excludedConnections.has(edge.kind) || edge.source === edge.target || !neighbors.has(edge.source) || !neighbors.has(edge.target)) continue;
+    neighbors.get(edge.source).add(edge.target);
+    neighbors.get(edge.target).add(edge.source);
+  }
+  const metrics = /* @__PURE__ */ new Map();
+  for (const id of [...data.elements.keys()].sort(data.compareNames)) {
+    const children = data.children.get(id).length, descendants = descendantsOf(id, data.children), connections = neighbors.get(id).size;
+    const crossBranchConnections = [...neighbors.get(id)].filter((other) => branches.get(other) !== branches.get(id)).length;
+    const score = 3 * Math.log2(1 + children) + Math.log2(1 + descendants.descendants) + 2 * Math.log2(1 + connections) + 2 * Math.log2(1 + crossBranchConnections);
+    metrics.set(id, { children, ...descendants, connections, crossBranchConnections, score });
+  }
+  const compare4 = (a, b) => {
+    const am = metrics.get(a), bm = metrics.get(b);
+    return Number(!!bm) - Number(!!am) || (bm?.score ?? 0) - (am?.score ?? 0) || data.compareNames(a, b);
+  };
+  const result = { metrics, compare: compare4 };
+  if (scopeIds2 === void 0) defaultIndexes.set(graph, result);
+  else if (cacheableScope) {
+    if (!scopedIndexes.has(graph)) scopedIndexes.set(graph, /* @__PURE__ */ new WeakMap());
+    scopedIndexes.get(graph).set(scopeIds2, result);
+  }
+  return result;
+}
+function buildSystemOverview(graph, { rootIds, budget = 9 } = {}) {
+  if (!Number.isInteger(budget) || budget < 0) throw Error("Overview budget must be a nonnegative integer");
+  const limit = Math.min(MAX_OVERVIEW_TILES, budget), all = prepare(graph), structure = nativeStructure(graph), allElements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
+  const explicit = Array.isArray(rootIds) && rootIds.length > 0;
+  let requested = [...new Set((rootIds ?? []).filter(idText))];
+  if (!explicit) {
+    requested = [...all.elements.keys()].filter((id) => !all.parents.get(id).length).sort(all.compareNames);
+    const covered = new Set(descendantClosure(structure.children, requested));
+    for (const id of [...all.elements.keys()].sort(all.compareNames)) if (!covered.has(id)) {
+      requested.push(id);
+      for (const member of descendantClosure(structure.children, [id])) covered.add(member);
+    }
+  }
+  const scopeIds2 = descendantClosure(structure.children, requested), scope = new Set(scopeIds2), data = prepare(graph, scopeIds2), index = createProminenceIndex(graph, { scopeIds: scopeIds2 });
+  const omissions = [], effectiveRoots = [];
+  for (const root of [...requested].sort(index.compare)) {
+    if (!data.elements.has(root)) {
+      omissions.push({ target: root, reason: allElements.has(root) ? "element-policy" : "unavailable-root" });
+      continue;
+    }
+    const promoted = promotedRoot(root, data);
+    if (!effectiveRoots.includes(promoted)) effectiveRoots.push(promoted);
+  }
+  effectiveRoots.sort(index.compare);
+  const chosen = /* @__PURE__ */ new Set(), add = (id) => {
+    if (chosen.size < limit) chosen.add(id);
+  };
+  for (const root of effectiveRoots) add(root);
+  const rootQueues = effectiveRoots.filter((root) => chosen.has(root)).map((root) => ({
+    root,
+    ids: [...data.children.get(root)].sort(index.compare),
+    offset: 0
+  }));
+  let partialRootRound = false;
+  while (chosen.size < limit) {
+    const expandable = [];
+    for (const queue of rootQueues) {
+      while (queue.offset < queue.ids.length && chosen.has(queue.ids[queue.offset])) queue.offset++;
+      if (queue.offset < queue.ids.length) expandable.push(queue);
+    }
+    if (!expandable.length) break;
+    if (rootQueues.length > 1 && expandable.length > limit - chosen.size) {
+      partialRootRound = true;
+      break;
+    }
+    for (const queue of expandable) if (chosen.size < limit) add(queue.ids[queue.offset++]);
+  }
+  const branches = [];
+  for (const queue of rootQueues) for (const child of queue.ids) if (chosen.has(child)) {
+    branches.push({ ids: (data.children.get(child) ?? []).map((id) => ({ id, depth: 2 })).sort((a, b) => index.compare(a.id, b.id)), offset: 0, queued: /* @__PURE__ */ new Set([child, ...data.children.get(child) ?? []]) });
+  }
+  while (chosen.size < limit && !partialRootRound) {
+    for (const branch of branches) while (branch.offset < branch.ids.length && chosen.has(branch.ids[branch.offset].id)) branch.offset++;
+    const depths = branches.filter((branch) => branch.offset < branch.ids.length).map((branch) => branch.ids[branch.offset].depth);
+    if (!depths.length) break;
+    const depth = Math.min(...depths);
+    for (const branch of branches) {
+      if (chosen.size >= limit) break;
+      const next = branch.ids[branch.offset];
+      if (!next || next.depth !== depth || chosen.has(next.id)) continue;
+      branch.offset++;
+      add(next.id);
+      for (const child of [...data.children.get(next.id)].sort(index.compare)) if (!branch.queued.has(child)) {
+        branch.queued.add(child);
+        branch.ids.push({ id: child, depth: next.depth + 1 });
+      }
+    }
+  }
+  const promotedWrappers = /* @__PURE__ */ new Set();
+  for (const root of requested) {
+    let id = root;
+    const seen = /* @__PURE__ */ new Set();
+    while (data.elements.has(id) && packageKind(data.elements.get(id).kind) && data.children.get(id)?.length === 1 && !seen.has(id)) {
+      seen.add(id);
+      if (effectiveRoots.includes(id)) break;
+      promotedWrappers.add(id);
+      id = data.children.get(id)[0];
+    }
+  }
+  const omittedTargets = new Set(omissions.map((item) => item.target));
+  for (const id of scopeIds2) if (!allElements.has(id) && !omittedTargets.has(id)) {
+    omissions.push({ target: id, reason: "unavailable" });
+    omittedTargets.add(id);
+  }
+  for (const element2 of graph.elements ?? []) {
+    if (!scope.has(element2.id)) {
+      if (eligible(element2)) omissions.push({ target: element2.id, reason: "outside-scope" });
+      continue;
+    }
+    if (!eligible(element2)) {
+      if (!omittedTargets.has(element2.id)) omissions.push({ target: element2.id, reason: element2.layer === "project" ? "element-policy" : "library" });
+      continue;
+    }
+    if (!chosen.has(element2.id)) omissions.push({ target: element2.id, reason: promotedWrappers.has(element2.id) ? "package-wrapper" : "budget" });
+  }
+  const compositionPairs = new Set((graph.relationships ?? []).filter((edge) => edge.kind === "composition").map((edge) => JSON.stringify([edge.source, edge.target])));
+  const edges = [...graph.relationships ?? [], ...(graph.containment ?? []).filter((edge) => edge.nativeRole === "owner" && !compositionPairs.has(JSON.stringify([edge.source, edge.target])))];
+  const seenEdges = /* @__PURE__ */ new Set(), relationships = [];
+  for (const edge of [...edges].sort((a, b) => compareText(edgeKey(a), edgeKey(b)))) {
+    if (!chosen.has(edge.source) || !chosen.has(edge.target)) continue;
+    const key2 = edgeKey(edge);
+    if (seenEdges.has(key2)) continue;
+    seenEdges.add(key2);
+    relationships.push(copy3(edge));
+  }
+  const ordered = [...chosen], focus = ordered[0] ?? null, shown = ordered.length, total = data.elements.size;
+  const descendantsCapped = [...index.metrics.values()].some((metric) => metric.descendantsCapped);
+  const summary = {
+    message: `${shown} of ${total} named model elements in the loaded native scope. Ranked by structural size and distinct connections; omitted content remains available through exploration.${descendantsCapped ? ` Descendant ranking counts stop at ${DESCENDANT_CAP} identities or ${DESCENDANT_WORK_CAP} inspected links; capped counts are lower bounds. Ranking is a reading aid, not engineering criticality.` : ""}`,
+    shown,
+    total,
+    roots: effectiveRoots.length,
+    shownRoots: effectiveRoots.filter((id) => chosen.has(id)).length,
+    descendantsCapped
+  };
+  return {
+    elements: ordered.map((id) => copy3(data.elements.get(id))),
+    relationships,
+    focus,
+    metrics: index.metrics,
+    omissions: omissions.sort((a, b) => compareText(a.reason, b.reason) || all.compareNames(a.target, b.target)),
+    summary,
+    rootIds: [...requested].sort(all.compareNames),
+    promotedRootIds: effectiveRoots,
+    scopeIds: scopeIds2,
+    budget: limit
+  };
+}
+
 // src/canvas-prototype/departures.mjs
 var visible = (node) => !!node && (node.opacity ?? 1) > 0.01;
 var active = (node) => visible(node) && !node.context && node.kind !== "context-boundary";
-var overlaps = (a, b, padding = 0) => a.x < b.x + b.width + padding && a.x + a.width + padding > b.x && a.y < b.y + b.height + padding && a.y + a.height + padding > b.y;
-var clamp = (value) => Math.max(0, Math.min(1, value));
+var overlaps2 = (a, b, padding = 0) => a.x < b.x + b.width + padding && a.x + a.width + padding > b.x && a.y < b.y + b.height + padding && a.y + a.height + padding > b.y;
+var clamp2 = (value) => Math.max(0, Math.min(1, value));
 var smooth = (value) => {
-  const t = clamp(value);
+  const t = clamp2(value);
   return t * t * (3 - 2 * t);
 };
-var identity = (node) => node.semanticId ?? node.semantic ?? node.id ?? node.key;
+var identity2 = (node) => node.semanticId ?? node.semantic ?? node.id ?? node.key;
 var rectangle = (node) => ({ x: node.x, y: node.y, width: node.width, height: node.height });
 function nativeObstacles(node, nodes) {
   const byId = new Map(nodes.map((item) => [item.id, item]));
@@ -1611,7 +3924,7 @@ function nativeObstacles(node, nodes) {
 }
 function firstContact(node, destination, obstacle) {
   const dx = destination.x - node.x, dy = destination.y - node.y;
-  if (overlaps(node, obstacle)) return Infinity;
+  if (overlaps2(node, obstacle)) return Infinity;
   if (dx && node.y < obstacle.y + obstacle.height && node.y + node.height > obstacle.y) {
     const gap = dx > 0 ? obstacle.x - node.x - node.width : node.x - obstacle.x - obstacle.width;
     return gap >= 0 ? gap / Math.abs(dx) : Infinity;
@@ -1632,7 +3945,7 @@ function exitPosition(node, width, height, obstacles) {
   ];
   for (const candidate of candidates) {
     const swept = { x: Math.min(node.x, candidate.x), y: Math.min(node.y, candidate.y), width: node.width + Math.abs(node.x - candidate.x), height: node.height + Math.abs(node.y - candidate.y) };
-    candidate.obstructions = obstacles.filter((obstacle) => !overlaps(node, obstacle) && overlaps(swept, obstacle)).length;
+    candidate.obstructions = obstacles.filter((obstacle) => !overlaps2(node, obstacle) && overlaps2(swept, obstacle)).length;
     candidate.fadeUntil = Math.min(1, ...obstacles.map((obstacle) => firstContact(node, candidate, obstacle)));
     candidate.fadeUntil = Math.max(0, candidate.fadeUntil - 5e-3);
     candidate.distance = Math.abs(candidate.x - node.x) + Math.abs(candidate.y - node.y);
@@ -1655,30 +3968,30 @@ function planDepartures(frames, { width, height, panels = [], offsets, clearAt =
     for (const node of startFrame.nodes) {
       const final = finalByKey.get(node.key);
       if (!active(node) || active(final)) continue;
-      const replacements = endFrame.nodes.filter((next) => active(next) && identity(next) !== identity(node) && overlaps(node, next, 4));
+      const replacements = endFrame.nodes.filter((next) => active(next) && identity2(next) !== identity2(node) && overlaps2(node, next, 4));
       if (!replacements.length) continue;
       const occupiedPanels = [...panels, ...startFrame.panels ?? [], ...endFrame.panels ?? []];
       const exit = exitPosition(node, width, height, [...occupiedPanels, ...nativeObstacles(node, startFrame.nodes)]);
-      localDepartures.push({ key: node.key, semanticId: identity(node), from: rectangle(node), exit: { x: exit.x, y: exit.y }, side: exit.side, fadeUntil: exit.fadeUntil, clearAt, arriveAfter, replacements: replacements.map((next) => next.key), interval, startAt: offsets[interval], endAt: offsets[interval + 1] });
+      localDepartures.push({ key: node.key, semanticId: identity2(node), from: rectangle(node), exit: { x: exit.x, y: exit.y }, side: exit.side, fadeUntil: exit.fadeUntil, clearAt, arriveAfter, replacements: replacements.map((next) => next.key), interval, startAt: offsets[interval], endAt: offsets[interval + 1] });
       for (const next of replacements) {
         localArrivals.add(next.key);
         arrivals.add(next.key);
       }
     }
     const identities = new Set(localDepartures.map((item) => item.semanticId));
-    const localReturns = new Set(endFrame.nodes.filter((node) => !active(node) && visible(node) && identities.has(identity(node))).map((node) => node.key));
-    for (const key of localReturns) contextReturns.add(key);
+    const localReturns = new Set(endFrame.nodes.filter((node) => !active(node) && visible(node) && identities.has(identity2(node))).map((node) => node.key));
+    for (const key2 of localReturns) contextReturns.add(key2);
     departures.push(...localDepartures);
     intervals.push({ startAt: offsets[interval], endAt: offsets[interval + 1], byKey: new Map(localDepartures.map((item) => [item.key, item])), arrivals: localArrivals, contextReturns: localReturns });
   }
-  function sampleNode(key, progress, sampleAt) {
+  function sampleNode(key2, progress, sampleAt) {
     if (progress <= 0) return sampleAt(0);
     if (progress >= 1) return sampleAt(1);
     if (offsets.some((offset) => Math.abs(progress - offset) < 1e-12)) return sampleAt(progress);
     const interval = intervals.find((item) => progress > item.startAt && progress < item.endAt);
     if (!interval) return sampleAt(progress);
     const span = interval.endAt - interval.startAt, local = (progress - interval.startAt) / span;
-    const departure = interval.byKey.get(key);
+    const departure = interval.byKey.get(key2);
     if (departure) {
       const base = sampleAt(progress), start2 = sampleAt(interval.startAt), finish = sampleAt(interval.endAt);
       if (local <= clearAt) {
@@ -1687,12 +4000,12 @@ function planDepartures(frames, { width, height, panels = [], offsets, clearAt =
       }
       return { ...base, ...rectangle(finish), scale: finish.scale, opacity: (finish.opacity ?? 0) * smooth((local - contextAfter) / (1 - contextAfter)) };
     }
-    if (interval.contextReturns.has(key)) {
+    if (interval.contextReturns.has(key2)) {
       const finish = sampleAt(interval.endAt);
       return { ...finish, opacity: (finish.opacity ?? 0) * smooth((local - contextAfter) / (1 - contextAfter)) };
     }
-    if (interval.arrivals.has(key)) {
-      const start2 = sampleAt(interval.startAt), t = clamp((local - arriveAfter) / (1 - arriveAfter));
+    if (interval.arrivals.has(key2)) {
+      const start2 = sampleAt(interval.startAt), t = clamp2((local - arriveAfter) / (1 - arriveAfter));
       return { ...sampleAt(interval.startAt + smooth(t) * span), ...local <= arriveAfter ? start2 : {} };
     }
     return sampleAt(progress);
@@ -1740,9 +4053,9 @@ function modelGraph(raw, views = []) {
   }
   const seen = /* @__PURE__ */ new Set();
   return { elements, containment, relationships: relationships.filter((e) => {
-    const key = JSON.stringify([e.source, e.target, e.kind]);
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const key2 = JSON.stringify([e.source, e.target, e.kind]);
+    if (seen.has(key2)) return false;
+    seen.add(key2);
     return true;
   }) };
 }
@@ -1754,274 +4067,6 @@ function requireNativeIdentity(view) {
   const missing = view.nodes.filter((n) => !n.semanticId && !["synthetic", "control", "notation"].includes(n.identityStatus));
   if (missing.length) throw Error("Native semantic identity missing for " + missing.map((n) => n.name || n.id).join(", "));
   return view;
-}
-
-// src/canvas-prototype/core/index.mjs
-var copy = (value) => structuredClone(value);
-var ENGINEERING_RELATIONSHIPS = Object.freeze([
-  "derive",
-  "derivation",
-  "refine",
-  "refinement",
-  "satisfy",
-  "satisfaction",
-  "verify",
-  "verification",
-  "allocate",
-  "allocation",
-  "dependency",
-  "composition",
-  "reference",
-  "connection",
-  "flow",
-  "item-flow",
-  "control-flow",
-  "causation"
-]);
-var FORBIDDEN_SHORTCUTS = /* @__PURE__ */ new Set(["type", "typing", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership"]);
-var endpoint = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
-var nativeEdges = (graph) => (graph.relationships ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") }));
-var allowedKinds = (options) => new Set((options.relationshipKinds ?? ENGINEERING_RELATIONSHIPS).filter((kind) => !FORBIDDEN_SHORTCUTS.has(kind)));
-function graphPolicy(graph, options) {
-  const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
-  const scope = options.scopeIds ? /* @__PURE__ */ new Set([...options.scopeIds, ...options.includedIds ?? []]) : null;
-  const explicit = new Set(options.includedIds ?? []);
-  const allowedElement = (id) => {
-    const element2 = elements.get(id);
-    if (!element2) return "unavailable";
-    if (scope && !scope.has(id)) return "outside-scope";
-    if ((element2.layer === "metamodel" || element2.metamodel === true) && !explicit.has(id)) return "metamodel-boundary";
-    return null;
-  };
-  return { elements, edges: nativeEdges(graph), kinds: allowedKinds(options), allowedElement };
-}
-function engineeringContext(graph, options = {}) {
-  const { focus, depth = 1, budget = 24 } = options;
-  if (!Number.isInteger(depth) || depth < 0 || !Number.isInteger(budget) || budget < 1) throw new Error("Invalid context depth or budget");
-  const policy = graphPolicy(graph, options), wanted = /* @__PURE__ */ new Set(), omissions = [], seenOmissions = /* @__PURE__ */ new Set();
-  const omit = (edge, target, reason) => {
-    const key = `${edge?.id}:${target}:${reason}`;
-    if (!seenOmissions.has(key)) {
-      seenOmissions.add(key);
-      omissions.push({ relationshipId: edge?.id ?? null, target, reason });
-    }
-  };
-  const rootReason = policy.allowedElement(focus);
-  if (rootReason) {
-    omit(null, focus, rootReason);
-    return { elements: [], relationships: [], omissions };
-  }
-  wanted.add(focus);
-  const queue = [[focus, 0]];
-  while (queue.length) {
-    const [id, distance2] = queue.shift();
-    for (const edge of policy.edges) {
-      if (edge.source !== id && edge.target !== id) continue;
-      const target = edge.source === id ? edge.target : edge.source;
-      if (!policy.kinds.has(edge.kind)) {
-        omit(edge, target, "relationship-policy");
-        continue;
-      }
-      const reason = policy.allowedElement(target);
-      if (reason) {
-        omit(edge, target, reason);
-        continue;
-      }
-      if (wanted.has(target)) continue;
-      if (distance2 >= depth) {
-        omit(edge, target, "depth");
-        continue;
-      }
-      if (wanted.size >= budget) {
-        omit(edge, target, "budget");
-        continue;
-      }
-      wanted.add(target);
-      queue.push([target, distance2 + 1]);
-    }
-  }
-  return copy({ elements: [...wanted].map((id) => policy.elements.get(id)), relationships: policy.edges.filter((edge) => policy.kinds.has(edge.kind) && wanted.has(edge.source) && wanted.has(edge.target)), omissions });
-}
-function findEngineeringRoute(graph, options = {}) {
-  const { from, to, maxHops = 12 } = options, policy = graphPolicy(graph, options), omissions = [];
-  for (const id of [from, to]) {
-    const reason = policy.allowedElement(id);
-    if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
-  }
-  const visited = /* @__PURE__ */ new Set([from]), queue = [{ id: from, path: [from], edges: [] }];
-  while (queue.length) {
-    const current = queue.shift();
-    if (current.id === to) return copy({ found: true, elements: current.path.map((id) => policy.elements.get(id)), relationships: current.edges, omissions });
-    for (const edge of policy.edges) {
-      if (edge.source !== current.id && edge.target !== current.id) continue;
-      const target = edge.source === current.id ? edge.target : edge.source;
-      const reason = !policy.kinds.has(edge.kind) ? "relationship-policy" : policy.allowedElement(target);
-      if (reason) {
-        omissions.push({ relationshipId: edge.id, target, reason });
-        continue;
-      }
-      if (visited.has(target)) continue;
-      if (current.edges.length >= maxHops) {
-        omissions.push({ relationshipId: edge.id, target, reason: "hop-limit" });
-        continue;
-      }
-      visited.add(target);
-      queue.push({ id: target, path: [...current.path, target], edges: [...current.edges, edge] });
-    }
-  }
-  return copy({ found: false, elements: [], relationships: [], omissions });
-}
-var UPWARD_KINDS = /* @__PURE__ */ new Set(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification"]);
-var DOWNWARD_KINDS = /* @__PURE__ */ new Set(["composition", "containment"]);
-function hierarchyPolicy(graph, options, includeOwnership) {
-  const policy = graphPolicy(graph, options), omissions = [], seen = /* @__PURE__ */ new Set(), upward = /* @__PURE__ */ new Map();
-  const omit = (edge, target, reason) => {
-    const key = JSON.stringify([edge?.id, target, reason]);
-    if (!seen.has(key)) {
-      seen.add(key);
-      omissions.push({ relationshipId: edge?.id ?? null, target, reason });
-    }
-  };
-  const allowed = (id) => {
-    const reason = policy.allowedElement(id);
-    if (reason) return reason;
-    const element2 = policy.elements.get(id);
-    if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
-    return element2.layer === "library" ? "library-boundary" : null;
-  };
-  const ownershipIds = new Set((graph.containment ?? []).map((edge) => edge.id));
-  const links = [...policy.edges, ...includeOwnership ? (graph.containment ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") })) : []];
-  for (const edge of links) {
-    const ownership = includeOwnership && ownershipIds.has(edge.id) && ["owner", "ownership", "containment"].includes(edge.kind);
-    if (!ownership && !UPWARD_KINDS.has(edge.kind) && !DOWNWARD_KINDS.has(edge.kind)) continue;
-    if (!ownership && !policy.kinds.has(edge.kind)) continue;
-    const [child, parent] = DOWNWARD_KINDS.has(edge.kind) ? [edge.target, edge.source] : [edge.source, edge.target];
-    if (!upward.has(child)) upward.set(child, []);
-    upward.get(child).push({ parent, edge, ownership });
-  }
-  for (const links2 of upward.values()) links2.sort((a, b) => a.parent.localeCompare(b.parent) || String(a.edge.id).localeCompare(String(b.edge.id)));
-  return { ...policy, allowed, upward, omissions, omit };
-}
-function findHierarchyRoute(graph, options = {}) {
-  const { from, to, maxHops = 12 } = options;
-  if (!Number.isInteger(maxHops) || maxHops < 0) throw Error("Invalid route hop limit");
-  function search(includeOwnership) {
-    const policy = hierarchyPolicy(graph, options, includeOwnership);
-    for (const id of [from, to]) {
-      const reason = policy.allowed(id);
-      if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
-    }
-    function ancestors(root) {
-      const found = /* @__PURE__ */ new Map([[root, { ids: [root], edges: [], ownership: false }]]), queue = [root];
-      for (let cursor = 0; cursor < queue.length; cursor++) {
-        const current = queue[cursor], path = found.get(current);
-        for (const { parent, edge, ownership } of policy.upward.get(current) ?? []) {
-          const reason = policy.allowed(parent);
-          if (reason) {
-            policy.omit(edge, parent, reason);
-            continue;
-          }
-          if (found.has(parent)) continue;
-          if (path.edges.length >= maxHops) {
-            policy.omit(edge, parent, "hop-limit");
-            continue;
-          }
-          found.set(parent, { ids: [...path.ids, parent], edges: [...path.edges, edge], ownership: path.ownership || ownership });
-          queue.push(parent);
-        }
-      }
-      return found;
-    }
-    const left = ancestors(from), right = ancestors(to), common = [...left.keys()].filter((id) => right.has(id));
-    const bounded = common.filter((id) => left.get(id).edges.length + right.get(id).edges.length <= maxHops);
-    bounded.sort((a, b) => {
-      const lengths = (id) => [left.get(id).edges.length, right.get(id).edges.length];
-      const [al, ar] = lengths(a), [bl, br] = lengths(b);
-      return al + ar - bl - br || Math.max(al, ar) - Math.max(bl, br) || a.localeCompare(b);
-    });
-    if (!bounded.length) {
-      if (common.length) policy.omit(null, to, "hop-limit");
-      policy.omit(null, to, "no-common-ancestor");
-      return { found: false, elements: [], relationships: [], omissions: policy.omissions };
-    }
-    const ancestor = bounded[0], ascent = left.get(ancestor), descent = right.get(ancestor), ids = [...ascent.ids, ...descent.ids.slice(0, -1).reverse()];
-    return copy({
-      found: true,
-      strategy: ascent.ownership || descent.ownership ? "ownership-ancestor" : "common-ancestor",
-      commonAncestor: ancestor,
-      ascentIds: ascent.ids,
-      descentIds: [...descent.ids].reverse(),
-      elements: ids.map((id) => policy.elements.get(id)),
-      relationships: [...ascent.edges, ...[...descent.edges].reverse()],
-      omissions: policy.omissions
-    });
-  }
-  const engineering = search(false);
-  return engineering.found || !(graph.containment ?? []).length ? engineering : search(true);
-}
-function findExplicitRoute(graph, ids, options = {}) {
-  const policy = graphPolicy(graph, options), relationships = [], elements = [], omissions = [];
-  if (!Array.isArray(ids) || !ids.length) return { found: false, elements: [], relationships: [], omissions: [{ reason: "empty-route" }] };
-  const ownership = new Set((graph.containment ?? []).map((edge) => edge.id));
-  const edges = [...policy.edges, ...(graph.containment ?? []).map((edge) => ({ ...edge, source: endpoint(edge, "source"), target: endpoint(edge, "target") }))];
-  for (const [index, id] of ids.entries()) {
-    const reason = policy.allowedElement(id);
-    if (reason) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason }] };
-    elements.push(policy.elements.get(id));
-    if (!index) continue;
-    const previous = ids[index - 1], edge = edges.find((edge2) => (policy.kinds.has(edge2.kind) || ownership.has(edge2.id)) && (edge2.source === previous && edge2.target === id || edge2.target === previous && edge2.source === id));
-    if (!edge) return { found: false, elements: [], relationships: [], omissions: [{ target: id, reason: "missing-explicit-link" }] };
-    relationships.push(edge);
-  }
-  return copy({ found: true, strategy: "explicit", elements, relationships, omissions });
-}
-function directTypingContext(graph, id) {
-  const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
-  const relationships = nativeEdges(graph).filter((edge) => ["type", "typing"].includes(edge.kind) && (edge.source === id || edge.target === id));
-  const ids = /* @__PURE__ */ new Set([id]);
-  for (const edge of relationships) {
-    ids.add(edge.source);
-    ids.add(edge.target);
-  }
-  return copy({ elements: [...ids].filter((key) => elements.has(key)).map((key) => elements.get(key)), relationships });
-}
-function projectView(view) {
-  const nodes = (view.nodes ?? []).map((node) => ({ ...copy(node), id: node.id, semanticId: node.semanticId ?? node.semantic_id ?? null, parentId: node.parentId ?? node.parent ?? null }));
-  if (nodes.some((node) => typeof node.id !== "string")) throw new Error("Native drawing node lacks a representation ID");
-  if (new Set(nodes.map((node) => node.id)).size !== nodes.length) throw new Error("Duplicate representation ID");
-  const nodeIds = new Set(nodes.map((node) => node.id));
-  const edges = (view.edges ?? []).map((edge, index) => ({ ...copy(edge), id: edge.id ?? `${view.id ?? "view"}:edge:${index}`, source: endpoint(edge, "source"), target: endpoint(edge, "target") }));
-  if (edges.some((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target))) throw new Error("Native edge references an unavailable drawing node");
-  return { ...copy(view), nodes, edges };
-}
-function semanticIds(scene2) {
-  return [...new Set((scene2.nodes ?? scene2.view?.nodes ?? []).map((node) => node.semanticId).filter(Boolean))];
-}
-function planTransition(fromScene, toScene, options = {}) {
-  const previous = fromScene.view ?? fromScene, next = toScene.view ?? toScene;
-  const oldIds = semanticIds(previous), newIds = semanticIds(next), duration = options.reducedMotion ? 0 : 360;
-  const correspondence = oldIds.filter((id) => newIds.includes(id)).map((semanticId) => ({ semanticId, fromRepresentationIds: previous.nodes.filter((node) => node.semanticId === semanticId).map((node) => node.id), toRepresentationIds: next.nodes.filter((node) => node.semanticId === semanticId).map((node) => node.id) }));
-  if (previous.kind === next.kind && correspondence.length && !options.journey?.length) return { mode: "same-kind", journeyRequired: false, correspondence, stages: [{ kind: "reflow", viewKind: next.kind, semanticIds: newIds, focusId: toScene.focus, duration }] };
-  const route2 = options.graph && fromScene.focus && toScene.focus ? options.journey?.length ? options.journey[0] === fromScene.focus && options.journey.at(-1) === toScene.focus ? findExplicitRoute(options.graph, options.journey, options) : { found: false, elements: [], relationships: [], omissions: [{ reason: "explicit-route-endpoints" }] } : findHierarchyRoute(options.graph, { ...options, from: fromScene.focus, to: toScene.focus }) : { found: false, elements: [], relationships: [], omissions: [{ reason: "missing-route-context" }] };
-  const journey = route2.found ? route2.elements.map((element2) => element2.id) : [], stages = [{ kind: "gv-bridge", viewKind: "gv", semanticIds: oldIds, focusId: fromScene.focus, duration }];
-  if (route2.found) {
-    if (journey.length === 1) stages.push({ kind: "gv-journey", viewKind: "gv", semanticIds: journey, focusId: journey[0], route: [], routeIndex: 0, duration });
-    else for (let index = 1; index < journey.length; index++) {
-      const start2 = Math.max(0, index - 1), end = Math.min(journey.length, index + 2);
-      stages.push({
-        kind: "gv-journey",
-        viewKind: "gv",
-        semanticIds: journey.slice(start2, end),
-        focusId: journey[index],
-        route: route2.relationships.slice(start2, end - 1),
-        routeIndex: index,
-        phase: route2.commonAncestor ? index <= journey.indexOf(route2.commonAncestor) ? "ascent" : "descent" : "explicit",
-        duration
-      });
-    }
-  } else stages.push({ kind: "gv-journey", viewKind: "gv", semanticIds: [], focusId: toScene.focus, route: [], disconnected: true, duration });
-  stages.push({ kind: "gv-gather", viewKind: "gv", semanticIds: newIds, focusId: toScene.focus, duration }, { kind: "morph", viewKind: next.kind, semanticIds: newIds, focusId: toScene.focus, duration });
-  return { mode: previous.kind === next.kind ? "same-kind-journey" : "cross-kind", journeyRequired: true, correspondence, route: route2, stages };
 }
 
 // src/canvas-prototype/exploration.mjs
@@ -2039,7 +4084,7 @@ var allocation = /* @__PURE__ */ new Set(["allocate", "allocation"]);
 var verification = /* @__PURE__ */ new Set(["verify", "verification"]);
 var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var clone = (value) => structuredClone(value);
-var edgeKey = (edge) => JSON.stringify([edge.id ?? null, edge.source, edge.target, edge.kind]);
+var edgeKey2 = (edge) => JSON.stringify([edge.id ?? null, edge.source, edge.target, edge.kind]);
 var modes = Object.freeze({
   origins: { label: "Origins", empty: "No upstream derivation or refinement links are known in the loaded model." },
   derived: { label: "Derived requirements", empty: "No downstream derivation or refinement links are known in the loaded model." },
@@ -2063,13 +4108,13 @@ function accepts(edge, anchor, mode, { root, elements, bridge } = {}) {
   if (mode === "verification") return verification.has(edge.kind) && edge.target === anchor;
   return engineeringKinds.has(edge.kind);
 }
-function prepare(graph) {
+function prepare2(graph) {
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
   const compositionPairs = new Set((graph.relationships ?? []).filter((e) => ["composition", "reference"].includes(e.kind)).map((e) => JSON.stringify([endpoint2(e, "source"), endpoint2(e, "target")])));
   const ownership = (graph.containment ?? []).filter((e) => e.kind === "containment" && e.nativeRole === "owner" && !compositionPairs.has(JSON.stringify([e.source, e.target])));
   const keyed = new Map([...graph.relationships ?? [], ...ownership].map((edge) => {
     const value = { ...edge, source: endpoint2(edge, "source"), target: endpoint2(edge, "target") };
-    return [edgeKey(value), value];
+    return [edgeKey2(value), value];
   }));
   const edges = [...keyed].sort((a, b) => compare(a[0], b[0])).map(([, edge]) => edge);
   const incident = /* @__PURE__ */ new Map();
@@ -2079,7 +4124,7 @@ function prepare(graph) {
   }
   return { elements, edges, incident };
 }
-function projection(graph, focus, mode, options = {}, prepared = prepare(graph)) {
+function projection(graph, focus, mode, options = {}, prepared = prepare2(graph)) {
   if (!modes[mode]) throw new Error("Unknown exploration mode: " + mode);
   const { elements, edges, incident } = prepared;
   const root = elements.get(focus), structural = isStructuralElement(root) && ["context", "contents", "container"].includes(mode);
@@ -2088,9 +4133,9 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
   const nodeKinds = options.elementKinds ? new Set(options.elementKinds) : null;
   const scope = options.scopeIds ? new Set(options.scopeIds) : null;
   const omit = (edge, target, reason2, anchor) => {
-    const key = JSON.stringify([edgeKey(edge ?? {}), target, reason2, anchor]);
-    if (!seen.has(key)) {
-      seen.add(key);
+    const key2 = JSON.stringify([edgeKey2(edge ?? {}), target, reason2, anchor]);
+    if (!seen.has(key2)) {
+      seen.add(key2);
       omissions.push({ relationshipId: edge?.id ?? null, target, reason: reason2, anchor: anchor ?? null });
     }
   };
@@ -2146,7 +4191,7 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
     candidates.get(target).push({ edge, anchor, bridge });
   }
   for (const target of candidates.keys()) filtered.delete(target);
-  for (const links of candidates.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare(a.anchor, b.anchor) || compare(edgeKey(a.edge), edgeKey(b.edge)));
+  for (const links of candidates.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare(a.anchor, b.anchor) || compare(edgeKey2(a.edge), edgeKey2(b.edge)));
   return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason: null, root };
 }
 function summaryFor(data, mode, shown, total) {
@@ -2164,7 +4209,7 @@ function summaryFor(data, mode, shown, total) {
   return { status: status2, message, shown, total, unavailable, filtered };
 }
 function requirementActions(graph, focus) {
-  const prepared = prepare(graph);
+  const prepared = prepare2(graph);
   return Object.entries(modes).filter(([mode]) => !structuralModes.has(mode)).map(([mode, definition]) => {
     const data = projection(graph, focus, mode, {}, prepared), count = data.candidates.size;
     return { mode, label: definition.label, count, total: count + data.unavailable.size + data.filtered.size, unavailable: data.unavailable.size, filtered: data.filtered.size, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
@@ -2185,7 +4230,8 @@ function traceContext(graph, options = {}) {
     }
     return mode === "context" ? priorities.get(edge.kind) ?? 99 : 0;
   }));
-  const targets = [...data.candidates.keys()].sort((a, b) => priority(a) - priority(b) || (isStructuralElement(data.root) ? compare(data.elements.get(a)?.qualifiedName ?? data.elements.get(a)?.name ?? a, data.elements.get(b)?.qualifiedName ?? data.elements.get(b)?.name ?? b) : 0) || compare(a, b)), pages = [];
+  const prominence = createProminenceIndex(graph, { scopeIds: options.prominenceScopeIds ?? options.scopeIds });
+  const targets = [...data.candidates.keys()].sort((a, b) => priority(a) - priority(b) || prominence.compare(a, b)), pages = [];
   let group = [], ids = /* @__PURE__ */ new Set([focus]);
   for (const target of targets) {
     const best = data.candidates.get(target)[0], addition = [target, ...best.bridge ? [best.anchor] : []];
@@ -2205,7 +4251,7 @@ function traceContext(graph, options = {}) {
     const best = data.candidates.get(target)[0];
     if (best.bridge) {
       wanted.add(best.anchor);
-      bridges.set(edgeKey(best.bridge), best.bridge);
+      bridges.set(edgeKey2(best.bridge), best.bridge);
     }
   }
   const relationships = new Map(bridges), omissions = [...data.omissions];
@@ -2215,16 +4261,16 @@ function traceContext(graph, options = {}) {
       continue;
     }
     for (const { edge, anchor, bridge } of links) if (wanted.has(anchor)) {
-      relationships.set(edgeKey(edge), edge);
-      if (bridge) relationships.set(edgeKey(bridge), bridge);
+      relationships.set(edgeKey2(edge), edge);
+      if (bridge) relationships.set(edgeKey2(bridge), bridge);
     }
   }
   if (isStructuralElement(data.root) && ["context", "contents"].includes(mode)) {
-    for (const edge of data.edges) if (["connection", "flow", "binding"].includes(edge.kind) && wanted.has(edge.source) && wanted.has(edge.target) && (!options.relationshipKinds || options.relationshipKinds.includes(edge.kind))) relationships.set(edgeKey(edge), edge);
+    for (const edge of data.edges) if (["connection", "flow", "binding"].includes(edge.kind) && wanted.has(edge.source) && wanted.has(edge.target) && (!options.relationshipKinds || options.relationshipKinds.includes(edge.kind))) relationships.set(edgeKey2(edge), edge);
   }
   return clone({
     elements: [...wanted].map((id) => data.elements.get(id)),
-    relationships: [...relationships.values()].sort((a, b) => compare(edgeKey(a), edgeKey(b))),
+    relationships: [...relationships.values()].sort((a, b) => compare(edgeKey2(a), edgeKey2(b))),
     omissions,
     summary: summaryFor(data, mode, shown.length, targets.length),
     mode,
@@ -2238,105 +4284,11 @@ function traceContext(graph, options = {}) {
   });
 }
 function structuralActions(graph, focus) {
-  const prepared = prepare(graph);
+  const prepared = prepare2(graph);
   return [...structuralModes].map((mode) => {
     const data = projection(graph, focus, mode, {}, prepared), count = data.candidates.size;
     return { mode, label: modes[mode].label, count, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
   });
-}
-
-// src/canvas-prototype/notation.mjs
-var profiles = Object.freeze({
-  connection: ["solid", "none", "none", false, "connector"],
-  transition: ["solid", "none", "filled-arrow", true, "behavior"],
-  succession: ["solid", "none", "filled-arrow", true, "behavior"],
-  flow: ["dashed", "none", "filled-arrow", true, "behavior"],
-  binding: ["solid", "none", "none", false, "connector"],
-  specialization: ["solid", "none", "hollow-triangle", true, "classifier"],
-  typing: ["dashed", "none", "hollow-triangle", true, "classifier"],
-  composition: ["solid", "diamond", "none", true, "ownership"],
-  reference: ["solid", "hollow-diamond", "none", true, "ownership"],
-  containment: ["solid", "containment", "none", true, "ownership"],
-  import: ["dashed", "none", "open-arrow", true, "dependency"],
-  satisfy: ["dashed", "none", "open-arrow", true, "dependency"],
-  verify: ["dashed", "none", "open-arrow", true, "dependency"],
-  derive: ["dashed", "none", "open-arrow", true, "derivation"],
-  refine: ["dashed", "none", "open-arrow", true, "dependency"],
-  allocate: ["dashed", "none", "open-arrow", true, "dependency"],
-  association: ["solid", "none", "none", false, "connector"],
-  include: ["dashed", "none", "filled-arrow", true, "dependency"],
-  anchor: ["dashed", "none", "none", false, "annotation"],
-  dependency: ["dashed", "none", "open-arrow", true, "dependency"]
-});
-function edgeAppearance(edge, { viewKind = edge.viewKind } = {}) {
-  const profile = Object.hasOwn(profiles, edge.kind) ? profiles[edge.kind] : null;
-  if (!profile) return {
-    line: "solid",
-    sourceMarker: "none",
-    targetMarker: "none",
-    directed: false,
-    label: edge.label ?? "",
-    supported: false,
-    family: "unsupported",
-    notice: `Unsupported relationship notation: ${String(edge.kind ?? "(missing kind)")}. Shown as a neutral line; direction is not inferred.`
-  };
-  let [line, sourceMarker, targetMarker, directed, family] = profile;
-  if (["case", "mixed"].includes(viewKind) && ["typing", "reference"].includes(edge.kind)) {
-    line = "dashed";
-    sourceMarker = "none";
-    targetMarker = "open-arrow";
-    directed = true;
-    family = "dependency";
-  }
-  return {
-    line,
-    sourceMarker,
-    targetMarker,
-    directed,
-    family,
-    label: edge.label ?? "",
-    supported: true,
-    notice: ""
-  };
-}
-function edgeLayoutHints(edge, options) {
-  const appearance = edgeAppearance(edge, options);
-  const caseReference = appearance.family === "dependency" && edge.kind === "reference";
-  const rank = ["specialization", "typing", "derive", "refine", "satisfy", "verify"].includes(edge.kind) ? "target-above-source" : ["composition", "containment", "reference"].includes(edge.kind) && !caseReference ? "source-above-target" : ["transition", "succession", "flow"].includes(edge.kind) ? "source-before-target" : "free";
-  return {
-    family: appearance.family,
-    rank,
-    preserveEndpoints: true,
-    supported: appearance.supported
-  };
-}
-function markerDefinition(name) {
-  const common = {
-    viewBox: "0 0 12 12",
-    refX: 11,
-    refY: 6,
-    markerWidth: 12,
-    markerHeight: 12,
-    orient: "auto-start-reverse"
-  };
-  switch (name) {
-    case "open-arrow":
-      return { ...common, path: "M1,1 L11,6 L1,11", fill: "none" };
-    case "filled-arrow":
-      return { ...common, path: "M1,1 L11,6 L1,11 Z", fill: "line" };
-    case "hollow-triangle":
-      return { ...common, path: "M1,1 L11,6 L1,11 Z", fill: "background" };
-    case "diamond":
-      return { ...common, path: "M1,6 L6,1 L11,6 L6,11 Z", fill: "line" };
-    case "hollow-diamond":
-      return { ...common, path: "M1,6 L6,1 L11,6 L6,11 Z", fill: "background" };
-    case "containment":
-      return { ...common, path: "M11,6 A5,5 0 1,1 1,6 A5,5 0 1,1 11,6 Z", fill: "background" };
-    case "continuation-chevron":
-      return { ...common, path: "M2,1 L7,6 L2,11 M6,1 L11,6 L6,11", fill: "none" };
-    default:
-      return null;
-  }
 }
 
 // src/canvas-prototype/context.mjs
@@ -2344,7 +4296,7 @@ var allowedKinds2 = new Set(ENGINEERING_RELATIONSHIPS);
 var forbiddenKinds = /* @__PURE__ */ new Set(["type", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership", "succession", "transition"]);
 var engineeringElement2 = /^(?:Package|Namespace)$|^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
 var compare2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-var edgeKey2 = (edge) => JSON.stringify([edge.id, edge.source, edge.target, edge.kind]);
+var edgeKey3 = (edge) => JSON.stringify([edge.id, edge.source, edge.target, edge.kind]);
 var kindOrder = new Map(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification", "allocate", "allocation", "composition", "connection", "reference", "flow", "item-flow", "control-flow", "causation", "dependency"].map((kind, index) => [kind, index]));
 function surroundingContext(graph, activeView, options = {}) {
   const { budget = 48 } = options;
@@ -2359,14 +4311,14 @@ function surroundingContext(graph, activeView, options = {}) {
   const structural = (id) => /^(PartUsage|PartDefinition|Package|Namespace)$/.test(elements.get(id)?.kind ?? "");
   const structuralView = options.structural === true || options.relationshipKinds?.includes("containment") === true;
   const allowed = (edge, anchor) => kinds2.has(edge.kind) && (edge.kind !== "containment" || nativePackageOwner(edge) && (structuralView || structural(anchor ?? (active2.has(edge.source) ? edge.source : edge.target)))) && (edge.kind !== "typing" || directType(edge));
-  const representations = /* @__PURE__ */ new Map();
-  for (const node of [...activeNodes].sort((a, b) => compare2(a.id, b.id))) if (node.semanticId && !representations.has(node.semanticId)) representations.set(node.semanticId, node.id);
-  const edges = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter(nativePackageOwner)].map((edge) => [edgeKey2(edge), edge])).values()].sort((a, b) => compare2(edgeKey2(a), edgeKey2(b)));
+  const representations2 = /* @__PURE__ */ new Map();
+  for (const node of [...activeNodes].sort((a, b) => compare2(a.id, b.id))) if (node.semanticId && !representations2.has(node.semanticId)) representations2.set(node.semanticId, node.id);
+  const edges = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter(nativePackageOwner)].map((edge) => [edgeKey3(edge), edge])).values()].sort((a, b) => compare2(edgeKey3(a), edgeKey3(b)));
   const omissions = [], seenOmissions = /* @__PURE__ */ new Set();
   const omit = (edge, target, reason, anchor) => {
-    const key = JSON.stringify([edgeKey2(edge), target, reason]);
-    if (seenOmissions.has(key)) return;
-    seenOmissions.add(key);
+    const key2 = JSON.stringify([edgeKey3(edge), target, reason]);
+    if (seenOmissions.has(key2)) return;
+    seenOmissions.add(key2);
     omissions.push({ relationshipId: edge.id ?? null, target, anchor, reason });
   };
   const elementReason = (id, edge) => {
@@ -2398,9 +4350,9 @@ function surroundingContext(graph, activeView, options = {}) {
     }
     return 10 + (kindOrder.get(edge.kind) ?? 99);
   }));
-  const byName = (a, b) => compare2(elements.get(a)?.name ?? elements.get(a)?.qualifiedName ?? a, elements.get(b)?.name ?? elements.get(b)?.qualifiedName ?? b) || compare2(a, b);
-  const focus = options.focusId ?? options.focus, anchors = [...activeIds].sort((a, b) => Number(b === focus) - Number(a === focus) || byName(a, b));
-  const chosen = /* @__PURE__ */ new Set(), pending = new Map(anchors.map((id) => [id, [...candidates.keys()].filter((target) => candidates.get(target).some((edge) => edge.source === id || edge.target === id)).sort((a, b) => priority(a, id) - priority(b, id) || byName(a, b))]));
+  const prominence = createProminenceIndex(graph, { scopeIds: options.prominenceScopeIds ?? options.scopeIds });
+  const focus = options.focusId ?? options.focus, anchors = [...activeIds].sort((a, b) => Number(b === focus) - Number(a === focus) || prominence.compare(a, b));
+  const chosen = /* @__PURE__ */ new Set(), pending = new Map(anchors.map((id) => [id, [...candidates.keys()].filter((target) => candidates.get(target).some((edge) => edge.source === id || edge.target === id)).sort((a, b) => priority(a, id) - priority(b, id) || prominence.compare(a, b))]));
   while (chosen.size < budget) {
     let progress = false;
     for (const id of anchors) {
@@ -2433,7 +4385,7 @@ function surroundingContext(graph, activeView, options = {}) {
   const contextElements = [...chosen].map((id) => elements.get(id));
   const projected = graphView(graph, { elements: contextElements, relationships: [] }, "Surrounding engineering context");
   const contextIDs = new Map(contextElements.map((element2) => [element2.id, `context:${activeView.id ?? "view"}:${element2.id}`]));
-  const endpoint3 = (id) => representations.get(id) ?? contextIDs.get(id);
+  const endpoint3 = (id) => representations2.get(id) ?? contextIDs.get(id);
   const byReason = {};
   for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
   const boundary = { omitted: omissions.length, byReason, budget, depth: 1, shown: contextElements.length };
@@ -2454,7 +4406,7 @@ function surroundingContext(graph, activeView, options = {}) {
       fit: false,
       boundary,
       nodes: projected.nodes.map((node) => ({ ...node, id: contextIDs.get(node.semanticId), detail: "", type: "", parentId: null, context: true, fit: false, notation: "general" })),
-      edges: relationships.map((edge) => ({ ...edge, id: `context:${edge.id ?? edgeKey2(edge)}`, semanticSource: edge.source, semanticTarget: edge.target, source: endpoint3(edge.source), target: endpoint3(edge.target), context: true, fit: false, notation: "general" }))
+      edges: relationships.map((edge) => ({ ...edge, id: `context:${edge.id ?? edgeKey3(edge)}`, semanticSource: edge.source, semanticTarget: edge.target, source: endpoint3(edge.source), target: endpoint3(edge.target), context: true, fit: false, notation: "general" }))
     }
   };
 }
@@ -2465,234 +4417,11 @@ function decisionOrder(edge) {
   return null;
 }
 
-// src/canvas-prototype/geometry.mjs
-var overlaps2 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
-var centre = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
-function graphArea(width, height, panels = []) {
-  const left = 16, top = 16, right = Math.max(left + 1, width - 16), bottom = Math.max(top + 1, height - 60);
-  const xs = [left, right, ...panels.flatMap((p) => [Math.max(left, p.x - 16), Math.min(right, p.x + p.width + 16)])];
-  const ys = [top, bottom, ...panels.flatMap((p) => [Math.max(top, p.y - 16), Math.min(bottom, p.y + p.height + 16)])];
-  const candidates = [];
-  for (const x of xs) for (const r of xs) for (const y of ys) for (const b of ys) {
-    const rect = { x, y, width: r - x, height: b - y };
-    if (rect.width > 0 && rect.height > 0 && !panels.some((p) => overlaps2(rect, p))) candidates.push(rect);
-  }
-  return candidates.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? { x: left, y: top, width: right - left, height: bottom - top };
-}
-function fitNodes(nodes, area) {
-  const minX = nodes.length ? Math.min(...nodes.map((n) => n.x)) : 0, minY = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 0;
-  const maxX = nodes.length ? Math.max(...nodes.map((n) => n.x + n.width)) : 1, maxY = nodes.length ? Math.max(...nodes.map((n) => n.y + n.height)) : 1;
-  const scale = Math.min(1.4, area.width / (maxX - minX + 20), area.height / (maxY - minY + 20));
-  const offsetX = area.x + (area.width - (maxX - minX) * scale) / 2 - minX * scale, offsetY = area.y + (area.height - (maxY - minY) * scale) / 2 - minY * scale;
-  return { scale, nodes: nodes.map((n) => ({ ...n, x: n.x * scale + offsetX, y: n.y * scale + offsetY, width: n.width * scale, height: n.height * scale })) };
-}
-var simplify = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
-function segmentBlocked(a, b, obstacles) {
-  return obstacles.some((n) => a.x === b.x ? a.x > n.x && a.x < n.x + n.width && Math.max(a.y, b.y) > n.y && Math.min(a.y, b.y) < n.y + n.height : a.y > n.y && a.y < n.y + n.height && Math.max(a.x, b.x) > n.x && Math.min(a.x, b.x) < n.x + n.width);
-}
-function routeOrthogonal(start2, end, obstacles, { bendPenalty = 14, segmentCost = () => 0 } = {}) {
-  const xs = [.../* @__PURE__ */ new Set([start2.x, end.x, ...obstacles.flatMap((n) => [n.x, n.x + n.width])])].sort((a, b) => a - b);
-  const ys = [.../* @__PURE__ */ new Set([start2.y, end.y, ...obstacles.flatMap((n) => [n.y, n.y + n.height])])].sort((a, b) => a - b);
-  const points = [], byXY = /* @__PURE__ */ new Map();
-  for (const x of xs) for (const y of ys) if (!obstacles.some((n) => x > n.x && x < n.x + n.width && y > n.y && y < n.y + n.height)) {
-    byXY.set(x + "," + y, points.length);
-    points.push({ x, y });
-  }
-  const first = byXY.get(start2.x + "," + start2.y), last = byXY.get(end.x + "," + end.y);
-  if (first === void 0 || last === void 0) return null;
-  const links = points.map(() => []);
-  for (const axis of ["x", "y"]) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const [i, p] of points.entries()) {
-      const value = p[axis];
-      if (!groups.has(value)) groups.set(value, []);
-      groups.get(value).push(i);
-    }
-    for (const group of groups.values()) {
-      group.sort((a, b) => points[a][axis === "x" ? "y" : "x"] - points[b][axis === "x" ? "y" : "x"]);
-      for (let j = 1; j < group.length; j++) {
-        const a = group[j - 1], b = group[j];
-        if (!segmentBlocked(points[a], points[b], obstacles)) {
-          const length2 = Math.abs(points[a].x - points[b].x) + Math.abs(points[a].y - points[b].y);
-          links[a].push([b, length2, axis]);
-          links[b].push([a, length2, axis]);
-        }
-      }
-    }
-  }
-  const queue = [{ id: first, cost: 0, axis: "", path: [first] }], best = /* @__PURE__ */ new Map();
-  while (queue.length) {
-    queue.sort((a, b) => a.cost - b.cost);
-    const current = queue.shift(), key = current.id + current.axis;
-    if (best.has(key) && best.get(key) < current.cost) continue;
-    if (current.id === last) return current.path.map((i) => points[i]);
-    for (const [id, length2, axis] of links[current.id]) {
-      const cost = current.cost + length2 + (current.axis && current.axis !== axis ? bendPenalty : 0) + Math.max(0, Number(segmentCost(points[current.id], points[id])) || 0), key2 = id + axis;
-      if (best.has(key2) && best.get(key2) <= cost) continue;
-      best.set(key2, cost);
-      queue.push({ id, cost, axis, path: [...current.path, id] });
-    }
-  }
-  return null;
-}
-function endpoints(a, b, sourceFraction = 0.5, targetFraction = 0.5) {
-  const ac = centre(a), bc = centre(b), vertical = Math.abs(ac.y - bc.y) > Math.abs(ac.x - bc.x) * 0.5;
-  const normal = (side) => ({ NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } })[side];
-  const defaultDirection = vertical ? { x: 0, y: bc.y > ac.y ? 1 : -1 } : { x: bc.x > ac.x ? 1 : -1, y: 0 };
-  const sourceDirection = normal(a.kind === "port" ? a.portSide ?? a.side : "") ?? defaultDirection, targetDirection = normal(b.kind === "port" ? b.portSide ?? b.side : "") ?? { x: -defaultDirection.x, y: -defaultDirection.y };
-  const attachment = (node, direction, fraction) => direction.x ? { x: node.x + (direction.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (direction.y > 0 ? node.height : 0) };
-  return [attachment(a, sourceDirection, sourceFraction), attachment(b, targetDirection, targetFraction), sourceDirection, targetDirection];
-}
-function connectionObstacles(edge, nodes) {
-  const byID = new Map(nodes.map((n) => [n.id, n])), ancestors = /* @__PURE__ */ new Set(), leafPortOwners = /* @__PURE__ */ new Set();
-  for (const id of [edge.source, edge.target]) {
-    let node = byID.get(id);
-    if (node?.kind === "port" && node.parentId && !byID.get(node.parentId)?.headerHeight) leafPortOwners.add(node.parentId);
-    const seen = /* @__PURE__ */ new Set();
-    while (node?.parentId && !seen.has(node.parentId)) {
-      seen.add(node.parentId);
-      ancestors.add(node.parentId);
-      node = byID.get(node.parentId);
-    }
-  }
-  return nodes.filter((n) => (n.opacity ?? 1) > 0.08 && n.width > 0 && n.height > 0).flatMap((n) => ancestors.has(n.id) && !leafPortOwners.has(n.id) ? n.headerHeight ? [{ ...n, height: n.headerHeight }] : [] : [n]);
-}
-function route(a, b, nodes, options = {}) {
-  const [start2, end, direction, targetDirection] = endpoints(a, b, options.sourceFraction, options.targetFraction), clearance = options.clearance ?? 8;
-  let stub = { x: start2.x + direction.x * clearance, y: start2.y + direction.y * clearance }, finish = { x: end.x + targetDirection.x * clearance, y: end.y + targetDirection.y * clearance };
-  const obstacles = connectionObstacles({ source: a.id, target: b.id }, nodes).map((n) => ({ x: n.x - 4, y: n.y - 4, width: n.width + 8, height: n.height + 8 }));
-  let middle = routeOrthogonal(stub, finish, obstacles);
-  if (!middle && clearance > 4.1) {
-    stub = { x: start2.x + direction.x * 4.1, y: start2.y + direction.y * 4.1 };
-    finish = { x: end.x + targetDirection.x * 4.1, y: end.y + targetDirection.y * 4.1 };
-    middle = routeOrthogonal(stub, finish, obstacles);
-  }
-  const points = middle ? simplify([start2, ...middle, end]) : [];
-  return { points, d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), routingBlocked: !middle };
-}
-function lineCrossesRect(a, b, rect, padding = 0) {
-  const left = rect.x - padding, top = rect.y - padding, right = rect.x + rect.width + padding, bottom = rect.y + rect.height + padding;
-  let lo = 0, hi = 1;
-  for (const [origin, delta, min, max2] of [[a.x, b.x - a.x, left, right], [a.y, b.y - a.y, top, bottom]]) {
-    if (Math.abs(delta) < 1e-9) {
-      if (origin <= min || origin >= max2) return false;
-      continue;
-    }
-    let first = (min - origin) / delta, last = (max2 - origin) / delta;
-    if (first > last) [first, last] = [last, first];
-    lo = Math.max(lo, first);
-    hi = Math.min(hi, last);
-    if (lo >= hi) return false;
-  }
-  return hi > 0 && lo < 1;
-}
-function clearLeader(box, points, nodes, labels) {
-  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 }, targets = [...points, ...points.slice(1).map((p, i) => ({ x: (p.x + points[i].x) / 2, y: (p.y + points[i].y) / 2 }))];
-  targets.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
-  const to = targets.find((target) => !nodes.some((n) => n.width > 0 && n.height > 0 && lineCrossesRect(from, target, n, 2)) && !labels.some((label2) => lineCrossesRect(from, target, label2, 2)));
-  return to ? { from, to } : null;
-}
-function labelCandidates(points, width, height) {
-  const candidates = [];
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-    if (length2 < 8) continue;
-    for (const t of [0.5, 0.25, 0.75]) {
-      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-      if (a.y === b.y) {
-        candidates.push({ x: x - width / 2, y: y - height - 3, score: length2 }, { x: x - width / 2, y: y + 3, score: length2 - 1 });
-      } else candidates.push({ x: x + 5, y: y - height / 2, score: length2 - 2 }, { x: x - width - 5, y: y - height / 2, score: length2 - 3 });
-    }
-  }
-  return candidates.sort((a, b) => b.score - a.score);
-}
-function routeEdges(edges, nodes, options = {}) {
-  const byID = new Map(nodes.map((n) => [n.id, n])), labels = [], ports = /* @__PURE__ */ new Map();
-  const measured = (text) => {
-    const size = options.measureLabel?.(text);
-    return { width: Math.max(1, size?.width ?? String(text).length * 7.2 + 4), height: Math.max(1, size?.height ?? 16) };
-  };
-  const ordered = [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-  for (const edge of ordered) for (const side of ["source", "target"]) {
-    const key = edge[side];
-    if (!ports.has(key)) ports.set(key, []);
-    ports.get(key).push({ edge, side });
-  }
-  const fraction = (edge, side) => {
-    const group = ports.get(edge[side]), index = group.findIndex((item) => item.edge === edge && item.side === side);
-    return group.length === 1 ? 0.5 : 0.2 + 0.6 * (index + 0.5) / group.length;
-  };
-  const area = options.area;
-  return edges.map((edge) => {
-    const a = byID.get(edge.source), b = byID.get(edge.target);
-    if (!a || !b) return null;
-    const result = { ...edge, ...route(a, b, nodes, { ...options, sourceFraction: fraction(edge, "source"), targetFraction: fraction(edge, "target") }) };
-    if (!edge.label || result.routingBlocked) return result;
-    const size = measured(edge.label), valid = (box) => !nodes.some((n) => n.width > 0 && n.height > 0 && overlaps2(box, n, 3)) && !labels.some((other) => overlaps2(box, other, 4)) && (!area || box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height);
-    let labelBox = labelCandidates(result.points, size.width, size.height).map((candidate) => ({ ...candidate, ...size })).find(valid);
-    if (!labelBox) {
-      const mid = result.points[1] ?? result.points[0], region = area ?? { x: Math.min(...nodes.map((n) => n.x)) - 80, y: Math.min(...nodes.map((n) => n.y)) - 40, width: Math.max(...nodes.map((n) => n.x + n.width)) - Math.min(...nodes.map((n) => n.x)) + 160, height: Math.max(...nodes.map((n) => n.y + n.height)) - Math.min(...nodes.map((n) => n.y)) + 80 };
-      const cards = nodes.filter((n) => n.width > 0 && n.height > 0);
-      const xs = [region.x, ...cards.flatMap((n) => [n.x + n.width / 2 - size.width / 2, n.x - size.width - 4, n.x + n.width + 4]), ...result.points.map((p) => p.x - size.width / 2)];
-      const ys = [region.y, ...cards.flatMap((n) => [n.y + n.height + 4, n.y - size.height - 4]), ...result.points.map((p) => p.y - size.height / 2)];
-      for (let y = region.y; y + size.height <= region.y + region.height; y += size.height + 5) ys.push(y);
-      for (let x = region.x; x + size.width <= region.x + region.width; x += Math.max(12, size.width / 2)) xs.push(x);
-      const slots = [];
-      for (const y of new Set(ys)) for (const x of new Set(xs)) {
-        const box = { x, y, ...size };
-        if (valid(box)) slots.push(box);
-      }
-      slots.sort((a2, b3) => Math.hypot(a2.x + a2.width / 2 - mid.x, a2.y + a2.height / 2 - mid.y) - Math.hypot(b3.x + b3.width / 2 - mid.x, b3.y + b3.height / 2 - mid.y));
-      for (const slot of slots) {
-        const leader = clearLeader(slot, result.points, nodes, labels);
-        if (leader) {
-          labelBox = slot;
-          result.labelLeader = leader;
-          break;
-        }
-      }
-    }
-    if (labelBox) {
-      labels.push(labelBox);
-      result.labelBox = labelBox;
-      result.x = labelBox.x;
-      result.y = labelBox.y + labelBox.height * 0.78;
-    } else result.labelOmitted = true;
-    return result;
-  }).filter(Boolean);
-}
-function fitDiagram(layout, area) {
-  const occupied = [...layout.nodes, ...layout.nodes.flatMap((n) => n.portLabelBox ? [n.portLabelBox] : []), ...layout.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], fit = fitNodes(occupied, area), scale = fit.scale;
-  const origin = occupied[0], fitted = fit.nodes[0], dx = origin ? fitted.x - origin.x * scale : area.x, dy = origin ? fitted.y - origin.y * scale : area.y;
-  const point = (p) => ({ x: p.x * scale + dx, y: p.y * scale + dy }), box = (n) => ({ ...n, ...point(n), width: n.width * scale, height: n.height * scale });
-  return { ...layout, scale, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point(p) })) };
-}
-function routeIsClear(points, edge, nodes, { orthogonalOnly = false } = {}) {
-  if (points.length < 2 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
-  const obstacles = connectionObstacles(edge, nodes);
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i];
-    if (orthogonalOnly && Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01) return false;
-    if (obstacles.some((n) => lineCrossesRect(a, b, { x: n.x + 0.05, y: n.y + 0.05, width: Math.max(0, n.width - 0.1), height: Math.max(0, n.height - 0.1) }))) return false;
-  }
-  return true;
-}
-function routeConnectsEndpoints(points, edge, nodes, tolerance = 0.7) {
-  const byID = new Map(nodes.map((n) => [n.id, n]));
-  const touches = (point, node) => {
-    if (!point || !node) return false;
-    if (!node.width && !node.height) return Math.hypot(point.x - node.x, point.y - node.y) <= tolerance;
-    const insideX = point.x >= node.x - tolerance && point.x <= node.x + node.width + tolerance, insideY = point.y >= node.y - tolerance && point.y <= node.y + node.height + tolerance;
-    return insideX && insideY && (Math.abs(point.x - node.x) <= tolerance || Math.abs(point.x - node.x - node.width) <= tolerance || Math.abs(point.y - node.y) <= tolerance || Math.abs(point.y - node.y - node.height) <= tolerance);
-  };
-  return points.length >= 2 && touches(points[0], byID.get(edge.source)) && touches(points.at(-1), byID.get(edge.target));
-}
-
 // src/canvas-prototype/peripheral-routing.mjs
 var eps = 0.05;
-var overlap = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var overlap2 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 var length = (points) => points.slice(1).reduce((s, p, i) => s + Math.abs(p.x - points[i].x) + Math.abs(p.y - points[i].y), 0);
-var simplify2 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
+var simplify3 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
 var segments = (points) => (points ?? []).slice(1).map((p, i) => [points[i], p]);
 function routeConflicts(points, otherPoints) {
   const crossingPoints = /* @__PURE__ */ new Set();
@@ -2739,8 +4468,8 @@ function terminals(a, b) {
   const secondary = preferred === "NORTH" || preferred === "SOUTH" ? dx >= 0 ? "EAST" : "WEST" : dy >= 0 ? "SOUTH" : "NORTH";
   const fixed = a.kind === "port" ? a.portSide ?? a.side : null;
   return (fixed && normals[fixed] ? [fixed] : [preferred, secondary]).flatMap((side) => (fixed ? [0.5] : side === preferred ? [0.5, 0.25, 0.75] : [0.5]).map((f) => {
-    const n = normals[side], point = n.x ? { x: a.x + (n.x > 0 ? a.width : 0), y: a.y + a.height * f } : { x: a.x + a.width * f, y: a.y + (n.y > 0 ? a.height : 0) };
-    return { point, stub: { x: point.x + n.x * 8, y: point.y + n.y * 8 } };
+    const n = normals[side], point2 = n.x ? { x: a.x + (n.x > 0 ? a.width : 0), y: a.y + a.height * f } : { x: a.x + a.width * f, y: a.y + (n.y > 0 ? a.height : 0) };
+    return { point: point2, stub: { x: point2.x + n.x * 8, y: point2.y + n.y * 8 } };
   }));
 }
 function cardObstacles(edge, nodes) {
@@ -2759,7 +4488,7 @@ function cardObstacles(edge, nodes) {
 }
 var segmentHitsRect = (a, b, r) => Math.abs(a.x - b.x) < eps ? a.x > r.x + eps && a.x < r.x + r.width - eps && Math.max(a.y, b.y) > r.y + eps && Math.min(a.y, b.y) < r.y + r.height - eps : a.y > r.y + eps && a.y < r.y + r.height - eps && Math.max(a.x, b.x) > r.x + eps && Math.min(a.x, b.x) < r.x + r.width - eps;
 var segmentBox = (a, b, pad = 1) => ({ x: Math.min(a.x, b.x) - pad, y: Math.min(a.y, b.y) - pad, width: Math.abs(a.x - b.x) + pad * 2, height: Math.abs(a.y - b.y) + pad * 2 });
-var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap(box, n, 3)) && !labels.some((r) => overlap(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap(box, segmentBox(a, b, 1))));
+var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap2(box, n, 3)) && !labels.some((r) => overlap2(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap2(box, segmentBox(a, b, 1))));
 function labelFor(edge, points, nodes, labels, paths, area, measureLabel) {
   if (!edge.label) return null;
   const measured = measureLabel?.(edge.label) ?? { width: String(edge.label).length * 6.5 + 4, height: 14 }, size = { width: Math.max(1, measured.width), height: Math.max(1, measured.height) }, slots = [];
@@ -2786,7 +4515,7 @@ function routePeripheralEdges(edges, nodes, area, { activeEdges = [], obstacles 
       const xs = uniqueLanes(laneXs, (a.x + a.width / 2 + b.x + b.width / 2) / 2, area.x, area.x + area.width), ys = uniqueLanes(laneYs, (a.y + a.height / 2 + b.y + b.height / 2) / 2, area.y, area.y + area.height);
       let best = null;
       const inspect = (from, to, middle) => {
-        const points = simplify2([from.point, ...middle, to.point]);
+        const points = simplify3([from.point, ...middle, to.point]);
         if (points.some((p) => p.x < area.x || p.y < area.y || p.x > area.x + area.width || p.y > area.y + area.height) || !routeIsClear(points, edge, nodes)) return;
         if (segments(points).some(([p, q]) => labels.some((r) => segmentHitsRect(p, q, r)))) return;
         if (segments(middle).some(([p, q]) => hard.some((r) => segmentHitsRect(p, q, r)))) return;
@@ -2838,9 +4567,9 @@ function routePeripheralEdges(edges, nodes, area, { activeEdges = [], obstacles 
 
 // src/canvas-prototype/neighborhood.mjs
 var compare3 = (a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
-var overlap2 = (a, b, g = 0) => a.x < b.x + b.width + g && a.x + a.width + g > b.x && a.y < b.y + b.height + g && a.y + a.height + g > b.y;
+var overlap3 = (a, b, g = 0) => a.x < b.x + b.width + g && a.x + a.width + g > b.x && a.y < b.y + b.height + g && a.y + a.height + g > b.y;
 var center = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
-var clamp2 = (v, min, max2) => Math.max(min, Math.min(max2, v));
+var clamp3 = (v, min, max2) => Math.max(min, Math.min(max2, v));
 var bounds = (rects) => {
   const x = Math.min(...rects.map((r) => r.x)), y = Math.min(...rects.map((r) => r.y));
   return { x, y, width: Math.max(...rects.map((r) => r.x + r.width)) - x, height: Math.max(...rects.map((r) => r.y + r.height)) - y };
@@ -2900,7 +4629,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
       min = -Infinity;
       max2 = Infinity;
     }
-    const idealY = clamp2(anchor.y - height2 / 2, min, max2), idealX = anchor.x - width2 / 2, dx = width2 + gap, dy = height2 + gap;
+    const idealY = clamp3(anchor.y - height2 / 2, min, max2), idealX = anchor.x - width2 / 2, dx = width2 + gap, dy = height2 + gap;
     let placed = null;
     for (let ring = 0; ring < drafts.length + blocked.length + 8 && !placed; ring++) {
       const candidates = [];
@@ -2908,8 +4637,8 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
       for (let row = ranked ? 0 : -ring; row <= (ranked ? 0 : ring); row++) for (let col = -ring; col <= ring; col++) {
         if (Math.max(Math.abs(row), Math.abs(col)) !== ring) continue;
         for (const offset of [0, dx / 2]) {
-          const candidate = { x: idealX + col * dx + offset, y: clamp2(idealY + row * dy, min, max2), width: width2, height: height2 };
-          if (blocked.some((other) => overlap2(candidate, other, gap / 2))) continue;
+          const candidate = { x: idealX + col * dx + offset, y: clamp3(idealY + row * dy, min, max2), width: width2, height: height2 };
+          if (blocked.some((other) => overlap3(candidate, other, gap / 2))) continue;
           const stemBlocked = orders.some((order) => {
             const other = active2.find((n) => n.id === (order.above === id ? order.below : order.below === id ? order.above : null));
             if (!other) return false;
@@ -2945,8 +4674,8 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
       });
       const byDistance = [...neighbors].sort((a, b) => Math.abs(center(b.other).x - center(node).x) - Math.abs(center(a.other).x - center(node).x) || compare3(a.edge.id, b.edge.id));
       neighbors.forEach(({ edge }, i) => {
-        const fraction = (i + 1) / (neighbors.length + 1), point = side === "NORTH" || side === "SOUTH" ? { x: node.x + node.width * fraction, y: node.y + (side === "SOUTH" ? node.height : 0) } : { x: node.x + (side === "EAST" ? node.width : 0), y: node.y + node.height * fraction };
-        attachments.set(`${edge.id}:${node.id}`, { ...point, side, lane: (byDistance.findIndex((n) => n.edge.id === edge.id) + 1) / (neighbors.length + 1) });
+        const fraction = (i + 1) / (neighbors.length + 1), point2 = side === "NORTH" || side === "SOUTH" ? { x: node.x + node.width * fraction, y: node.y + (side === "SOUTH" ? node.height : 0) } : { x: node.x + (side === "EAST" ? node.width : 0), y: node.y + node.height * fraction };
+        attachments.set(`${edge.id}:${node.id}`, { ...point2, side, lane: (byDistance.findIndex((n) => n.edge.id === edge.id) + 1) / (neighbors.length + 1) });
       });
     }
   }
@@ -2956,10 +4685,10 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   for (const edge of sorted) {
     const endpoints2 = /* @__PURE__ */ new Set([edge.source, edge.target]), proxyNodes = allNodes.flatMap((node) => {
       if (!endpoints2.has(node.id)) return [node];
-      const point = attachments.get(`${edge.id}:${node.id}`);
-      if (!point) return [node];
+      const point2 = attachments.get(`${edge.id}:${node.id}`);
+      if (!point2) return [node];
       const interior = { ...node, id: `interior:${node.id}`, x: node.x + 6, y: node.y + 6, width: Math.max(0, node.width - 12), height: Math.max(0, node.height - 12), parentId: null };
-      return [interior, { ...node, ...point, width: 0.01, height: 0.01, kind: "port", portSide: point.side, parentId: null }];
+      return [interior, { ...node, ...point2, width: 0.01, height: 0.01, kind: "port", portSide: point2.side, parentId: null }];
     });
     const routingOptions = { activeEdges: [...activeEdges, ...routed.filter((e) => !e.routingBlocked)], obstacles: [...obstacles, ...labelObstacles], measureLabel, candidateBudget: 4, reverse: false, visibilitySearches: 0 };
     const routingEdge = { ...edge, label: "" };
@@ -2974,7 +4703,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
           if (bottom.x > obstacle.x - 5 && bottom.x < obstacle.x + obstacle.width + 5 && obstacle.y + obstacle.height > top.y && obstacle.y + obstacle.height <= bottom.y - 8) laneMin = Math.max(laneMin, obstacle.y + obstacle.height + 8);
         }
         const lane = laneMin + (laneMax - laneMin) * top.lane, path = [{ x: top.x, y: top.y }, { x: top.x, y: lane }, { x: bottom.x, y: lane }, { x: bottom.x, y: bottom.y }], points = edge.source === order.above ? path : [...path].reverse(), candidate = { ...edge, points, routingBlocked: false, d: points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ") };
-        const avoids = laneMin <= laneMax && ![...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])].some((r) => pathBoxes([candidate]).some((box) => overlap2(box, r)));
+        const avoids = laneMin <= laneMax && ![...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])].some((r) => pathBoxes([candidate]).some((box) => overlap3(box, r)));
         if (avoids && routeIsClear(points, edge, allNodes, { orthogonalOnly: true })) {
           fanCandidates.set(edge.id, candidate);
         }
@@ -2993,7 +4722,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   const allFans = routed.map((edge) => fanCandidates.get(edge.id) ?? edge);
   if (peripheralRouteScore(peripheralRoutingMetrics(allFans, activeEdges)) < peripheralRouteScore(peripheralRoutingMetrics(routed, activeEdges))) routed = allFans;
   const protectedRects = [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])];
-  const safe = (edge) => routeConnectsEndpoints(edge.points, edge, allNodes) && routeIsClear(edge.points, edge, allNodes, { orthogonalOnly: true }) && !pathBoxes([edge]).some((box) => protectedRects.some((r) => overlap2(box, r)));
+  const safe = (edge) => routeConnectsEndpoints(edge.points, edge, allNodes) && routeIsClear(edge.points, edge, allNodes, { orthogonalOnly: true }) && !pathBoxes([edge]).some((box) => protectedRects.some((r) => overlap3(box, r)));
   const clipPoints = (points) => {
     const paths = [];
     for (let i = 1; i < points.length; i++) {
@@ -3056,7 +4785,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
         else slots.push({ x: x + 8, y: y - size.height / 2, ...size }, { x: x - size.width - 8, y: y - size.height / 2, ...size });
       }
     }
-    const box = slots.find((box2) => box2.x >= worldBounds.x && box2.y >= worldBounds.y && box2.x + box2.width <= worldBounds.x + worldBounds.width && box2.y + box2.height <= worldBounds.y + worldBounds.height && ![...allNodes, ...reserved, ...corridors].some((r) => overlap2(box2, r, 2)));
+    const box = slots.find((box2) => box2.x >= worldBounds.x && box2.y >= worldBounds.y && box2.x + box2.width <= worldBounds.x + worldBounds.width && box2.y + box2.height <= worldBounds.y + worldBounds.height && ![...allNodes, ...reserved, ...corridors].some((r) => overlap3(box2, r, 2)));
     if (box) {
       edge.labelBox = box;
       edge.x = box.x;
@@ -3077,182 +4806,6 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   return { ...context.view, nodes, edges, routedEdges, stubEdges: [], boundaryMarkers: [], worldBounds: finalBounds, routingMetrics: routing.metrics, notices, omissions, boundary: { ...context.boundary, cards: nodes.length, markers: 0, omitted: omissions.length, byReason } };
 }
 
-// src/canvas-prototype/camera.mjs
-var CAMERA_LIMITS = Object.freeze({ minScale: 5e-3, maxScale: 4 });
-var finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
-function limits(options = {}) {
-  const minScale = clamp3(finite(options.minScale, CAMERA_LIMITS.minScale), CAMERA_LIMITS.minScale, CAMERA_LIMITS.maxScale);
-  return { minScale, maxScale: clamp3(finite(options.maxScale, CAMERA_LIMITS.maxScale), minScale, CAMERA_LIMITS.maxScale) };
-}
-var clamp3 = (value, min, max2) => Math.max(min, Math.min(max2, value));
-function createCamera(camera = {}, options = {}) {
-  const { minScale, maxScale } = limits(options);
-  return { x: finite(camera?.x, 0), y: finite(camera?.y, 0), scale: clamp3(finite(camera?.scale, 1), minScale, maxScale) };
-}
-function panCamera(camera, dx, dy) {
-  const c = createCamera(camera);
-  return { ...c, x: c.x + finite(dx, 0), y: c.y + finite(dy, 0) };
-}
-function zoomCameraAt(camera, point, factor, options = {}) {
-  const c = createCamera(camera, options), { minScale, maxScale } = limits(options);
-  const scale = clamp3(c.scale * Math.max(1e-4, finite(factor, 1)), minScale, maxScale);
-  const world = { x: (point.x - c.x) / c.scale, y: (point.y - c.y) / c.scale };
-  return { x: point.x - world.x * scale, y: point.y - world.y * scale, scale };
-}
-function fitCameraToBounds(bounds2, area, padding = 24, options = {}) {
-  if (!bounds2 || !area || ![bounds2.x, bounds2.y, bounds2.width, bounds2.height, area.x, area.y, area.width, area.height].every(Number.isFinite) || bounds2.width < 0 || bounds2.height < 0 || area.width <= 0 || area.height <= 0) return createCamera({}, options);
-  const inset = Math.max(0, finite(padding, 24)), { minScale, maxScale } = limits(options);
-  const scale = clamp3(Math.min(Math.max(1, area.width - inset * 2) / Math.max(1, bounds2.width), Math.max(1, area.height - inset * 2) / Math.max(1, bounds2.height)), minScale, maxScale);
-  return { x: area.x + area.width / 2 - (bounds2.x + bounds2.width / 2) * scale, y: area.y + area.height / 2 - (bounds2.y + bounds2.height / 2) * scale, scale };
-}
-function graphTarget(target, element2) {
-  if (!target || !element2.contains(target)) return false;
-  if (target.closest?.("article,aside,dialog,#selection,#canvas-tools,#loading,[data-camera-ignore]")) return false;
-  if (target.closest?.(".node,[data-relationship],[data-camera-surface]")) return true;
-  return !target.closest?.('button,a,input,textarea,select,summary,[contenteditable="true"],[role="button"]');
-}
-var midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-var distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-function bindCameraControls({ element: element2, getCamera, setCamera, onChange, onGestureStart, getViewportArea, shouldHandleTarget = graphTarget, minScale = 5e-3, maxScale = 4, dragThreshold = 5 }) {
-  if (!element2 || typeof getCamera !== "function" || typeof setCamera !== "function") throw new TypeError("Camera controls require element, getCamera and setCamera");
-  const options = { minScale, maxScale }, points = /* @__PURE__ */ new Map(), listeners = [], captures = /* @__PURE__ */ new Set();
-  const pointerHost = element2.ownerDocument ?? element2;
-  let gesture = null, moved = false, suppressClick = false, disposed = false;
-  const local = (event) => {
-    const r = element2.getBoundingClientRect();
-    return { x: event.clientX - r.left, y: event.clientY - r.top };
-  };
-  const accept = (event) => shouldHandleTarget(event.target, element2, event);
-  const listen = (host, type, fn, options2) => {
-    host.addEventListener(type, fn, options2);
-    listeners.push(() => host.removeEventListener(type, fn, options2));
-  };
-  const emit = (camera, source) => {
-    const next = createCamera(camera, options), current = createCamera(getCamera(), options);
-    if (next.x === current.x && next.y === current.y && next.scale === current.scale) return;
-    setCamera(next, { source });
-    onChange?.(next, { source });
-  };
-  const rebase = () => {
-    gesture = { camera: createCamera(getCamera(), options), points: [...points.values()].map((p) => ({ ...p })) };
-  };
-  const capture2 = () => {
-    for (const id of points.keys()) if (!captures.has(id)) {
-      try {
-        element2.setPointerCapture?.(id);
-        captures.add(id);
-      } catch {
-      }
-    }
-  };
-  const begin = (source) => {
-    if (!moved) {
-      moved = true;
-      suppressClick = true;
-      onGestureStart?.({ source });
-      if (gesture) gesture.camera = createCamera(getCamera(), options);
-    }
-    capture2();
-  };
-  const down = (event) => {
-    if (disposed || event.button > 0 || points.has(event.pointerId) || points.size >= 2 || !accept(event)) return;
-    if (!points.size) {
-      moved = false;
-      suppressClick = false;
-    }
-    points.set(event.pointerId, local(event));
-    rebase();
-    if (points.size === 2) {
-      begin("pinch");
-      event.preventDefault();
-    }
-  };
-  const move = (event) => {
-    if (!points.has(event.pointerId) || !gesture) return;
-    points.set(event.pointerId, local(event));
-    const current = [...points.values()], base = gesture.points;
-    if (current.length === 2 && base.length === 2) {
-      begin("pinch");
-      event.preventDefault();
-      const origin = midpoint(...base), now = midpoint(...current), ratio = distance(...current) / Math.max(1, distance(...base));
-      const zoomed = zoomCameraAt(gesture.camera, origin, ratio, options);
-      emit({ ...zoomed, x: zoomed.x + now.x - origin.x, y: zoomed.y + now.y - origin.y }, "pinch");
-    } else if (current.length === 1 && base.length === 1) {
-      const dx = current[0].x - base[0].x, dy = current[0].y - base[0].y;
-      if (!moved && Math.hypot(dx, dy) < dragThreshold) return;
-      begin("pan");
-      event.preventDefault();
-      emit(panCamera(gesture.camera, dx, dy), "pan");
-    }
-  };
-  const release = (id) => {
-    if (captures.delete(id)) try {
-      element2.releasePointerCapture?.(id);
-    } catch {
-    }
-  };
-  const up = (event) => {
-    if (!points.has(event.pointerId)) return;
-    points.delete(event.pointerId);
-    release(event.pointerId);
-    if (points.size) rebase();
-    else gesture = null;
-  };
-  const cancel = (event) => {
-    if (!points.has(event.pointerId)) return;
-    suppressClick = true;
-    points.clear();
-    gesture = null;
-    for (const id of [...captures]) release(id);
-  };
-  const click = (event) => {
-    if (suppressClick && event.detail !== 0 && accept(event)) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      suppressClick = false;
-    }
-  };
-  const wheel = (event) => {
-    if (!accept(event) || !Number.isFinite(event.deltaY) || !event.deltaY) return;
-    event.preventDefault();
-    onGestureStart?.({ source: "wheel" });
-    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element2.getBoundingClientRect().height : 1;
-    emit(zoomCameraAt(getCamera(), local(event), Math.exp(clamp3(-event.deltaY * unit * 2e-3, -2, 2)), options), "wheel");
-  };
-  const key = (event) => {
-    if (event.altKey || event.ctrlKey || event.metaKey || !accept(event) || !["+", "=", "-", "0", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
-    event.preventDefault();
-    onGestureStart?.({ source: "keyboard" });
-    const r = element2.getBoundingClientRect(), area = getViewportArea?.();
-    const usable = area && [area.x, area.y, area.width, area.height].every(Number.isFinite) && area.width > 0 && area.height > 0;
-    const center2 = usable ? { x: area.x + area.width / 2, y: area.y + area.height / 2 } : { x: r.width / 2, y: r.height / 2 };
-    let next;
-    if (event.key === "+" || event.key === "=") next = zoomCameraAt(getCamera(), center2, 1.25, options);
-    else if (event.key === "-") next = zoomCameraAt(getCamera(), center2, 0.8, options);
-    else if (event.key === "0") next = createCamera({}, options);
-    else if (event.key === "ArrowLeft") next = panCamera(getCamera(), 48, 0);
-    else if (event.key === "ArrowRight") next = panCamera(getCamera(), -48, 0);
-    else if (event.key === "ArrowUp") next = panCamera(getCamera(), 0, 48);
-    else if (event.key === "ArrowDown") next = panCamera(getCamera(), 0, -48);
-    if (next) emit(next, "keyboard");
-  };
-  listen(element2, "pointerdown", down);
-  listen(pointerHost, "pointermove", move, { passive: false });
-  listen(pointerHost, "pointerup", up);
-  listen(pointerHost, "pointercancel", cancel);
-  listen(element2, "lostpointercapture", cancel);
-  listen(element2, "click", click, true);
-  listen(element2, "wheel", wheel, { passive: false });
-  listen(element2, "keydown", key);
-  return () => {
-    disposed = true;
-    points.clear();
-    gesture = null;
-    for (const id of [...captures]) release(id);
-    for (const remove of listeners) remove();
-  };
-}
-
 // src/canvas-prototype/motion.mjs
 function sampleTrack(track, offsets, progress) {
   if (progress <= 0) return { ...track[0] };
@@ -3260,13 +4813,13 @@ function sampleTrack(track, offsets, progress) {
   let i = 0;
   while (i < offsets.length - 2 && progress > offsets[i + 1]) i++;
   const t = (progress - offsets[i]) / (offsets[i + 1] - offsets[i]), a = track[i], b = track[i + 1], result = {};
-  for (const key of Object.keys(a)) {
-    if (typeof a[key] !== "number") {
-      result[key] = t < 0.5 ? a[key] : b[key];
+  for (const key2 of Object.keys(a)) {
+    if (typeof a[key2] !== "number") {
+      result[key2] = t < 0.5 ? a[key2] : b[key2];
       continue;
     }
     const derivative = (index) => {
-      const slope = (j) => (track[j + 1][key] - track[j][key]) / (offsets[j + 1] - offsets[j]);
+      const slope = (j) => (track[j + 1][key2] - track[j][key2]) / (offsets[j + 1] - offsets[j]);
       if (index === 0) return slope(0);
       if (index === track.length - 1) return slope(index - 1);
       const left = slope(index - 1), right = slope(index);
@@ -3275,8 +4828,8 @@ function sampleTrack(track, offsets, progress) {
       return (w0 + w1) / (w0 / left + w1 / right);
     };
     const width = offsets[i + 1] - offsets[i], m0 = derivative(i) * width, m1 = derivative(i + 1) * width;
-    const value = (2 * t ** 3 - 3 * t ** 2 + 1) * a[key] + (t ** 3 - 2 * t ** 2 + t) * m0 + (-2 * t ** 3 + 3 * t ** 2) * b[key] + (t ** 3 - t ** 2) * m1;
-    result[key] = Math.max(Math.min(a[key], b[key]), Math.min(Math.max(a[key], b[key]), value));
+    const value = (2 * t ** 3 - 3 * t ** 2 + 1) * a[key2] + (t ** 3 - 2 * t ** 2 + t) * m0 + (-2 * t ** 3 + 3 * t ** 2) * b[key2] + (t ** 3 - t ** 2) * m1;
+    result[key2] = Math.max(Math.min(a[key2], b[key2]), Math.min(Math.max(a[key2], b[key2]), value));
   }
   return result;
 }
@@ -3316,10 +4869,10 @@ function samplePolyline(points, count = 20) {
   for (let i = 1; i < points.length; i++) lengths.push(lengths.at(-1) + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
   const total = lengths.at(-1);
   return Array.from({ length: count }, (_, i) => {
-    const distance2 = total * i / (count - 1);
+    const distance3 = total * i / (count - 1);
     let j = 1;
-    while (j < lengths.length - 1 && lengths[j] < distance2) j++;
-    const amount = (distance2 - lengths[j - 1]) / (lengths[j] - lengths[j - 1] || 1);
+    while (j < lengths.length - 1 && lengths[j] < distance3) j++;
+    const amount = (distance3 - lengths[j - 1]) / (lengths[j] - lengths[j - 1] || 1);
     return { x: points[j - 1].x + (points[j].x - points[j - 1].x) * amount, y: points[j - 1].y + (points[j].y - points[j - 1].y) * amount };
   });
 }
@@ -3330,7 +4883,7 @@ function visibleTrackKeys(frames, collection) {
 // src/canvas-prototype/journey-camera.mjs
 var clamp4 = (value, min, max2) => Math.max(min, Math.min(max2, value));
 var validNode = (node) => node && (node.opacity ?? 1) > 0 && [node.x, node.y, node.width, node.height].every(Number.isFinite) && node.width >= 0 && node.height >= 0;
-var identity2 = (node) => node.semanticId ?? node.key ?? node.id;
+var identity3 = (node) => node.semanticId ?? node.key ?? node.id;
 function boundsFor(nodes) {
   if (!nodes.length) return null;
   const x = Math.min(...nodes.map((n) => n.x)), y = Math.min(...nodes.map((n) => n.y));
@@ -3343,7 +4896,7 @@ function frameArea(frame2) {
 }
 function focusNode(frame2, nodes) {
   const focus = frame2.focus ?? frame2.view?.focus;
-  return nodes.find((n) => identity2(n) === focus || n.id === focus || n.key === focus);
+  return nodes.find((n) => identity3(n) === focus || n.id === focus || n.key === focus);
 }
 function viewpoint(frame2, nodes, { maximumScale = 0.78, padding = 24 } = {}) {
   const area = frameArea(frame2), bounds2 = boundsFor(nodes);
@@ -3373,9 +4926,9 @@ function journeyCameraTrack(frames, { initialCamera = createCamera(), finalCamer
     add(0, start2, "source", 0);
     if (frames.length > 2) {
       const routeIds = /* @__PURE__ */ new Set();
-      for (const frame2 of frames.slice(1, -1)) for (const node of frame2.nodes ?? []) if (validNode(node) && !node.context) routeIds.add(identity2(node));
+      for (const frame2 of frames.slice(1, -1)) for (const node of frame2.nodes ?? []) if (validNode(node) && !node.context) routeIds.add(identity3(node));
       const source = frames[0], sourceNodes = (source.nodes ?? []).filter(validNode), focus = focusNode(source, sourceNodes);
-      const openingNodes = sourceNodes.filter((node) => routeIds.has(identity2(node)) || node === focus);
+      const openingNodes = sourceNodes.filter((node) => routeIds.has(identity3(node)) || node === focus);
       if (openingNodes.length) add(Math.min(0.1, times[1] * 0.5), viewpoint(source, openingNodes, { maximumScale: 0.82 }), "open-route", 0);
       for (let index = 1; index < frames.length - 1; index++) {
         const frame2 = frames[index], nodes = (frame2.nodes ?? []).filter((node) => validNode(node) && !node.context);
@@ -3417,377 +4970,16 @@ function measureCard(document2, node, detail) {
   const card = document2.createElement("div");
   card.className = "node";
   card.style.cssText = `position:fixed;left:-10000px;top:0;visibility:hidden;width:${width}px;height:auto;transform:none;`;
-  for (const [className, text] of [["kind", `\xAB${node.kind}\xBB${node.displayID ? " " + node.displayID : ""}${node.type ? " : " + node.type : ""}`], ["name", (node.name?.split("::").at(-1) || node.kind).replace(/([a-z0-9])([A-Z])/g, "$1\u200B$2")], ...detail ? [["detail", detail]] : []]) {
+  for (const [className, text2] of [["kind", `\xAB${node.kind}\xBB${node.displayID ? " " + node.displayID : ""}${node.type ? " : " + node.type : ""}`], ["name", (node.name?.split("::").at(-1) || node.kind).replace(/([a-z0-9])([A-Z])/g, "$1\u200B$2")], ...detail ? [["detail", detail]] : [], ...node.overviewLabel ? [["prominence", node.overviewLabel]] : []]) {
     const part = document2.createElement("span");
     part.className = className;
-    part.textContent = text;
+    part.textContent = text2;
     card.append(part);
   }
   document2.body.append(card);
   const height = Math.max(76, Math.ceil(card.getBoundingClientRect().height), card.scrollHeight);
   card.remove();
   return { width, height };
-}
-
-// src/canvas-prototype/elk-layout.mjs
-var import_elk_api = __toESM(require_elk_api(), 1);
-var createLayoutEngine = (options) => new import_elk_api.default({ algorithms: ["layered"], ...options });
-var behavioralKinds = /* @__PURE__ */ new Set(["action", "activity", "state"]);
-var sizes = /* @__PURE__ */ new Map([["initial", [28, 28]], ["final", [32, 32]], ["fork", [80, 8]], ["join", [80, 8]], ["decision", [44, 44]], ["merge", [44, 44]], ["start", [28, 28]], ["end", [32, 32]]]);
-var overlap3 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
-var segmentHits = (a, b, n) => a.x === b.x ? a.x > n.x + 0.01 && a.x < n.x + n.width - 0.01 && Math.max(a.y, b.y) > n.y + 0.01 && Math.min(a.y, b.y) < n.y + n.height - 0.01 : a.y === b.y && a.y > n.y + 0.01 && a.y < n.y + n.height - 0.01 && Math.max(a.x, b.x) > n.x + 0.01 && Math.min(a.x, b.x) < n.x + n.width - 0.01;
-var simplify3 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, all) => !i || i === all.length - 1 || !(all[i - 1].x === p.x && p.x === all[i + 1].x || all[i - 1].y === p.y && p.y === all[i + 1].y));
-var num = (value, fallback) => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
-function dimensions(node) {
-  const symbol = sizes.get(node.kind);
-  return { width: symbol?.[0] ?? num(node.width, 160), height: symbol?.[1] ?? num(node.height, 76) };
-}
-function isPort(node, nodes) {
-  return node.kind === "port" && nodes.has(node.parentId);
-}
-function projectEmbeddedPorts(view) {
-  const nodes = [...view.nodes], attachments = /* @__PURE__ */ new Map(), usedIDs = new Set(nodes.map((n) => n.id));
-  for (const owner of view.nodes) for (const port of owner.ports ?? []) {
-    if (typeof port.id !== "string" || !port.id) throw Error("Native embedded port lacks a rendering ID");
-    const key = JSON.stringify([owner.id, port.id]);
-    if (attachments.has(key)) throw Error("Duplicate native port on " + owner.id + ": " + port.id);
-    let id = "syspresent-native-port:" + key;
-    while (usedIDs.has(id)) id += ":";
-    usedIDs.add(id);
-    attachments.set(key, id);
-    const name = port.nameSynthesized ? "" : port.name ?? "", label2 = port.type ? name + " : " + port.type : name;
-    nodes.push({ id, kind: "port", name, label: label2, parentId: owner.id, width: 12, height: 12, semanticId: null, identityStatus: "modeled-pin", nativePortId: port.id, nativePort: structuredClone(port), direction: port.direction, parameter: port.parameter, origin: structuredClone(port.origin ?? null) });
-  }
-  const edges = view.edges.map((edge) => {
-    const result = { ...edge };
-    for (const [endpoint3, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
-      const pin = edge[field] ?? edge[field === "fromPort" ? "from_port" : "to_port"];
-      if (!pin) continue;
-      const id = attachments.get(JSON.stringify([edge[endpoint3], pin]));
-      if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint3]);
-      result[attachment] = id;
-    }
-    return result;
-  });
-  return { ...view, nodes, edges };
-}
-function orientation(edge, behavioral, viewKind) {
-  return !behavioral && edgeLayoutHints(edge, { viewKind }).rank === "target-above-source" ? [edge.target, edge.source, true] : [edge.source, edge.target, false];
-}
-function partitions(nodes, edges, capacity) {
-  const ranks = new Map(nodes.map((n) => [n.id, 0]));
-  for (let i = 0; i < nodes.length; i++) {
-    let changed = false;
-    for (const [a, b] of edges) {
-      if (a !== b && ranks.has(a) && ranks.has(b) && ranks.get(b) <= ranks.get(a)) {
-        ranks.set(b, ranks.get(a) + 1);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-    if (i === nodes.length - 1) return null;
-  }
-  const groups = /* @__PURE__ */ new Map();
-  for (const node of nodes) {
-    const rank = ranks.get(node.id);
-    if (!groups.has(rank)) groups.set(rank, []);
-    groups.get(rank).push(node);
-  }
-  const result = /* @__PURE__ */ new Map();
-  let row = 0;
-  for (const [, group] of [...groups].sort((a, b) => a[0] - b[0])) {
-    group.sort((a, b) => a.id.localeCompare(b.id));
-    for (let i = 0; i < group.length; i++) result.set(group[i].id, row + Math.floor(i / capacity));
-    row += Math.ceil(group.length / capacity);
-  }
-  return result;
-}
-function makeGraph(view, options, profile) {
-  const nodes = new Map(view.nodes.map((n) => [n.id, n])), behavioral = behavioralKinds.has(view.kind), actualPorts = new Set(view.nodes.filter((n) => isPort(n, nodes)).map((n) => n.id)), children = new Map(view.nodes.map((n) => [n.id, []]));
-  for (const node of view.nodes) if (node.parentId && nodes.has(node.parentId) && !actualPorts.has(node.id)) children.get(node.parentId).push(node.id);
-  const roots = view.nodes.filter((n) => !actualPorts.has(n.id) && (!n.parentId || !nodes.has(n.parentId)));
-  if (options.grouping === "owner" && !behavioral) roots.sort((a, b) => String(a.layoutGroup || a.id).localeCompare(String(b.layoutGroup || b.id)) || a.id.localeCompare(b.id));
-  const rootOf = (id) => {
-    let node = nodes.get(id), seen = /* @__PURE__ */ new Set();
-    while (node?.parentId && nodes.has(node.parentId)) {
-      if (seen.has(node.id)) throw Error("Cyclic native drawing containment");
-      seen.add(node.id);
-      node = nodes.get(node.parentId);
-    }
-    return node?.id;
-  };
-  const rows = profile.capacity ? partitions(roots, view.edges.filter((e) => edgeLayoutHints(e, { viewKind: view.kind }).rank !== "free").map((e) => {
-    const [a, b] = orientation(e, behavioral, view.kind);
-    return [rootOf(a), rootOf(b)];
-  }), profile.capacity) : null;
-  const elkNodes = /* @__PURE__ */ new Map(), anchors = /* @__PURE__ */ new Map(), edgeMap = /* @__PURE__ */ new Map(), gap = profile.gap;
-  function build(node) {
-    const { width, height } = dimensions(node), nested = children.get(node.id), result = { id: node.id, width, height, children: nested.map((id) => build(nodes.get(id))), ports: [], layoutOptions: { "elk.portConstraints": "FIXED_SIDE", "elk.portLabels.placement": "[OUTSIDE]", "elk.padding": `[top=${height + 20},left=24,bottom=24,right=24]` } };
-    if (!nested.length) delete result.children;
-    if (rows?.has(node.id)) result.layoutOptions["elk.partitioning.partition"] = String(rows.get(node.id));
-    elkNodes.set(node.id, result);
-    return result;
-  }
-  const graph = { id: "syspresent-layout-root", children: roots.map(build), edges: [], layoutOptions: {
-    "elk.algorithm": "layered",
-    "elk.direction": "DOWN",
-    "elk.edgeRouting": "ORTHOGONAL",
-    "elk.hierarchyHandling": "INCLUDE_CHILDREN",
-    "elk.randomSeed": "1",
-    "elk.padding": "[top=12,left=12,bottom=12,right=12]",
-    "elk.spacing.nodeNode": String(gap),
-    "elk.spacing.edgeEdge": "12",
-    "elk.spacing.edgeNode": "12",
-    "elk.spacing.labelNode": "8",
-    "elk.spacing.edgeLabel": "7",
-    "elk.layered.spacing.nodeNodeBetweenLayers": String(gap),
-    "elk.layered.spacing.edgeEdgeBetweenLayers": "12",
-    "elk.layered.spacing.edgeNodeBetweenLayers": "12",
-    "elk.layered.mergeEdges": "false",
-    "elk.layered.mergeHierarchyEdges": "false",
-    "elk.layered.unnecessaryBendpoints": "true",
-    "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-    "elk.layered.nodePlacement.strategy": profile.capacity ? "SIMPLE" : "BRANDES_KOEPF",
-    ...profile.balanced ? { "elk.layered.nodePlacement.favorStraightEdges": "false", "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED" } : {},
-    ...rows ? { "elk.partitioning.activate": "true" } : {},
-    ...options.grouping === "owner" && !behavioral ? { "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES" } : {}
-  } };
-  for (const native of view.nodes.filter((n) => actualPorts.has(n.id))) {
-    const owner = elkNodes.get(native.parentId), incoming = view.edges.find((e) => (e.sourceAttachment ?? e.source) === native.id || (e.targetAttachment ?? e.target) === native.id), specified = String(native.portSide ?? native.side ?? "").toUpperCase();
-    const side = ["NORTH", "SOUTH", "EAST", "WEST"].includes(specified) ? specified : (incoming?.sourceAttachment ?? incoming?.source) === native.id ? "SOUTH" : "NORTH";
-    const text = native.label ?? native.name, label2 = text ? options.measureLabel?.(text) ?? { width: String(text).length * 6.5, height: 16 } : null;
-    owner.ports.push({ id: native.id, width: num(native.width, 12), height: num(native.height, 12), ...label2 ? { labels: [{ id: native.id + ":port-label", text, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {}, layoutOptions: { "elk.port.side": side, "elk.port.borderOffset": String(-Math.min(num(native.width, 12), num(native.height, 12)) / 2) } });
-    anchors.set(native.id, { identityStatus: native.semanticId ? "actual-model-port" : "modeled-pin", semanticId: native.semanticId ?? null, representationId: native.id, ownerId: native.parentId, ...native.nativePortId ? { nativePortId: native.nativePortId, nativePort: structuredClone(native.nativePort) } : {} });
-  }
-  function anchor(id, edgeId, side, preferredSide) {
-    if (actualPorts.has(id)) return id;
-    const portId = `syspresent-anchor:${edgeId}:${side}`, owner = elkNodes.get(id);
-    if (!owner) throw Error("Native endpoint has no drawing owner: " + id);
-    owner.ports.push({ id: portId, width: 0, height: 0, layoutOptions: { "elk.port.side": preferredSide ?? (side === "source" ? "SOUTH" : "NORTH") } });
-    anchors.set(portId, { identityStatus: "drawing-anchor", semanticId: null, representationId: null, ownerId: id });
-    return portId;
-  }
-  for (const [i, edge] of [...view.edges].sort((a, b) => a.id.localeCompare(b.id)).entries()) {
-    const [source, target, reversed] = orientation(edge, behavioral, view.kind), id = `syspresent-edge:${i}`, label2 = edge.label ? options.measureLabel?.(edge.label) ?? { width: String(edge.label).length * 7.2 + 4, height: 16 } : null;
-    const sourcePin = reversed ? edge.targetAttachment : edge.sourceAttachment, targetPin = reversed ? edge.sourceAttachment : edge.targetAttachment, sides = profile.anchorSides?.get(edge.id);
-    graph.edges.push({ id, sources: [anchor(sourcePin ?? source, id, "source", sides?.[0])], targets: [anchor(targetPin ?? target, id, "target", sides?.[1])], ...label2 ? { labels: [{ id: id + ":label", text: edge.label, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {} });
-    edgeMap.set(id, { edge, reversed });
-  }
-  return { graph, nodes, children, actualPorts, anchors, edgeMap };
-}
-function readLayout(view, data, laid, options, profile) {
-  const positions = /* @__PURE__ */ new Map(), routes = /* @__PURE__ */ new Map(), diagnostics = [], ports = [], nativeRoutes = [];
-  function walk(item, ox = 0, oy = 0) {
-    const x = ox + (item.x ?? 0), y = oy + (item.y ?? 0);
-    if (data.nodes.has(item.id)) {
-      const native = data.nodes.get(item.id);
-      positions.set(item.id, { ...native, x, y, width: item.width, height: item.height, ...item.children?.length ? { headerHeight: dimensions(native).height } : {} });
-    }
-    for (const port of item.ports ?? []) {
-      const anchor = data.anchors.get(port.id), position = { ...anchor, id: port.id, x: x + port.x + port.width / 2, y: y + port.y + port.height / 2, side: port.layoutOptions?.["elk.port.side"] };
-      ports.push(position);
-      if (data.actualPorts.has(port.id)) {
-        const native = data.nodes.get(port.id), label2 = port.labels?.[0], portLabelBox = label2 ? { x: x + port.x + label2.x, y: y + port.y + label2.y, width: label2.width, height: label2.height } : null;
-        positions.set(port.id, { ...native, portSide: port.layoutOptions?.["elk.port.side"], x: x + port.x, y: y + port.y, width: port.width, height: port.height, ...portLabelBox ? { portLabelBox } : {} });
-        position.portLabelBox = portLabelBox;
-      }
-    }
-    for (const edge of item.edges ?? []) nativeRoutes.push({ edge, x, y });
-    for (const child of item.children ?? []) walk(child, x, y);
-  }
-  walk(laid);
-  for (const record of nativeRoutes) {
-    const { edge } = record, native = data.edgeMap.get(edge.id);
-    if (!native) continue;
-    const container = positions.get(edge.container), x = container?.x ?? record.x, y = container?.y ?? record.y;
-    const points = simplify3((edge.sections ?? []).flatMap((s) => [s.startPoint, ...s.bendPoints ?? [], s.endPoint]).map((p) => ({ x: p.x + x, y: p.y + y })));
-    const label2 = edge.labels?.[0], labelBox = label2 ? { x: label2.x + x, y: label2.y + y, width: label2.width, height: label2.height } : void 0;
-    const first = data.anchors.get(edge.sources?.[0]), last = data.anchors.get(edge.targets?.[0]);
-    routes.set(native.edge.id, { ...native.edge, points: native.reversed ? [...points].reverse() : points, ...labelBox ? { labelBox, x: labelBox.x, y: labelBox.y + labelBox.height * 0.78 } : {}, sourceAnchor: native.reversed ? last : first, targetAnchor: native.reversed ? first : last, routingEngine: "elk-layered" });
-  }
-  const nodes = view.nodes.map((n) => positions.get(n.id)).filter(Boolean);
-  if (!behavioralKinds.has(view.kind) && nodes.length <= 24 && !nodes.some((n) => n.parentId)) optimizeRoutes([...routes.values()], nodes);
-  const ancestors = (id) => {
-    const result = /* @__PURE__ */ new Set();
-    let node = data.nodes.get(id);
-    while (node?.parentId && data.nodes.has(node.parentId)) {
-      if (result.has(node.parentId)) throw Error("Cyclic native drawing containment");
-      result.add(node.parentId);
-      node = data.nodes.get(node.parentId);
-    }
-    return result;
-  };
-  if (nodes.length !== view.nodes.length || nodes.some((n) => ![n.x, n.y, n.width, n.height].every(Number.isFinite))) throw Error("ELK returned invalid tile geometry");
-  const edges = view.edges.map((native) => {
-    const edge = routes.get(native.id) ?? { ...native, points: [] }, anc = /* @__PURE__ */ new Set([...ancestors(native.sourceAttachment ?? native.source), ...ancestors(native.targetAttachment ?? native.target)]);
-    const obstacles = nodes.flatMap((n) => data.children.get(n.id)?.length ? anc.has(n.id) ? [{ ...n, height: n.headerHeight }] : [n] : data.actualPorts.has(n.id) && [native.sourceAttachment ?? native.source, native.targetAttachment ?? native.target].includes(n.id) ? [] : [n]);
-    const blocked = edge.points.length < 2 || edge.points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y)) || edge.points.slice(1).some((point, i) => obstacles.some((n) => segmentHits(edge.points[i], point, n)));
-    if (blocked) {
-      diagnostics.push({ reason: "unroutable-connection", relationshipId: native.id, message: "No unobstructed native connection route was found." });
-      edge.points = [];
-      edge.routingBlocked = true;
-    }
-    if (edge.labelBox && (![edge.labelBox.x, edge.labelBox.y, edge.labelBox.width, edge.labelBox.height].every(Number.isFinite) || obstacles.some((n) => overlap3(edge.labelBox, n, 2)))) {
-      delete edge.labelBox;
-      edge.labelOmitted = true;
-      diagnostics.push({ reason: "unplaceable-connection-label", relationshipId: native.id });
-    }
-    return edge;
-  });
-  for (let i = 0; i < edges.length; i++) for (let j = 0; j < i; j++) if (edges[i].labelBox && edges[j].labelBox && overlap3(edges[i].labelBox, edges[j].labelBox, 2)) {
-    delete edges[i].labelBox;
-    edges[i].labelOmitted = true;
-    diagnostics.push({ reason: "unplaceable-connection-label", relationshipId: edges[i].id });
-  }
-  return { ...view, nodes, edges, ports, diagnostics, omissions: [...view.omissions ?? [], ...diagnostics], bounds: { x: 0, y: 0, width: laid.width, height: laid.height }, layoutEngine: "elk-layered", layoutProfile: (profile.capacity ? "responsive-partitions-" + profile.capacity : "layered") + (profile.anchorSides ? "-facing-sides" : "") + (profile.balanced ? "-balanced" : ""), panels: structuredClone(options.panels ?? []) };
-}
-async function layoutDiagram(nativeView, options = {}) {
-  const { width = 1e3, height = 700, elk } = options;
-  if (!elk?.layout) throw Error("layoutDiagram requires an ELK engine");
-  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) throw Error("Invalid viewport");
-  const view = projectEmbeddedPorts(projectView(nativeView)), area = options.panels?.length ? graphArea(width, height, options.panels) : { width, height };
-  if (!view.nodes.length) return { ...view, nodes: [], edges: [], ports: [], diagnostics: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered" };
-  const rootCount = view.nodes.filter((n) => !n.parentId).length, behavioral = behavioralKinds.has(view.kind), profiles2 = [{ gap: 32 }];
-  if (!behavioral && rootCount > 2 && area.width < 700) for (const capacity of [2, 1]) profiles2.push({ gap: 28, capacity });
-  if (!behavioral && rootCount >= 3 && rootCount <= 9 && requirementFanout(view)) profiles2.push({ gap: 32, balanced: true });
-  const candidates = [];
-  for (const profile of profiles2) {
-    try {
-      const data = makeGraph(view, options, profile), laid = await elk.layout(data.graph), candidate = readLayout(view, data, laid, options, profile);
-      scoreLayout(candidate, area);
-      candidates.push(candidate);
-      let previous = candidate;
-      const seen = /* @__PURE__ */ new Set();
-      for (let retry = 0; !behavioral && profile.capacity && retry < 3; retry++) {
-        const anchorSides = facingSides(previous);
-        if (!anchorSides.size) break;
-        const key = JSON.stringify([...anchorSides]);
-        if (seen.has(key)) break;
-        seen.add(key);
-        const alternate = { ...profile, anchorSides }, joint = makeGraph(view, options, alternate), result = readLayout(view, joint, await elk.layout(joint.graph), options, alternate);
-        scoreLayout(result, area);
-        candidates.push(result);
-        previous = result;
-      }
-    } catch (error) {
-      candidates.push({ ...view, nodes: [], edges: view.edges.map((e) => ({ ...e, points: [], routingBlocked: true })), ports: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered", layoutScore: 1e9, diagnostics: [{ reason: "layout-failed", message: error.message }] });
-    }
-  }
-  candidates.sort((a, b) => a.layoutScore - b.layoutScore);
-  if (!candidates.some((candidate) => candidate.nodes.length)) throw Error(candidates[0]?.diagnostics[0]?.message ?? "ELK could not lay out the native diagram");
-  return candidates[0];
-}
-function requirementFanout(view) {
-  if (!["requirement", "definition", "general"].includes(view.kind) || view.nodes.some((n) => n.parentId) || view.edges.length !== view.nodes.length - 1) return false;
-  const oriented = view.edges.map((edge) => edgeLayoutHints(edge, { viewKind: view.kind }).rank === "target-above-source" ? orientation(edge, false, view.kind) : null);
-  return oriented.every(Boolean) && oriented.every(([source]) => source === oriented[0][0]) && new Set(oriented.map(([, target]) => target)).size === view.nodes.length - 1;
-}
-function facingSides(view) {
-  const nodes = new Map(view.nodes.map((n) => [n.id, n])), sides = /* @__PURE__ */ new Map();
-  for (const edge of view.edges) {
-    if (edgeLayoutHints(edge, { viewKind: view.kind }).rank === "free") continue;
-    const [from, to] = orientation(edge, false, view.kind), a = nodes.get(from), b = nodes.get(to);
-    if (!a || !b || a.parentId || b.parentId || a.kind === "port" || b.kind === "port") continue;
-    if (!view.nodes.some((n) => n !== a && n !== b && !n.parentId && n.y >= a.y + a.height - 0.01 && n.y + n.height <= b.y + 0.01)) continue;
-    const side = b.x + b.width / 2 < a.x + a.width / 2 ? "WEST" : "EAST";
-    sides.set(edge.id, [side, side]);
-  }
-  return sides;
-}
-function scoreLayout(candidate, area) {
-  let length2 = 0, bends = 0, stretch = 0, crossings = 0;
-  for (const edge of candidate.edges) {
-    const points = edge.points;
-    let route2 = 0;
-    for (let i = 1; i < points.length; i++) route2 += Math.abs(points[i].x - points[i - 1].x) + Math.abs(points[i].y - points[i - 1].y);
-    length2 += route2;
-    bends += Math.max(0, points.length - 2);
-    if (points.length > 1) {
-      const direct = Math.abs(points[0].x - points.at(-1).x) + Math.abs(points[0].y - points.at(-1).y);
-      stretch += Math.max(0, route2 / Math.max(1, direct) - 1);
-    }
-  }
-  for (let i = 0; i < candidate.edges.length; i++) for (let j = 0; j < i; j++) {
-    const a = candidate.edges[i].points, b = candidate.edges[j].points;
-    for (let ai = 1; ai < a.length; ai++) for (let bi = 1; bi < b.length; bi++) {
-      const aa = a[ai - 1], ab = a[ai], ba = b[bi - 1], bb = b[bi], horizontal = aa.y === ab.y, otherHorizontal = ba.y === bb.y;
-      if (horizontal === otherHorizontal) continue;
-      const h = horizontal ? [aa, ab] : [ba, bb], v = horizontal ? [ba, bb] : [aa, ab];
-      if (v[0].x > Math.min(h[0].x, h[1].x) + 0.01 && v[0].x < Math.max(h[0].x, h[1].x) - 0.01 && h[0].y > Math.min(v[0].y, v[1].y) + 0.01 && h[0].y < Math.max(v[0].y, v[1].y) - 0.01) crossings++;
-    }
-  }
-  const occupied = [...candidate.nodes, ...candidate.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], minX = Math.min(...occupied.map((n) => n.x)), minY = Math.min(...occupied.map((n) => n.y)), maxX = Math.max(...occupied.map((n) => n.x + n.width)), maxY = Math.max(...occupied.map((n) => n.y + n.height));
-  candidate.bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-  const scale = Math.min(1, area.width / (candidate.bounds.width + 20), area.height / (candidate.bounds.height + 20));
-  candidate.layoutFitScale = scale;
-  const extent = candidate.nodes.reduce((sum, n) => sum + n.width + n.height, 0);
-  candidate.layoutMetrics = { pathLength: length2, bends, pathStretch: stretch, crossings };
-  candidate.layoutScore = candidate.diagnostics.length * 1e4 + 3 / Math.max(0.01, scale) + length2 / Math.max(1, extent) * 0.45 + stretch * 0.3 + bends * 0.05 + crossings * 0.6 + candidate.bounds.width * candidate.bounds.height / 1e8;
-}
-function optimizeRoutes(edges, nodes) {
-  const inflated = (n, padding) => ({ x: n.x - padding, y: n.y - padding, width: n.width + padding * 2, height: n.height + padding * 2 });
-  const tileObstacles = nodes.map((n) => inflated(n, 4)), settled = [];
-  for (const edge of [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
-    const original = edge.points;
-    if (original.length < 2) continue;
-    const obstacles = [...tileObstacles, ...edges.flatMap((other) => other !== edge && other.labelBox ? [inflated(other.labelBox, 3)] : [])];
-    const start2 = original[0], end = original.at(-1), normal = (from, to) => ({ x: Math.sign(to.x - from.x), y: Math.sign(to.y - from.y) }), a = normal(start2, original[1]), b = normal(end, original.at(-2));
-    if (a.x && a.y || b.x && b.y) continue;
-    const stub = { x: start2.x + a.x * 8, y: start2.y + a.y * 8 }, finish = { x: end.x + b.x * 8, y: end.y + b.y * 8 };
-    const middle = routeOrthogonal(stub, finish, obstacles, { bendPenalty: 24, segmentCost: (from, to) => {
-      let cost = 0;
-      for (const points of settled) for (let i = 1; i < points.length; i++) {
-        const a2 = points[i - 1], b3 = points[i];
-        if (from.y === to.y && a2.y === b3.y && from.y === a2.y) cost += Math.max(0, Math.min(Math.max(from.x, to.x), Math.max(a2.x, b3.x)) - Math.max(Math.min(from.x, to.x), Math.min(a2.x, b3.x))) * 4;
-        else if (from.x === to.x && a2.x === b3.x && from.x === a2.x) cost += Math.max(0, Math.min(Math.max(from.y, to.y), Math.max(a2.y, b3.y)) - Math.max(Math.min(from.y, to.y), Math.min(a2.y, b3.y))) * 4;
-        else {
-          const h = from.y === to.y ? [from, to] : [a2, b3], v = from.x === to.x ? [from, to] : [a2, b3];
-          if (h[0].y === h[1].y && v[0].x === v[1].x && v[0].x > Math.min(h[0].x, h[1].x) && v[0].x < Math.max(h[0].x, h[1].x) && h[0].y > Math.min(v[0].y, v[1].y) && h[0].y < Math.max(v[0].y, v[1].y)) cost += 80;
-        }
-      }
-      return cost;
-    } });
-    if (middle) {
-      const points = simplify3([start2, ...middle, end]), length2 = (ps) => ps.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - ps[i].x) + Math.abs(p.y - ps[i].y), 0);
-      if (length2(points) + Math.max(0, points.length - 2) * 24 < length2(original) + Math.max(0, original.length - 2) * 24) edge.points = points;
-    }
-    if (!relocateLabels([edge], nodes, edges)) edge.points = original;
-    settled.push(edge.points);
-  }
-}
-function relocateLabels(edges, nodes, allEdges = edges) {
-  const distance2 = (box, points) => {
-    const center2 = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    return Math.min(...points.slice(1).map((b, i) => {
-      const a = points[i];
-      return a.x === b.x ? Math.hypot(center2.x - a.x, center2.y - Math.max(Math.min(a.y, b.y), Math.min(Math.max(a.y, b.y), center2.y))) : Math.hypot(center2.y - a.y, center2.x - Math.max(Math.min(a.x, b.x), Math.min(Math.max(a.x, b.x), center2.x)));
-    }));
-  };
-  for (const edge of edges) {
-    const box = edge.labelBox;
-    if (!box) continue;
-    const crossed = edge.points.slice(1).some((p, i) => segmentHits(edge.points[i], p, box));
-    const left = Math.min(...nodes.map((n) => n.x)), right = Math.max(...nodes.map((n) => n.x + n.width));
-    if (!crossed && box.x >= left && box.x + box.width <= right && distance2(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
-    const candidates = [];
-    for (let i = 1; i < edge.points.length; i++) {
-      const a = edge.points[i - 1], b = edge.points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-      for (const t of [0.5, 0.25, 0.75]) {
-        const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-        if (a.y === b.y) candidates.push({ ...box, x: x - box.width / 2, y: y - box.height - 5, score: length2 }, { ...box, x: x - box.width / 2, y: y + 5, score: length2 - 1 });
-        else candidates.push({ ...box, x: x + 5, y: y - box.height / 2, score: length2 }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length2 - 1 });
-      }
-    }
-    const labelScore = (candidate) => candidate.score - 12 * (Math.max(0, left - candidate.x) + Math.max(0, candidate.x + candidate.width - right));
-    const replacement = candidates.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap3(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap3(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
-    if (replacement) {
-      delete replacement.score;
-      edge.labelBox = replacement;
-      edge.x = replacement.x;
-      edge.y = replacement.y + replacement.height * 0.78;
-    } else return false;
-  }
-  return true;
 }
 
 // src/canvas-prototype/engine/client.mjs
@@ -3843,19 +5035,29 @@ function createSemanticEngine({ assetBase, assetVersion, workerURL = new URL("./
 // src/canvas-prototype/app.mjs
 var buildVersion = document.querySelector('meta[name="syspresent-build"]')?.content || "development";
 var $ = (id) => document.getElementById(id);
-var el = (name, text, cls) => {
+var el = (name, text2, cls) => {
   const e = document.createElement(name);
-  if (text !== void 0) e.textContent = text;
+  if (text2 !== void 0) e.textContent = text2;
   if (cls) e.className = cls;
   return e;
 };
-var button = (text, fn) => {
-  const e = el("button", text);
+var button = (text2, fn) => {
+  const e = el("button", text2);
   e.type = "button";
   e.onclick = () => Promise.resolve(fn()).catch(report);
   return e;
 };
 var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [], future: [], presentation: {}, traceRequest: null, camera: createCamera(), cameraRevision: 0, neighborhoodBudget: null };
+try {
+  state.reader = loadReaderSettings(localStorage);
+} catch {
+  state.reader = loadReaderSettings(null);
+}
+state.surfaceStates = {};
+state.surfaces = [];
+state.selectedIds = [];
+state.comparison = null;
+state.activeRegion = "primary";
 var report = (error) => {
   const message = error.message || String(error);
   $("status").textContent = message;
@@ -3867,7 +5069,16 @@ var report = (error) => {
   }
   console.error(error);
 };
-var element = (id) => state.graph?.elements.find((e) => e.id === id);
+var elementIndexes = /* @__PURE__ */ new WeakMap();
+function element(id) {
+  if (!state.graph) return;
+  let index = elementIndexes.get(state.graph);
+  if (!index) {
+    index = new Map(state.graph.elements.map((e) => [e.id, e]));
+    elementIndexes.set(state.graph, index);
+  }
+  return index.get(id);
+}
 var label = (id) => element(id)?.name || id;
 function resolveInGraph(graph, value) {
   const exact = graph?.elements.find((e) => e.id === value);
@@ -3883,21 +5094,21 @@ function scopeIds() {
   const roots = state.project.manifest.systemOfInterest;
   return state.graph.elements.filter((e) => roots.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id);
 }
-function status(text) {
-  $("status").textContent = text;
-  $("loading-phase").textContent = text;
-  if (!$("landing").hidden) $("landing-status").textContent = text;
+function status(text2) {
+  $("status").textContent = text2;
+  $("loading-phase").textContent = text2;
+  if (!$("landing").hidden) $("landing-status").textContent = text2;
 }
-function inline(parent, text) {
+function inline(parent, text2) {
   let start2 = 0;
-  for (const m of text.matchAll(/\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g)) {
-    parent.append(document.createTextNode(text.slice(start2, m.index)));
+  for (const m of text2.matchAll(/\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g)) {
+    parent.append(document.createTextNode(text2.slice(start2, m.index)));
     parent.append(el(m[1] ? "strong" : m[2] ? "code" : "em", m[1] ?? m[2] ?? m[3]));
     start2 = m.index + m[0].length;
   }
-  parent.append(document.createTextNode(text.slice(start2)));
+  parent.append(document.createTextNode(text2.slice(start2)));
 }
-function markdown(text) {
+function markdown(text2) {
   const host = el("div");
   let paragraph = [], list;
   const flush = () => {
@@ -3909,8 +5120,8 @@ function markdown(text) {
     }
     list = null;
   };
-  for (const line of text.split("\n")) {
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line), item = /^[-*]\s+(.+)$/.exec(line);
+  for (const line2 of text2.split("\n")) {
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line2), item = /^[-*]\s+(.+)$/.exec(line2);
     if (heading) {
       flush();
       host.append(el("h" + Math.min(6, Number(heading[1].length) + 1), heading[2]));
@@ -3923,8 +5134,8 @@ function markdown(text) {
       const li = el("li");
       inline(li, item[1]);
       list.append(li);
-    } else if (!line.trim()) flush();
-    else paragraph.push(line);
+    } else if (!line2.trim()) flush();
+    else paragraph.push(line2);
   }
   flush();
   return host;
@@ -4041,12 +5252,14 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
   const coverage = requireNativeIdentity(adaptNativeView(seeds.length ? cache?.coverage ?? await state.engine.call("RenderView", { modelHash: parsed.modelHash, view: runtimePackage + "::coverage", includeSemanticIdentity: true }) : { kind: "definition", nodes: [], edges: [] }, runtimePackage + "::coverage"));
   exported.elements = exported.elements.filter((e) => e.qualifiedName !== runtimePackage && !e.qualifiedName?.startsWith(runtimePackage + "::"));
   const availableViews = exported.elements.filter((e) => e["@type"] === "ViewUsage" && e.qualifiedName && e["sysx:sourceLine"]).map((e) => e.qualifiedName);
-  const needed = /* @__PURE__ */ new Set([...scenes.map((s) => s.view), ...m.entryView ? [m.entryView] : []]), views = /* @__PURE__ */ new Map();
+  const needed = /* @__PURE__ */ new Set([...scenes.flatMap((s) => [s.view, ...(s.regions ?? []).map((r) => r.view)]), ...m.entryView ? [m.entryView] : []]), views = /* @__PURE__ */ new Map();
   for (const name of needed) {
     if (!availableViews.includes(name)) throw Error("Native view does not resolve: " + name);
     progress("Preparing " + (scenes.find((s) => s.view === name)?.title || "model view") + "\u2026");
     const raw = cache?.views?.[name] ?? await state.engine.call("RenderView", { modelHash: parsed.modelHash, view: name, includeSemanticIdentity: true });
-    views.set(name, requireNativeIdentity(adaptNativeView(raw, name)));
+    const view = requireNativeIdentity(adaptNativeView(raw, name));
+    if (!supportsView(view)) throw Error("Unsupported native view kind: " + view.kind);
+    views.set(name, view);
   }
   if (!m.systemOfInterest.length) m.systemOfInterest = [...roots];
   const graph = modelGraph(exported.elements, [...views.values(), coverage]);
@@ -4063,6 +5276,7 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
     }
   }
   const scoped = graph.elements.filter((e) => project.manifest.systemOfInterest.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id);
+  for (const item of scenes) for (const region of item.regions ?? []) if (region.focus && !byName(region.focus)) throw Error(`Scene ${item.id}: region ${region.id} focus does not resolve`);
   for (let i = 1; i < scenes.length; i++) {
     const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: scoped, journey: b.journey?.map(byName) });
     if (b.journey?.length && !plan.route.found) throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);
@@ -4071,11 +5285,17 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
   if (m.entryFocus && !byName(m.entryFocus)) throw Error("Starting element does not resolve: " + m.entryFocus);
   return { project, modelHash: parsed.modelHash, exported, graph, views, scenes, coverage, availableViews };
 }
+var rankingScope;
+function prominenceScope() {
+  const roots = state.project.manifest.systemOfInterest.map(resolve).filter(Boolean), key2 = JSON.stringify(roots);
+  if (rankingScope?.graph !== state.graph || rankingScope.key !== key2) rankingScope = { graph: state.graph, key: key2, ids: nativeScopeIds(state.graph, roots) };
+  return rankingScope.ids;
+}
 function busy(value) {
   $("landing").setAttribute("aria-busy", String(value));
   for (const control of $("landing").querySelectorAll("button:not(#resume-model)")) control.disabled = value;
   $("loading").hidden = !value;
-  for (const id of ["previous", "next", "scenes", "standalone", "return", "fit", "show-neighborhood", "zoom-in", "zoom-out", "find-toggle", "edit"]) $(id).disabled = value;
+  for (const id of ["previous", "next", "scenes", "standalone", "return", "system-overview", "fit", "show-neighborhood", "zoom-in", "zoom-out", "find-toggle", "edit"]) $(id).disabled = value;
 }
 async function loadProject(project, { cacheHash = state.trustedCacheHash, loadToken } = {}) {
   const revision = loadToken ?? ++state.loadRevision;
@@ -4090,8 +5310,8 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
   try {
     await ensureEngine();
     if (revision !== state.loadRevision) return;
-    compiled = await compile(validateProject(project), { cacheHash, progress: (text) => {
-      if (revision === state.loadRevision) status(text);
+    compiled = await compile(validateProject(project), { cacheHash, progress: (text2) => {
+      if (revision === state.loadRevision) status(text2);
     } });
   } catch (error) {
     if (revision !== state.loadRevision) return;
@@ -4101,7 +5321,8 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
     throw error;
   }
   if (revision !== state.loadRevision) return;
-  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map(), neighborhoodBudget: null });
+  disposeSurfaces();
+  Object.assign(state, compiled, { sceneIndex: 0, selected: null, selectedIds: [], exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map(), neighborhoodBudget: null, surfaceStates: {}, comparison: null, activeRegion: "primary" });
   state.trustedCacheHash = cacheHash ?? null;
   showLanding(document, false);
   document.title = project.manifest.title + " \xB7 Syspresent";
@@ -4111,12 +5332,12 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
   $("editor-error").textContent = "";
   $("project-menu").open = false;
   if (state.scenes.length) await showScene(0, false);
-  else {
+  else if (project.manifest.entryView || project.manifest.entryFocus) {
     state.focus = resolve(project.manifest.entryFocus ?? project.manifest.systemOfInterest[0]);
     const entry = state.views.get(project.manifest.entryView);
     if (entry) await openExploration(entry, state.focus, { record: false });
     else await explore(state.focus);
-  }
+  } else await openSystemOverview({ record: false });
   status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
   $("boundary").textContent = project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 traversal stays within supplied model" : "Complete project \xB7 standalone exploration available";
 }
@@ -4166,13 +5387,13 @@ function panelGeometry(view = state.view) {
 }
 function sizeView(view, focus, { compact = false } = {}) {
   return { ...view, nodes: view.nodes.map((n) => {
-    const preferences = displayPreferences(), expanded = !state.collapsed.has(n.semanticId) && (state.expanded.has(n.semanticId) || preferences.compartments === "expanded"), requirement = preferences.compartments !== "compact" && !compact && n.kind === "requirement" && n.semanticId === focus && !state.collapsed.has(n.semanticId), documentation = documentationFor(state.graph, n.semanticId);
-    const detail = expanded || requirement ? documentation.text || n.detail || (expanded ? "No statement or documentation recorded." : "") : "";
+    const preferences = displayPreferences(), expanded = compartmentVisible(n, { mode: state.reader.compartments, focus, expanded: state.expanded, collapsed: state.collapsed }), documentation = documentationFor(state.graph, n.semanticId);
+    const detail = [...new Set([behaviorNodeDetail(n), ...expanded ? [documentation.text || n.detail] : []].filter(Boolean))].join("\n");
     const attribution = detail && documentation.text && documentation.source?.id !== n.semanticId ? `Statement from ${documentation.source.qualifiedName || documentation.source.name}
 ` : "";
     const displayDetail = attribution + detail;
     const displayID = element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "";
-    const measured = ["initial", "final", "fork", "join", "decision", "merge", "port"].includes(n.kind) ? {} : measureCard(document, { ...n, displayID }, displayDetail);
+    const measured = ["initial", "final", "fork", "join", "decision", "merge", "port"].includes(n.kind) && !n.overviewLabel ? {} : measureCard(document, { ...n, displayID }, displayDetail);
     return { ...n, ...measured, layoutGroup: preferences.grouping === "owner" ? element(n.semanticId)?.native?.owner?.["@id"] ?? "" : "", displayDetail, displayID: element(n.semanticId)?.native?.declaredShortName || documentation.source?.native?.declaredShortName || "" };
   }) };
 }
@@ -4193,8 +5414,8 @@ var nodeKey = (node, counts, view) => {
   counts.set(base, count + 1);
   return base + ":" + count;
 };
-function labelSize(text) {
-  const span = el("span", text);
+function labelSize(text2) {
+  const span = el("span", text2);
   span.style.cssText = "position:fixed;visibility:hidden;left:-10000px;white-space:pre;font:12px system-ui,sans-serif";
   document.body.append(span);
   const rect = span.getBoundingClientRect();
@@ -4202,18 +5423,14 @@ function labelSize(text) {
   return { width: Math.ceil(rect.width) + 4, height: 16 };
 }
 async function prepareFrame(view, focus, panels, { journey = false } = {}) {
-  const stage = $("stage"), area = graphArea(stage.clientWidth, stage.clientHeight, panels);
+  const stage = $("stage"), area = primaryArea(view, panels, journey);
   const layoutFor = (compact) => layoutDiagram(sizeView(view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize, grouping: displayPreferences().grouping });
   let layout = await layoutFor(false), fitted = fitDiagram(layout, area);
-  if (fitted.scale < 0.9 && view.nodes.length > 3 && !state.expanded.has(focus) && displayPreferences().compartments !== "expanded") {
-    layout = await layoutFor(true);
-    fitted = fitDiagram(layout, area);
-  }
   const active2 = fitted.nodes.map((n) => ({ ...n, scale: fitted.scale, opacity: 1, context: false }));
   const routed = fitted.edges;
   const labelObstacles = [...routed.filter((e) => e.labelBox).map((e, i) => ({ ...e.labelBox, id: "label-obstacle:" + i })), ...active2.flatMap((n) => n.portLabelBox ? [{ ...n.portLabelBox, id: "port-label:" + n.id }] : [])];
   const routeObstacles = routed.flatMap((e) => e.points.slice(1).map((p, i) => ({ id: "route:" + e.id + ":" + i, x: Math.min(p.x, e.points[i].x) - 3, y: Math.min(p.y, e.points[i].y) - 3, width: Math.max(6, Math.abs(p.x - e.points[i].x) + 6), height: Math.max(6, Math.abs(p.y - e.points[i].y) + 6) })));
-  const budget = state.neighborhoodBudget ?? displayPreferences().contextBudget, context = surroundingContext(state.graph, layout, { budget: journey ? Math.min(8, budget) : budget, focus });
+  const budget = state.neighborhoodBudget ?? displayPreferences().contextBudget, context = view.overview && !journey ? { view: { nodes: [], edges: [] }, elements: [], omissions: [] } : surroundingContext(state.graph, layout, { budget: journey ? Math.min(8, budget) : budget, focus, prominenceScopeIds: prominenceScope() });
   context.view.nodes = context.view.nodes.map((node) => ({ ...node, ...measureCard(document, node, "") }));
   const fringe = prepareNeighborhood(context, active2, area, { width: 160, height: 80, gap: 72, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize });
   const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.3, context: true, displayDetail: "", displayID: "" }));
@@ -4231,19 +5448,25 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
     return { ...e, journey: journey && !e.context, sourceClipped: a?.kind === "context-boundary", targetClipped: b?.kind === "context-boundary", key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : !journey && displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: edgeAppearance(e, { viewKind: view.kind }) })).filter((p) => !p.appearance.supported).map((p) => ({ reason: "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
-  const omissions = [...layout.omissions ?? view.omissions ?? [], ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
+  const omissions = [...layout.omissions ?? view.omissions ?? [], ...(view.notices ?? []).map((message) => ({ reason: "native-view", message: typeof message === "string" ? message : JSON.stringify(message) })), ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
   return { view, focus, journey, nodes, edges, area, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics, worldBounds: fringe.worldBounds, neighborhood: { shown: context.elements.length, total: context.elements.length + new Set(context.omissions.filter((o) => o.reason === "budget").map((o) => o.target)).size, budget } };
 }
 function face(n) {
+  const behavior = behaviorFace(document, n);
+  if (behavior) {
+    if (n.overviewLabel) behavior.append(el("span", n.overviewLabel, "prominence"));
+    return behavior;
+  }
   const host = el("span", void 0, "node-face");
-  if (n.kind === "port") {
-    const text = n.label ?? n.name ?? "";
-    if (text) host.append(el("span", text, "port-name"));
+  if (n.kind === "port" && !n.overviewLabel) {
+    const text2 = n.label ?? n.name ?? "";
+    if (text2) host.append(el("span", text2, "port-name"));
     return host;
   }
   const short = (n.name?.split("::").at(-1) || n.kind).replace(/([a-z0-9])([A-Z])/g, "$1\u200B$2");
   host.append(el("span", `\xAB${n.kind}\xBB${n.displayID ? " " + n.displayID : ""}${n.type ? " : " + n.type : ""}`, "kind"), el("span", short, "name"));
-  if (n.displayDetail && !n.container) host.append(el("span", n.displayDetail, "detail"));
+  if (n.displayDetail) host.append(el("span", n.displayDetail, "detail"));
+  if (n.overviewLabel) host.append(el("span", n.overviewLabel, "prominence"));
   return host;
 }
 function visualNode(n) {
@@ -4258,7 +5481,7 @@ function visualNode(n) {
     marker.append(glyph);
     return marker;
   }
-  const node = el("button", void 0, `node ${n.kind}${n.container ? " container" : ""}${n.context ? " peripheral" : ""}${n.semanticId && n.semanticId === state.selected ? " selected" : ""}`);
+  const node = el("button", void 0, `node ${n.kind}${n.overviewLabel ? " overview-card" : ""}${n.container ? " container" : ""}${n.context ? " peripheral" : ""}${n.semanticId && n.semanticId === state.selected ? " selected" : ""}`);
   node.type = "button";
   node.dataset.representation = n.id;
   if (n.semanticId) node.dataset.semanticId = n.semanticId;
@@ -4277,12 +5500,12 @@ function visualNode(n) {
   return node;
 }
 var rectValues = (n) => ({ x: n.x, y: n.y, width: n.width, height: n.height, scale: n.scale ?? 1, opacity: n.opacity ?? 1, context: n.context ? 1 : 0 });
-function presenceTrack(frames, key, collection) {
+function presenceTrack(frames, key2, collection) {
   return frames.map((f, index) => {
-    const item = f[collection].find((n) => n.key === key);
+    const item = f[collection].find((n) => n.key === key2);
     if (item) return item;
     let nearest;
-    for (let distance2 = 1; distance2 < frames.length && !nearest; distance2++) nearest = frames[index - distance2]?.[collection].find((n) => n.key === key) ?? frames[index + distance2]?.[collection].find((n) => n.key === key);
+    for (let distance3 = 1; distance3 < frames.length && !nearest; distance3++) nearest = frames[index - distance3]?.[collection].find((n) => n.key === key2) ?? frames[index + distance3]?.[collection].find((n) => n.key === key2);
     return { ...nearest, opacity: 0 };
   });
 }
@@ -4343,48 +5566,48 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
   const departurePlan = planDepartures(frames, { width: stage.clientWidth, height: stage.clientHeight, panels: destination.panels ?? [], offsets });
   stage.dataset.departureCount = String(departurePlan.departures.length);
   const nodeKeys = visibleTrackKeys(frames, "nodes"), edgeKeys = visibleTrackKeys(frames, "edges").sort((a2, b) => {
-    const edge = (key) => destination.edges.find((e) => e.key === key) ?? frames.flatMap((f) => f.edges).find((e) => e.key === key);
+    const edge = (key2) => destination.edges.find((e) => e.key === key2) ?? frames.flatMap((f) => f.edges).find((e) => e.key === key2);
     return Number(!!edge(b)?.context) - Number(!!edge(a2)?.context);
   });
-  const nodeTracks = nodeKeys.map((key) => {
-    const track = presenceTrack(frames, key, "nodes"), latest = destination.nodes.find((n) => n.key === key) ?? track.filter((n) => n.opacity > 0).at(-1), node = visualNode(latest);
+  const nodeTracks = nodeKeys.map((key2) => {
+    const track = presenceTrack(frames, key2, "nodes"), latest = destination.nodes.find((n) => n.key === key2) ?? track.filter((n) => n.opacity > 0).at(-1), node = visualNode(latest);
     host.append(node);
-    const first = track.find((n) => n.opacity > 0), oldFace = latest.kind !== "context-boundary" && first && JSON.stringify([first.kind, first.displayDetail, first.type, first.container]) !== JSON.stringify([latest.kind, latest.displayDetail, latest.type, latest.container]) ? face(first) : null;
+    const first = track.find((n) => n.opacity > 0), oldFace = latest.kind !== "context-boundary" && first && JSON.stringify([first.kind, first.displayDetail, first.type, first.container, first.overviewLabel]) !== JSON.stringify([latest.kind, latest.displayDetail, latest.type, latest.container, latest.overviewLabel]) ? face(first) : null;
     if (oldFace) {
       oldFace.classList.add("old-face");
       oldFace.setAttribute("aria-hidden", "true");
       node.append(oldFace);
     }
-    return { key, node, latest, oldFace, newFace: node.firstChild, track: track.map(rectValues) };
+    return { key: key2, node, latest, oldFace, newFace: node.firstChild, track: track.map(rectValues) };
   });
-  const edgeTracks = edgeKeys.map((key) => {
-    const track = presenceTrack(frames, key, "edges"), latest = destination.edges.find((e) => e.key === key) ?? track.filter((e) => e.opacity > 0).at(-1), appearance = edgeAppearance(latest, { viewKind: destination.view.kind });
+  const edgeTracks = edgeKeys.map((key2) => {
+    const track = presenceTrack(frames, key2, "edges"), latest = destination.edges.find((e) => e.key === key2) ?? track.filter((e) => e.opacity > 0).at(-1), appearance = edgeAppearance(latest, { viewKind: destination.view.kind });
     const group = svgel("g", { "data-relationship": latest.semanticId || latest.id, "data-context": String(!!latest.context), "data-source": latest.sourceSemantic || "", "data-target": latest.targetSemantic || "", role: "button", tabindex: 0, "aria-label": `${latest.label || latest.kind}: ${label(latest.sourceSemantic)} to ${label(latest.targetSemantic)}`, "data-kind": latest.kind });
-    const line = svgel("path", { class: "edge-line", fill: "none", stroke: "#426869", "stroke-width": latest.context ? 1.1 : 1.5 });
-    for (const [side, marker] of [["start", appearance.sourceMarker], ["end", appearance.targetMarker]]) if (marker !== "none" && !(side === "start" ? latest.sourceClipped : latest.targetClipped)) line.setAttribute("marker-" + side, "url(#edge-" + marker + ")");
-    if (appearance.line === "dashed") line.setAttribute("stroke-dasharray", "5 3");
-    const oldLine = line.cloneNode();
+    const line2 = svgel("path", { class: "edge-line", fill: "none", stroke: "#426869", "stroke-width": latest.context ? 1.1 : 1.5 });
+    for (const [side, marker] of [["start", appearance.sourceMarker], ["end", appearance.targetMarker]]) if (marker !== "none" && !(side === "start" ? latest.sourceClipped : latest.targetClipped)) line2.setAttribute("marker-" + side, "url(#edge-" + marker + ")");
+    if (appearance.line === "dashed") line2.setAttribute("stroke-dasharray", "5 3");
+    const oldLine = line2.cloneNode();
     oldLine.classList.add("edge-outgoing");
     oldLine.style.opacity = 0;
     const hit = svgel("path", { class: "edge-hit", fill: "none", stroke: "transparent", "stroke-width": latest.context ? 8 : 18, "pointer-events": "stroke" });
-    group.append(hit, oldLine, line);
+    group.append(hit, oldLine, line2);
     const title = svgel("title");
     title.textContent = latest.label || latest.kind;
     group.append(title);
-    let text;
+    let text2;
     if (latest.label && !latest.labelOmitted) {
-      text = svgel("text", { "font-size": 12 * (latest.labelScale ?? 1), "font-family": "system-ui, sans-serif", fill: "#355e60", "paint-order": "stroke", stroke: "#f5f7f7", "stroke-width": 4, "text-anchor": "start" });
-      text.textContent = latest.label;
-      group.append(text);
+      text2 = svgel("text", { "font-size": 12 * (latest.labelScale ?? 1), "font-family": "system-ui, sans-serif", fill: "#355e60", "paint-order": "stroke", stroke: "#f5f7f7", "stroke-width": 4, "text-anchor": "start" });
+      text2.textContent = latest.label;
+      group.append(text2);
     }
     group.onclick = (event) => {
       event.stopPropagation();
-      traceEdge(latest, key);
+      traceEdge(latest, key2);
     };
     group.onkeydown = (event) => {
       if (["Enter", " "].includes(event.key)) {
         event.preventDefault();
-        traceEdge(latest, key);
+        traceEdge(latest, key2);
       }
     };
     svg.append(group);
@@ -4396,7 +5619,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
       }
       return r;
     });
-    return { key, group, line, oldLine, hit, text, latest, track: numeric };
+    return { key: key2, group, line: line2, oldLine, hit, text: text2, latest, track: numeric };
   });
   const draw = (progress, clock) => {
     const contextFade = duration ? Math.max(0, 1 - clock / 0.16, (clock - 0.84) / 0.16) : 1;
@@ -4432,11 +5655,11 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
     const currentNodes = nodes.map((n) => ({ ...n, id: n.key, parentId: n.parentId ? nodes.find((p) => p.id === n.parentId)?.key : void 0 }));
     const sampledEdges = edgeTracks.map((item) => ({ item, r: sampleTrack(item.track, offsets, progress) })), journeySizes = /* @__PURE__ */ new Map();
     const liveEdges = sampledEdges.filter(({ r }) => clock !== 1 && r.journey > 0.5 && r.opacity > 0.01).map(({ item }) => {
-      const text = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text.length * 7), height: 16 }, old = journeySizes.get(text);
-      journeySizes.set(text, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
-      return { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, label: text };
+      const text2 = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text2.length * 7), height: 16 }, old = journeySizes.get(text2);
+      journeySizes.set(text2, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
+      return { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, label: text2 };
     });
-    const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text) => journeySizes.get(text) }).map((route2) => [route2.id, route2]));
+    const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text2) => journeySizes.get(text2) }).map((route2) => [route2.id, route2]));
     const shapeFor = ({ item, r }) => {
       if (r.context > 0.5 && r.journey < 0.5 && contextFade < 0.01) return { points: [], edge: { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey }, journeyEdge: false };
       const interpolated = Array.from({ length: 20 }, (_, i) => ({ x: r["x" + i], y: r["y" + i] }));
@@ -4463,13 +5686,13 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
     }).filter((edge) => edge.points.length > 1 && visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
     if (clock > 0 && clock < 1 && contextFade > 0.01) {
       const contextSizes = /* @__PURE__ */ new Map(), movingContext = sampledEdges.filter(({ item, r }) => r.context > 0.5 && r.journey < 0.5 && r.opacity > 0.01).map(({ item }) => {
-        const shape = shapes.get(item.key), text = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text.length * 7), height: 16 }, old = contextSizes.get(text);
-        contextSizes.set(text, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
+        const shape = shapes.get(item.key), text2 = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text2.length * 7), height: 16 }, old = contextSizes.get(text2);
+        contextSizes.set(text2, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
         return { ...shape.edge, points: shape.points };
       }).filter((edge) => visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
       const before = peripheralRoutingMetrics(movingContext, currentActive);
       if (before.crossings || before.overlapLength || before.blocked) {
-        const optimized = routePeripheralEdges(movingContext, visibleNodes, destination.area, { activeEdges: currentActive, measureLabel: (text) => contextSizes.get(text), candidateBudget: 4, reverse: false, visibilitySearches: 0 });
+        const optimized = routePeripheralEdges(movingContext, visibleNodes, destination.area, { activeEdges: currentActive, measureLabel: (text2) => contextSizes.get(text2), candidateBudget: 4, reverse: false, visibilitySearches: 0 });
         if (peripheralRouteScore(optimized.metrics) < peripheralRouteScore(before)) for (const route2 of optimized.edges) {
           const shape = shapes.get(route2.id);
           shape.points = route2.points;
@@ -4487,7 +5710,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
     })];
     for (const { item, r } of sampledEdges) {
       const { points, edge, journeyEdge, liveLabel } = shapes.get(item.key);
-      const pathOf = (path2) => path2.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), signature = points.slice(1).map((p, i) => Math.abs(p.x - points[i].x) < 0.01 ? "V" : "H").filter((v, i, a2) => !i || v !== a2[i - 1]).join("");
+      const pathOf = (path2) => connectionPath(path2, { style: state.reader.routing, edge, nodes: currentNodes.concat(visibleLabels) }), signature = points.slice(1).map((p, i) => Math.abs(p.x - points[i].x) < 0.01 ? "V" : "H").filter((v, i, a2) => !i || v !== a2[i - 1]).join("");
       if (clock !== 1 && item.signature && signature !== item.signature) {
         item.outgoingPoints = item.drawnPoints;
         item.routeChangedAt = clock;
@@ -4540,8 +5763,8 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
   $("more-neighbors").textContent = neighborhood ? `More neighbors (${neighborhood.shown} of ${neighborhood.total})` : "More neighbors";
   const omissions = destination.omissions;
   $("transition").dataset.notice = String(!!caption);
-  $("context-details").hidden = !omissions.length && !neighborhood?.shown;
-  $("context-details").textContent = neighborhood?.shown ? `Neighbors (${neighborhood.shown})` : "Context limits";
+  $("context-details").hidden = !destination.view.overview && !omissions.length && !neighborhood?.shown;
+  $("context-details").textContent = destination.view.overview ? "Overview selection" : neighborhood?.shown ? `Neighbors (${neighborhood.shown})` : "Context limits";
   $("transition").textContent = caption || `${destination.view.kind} \xB7 ${destination.view.nodes.length} active elements`;
   const motion = startTimeline({ duration: state.reduce ? 0 : duration, update: draw });
   state.motion = motion;
@@ -4570,9 +5793,166 @@ async function frame(view, caption = "", duration = 0, focus = state.focus) {
     const pending = state.pendingDestination;
     return transitionTo(pending.view, pending.focus, { animate: false, allowDisconnected: true, journey: pending.journey, camera: pending.cameraRevision === state.cameraRevision ? pending.camera : state.camera });
   }
-  const revision = ++state.revision, panels = panelGeometry(view), destination = await prepareFrame(view, focus, panels), previous = state.visualSnapshot;
+  const revision = ++state.revision;
+  saveSurfaces();
+  disposeSurfaces();
+  const panels = panelGeometry(view);
+  if (rendererFamily(view) !== "graph") {
+    await renderSurfaces(view, focus, panels, revision);
+    return;
+  }
+  const destination = await prepareFrame(view, focus, panels), previous = state.visualSnapshot;
   if (revision !== state.revision) return;
-  return paintFrames(duration && previous ? [previous, destination] : [destination], { duration, caption });
+  const result = await paintFrames(duration && previous ? [previous, destination] : [destination], { duration, caption });
+  if (!result?.cancelled && revision === state.revision) await renderSurfaces(view, focus, panels, revision);
+  return result;
+}
+function sceneRegions(view = state.view) {
+  const regions = [{ id: "primary", view, focus: state.focus, title: view?.title || "Primary view" }];
+  if (!state.exploring) for (const r of scene()?.regions ?? []) regions.push({ ...r, view: state.views.get(r.view), focus: resolve(r.focus ?? scene().focus) });
+  if (state.comparison) regions.push({ ...state.comparison, id: "comparison" });
+  return regions.filter((r) => r.view);
+}
+function primaryArea(view, panels, journey = false) {
+  const area = graphArea($("stage").clientWidth, $("stage").clientHeight, panels);
+  return journey ? area : regionAreas(area, sceneRegions(view), state.activeRegion)[0].area;
+}
+function saveSurfaces() {
+  for (const s of state.surfaces) state.surfaceStates[s.key] = s.controller.getState();
+}
+function disposeSurfaces() {
+  for (const s of state.surfaces) s.controller.destroy();
+  state.surfaces = [];
+  $("view-regions").replaceChildren();
+  $("region-tabs").replaceChildren();
+  $("graph-viewport").hidden = false;
+}
+function surfaceAnchorSnapshot() {
+  const primary = state.surfaces.find((s) => s.id === "primary");
+  if (!primary) return;
+  const area = primary.area, anchors = primary.controller.anchors().filter((a) => a.width > 0 && a.height > 0 && a.x + a.width > 0 && a.y + a.height > 0 && a.x < area.width && a.y < area.height).slice(0, 24), counts = /* @__PURE__ */ new Map();
+  const nodes = anchors.map((a) => {
+    const node = { id: a.representationId, semanticId: a.semanticId, name: label(a.semanticId), kind: "element", x: area.x + a.x, y: area.y + a.y, width: a.width, height: a.height, scale: 1, opacity: 1, context: false };
+    return { ...node, key: nodeKey(node, counts, state.view) };
+  });
+  state.visualSnapshot = { view: state.view, focus: state.focus, nodes, edges: [], area, panels: [], width: $("stage").clientWidth, height: $("stage").clientHeight, omissions: [], layout: { nodes, edges: [] }, scale: 1 };
+}
+function destinationAnchors(view, focus, panels, base) {
+  const family = rendererFamily(view);
+  if (family === "graph") return null;
+  const area = primaryArea(view, panels), host = el("section", void 0, "view-region"), key2 = "primary:" + view.id;
+  host.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:${area.x}px;top:${area.y}px;width:${area.width}px;height:${area.height}px`;
+  $("stage").append(host);
+  const options = { state: structuredClone(state.surfaceStates[key2] ?? {}), selectedId: state.selected, selectedIds: state.selectedIds, labelFor: label }, controller = family === "grid" ? mountGrid(host, view, options) : mountSequence(host, view, options);
+  try {
+    const anchors = controller.anchors(), counts = /* @__PURE__ */ new Map(), wanted = /* @__PURE__ */ new Set();
+    const nodes = anchors.filter((a) => a.width > 0 && a.height > 0 && element(a.semanticId) && !wanted.has(a.semanticId) && (wanted.add(a.semanticId), true)).slice(0, 24).map((a) => {
+      const node = { id: a.representationId, semanticId: a.semanticId, kind: "element", name: label(a.semanticId), x: area.x + a.x, y: area.y + a.y, width: a.width, height: a.height, scale: 1, opacity: 1, context: false };
+      return { ...node, key: nodeKey(node, counts, view) };
+    });
+    return nodes.length ? { ...base, view, focus, nodes, edges: [], area, layout: { nodes, edges: [] }, worldBounds: void 0, neighborhood: null, omissions: [] } : null;
+  } finally {
+    controller.destroy();
+    host.remove();
+  }
+}
+async function renderSurfaces(view, focus, panels, revision) {
+  const area = graphArea($("stage").clientWidth, $("stage").clientHeight, panels), regions = regionAreas(area, sceneRegions(view), state.activeRegion), primary = regions[0];
+  $("graph-viewport").hidden = rendererFamily(view) !== "graph" || !primary.visible;
+  const grid = rendererFamily(view) !== "graph";
+  for (const id of ["fit", "show-neighborhood", "zoom-in", "zoom-out", "more-neighbors"]) $(id).disabled = grid || !primary.visible || id === "more-neighbors" && !!view.overview;
+  $("region-tabs").replaceChildren();
+  $("region-tabs").hidden = regions.length < 2;
+  $("region-tabs").style.cssText = `left:${area.x}px;top:${area.y}px;width:${area.width}px`;
+  if (regions.length > 1) for (const region of regions) {
+    const tab = button(region.title || region.view.title, async () => {
+      saveSurfaces();
+      state.activeRegion = region.id;
+      await frame(state.view);
+    });
+    tab.setAttribute("aria-pressed", String(region.visible));
+    $("region-tabs").append(tab);
+  }
+  if (state.comparison) $("region-tabs").append(button("Close comparison", async () => {
+    saveSurfaces();
+    state.comparison = null;
+    state.activeRegion = "primary";
+    await frame(state.view);
+  }));
+  for (const region of regions) {
+    if (!region.visible || region.id === "primary" && rendererFamily(region.view) === "graph") continue;
+    const host = el("section", void 0, "view-region");
+    host.setAttribute("aria-label", region.title || region.view.title);
+    host.dataset.regionId = region.id;
+    const r = region.area;
+    host.style.cssText = `left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px`;
+    $("view-regions").append(host);
+    const key2 = region.id + ":" + region.view.id, family = rendererFamily(region.view), options = { state: structuredClone(state.surfaceStates[key2] ?? {}), selectedId: state.selected, selectedIds: [...state.selectedIds], labelFor: label, onSelect: (selection) => selectSurface(selection, key2), onExplore: (selection) => exploreSurface(selection).catch(report), onStateChange: (value) => {
+      if (revision === state.revision) state.surfaceStates[key2] = structuredClone(value);
+    } };
+    const controller = await (family === "grid" ? mountGrid(host, region.view, options) : family === "sequence" ? mountSequence(host, region.view, options) : mountGraphRegion(host, sizeView(region.view, region.focus ?? focus), { ...options, elk: state.layoutEngine, routing: state.reader.routing, measureLabel: labelSize }));
+    if (revision !== state.revision) {
+      controller.destroy();
+      host.remove();
+      return;
+    }
+    if (family === "graph" || JSON.stringify(options.selectedIds) !== JSON.stringify(state.selectedIds)) controller.selectMany?.(state.selectedIds);
+    state.surfaces.push({ id: region.id, key: key2, family, controller, area: r });
+  }
+  if (grid) {
+    state.displayed = view;
+    state.displayOmissions = (view.notices ?? []).map((message) => ({ reason: "native-view", message }));
+    $("context-details").hidden = !view.notices?.length;
+    $("transition").textContent = `${view.kind} \xB7 ${representedIdentities(view).length} represented elements`;
+  }
+}
+function highlightSelection(ids, origin) {
+  state.selectedIds = [...new Set(ids.filter(Boolean))];
+  state.selected = state.selectedIds.length === 1 ? state.selectedIds[0] : null;
+  for (const s of state.surfaces) if (s.key !== origin) {
+    if (s.controller.selectMany) s.controller.selectMany(state.selectedIds);
+    else s.controller.select(state.selected);
+  }
+  for (const n of $("nodes").children) n.classList.toggle("selected", state.selectedIds.includes(n.dataset.semanticId));
+  for (const g of $("connections").querySelectorAll("g[data-relationship]")) {
+    const selected = state.selectedIds.includes(g.dataset.relationship);
+    g.classList.toggle("traced", selected);
+    g.setAttribute("aria-pressed", String(selected));
+  }
+}
+function selectSurface(selection, origin) {
+  const surface = state.surfaces.find((s) => s.key === origin);
+  if (surface && surface.family !== "graph") {
+    highlightSelection(selection.relationships?.length ? selection.relationships.map((r) => r.semanticId) : [selection.semanticId], origin);
+    $("selection").hidden = true;
+    return;
+  }
+  if (selection.relationships?.length) {
+    highlightSelection(selection.relationships.map((r) => r.semanticId), origin);
+    const menu = $("selection");
+    menu.replaceChildren(el("strong", selection.label || "Relationships"));
+    for (const r of selection.relationships) menu.append(el("p", `${label(r.sourceSemanticId)} \u2192 ${label(r.targetSemanticId)} \xB7 ${r.kind}`));
+    menu.append(button("Explore relationship", () => exploreSurface(selection)), button("Close", () => {
+      menu.hidden = true;
+    }));
+    menu.hidden = false;
+  } else if (selection.semanticId) select(selection.semanticId, { name: selection.name || selection.label }, origin);
+  else {
+    highlightSelection([], origin);
+    const menu = $("selection");
+    menu.replaceChildren(el("p", selection.kind === "relationship-cell" && !selection.label ? "No matching relationship in this view." : "No native semantic identity is available for this record."), button("Close", () => {
+      menu.hidden = true;
+    }));
+    menu.hidden = false;
+  }
+}
+async function exploreSurface(selection) {
+  if (selection.relationships?.length) {
+    const relationships = selection.relationships.map((r, i) => ({ id: r.semanticId || "native-cell:" + i, semanticId: r.semanticId, source: r.sourceSemanticId, target: r.targetSemanticId, kind: r.kind, label: r.label || r.kind, authority: "native-view" }));
+    const ids = new Set(relationships.flatMap((r) => [r.source, r.target])), elements = state.graph.elements.filter((e) => ids.has(e.id));
+    if (elements.length !== ids.size) throw Error("A native relationship endpoint is unavailable in this loaded declaration projection.");
+    await openExploration(graphView(state.graph, { elements, relationships }, "Selected native relationships"), selection.semanticId && element(selection.semanticId) ? selection.semanticId : relationships[0].source);
+  } else if (selection.semanticId) await explore(selection.semanticId);
 }
 function gather(ids, relationships) {
   const set = new Set(ids), elements = state.graph.elements.filter((e) => set.has(e.id));
@@ -4585,10 +5965,14 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
   if (savedJourney && !plan?.route?.found) throw Error("Saved journey no longer resolves within the presentation boundary");
   const disconnected = plan?.journeyRequired && plan.route?.found === false;
   if (disconnected && !state.exploring && !allowDisconnected) throw Error("No engineering route connects these viewpoints within the presentation system. Explore the model to open a disconnected viewpoint explicitly.");
+  saveSurfaces();
+  surfaceAnchorSnapshot();
+  disposeSurfaces();
   cancelAnimations();
   for (const p of $("stage").querySelectorAll(".narrative-outgoing")) p.remove();
   $("selection").hidden = true;
   state.transitioning = true;
+  $("stage").setAttribute("aria-busy", "true");
   state.pendingDestination = { view, focus, journey, camera, cameraRevision };
   state.lastTransition = plan;
   let oldPanel;
@@ -4600,7 +5984,7 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
       oldPanel.setAttribute("aria-hidden", "true");
       $("stage").append(oldPanel);
     }
-    const panels = panelGeometry(view), target = await prepareFrame(view, focus, panels), frames = [];
+    const panels = panelGeometry(view), projection2 = rendererFamily(view) === "graph" ? view : gather(representedIdentities(view).filter((id) => element(id)).slice(0, 24)), target = await prepareFrame(projection2, focus, panels), frames = [];
     if (revision !== state.revision) {
       oldPanel?.remove();
       return;
@@ -4617,6 +6001,8 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
         }
       }
       frames.push(target);
+      const anchors = destinationAnchors(view, focus, panels, target);
+      if (anchors) frames.push(anchors);
     } else frames.push(target);
     if (revision !== state.revision) {
       oldPanel?.remove();
@@ -4628,6 +6014,9 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
     state.view = view;
     state.focus = focus;
     state.previousFocus = focus;
+    await renderSurfaces(view, focus, panels, revision);
+    if (revision !== state.revision) return;
+    updateExplorationControls();
     if (!state.exploring) status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
     else status(state.traceInfo?.summary.message ?? "Explore this native view \xB7 select an element for contextual actions");
     $("boundary").textContent = !scopeIds().includes(focus) ? "Outside presentation boundary \xB7 loaded model context" : state.project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 supplied model context only" : "Complete project \xB7 standalone exploration available";
@@ -4635,6 +6024,7 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
     oldPanel?.remove();
     if (revision === state.revision) {
       state.transitioning = false;
+      $("stage").setAttribute("aria-busy", "false");
       state.pendingDestination = null;
     }
   }
@@ -4646,11 +6036,12 @@ async function showScene(index, animate = true, { record = false } = {}) {
   state.sceneIndex = index;
   state.exploring = false;
   state.neighborhoodBudget = null;
-  state.selected = null;
   state.traceRequest = null;
   state.traceInfo = null;
+  state.comparison = null;
+  state.activeRegion = "primary";
   state.presentation = structuredClone(state.scenes[index].presentation ?? {});
-  state.expanded = new Set(displayPreferences().expandedIds);
+  state.expanded = /* @__PURE__ */ new Set();
   state.collapsed = /* @__PURE__ */ new Set();
   updateExplorationControls();
   const s = scene();
@@ -4678,13 +6069,15 @@ async function showScene(index, animate = true, { record = false } = {}) {
   }
 }
 function displayPreferences() {
-  return resolvePresentation(state.presentation, { width: $("stage").clientWidth, resolve });
+  return { ...resolvePresentation(state.presentation, { width: $("stage").clientWidth, resolve }), compartments: { all: "expanded", none: "compact", focused: "auto" }[state.reader.compartments] };
 }
 function snapshot() {
-  return { view: state.pendingDestination?.view ?? state.view, focus: state.pendingDestination?.focus ?? state.focus, sceneIndex: state.sceneIndex, exploring: state.exploring, selected: state.selected, expanded: [...state.expanded], collapsed: [...state.collapsed], presentation: structuredClone(state.presentation), traceRequest: structuredClone(state.traceRequest), traceInfo: structuredClone(state.traceInfo ?? null), camera: { ...state.camera }, neighborhoodBudget: state.neighborhoodBudget };
+  saveSurfaces();
+  return { view: state.pendingDestination?.view ?? state.view, focus: state.pendingDestination?.focus ?? state.focus, sceneIndex: state.sceneIndex, exploring: state.exploring, selected: state.selected, selectedIds: [...state.selectedIds], expanded: [...state.expanded], collapsed: [...state.collapsed], presentation: structuredClone(state.presentation), traceRequest: structuredClone(state.traceRequest), traceInfo: structuredClone(state.traceInfo ?? null), camera: { ...state.camera }, neighborhoodBudget: state.neighborhoodBudget, surfaceStates: structuredClone(state.surfaceStates), comparison: state.comparison, activeRegion: state.activeRegion };
 }
 function restoreValues(target) {
-  Object.assign(state, { sceneIndex: target.sceneIndex, exploring: target.exploring, selected: target.selected, expanded: new Set(target.expanded), collapsed: new Set(target.collapsed), presentation: structuredClone(target.presentation), traceRequest: structuredClone(target.traceRequest), neighborhoodBudget: target.neighborhoodBudget ?? null });
+  disposeSurfaces();
+  Object.assign(state, { sceneIndex: target.sceneIndex, exploring: target.exploring, selected: target.selected, selectedIds: [...target.selectedIds ?? [target.selected].filter(Boolean)], expanded: new Set(target.expanded), collapsed: new Set(target.collapsed), presentation: structuredClone(target.presentation), traceRequest: structuredClone(target.traceRequest), neighborhoodBudget: target.neighborhoodBudget ?? null, surfaceStates: structuredClone(target.surfaceStates ?? {}), comparison: target.comparison ?? null, activeRegion: target.activeRegion ?? "primary" });
   state.traceInfo = structuredClone(target.traceInfo ?? null);
 }
 function remember() {
@@ -4703,7 +6096,7 @@ function updateExplorationControls() {
   $("return").hidden = !exploring || !state.scenes.length;
   $("standalone").hidden = exploring;
   const request = state.traceRequest, info = state.traceInfo;
-  $("exploration-label").textContent = exploring ? request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification", contents: "Parts / contents", container: "Containing element" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
+  $("exploration-label").textContent = exploring ? state.view?.overview ? "System overview \xB7 " + label(state.focus) : request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification", contents: "Parts / contents", container: "Containing element" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
   $("exploration-label").title = $("exploration-label").textContent;
   $("trace-previous").hidden = !request || !info || info.pages < 2;
   $("trace-next").hidden = !request || !info || info.pages < 2;
@@ -4735,15 +6128,18 @@ async function restoreHistory(direction) {
     throw error;
   }
 }
-async function openExploration(view, id, { request = null, info = null, record = true } = {}) {
+async function openExploration(view, id, { request = null, info = null, record = true, resetRegions = false } = {}) {
   const previous = snapshot(), history = [...state.history], future = [...state.future];
   if (record) remember();
+  if (resetRegions) {
+    state.comparison = null;
+    state.activeRegion = "primary";
+  }
   state.neighborhoodBudget = null;
   state.exploring = true;
   state.traceRequest = request;
   state.traceInfo = info;
   if (request) state.presentation = { ...state.presentation, emphasis: [] };
-  state.selected = null;
   updateExplorationControls();
   const revision = state.revision + 1;
   try {
@@ -4761,6 +6157,19 @@ async function openExploration(view, id, { request = null, info = null, record =
     throw error;
   }
 }
+async function openSystemOverview({ record = true } = {}) {
+  const rootIds = state.project.manifest.systemOfInterest.map(resolve).filter(Boolean), budget = $("stage").clientWidth < 700 ? 6 : 9;
+  const context = buildSystemOverview(state.graph, { rootIds, budget });
+  if (!context.elements.length) throw Error("No named project declarations are available for a system overview.");
+  const view = graphView(state.graph, context, "System overview");
+  view.id = "overview:" + JSON.stringify([rootIds, budget, context.elements.map((e) => e.id)]);
+  view.overview = { rootIds, budget, metrics: Object.fromEntries(context.elements.map((e) => [e.id, context.metrics.get(e.id)])), summary: context.summary };
+  view.nodes = view.nodes.map((node) => {
+    const m = context.metrics.get(node.semanticId);
+    return { ...node, overviewLabel: m ? `${m.children} children \xB7 ${m.connections} neighbors` : void 0 };
+  });
+  await openExploration(view, context.focus, { record, resetRegions: true });
+}
 async function explore(id, kind) {
   if (!id || !element(id)) throw Error("Model target unavailable");
   const revision = ++state.revision, modelHash = state.modelHash;
@@ -4769,7 +6178,7 @@ async function explore(id, kind) {
     if (!q) throw Error("Native view requires a qualified model identity");
     const raw = await state.engine.call("RenderView", { modelHash, view: `#${kind}:${q}`, includeSemanticIdentity: true });
     if (revision !== state.revision || modelHash !== state.modelHash) return;
-    const view = { ...requireNativeIdentity(adaptNativeView(raw, `#${kind}:${q}`)), capture: { definition: kind === "action" ? "ActionFlowView" : "InterconnectionView", root: q } };
+    const view = { ...requireNativeIdentity(adaptNativeView(raw, `#${kind}:${q}`)), capture: { definition: { action: "ActionFlowView", state: "StateTransitionView", sequence: "SequenceView", interconnection: "InterconnectionView" }[kind], root: q } };
     state.extraViews ??= /* @__PURE__ */ new Map();
     state.extraViews.set(view.id, view);
     state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
@@ -4777,14 +6186,13 @@ async function explore(id, kind) {
   } else await followTrace(id, "context");
 }
 async function followTrace(id, mode, page = 0) {
-  const request = { focus: id, mode, budget: $("stage").clientWidth < 700 ? 5 : 7, page }, context = traceContext(state.graph, request), view = graphView(state.graph, context, mode + " of " + label(id));
+  const request = { focus: id, mode, budget: $("stage").clientWidth < 700 ? 5 : 7, page }, context = traceContext(state.graph, { ...request, prominenceScopeIds: prominenceScope() }), view = graphView(state.graph, context, mode + " of " + label(id));
   view.traceRequest = request;
   await openExploration(view, id, { request, info: context });
 }
-function select(id, node) {
+function select(id, node, origin) {
   clearTrace();
-  state.selected = id || null;
-  for (const n of $("nodes").children) n.classList.toggle("selected", !!id && n.dataset.semanticId === id);
+  highlightSelection([id], origin);
   const menu = $("selection");
   menu.replaceChildren(el("strong", node?.name || label(id)));
   menu.hidden = false;
@@ -4801,6 +6209,11 @@ function select(id, node) {
     $("information-text").textContent = (documentation.source?.qualifiedName || label(id)) + "\n\n" + documentation.text;
     $("information").showModal();
   }));
+  const prominence = state.view?.overview?.metrics[id];
+  if (prominence) {
+    menu.append(el("p", `${prominence.children} direct children \xB7 ${prominence.connections} distinct connected elements. Structural prominence describes the loaded model, not engineering criticality.`));
+    if (prominence.children > 0 && isStructuralElement(element(id))) menu.append(button("Expand contents", () => followTrace(id, "contents")));
+  }
   menu.append(button("Focus", () => explore(id)), button(state.expanded.has(id) || !!node?.displayDetail ? "Collapse compartment" : "Show statement / compartment", async () => {
     if (state.expanded.has(id) || !!node?.displayDetail) {
       state.expanded.delete(id);
@@ -4825,6 +6238,7 @@ function select(id, node) {
   }
   if (["PartUsage", "PartDefinition", "Package"].includes(e?.kind)) menu.append(button("Internal view", () => explore(id, "interconnection")));
   if (["ActionUsage", "ActionDefinition"].includes(e?.kind)) menu.append(button("Activity view", () => explore(id, "action")));
+  if (["StateUsage", "StateDefinition"].includes(e?.kind)) menu.append(button("State view", () => explore(id, "state")));
   if (["RequirementUsage", "RequirementDefinition"].includes(e?.kind)) {
     const actions = el("div", void 0, "requirement-actions");
     for (const action of requirementActions(state.graph, id).filter((a) => a.mode !== "context")) {
@@ -4859,8 +6273,9 @@ function clearTrace() {
     e.removeAttribute("aria-pressed");
   }
 }
-function traceEdge(edge, key) {
+function traceEdge(edge, key2) {
   clearTrace();
+  highlightSelection([edge.semanticId || edge.id]);
   $("stage").classList.add("tracing");
   for (const n of $("nodes").children) n.classList.toggle("trace-endpoint", [edge.sourceSemantic, edge.targetSemantic].includes(n.dataset.semanticId));
   for (const g of $("connections").querySelectorAll("g[data-relationship]")) {
@@ -4894,6 +6309,7 @@ function editorPresentation() {
 }
 function openEditor() {
   if (!state.project) return;
+  $("scene-regions").value = (scene()?.regions ?? []).map((r) => r.view).join("\n");
   $("scene-title").value = scene()?.title || "New scene";
   $("scene-prose").value = scene()?.markdown || "";
   $("panel-placement").value = scene()?.panel?.placement || "right";
@@ -4931,6 +6347,7 @@ async function capture() {
   status("Scene captured. Export the project ZIP or Markdown to keep it.");
 }
 function contextNotice(notice) {
+  if (notice.message) return notice.message;
   if (notice.reason === "context-route-fallback") return `Connection layout: ${notice.continued ?? 0} shortened; ${notice.unrepresented ?? 0} not drawn in this view. Native relationships: ${(notice.relationships ?? []).join(", ")}.`;
   if (notice.reason === "context-route-continuation") return `Shortened context: ${(notice.targets ?? []).map((id) => label(id) ?? id).join(", ")}; ${notice.continued ?? 0} labeled connections.`;
   if (notice.reason === "context-route-conflict") return `Layout notice: ${notice.crossings} context crossings; ${Math.round(notice.overlapLength ?? 0)} pixels of shared path remain.`;
@@ -4938,7 +6355,34 @@ function contextNotice(notice) {
   const prefix = notice.reason === "context-route-continuation" ? "Shortened connection" : ["unavailable", "outside-scope", "metamodel-boundary"].includes(notice.reason) ? "Unavailable / boundary" : "Hidden by view policy";
   return `${prefix}: ${notice.reason} \xB7 ${name} (${target})`;
 }
+function omissionDisclosure(omissions, overview) {
+  if (!overview) return omissions.map(contextNotice).join("\n");
+  const counts = /* @__PURE__ */ new Map();
+  for (const item of omissions) counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1);
+  const heading = [...counts].map(([reason, count]) => `${reason}: ${count}`).join(" \xB7 ");
+  return heading + "\n\n" + omissions.slice(0, 100).map(contextNotice).join("\n") + (omissions.length > 100 ? `
+
+Showing 100 of ${omissions.length} omitted records. Use Find to locate another named model element.` : "");
+}
 function bind() {
+  $("global-compartments").value = state.reader.compartments;
+  $("global-routing").value = state.reader.routing;
+  for (const [id, key2] of [["global-compartments", "compartments"], ["global-routing", "routing"]]) $(id).onchange = async () => {
+    try {
+      state.reader = { ...state.reader, [key2]: $(id).value };
+      try {
+        saveReaderSettings(localStorage, state.reader);
+      } catch {
+      }
+      if (key2 === "compartments") {
+        state.expanded.clear();
+        state.collapsed.clear();
+      }
+      if (state.view) await frame(state.view);
+    } catch (e) {
+      report(e);
+    }
+  };
   $("open-folder").hidden = !("webkitdirectory" in $("folder-files"));
   for (const kind of PRESENTATION_RELATIONSHIP_KINDS) {
     const option = el("option", kind);
@@ -4960,6 +6404,10 @@ function bind() {
     }
   };
   $("return").onclick = () => showScene(state.sceneIndex, true, { record: true }).catch(report);
+  $("system-overview").onclick = () => {
+    $("camera-menu").open = false;
+    openSystemOverview().catch(report);
+  };
   $("fit").onclick = () => resetCamera().catch(report);
   $("show-neighborhood").onclick = fitNeighborhood;
   $("zoom-in").onclick = () => zoomBy(1.25);
@@ -4986,33 +6434,40 @@ function bind() {
       await explore(e.id);
     }));
   };
-  $("open-view").onclick = async () => {
-    try {
-      const revision = ++state.revision, modelHash = state.modelHash, name = $("views").value;
-      let view = state.views.get(name);
-      if (!view) {
-        const raw = await state.engine.call("RenderView", { modelHash, view: name, includeSemanticIdentity: true });
-        if (revision !== state.revision || modelHash !== state.modelHash) return;
-        view = requireNativeIdentity(adaptNativeView(raw, name));
-        if (!["requirement", "definition", "tree", "package", "interconnection", "action", "state"].includes(view.kind)) throw Error("This canvas does not yet render the native " + view.kind + " notation. The complete source remains included.");
-        state.views.set(name, view);
-        state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
-      }
-      const target = view.nodes.find((n) => n.semanticId)?.semanticId;
-      $("find").hidden = true;
+  const openNative = async (compare4) => {
+    const revision = ++state.revision, modelHash = state.modelHash, name = $("views").value;
+    let view = state.views.get(name);
+    if (!view) {
+      const raw = await state.engine.call("RenderView", { modelHash, view: name, includeSemanticIdentity: true });
+      if (revision !== state.revision || modelHash !== state.modelHash) return;
+      view = requireNativeIdentity(adaptNativeView(raw, name));
+      if (!supportsView(view)) throw Error("Unsupported native notation: " + view.kind);
+      state.views.set(name, view);
+      state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
+    }
+    const target = representedIdentities(view).find((id) => element(id)) ?? state.focus;
+    $("find").hidden = true;
+    if (compare4) {
+      remember();
+      state.comparison = { view, focus: target, title: name };
+      state.activeRegion = "comparison";
+      await frame(state.view);
+    } else {
+      state.comparison = null;
+      state.activeRegion = "primary";
       await openExploration(view, target);
-    } catch (e) {
-      report(e);
     }
   };
+  $("open-view").onclick = () => openNative(false).catch(report);
+  $("compare-view").onclick = () => openNative(true).catch(report);
   $("context-details").onclick = () => {
     $("information").classList.remove("statement");
-    $("information-title").textContent = "Prepared neighborhood";
+    $("information-title").textContent = state.view?.overview ? "Overview selection" : "Prepared neighborhood";
     const omissions = state.displayOmissions ?? state.displayed?.omissions ?? [], n = state.visualSnapshot?.neighborhood;
-    const summary = n ? `${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.
+    const summary = state.view?.overview ? state.view.overview.summary.message + "\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n" : n ? `${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.
 
 ` : "";
-    $("information-text").textContent = summary + omissions.map(contextNotice).join("\n") + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
+    $("information-text").textContent = summary + omissionDisclosure(omissions, !!state.view?.overview) + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
     $("information").showModal();
   };
   $("edit").onclick = openEditor;
@@ -5022,15 +6477,12 @@ function bind() {
   $("save-scene").onclick = async () => {
     try {
       if (!scene()) throw Error("Capture a first scene before editing it");
-      const presentation = editorPresentation();
-      scene().presentation = presentation;
-      scene().title = $("scene-title").value;
-      scene().markdown = $("scene-prose").value;
-      scene().panel = { placement: $("panel-placement").value };
-      state.project.files[state.project.manifest.story] = writeStory(state.project.manifest.title, state.scenes);
-      updateLists();
+      const presentation = editorPresentation(), regions = updateRegionReferences(scene().regions ?? [], $("scene-regions").value.split("\n").map((s) => s.trim()).filter(Boolean)), index = state.sceneIndex, project = structuredClone(state.project), scenes = structuredClone(state.scenes);
+      Object.assign(scenes[index], { presentation, regions, title: $("scene-title").value, markdown: $("scene-prose").value, panel: { placement: $("panel-placement").value } });
+      project.files[project.manifest.story] = writeStory(project.manifest.title, scenes);
+      await loadProject(project);
       $("editor").close();
-      await showScene(state.sceneIndex, false);
+      await showScene(index, false);
     } catch (e) {
       report(e);
     }
