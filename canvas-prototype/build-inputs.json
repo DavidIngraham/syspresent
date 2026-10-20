@@ -1,5 +1,52 @@
 {
   "inputs": {
+    "src/canvas-prototype/landing.mjs": {
+      "bytes": 492,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/preferences.mjs": {
+      "bytes": 4627,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/fflate/esm/browser.js": {
+      "bytes": 89198,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/project.mjs": {
+      "bytes": 14040,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/preferences.mjs",
+          "kind": "import-statement",
+          "original": "./preferences.mjs"
+        },
+        {
+          "path": "node_modules/fflate/esm/browser.js",
+          "kind": "import-statement",
+          "original": "fflate"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/browser-project.mjs": {
+      "bytes": 1374,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/project.mjs",
+          "kind": "import-statement",
+          "original": "./project.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/native-project.mjs": {
+      "bytes": 690,
+      "imports": [],
+      "format": "esm"
+    },
     "src/canvas-prototype/departures.mjs": {
       "bytes": 7716,
       "imports": [],
@@ -29,11 +76,6 @@
           "original": "./core/index.mjs"
         }
       ],
-      "format": "esm"
-    },
-    "src/canvas-prototype/preferences.mjs": {
-      "bytes": 4627,
-      "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/notation.mjs": {
@@ -172,30 +214,24 @@
       "imports": [],
       "format": "esm"
     },
-    "node_modules/fflate/esm/browser.js": {
-      "bytes": 89198,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/project.mjs": {
-      "bytes": 7103,
+    "src/canvas-prototype/app.mjs": {
+      "bytes": 70229,
       "imports": [
         {
-          "path": "src/canvas-prototype/preferences.mjs",
+          "path": "src/canvas-prototype/landing.mjs",
           "kind": "import-statement",
-          "original": "./preferences.mjs"
+          "original": "./landing.mjs"
         },
         {
-          "path": "node_modules/fflate/esm/browser.js",
+          "path": "src/canvas-prototype/browser-project.mjs",
           "kind": "import-statement",
-          "original": "fflate"
-        }
-      ],
-      "format": "esm"
-    },
-    "src/canvas-prototype/app.mjs": {
-      "bytes": 64899,
-      "imports": [
+          "original": "./browser-project.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/native-project.mjs",
+          "kind": "import-statement",
+          "original": "./native-project.mjs"
+        },
         {
           "path": "src/canvas-prototype/departures.mjs",
           "kind": "import-statement",
@@ -290,7 +326,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 563415
+      "bytes": 589605
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -299,6 +335,24 @@
       "inputs": {
         "node_modules/elkjs/lib/elk-api.js": {
           "bytesInOutput": 9829
+        },
+        "src/canvas-prototype/landing.mjs": {
+          "bytesInOutput": 414
+        },
+        "src/canvas-prototype/preferences.mjs": {
+          "bytesInOutput": 3797
+        },
+        "node_modules/fflate/esm/browser.js": {
+          "bytesInOutput": 24695
+        },
+        "src/canvas-prototype/project.mjs": {
+          "bytesInOutput": 14693
+        },
+        "src/canvas-prototype/browser-project.mjs": {
+          "bytesInOutput": 1407
+        },
+        "src/canvas-prototype/native-project.mjs": {
+          "bytesInOutput": 653
         },
         "src/canvas-prototype/departures.mjs": {
           "bytesInOutput": 7885
@@ -311,9 +365,6 @@
         },
         "src/canvas-prototype/exploration.mjs": {
           "bytesInOutput": 15277
-        },
-        "src/canvas-prototype/preferences.mjs": {
-          "bytesInOutput": 3797
         },
         "src/canvas-prototype/notation.mjs": {
           "bytesInOutput": 3893
@@ -348,17 +399,11 @@
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 1698
         },
-        "node_modules/fflate/esm/browser.js": {
-          "bytesInOutput": 24695
-        },
-        "src/canvas-prototype/project.mjs": {
-          "bytesInOutput": 7521
-        },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 73527
+          "bytesInOutput": 79605
         }
       },
-      "bytes": 270483
+      "bytes": 286333
     }
   }
 }

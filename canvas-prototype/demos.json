@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "syspresent.demos.v1",
+  "demos": [
+    {
+      "id": "blue-dog",
+      "title": "Blue Dog: river traffic and recovery",
+      "description": "Explore the complete Blue Dog model through river traffic, requirements and recovery.",
+      "project": "project.zip",
+      "runtimeCacheHash": "d16d446235313877cfad75806c781a2da633a897c1e3d085a9a00910c76f005c"
+    },
+    {
+      "id": "flashlight",
+      "title": "A flashlight: requirement, assembly and switching",
+      "description": "A small model connecting a requirement, the flashlight assembly and switching behavior.",
+      "project": "demos/flashlight.zip"
+    }
+  ]
+}

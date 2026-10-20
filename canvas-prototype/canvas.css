@@ -74,3 +74,33 @@ footer #transition:not([data-notice=true]){display:none}
 .node.peripheral{background:#fff}
 .node.peripheral .kind{display:block;font-size:10px}
 .node.peripheral .name{font-size:12px;display:block;-webkit-line-clamp:unset;overflow-wrap:anywhere}
+
+/* The entry screen is a separate surface; model controls appear only after opening a project. */
+body.landing-mode{height:auto;min-height:100dvh;overflow:auto}
+#landing{flex:none;overflow:visible;min-height:100dvh;background:#f5f7f7}
+.landing-shell{width:min(940px,calc(100% - 48px));margin:0 auto;padding:clamp(24px,5vh,60px) 0 32px}
+.landing-brand{display:inline-block;font-size:1.3rem}
+.landing-intro{margin:clamp(28px,6vh,64px) 0 30px}
+.landing-intro h1{font-size:clamp(1.8rem,4vw,2.5rem);line-height:1.15;letter-spacing:-.025em;margin:0 0 .7rem}
+.landing-intro p{font-size:1.1rem;color:#526c70;margin:0}
+#landing h2{font-size:1rem;line-height:1.3;margin:0 0 1rem}
+.demo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.demo-card{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:12px;padding:24px;min-height:210px;border:1px solid #b9ccca;border-radius:12px;background:#fff;box-shadow:0 2px 6px #193d3308}
+.demo-card:hover{background:#edf4f2;border-color:#729994}
+.demo-title{font-size:1.2rem;font-weight:700;line-height:1.3}
+.demo-description{color:#526c70;line-height:1.5}
+.demo-link{margin-top:auto;padding-top:8px;color:#245e60;font-weight:650}
+.landing-import{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:28px;margin-top:28px;padding:26px 0;border-top:1px solid var(--line)}
+#landing .landing-import h2{margin-bottom:.65rem}
+.landing-import p{margin:0;max-width:490px;color:#526c70}
+.landing-import .local-note{font-size:.85rem;margin-top:.65rem}
+.landing-import-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:180px}
+.landing-import-actions button{min-height:44px}
+#open-sysml{background:#245e60;color:white;border-color:#245e60}
+#open-sysml:hover{background:#194b4d}
+#landing-status{margin:4px 0;color:#526c70;overflow-wrap:anywhere}
+#landing-status:empty{display:none}
+#landing-error{padding:12px 16px;border:1px solid #d6b4a9;border-radius:8px;background:#fff5f1;color:#863b2b;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:600px){.landing-shell{width:calc(100% - 32px);padding-top:22px}.landing-intro{margin:28px 0 24px}.demo-grid{grid-template-columns:1fr;gap:12px}.demo-card{min-height:0;padding:20px;gap:10px}.demo-link{padding-top:2px}.landing-import{grid-template-columns:1fr;gap:18px;margin-top:24px;padding-top:24px}.landing-import-actions{align-items:stretch}.landing-import-actions button{min-height:46px}}
+
+@media(max-width:600px){.landing-intro{margin:22px 0 18px}.demo-card{padding:16px;gap:7px}.demo-description{font-size:.95rem;line-height:1.4}.landing-import-actions{display:grid;grid-template-columns:1fr 1fr}.landing-import-actions #open-sysml{grid-column:1/-1}}
