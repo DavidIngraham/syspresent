@@ -42,7 +42,7 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'SV-004'> exploration {
-        doc /* Trace requirement-to-component-to-verification paths; filter and expand in both directions, cross a library boundary, distinguish omitted and unexported neighbors, restore history and reproduce state from a shared URL. */
+        doc /* Trace requirement-to-component-to-verification paths; filter and expand in both directions, cross a library boundary, distinguish omitted and unexported neighbors, restore history and reproduce state from a shared URL. Exercise a neighborhood larger than the viewport, verify real tiles and complete native endpoints, pan and zoom without geometry or selection changes, frame the neighborhood, restore active fit, focus a neighbor, and restore its prior camera and neighborhood budget through history. Check pointer cancellation and that taps do not become drags; verify disclosures for filters, unavailable targets, caps and unavailable routes. */
         objective acceptance {
             verify SyspresentRequirements::Exploration::localContext;
             verify SyspresentRequirements::Exploration::typedFilters;

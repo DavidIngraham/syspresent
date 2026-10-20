@@ -17,7 +17,7 @@ test('surrounding context preserves the full active view and native edge directi
  assert.deepEqual({graph,view},before);
 });
 
-test('typing, ownership and source plumbing never become surrounding system connections',()=>{
+test('invalid typing, arbitrary ownership and source plumbing never become surrounding system connections',()=>{
  const graph={elements:[element('a'),element('b'),element('type'),element('doc','Documentation'),element('meta','PartDefinition',{layer:'metamodel'}),element('outside')],relationships:[edge('t','a','type','typing'),edge('o','a','doc','ownership'),edge('d','a','doc','dependency'),edge('m','a','meta','dependency'),edge('s','a','outside','dependency'),edge('missing','a','absent','dependency')]};
  const context=surroundingContext(graph,view,{scopeIds:['a','b','type','doc','meta']});
  assert.equal(context.elements.length,0);
@@ -96,4 +96,46 @@ test('bounded context prioritizes explicit trace kinds over generic dependencies
  assert.deepEqual(context.elements.map(e=>e.id),['derived','verification']);
  assert.ok(context.relationships.some(e=>e.id==='context-link'));
  assert.equal(context.omissions.find(o=>o.relationshipId==='dependency').reason,'budget');
+});
+
+
+test('prepared context includes more neighbors by default without recursive expansion',()=>{
+ const graph={elements:[element('a'),...Array.from({length:60},(_,i)=>element(`n${String(i).padStart(2,'0')}`))],relationships:Array.from({length:60},(_,i)=>edge(`r${i}`,'a',`n${String(i).padStart(2,'0')}`))};
+ const context=surroundingContext(graph,{id:'v',nodes:[{id:'A',semanticId:'a'}],edges:[]});
+ assert.equal(context.elements.length,48);assert.equal(context.boundary.budget,48);assert.equal(context.boundary.byReason.budget,12);
+});
+
+test('parts prioritize composition and direct native type while packages expose declared ownership distinctly',()=>{
+ const graph={elements:[element('part','PartUsage'),element('child','PartUsage'),element('type','PartDefinition'),element('req'),element('pkg','Package'),element('nested','Package')],relationships:[edge('req','part','req','satisfy'),edge('type','part','type','typing'),edge('child','part','child','composition')],containment:[{...edge('owner','pkg','part','containment'),nativeRole:'owner'},{...edge('nested','pkg','nested','containment'),nativeRole:'owner'}]};
+ const part=surroundingContext(graph,{id:'part',nodes:[{id:'p',semanticId:'part'}],edges:[]},{budget:2});
+ assert.deepEqual(part.elements.map(e=>e.id),['child','pkg']);
+ const all=surroundingContext(graph,{id:'part',nodes:[{id:'p',semanticId:'part'}],edges:[]});
+ assert.ok(all.relationships.some(e=>e.kind==='typing'&&e.target==='type'));
+ const pkg=surroundingContext(graph,{id:'pkg',nodes:[{id:'p',semanticId:'pkg'}],edges:[]});
+ assert.deepEqual(new Set(pkg.elements.map(e=>e.id)),new Set(['part','nested']));
+ assert.ok(pkg.relationships.every(e=>e.kind==='containment'&&e.nativeRole==='owner'));
+});
+
+test('context focus gets first choice, with stable names and balanced other anchors',()=>{
+ const graph={elements:[element('a'),element('b'),element('id-z','RequirementUsage',{name:'Alpha'}),element('id-a','RequirementUsage',{name:'Zulu'}),element('from-b')],relationships:[edge('a1','a','id-a'),edge('a2','a','id-z'),edge('b1','b','from-b')]};
+ const context=surroundingContext(graph,view,{budget:2,focusId:'b'});
+ assert.deepEqual(context.elements.map(e=>e.id),['from-b','id-z']);
+});
+
+test('native ownership only exposes package declarations, without inferred qname links',()=>{
+ const graph={elements:[element('pkg','Package'),element('child','PartDefinition'),element('fake','PartDefinition',{qualifiedName:'pkg::fake'})],relationships:[edge('arbitrary','pkg','fake','containment')],containment:[{...edge('native','pkg','child','containment'),nativeRole:'owner'}]};
+ const result=surroundingContext(graph,{nodes:[{id:'p',semanticId:'pkg'}]});
+ assert.deepEqual(result.elements.map(e=>e.id),['child']);
+ assert.equal(result.omissions.find(o=>o.relationshipId==='arbitrary').reason,'relationship-policy');
+});
+
+
+test('native package declaration context includes enum and concern but ownership does not crowd requirement traces',()=>{
+ const graph={elements:[element('pkg','Package'),element('enum','EnumerationDefinition'),element('concern','ConcernUsage'),element('view','ViewDefinition'),element('meta','MetadataUsage'),element('req')],relationships:[],containment:['enum','concern','view','meta','req'].map(id=>({...edge('o:'+id,'pkg',id,'containment'),nativeRole:'owner'}))};
+ const pkg=surroundingContext(graph,{nodes:[{id:'p',semanticId:'pkg'}]});
+ assert.deepEqual(new Set(pkg.elements.map(e=>e.id)),new Set(['enum','concern','view','meta','req']));
+ const req=surroundingContext(graph,{nodes:[{id:'r',semanticId:'req'}]});
+ assert.equal(req.elements.length,0);assert.equal(req.omissions[0].reason,'relationship-policy');
+ const explicit=surroundingContext(graph,{nodes:[{id:'r',semanticId:'req'}]},{relationshipKinds:['containment']});
+ assert.deepEqual(explicit.elements.map(e=>e.id),['pkg']);
 });

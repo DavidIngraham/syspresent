@@ -19,13 +19,13 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
  const fixtureRaw=raw.map(e=>structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
- let pendingRender,holdLayout=false;const heldLayouts=[];
+ let pendingRender,holdLayout=false,holdCountdown=null;const heldLayouts=[];
  const window=new JSDOM(html,{url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole()}).window;
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};const ownRealm=value=>{if(value===null||typeof value!=='object')return value;if(ArrayBuffer.isView(value))return new window.Uint8Array(value);if(Array.isArray(value))return window.Array.from(value,ownRealm);if(value instanceof Set)return new window.Set([...value].map(ownRealm));if(value instanceof Map)return new window.Map([...value].map(([k,v])=>[ownRealm(k),ownRealm(v)]));return window.Object.fromEntries(Object.entries(value).map(([k,v])=>[k,ownRealm(v)]));};window.structuredClone=value=>ownRealm(structuredClone(value));window.ResizeObserver=class{constructor(fn){resizeCallback=fn;}observe(){}};
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return size.width;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return size.height;}});
  window.fetch=async url=>({ok:true,arrayBuffer:async()=>packProject({manifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('project.json')?manifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});
- window.Worker=class{constructor(url){this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout){holdLayout=false;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else reply();});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
+ window.Worker=class{constructor(url){this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
   else if(method==='ExportModel')respond({elements:structuredClone([...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
@@ -34,7 +34,7 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(native));
  }terminate(){}};
  window.eval(outputFiles[0].text);await until(()=>window.document.querySelectorAll('.node[data-context=\"false\"]').length===2&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ return {window,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('a delayed native view cannot overwrite a newer scene navigation',async()=>{
  const h=await harness(),d=h.document;
@@ -81,9 +81,9 @@ test('viewport changes during a journey rebuild and settle the intended destinat
  await until(()=>d.getElementById('stage').dataset.motionProgress===undefined&&d.getElementById('scenes').value==='1');
  assert.equal(d.querySelector('.node[data-context="false"]').dataset.semanticId,'orphan');assert.equal(d.getElementById('connections').getAttribute('viewBox'),'0 0 390 650');h.window.close();
 });
-test('space-limited peripheral context uses a short labeled continuation with its directed native link',async()=>{
+test('space-limited context retains a real offscreen tile and complete native link',async()=>{
  const h=await harness({contextNeighbor:true,size:{width:180,height:240}}),d=h.document;
- const marker=d.querySelector('.context-boundary');assert.ok(marker,d.getElementById('nodes').outerHTML+' STATUS '+d.getElementById('status').textContent);assert.equal(marker.hidden,false);assert.equal(marker.getAttribute('aria-hidden'),'false');
+ assert.equal(d.querySelector('.context-boundary'),null);const neighbor=d.querySelector('.node[data-context="true"]');assert.equal(neighbor.dataset.semanticId,'orphan');assert.equal(neighbor.getAttribute('aria-hidden'),'false');
  const edge=d.querySelector('#connections g[data-context="true"]');assert.equal(edge.dataset.source,'req');assert.equal(edge.dataset.target,'orphan');assert.ok(Number(edge.style.opacity)>0&&Number(edge.style.opacity)<1);const coordinates=[...edge.querySelector('.edge-line:not(.edge-outgoing)').getAttribute('d').matchAll(/[ML]([\d.-]+),([\d.-]+)/g)].map(m=>({x:Number(m[1]),y:Number(m[2])}));assert.ok(coordinates.length>=2,'context path must remain visible');for(let i=1;i<coordinates.length;i++)assert.ok(coordinates[i].x===coordinates[i-1].x||coordinates[i].y===coordinates[i-1].y,'settled context routes retain exact orthogonal bends');h.window.close();
 });
 
@@ -142,8 +142,8 @@ test('viewport changes during verification preserve the matching verification di
  const h=await harness({traceFixture:true,reducedMotion:false}),d=h.document;d.querySelector('[data-semantic-id="req"]').click();action(d,'Verification (1)').click();await until(()=>d.getElementById('stage').dataset.motionProgress!==undefined);h.resize(390,650);await new Promise(r=>setTimeout(r,130));d.getElementById('reduce').click();await until(()=>d.getElementById('stage').dataset.motionProgress===undefined&&activeIDs(d).join(',')==='case,req'&&d.getElementById('status').textContent.includes('not executed'));h.window.close();
 });
 
-test('an impossible peripheral continuation is disclosed instead of drawing a misleading wire',async()=>{
- const h=await harness({contextNeighbor:true,size:{width:120,height:140}}),d=h.document;assert.equal(d.querySelector('.context-boundary'),null);assert.equal(d.querySelector('#connections g[data-context="true"]'),null);assert.equal(d.getElementById('context-details').hidden,false);d.getElementById('context-details').click();assert.ok(d.getElementById('information-text').textContent.includes('context-continuation-space'));h.window.close();
+test('a tiny viewport clips the neighborhood without removing its actual endpoint',async()=>{
+ const h=await harness({contextNeighbor:true,size:{width:120,height:140}}),d=h.document;assert.equal(d.querySelector('.context-boundary'),null);assert.ok(d.querySelector('#connections g[data-context="true"]'));assert.equal(d.querySelector('.node[data-context="true"]').dataset.semanticId,'orphan');const before=d.querySelector('.node[data-context="true"]').style.transform;d.getElementById('show-neighborhood').click();assert.notEqual(d.getElementById('graph-world').style.transform,'translate(0px,0px) scale(1)');assert.equal(d.querySelector('.node[data-context="true"]').style.transform,before);h.window.close();
 });
 
 
@@ -225,4 +225,69 @@ test('part and package actions expose structural context on the canvas and histo
  assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['Model','part','definition','nested']));
  const owned=[...d.querySelectorAll('#connections g[data-kind="containment"][data-context="false"]')];assert.equal(owned.length,3);assert.ok(owned.every(g=>g.dataset.source==='Model'));
  assert.ok(d.getElementById('status').textContent.includes('Package ownership is location context'));h.window.close();
+});
+
+
+test('camera zoom and pan reveal fixed world geometry, Fit restores active content and taps stay stationary',async()=>{
+ const h=await harness({contextNeighbor:true,size:{width:390,height:720}}),d=h.document,world=d.getElementById('graph-world'),surface=d.getElementById('graph-viewport');
+ const geometry=()=>[...d.querySelectorAll('.node')].map(n=>[n.dataset.semanticId,n.style.transform,n.style.width,n.style.height]);
+ const before=geometry();h.holdLayout();d.getElementById('show-neighborhood').click();const neighborhoodCamera=world.style.transform;assert.notEqual(neighborhoodCamera,'translate(0px,0px) scale(1)');assert.deepEqual(geometry(),before);assert.equal(h.layoutPending(),false);
+ d.querySelector('.node[data-context="true"]').click();assert.equal(world.style.transform,neighborhoodCamera);assert.equal(d.getElementById('selection').hidden,false);
+ surface.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.notEqual(world.style.transform,neighborhoodCamera);assert.deepEqual(geometry(),before);
+ const panCamera=world.style.transform;surface.dispatchEvent(new h.window.WheelEvent('wheel',{deltaY:100,clientX:190,clientY:200,bubbles:true,cancelable:true}));assert.notEqual(world.style.transform,panCamera);assert.deepEqual(geometry(),before);
+ d.getElementById('fit').click();assert.equal(world.style.transform,'translate(0px,0px) scale(1)');assert.deepEqual(geometry(),before);assert.equal(h.layoutPending(),false);h.window.close();
+});
+
+test('offscreen neighbor Focus and Back restore the former camera and neighborhood without changing native identity',async()=>{
+ const h=await harness({contextNeighbor:true,size:{width:390,height:720}}),d=h.document,active=()=>[...d.querySelectorAll('.node[data-context="false"]')].map(n=>n.dataset.semanticId).sort();
+ d.getElementById('show-neighborhood').click();const camera=d.getElementById('graph-world').style.transform;
+ d.querySelector('.node[data-context="true"]').click();[...d.querySelectorAll('#selection button')].find(b=>b.textContent==='Focus').click();
+ await until(()=>d.getElementById('exploration-label').textContent.includes('orphan')&&active().includes('orphan')&&d.getElementById('stage').dataset.motionProgress===undefined);
+ assert.equal(d.getElementById('graph-world').style.transform,'translate(0px,0px) scale(1)');
+ d.getElementById('explore-back').click();await until(()=>d.getElementById('return').hidden&&active().join(',')==='part,req'&&d.getElementById('stage').dataset.motionProgress===undefined);
+ assert.equal(d.getElementById('graph-world').style.transform,camera);assert.equal(d.querySelector('.node[data-context="true"]').dataset.semanticId,'orphan');h.window.close();
+});
+
+test('explicit More neighbors expands only the prepared neighborhood and keeps the active layout and camera',async()=>{
+ const h=await harness({contextNeighbor:true,presentation:{contextBudget:0}}),d=h.document;
+ const active=()=>[...d.querySelectorAll('.node[data-context="false"]')].map(n=>[n.dataset.semanticId,n.style.transform]);
+ const before=active(),camera=d.getElementById('graph-world').style.transform;assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);assert.equal(d.getElementById('more-neighbors').hidden,false);
+ d.getElementById('more-neighbors').click();await until(()=>d.querySelectorAll('.node[data-context="true"]').length===1&&d.getElementById('stage').dataset.motionProgress===undefined);
+ assert.deepEqual(active(),before);assert.equal(d.getElementById('graph-world').style.transform,camera);assert.equal(d.getElementById('more-neighbors').hidden,true);
+ d.getElementById('explore-back').click();await until(()=>d.querySelectorAll('.node[data-context="true"]').length===0);h.window.close();
+});
+
+
+test('a camera gesture during pending layout is not overwritten by its eventual destination',async()=>{
+ const h=await harness({reducedMotion:false,secondScene:true}),d=h.document;h.holdLayout();d.getElementById('next').click();await until(h.layoutPending);
+ d.getElementById('graph-viewport').dispatchEvent(new h.window.WheelEvent('wheel',{deltaY:120,clientX:180,clientY:170,bubbles:true,cancelable:true}));
+ const camera=d.getElementById('graph-world').style.transform;assert.notEqual(camera,'translate(0px,0px) scale(1)');h.releaseLayout();
+ await until(()=>d.getElementById('scenes').value==='1'&&d.getElementById('stage').dataset.motionProgress===undefined&&activeIDs(d).join(',')==='orphan');
+ assert.equal(d.getElementById('graph-world').style.transform,camera);h.window.close();
+});
+
+test('a native ancestor journey pulls the camera back and travels before settling on active fit',async()=>{
+ const h=await harness({reducedMotion:false,secondScene:true,ancestorFixture:true}),d=h.document;
+ d.getElementById('next').click();await until(()=>d.getElementById('stage').dataset.motionProgress!==undefined);
+ await until(()=>{const m=/scale\(([^)]+)\)/.exec(d.getElementById('graph-world').style.transform);return m&&Number(m[1])<.9;});
+ const camera=d.getElementById('graph-world').style.transform;assert.notEqual(camera,'translate(0px,0px) scale(1)');
+ await until(()=>d.querySelector('.node[data-semantic-id="Model"]')&&Number(d.querySelector('.node[data-semantic-id="Model"]').style.opacity)>.5);
+ assert.match(d.getElementById('transition').textContent,/Model ownership route/);
+ d.getElementById('fit').click();await until(()=>activeIDs(d).join(',')==='orphan'&&d.getElementById('stage').dataset.motionProgress===undefined);
+ assert.equal(d.getElementById('graph-world').style.transform,'translate(0px,0px) scale(1)');h.window.close();
+});
+
+
+test('a gesture during intermediate journey preparation cancels automated camera travel',async()=>{
+ const h=await harness({reducedMotion:false,secondScene:true,ancestorFixture:true}),d=h.document;h.holdLayoutAfter(2);d.getElementById('next').click();await until(h.layoutPending);
+ d.getElementById('graph-viewport').dispatchEvent(new h.window.WheelEvent('wheel',{deltaY:120,clientX:180,clientY:170,bubbles:true,cancelable:true}));const camera=d.getElementById('graph-world').style.transform;h.releaseLayout();
+ await until(()=>d.getElementById('scenes').value==='1'&&d.getElementById('stage').dataset.motionProgress===undefined&&activeIDs(d).join(',')==='orphan');
+ assert.equal(d.getElementById('graph-world').style.transform,camera);h.window.close();
+});
+
+
+test('neighbor disclosure counts prepared tiles rather than conflating offscreen tiles with omissions',async()=>{
+ const h=await harness({contextNeighbor:true}),d=h.document;assert.equal(d.getElementById('context-details').textContent,'Neighbors (1)');
+ d.getElementById('context-details').click();assert.equal(d.getElementById('information-title').textContent,'Prepared neighborhood');
+ assert.match(d.getElementById('information-text').textContent,/1 of 1 eligible one-hop neighbors prepared/);assert.match(d.getElementById('information-text').textContent,/real tile/);h.window.close();
 });

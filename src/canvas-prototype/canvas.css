@@ -58,3 +58,19 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 footer #transition{position:static;max-width:none;flex:1;text-align:left;font:inherit;padding:0;background:none;border-radius:0}
 footer:has(#transition[data-notice=true]) #status{display:none}
 footer #transition:not([data-notice=true]){display:none}
+
+/* The camera moves only the graph. Prose and controls stay in screen space. */
+#graph-viewport,#graph-world{position:absolute;inset:0;width:100%;height:100%}
+#graph-viewport{overflow:clip;touch-action:none;outline-offset:-4px;cursor:grab}
+#graph-viewport:active{cursor:grabbing}
+#graph-world{transform-origin:0 0;will-change:transform}
+#graph-world #connections{overflow:visible}
+#graph-world #nodes{overflow:visible}
+#camera-menu{position:relative}
+#camera-menu>summary{font-size:.8rem;border:1px solid #b7c8c7;border-radius:6px;background:white;list-style:none}
+.camera-actions{position:absolute;bottom:calc(100% + 8px);left:0;display:grid;gap:.35rem;min-width:210px;max-width:calc(100vw - 40px);padding:.65rem;background:white;border:1px solid var(--line);border-radius:8px;box-shadow:0 5px 22px #2443}
+.camera-actions span{font-size:.73rem;color:#526e70;max-width:240px}
+#canvas-tools{flex-wrap:wrap;max-width:calc(100% - 24px)}
+.node.peripheral{background:#fff}
+.node.peripheral .kind{display:block;font-size:10px}
+.node.peripheral .name{font-size:12px;display:block;-webkit-line-clamp:unset;overflow-wrap:anywhere}

@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {validatePresentation, resolvePresentation, PRESENTATION_RELATIONSHIP_KINDS} from '../src/canvas-prototype/preferences.mjs';
 import {edgeAppearance} from '../src/canvas-prototype/notation.mjs';
 
-test('display defaults are responsive and preserve no expansion or emphasis intent', () => {
+test('display defaults are independent of viewport width and preserve no expansion or emphasis intent', () => {
   assert.deepEqual(validatePresentation(), {compartments:'auto', expanded:[], emphasis:[], grouping:'none'});
   assert.deepEqual(resolvePresentation(undefined, {width:390}), {
-    compartments:'auto', expanded:[], emphasis:[], grouping:'none', contextBudget:4, expandedIds:[],
+    compartments:'auto', expanded:[], emphasis:[], grouping:'none', contextBudget:48, expandedIds:[],
   });
-  assert.equal(resolvePresentation({}, {width:699}).contextBudget, 4);
-  assert.equal(resolvePresentation({}, {width:700}).contextBudget, 6);
-  assert.equal(resolvePresentation().contextBudget, 6);
+  assert.equal(resolvePresentation({}, {width:699}).contextBudget, 48);
+  assert.equal(resolvePresentation({}, {width:700}).contextBudget, 48);
+  assert.equal(resolvePresentation().contextBudget, 48);
 });
 
 test('explicit display preferences are JSON round-trip safe and copied without mutation', () => {
@@ -66,10 +66,10 @@ test('unknown fields cannot introduce a competing model query language', () => {
 });
 
 test('invalid context limits fail instead of silently truncating or coercing author intent', () => {
-  for (const contextBudget of [-1,9,1.5,'4',false,null,undefined,Infinity,NaN]) {
+  for (const contextBudget of [-1,257,1.5,'4',false,null,undefined,Infinity,NaN]) {
     assert.throws(() => validatePresentation({contextBudget}), /contextBudget/);
   }
-  for (let contextBudget = 0; contextBudget <= 8; contextBudget++) assert.equal(validatePresentation({contextBudget}).contextBudget, contextBudget);
+  for (let contextBudget = 0; contextBudget <= 256; contextBudget++) assert.equal(validatePresentation({contextBudget}).contextBudget, contextBudget);
 });
 
 test('reference and emphasis lists reject malformed values and preserve exact identity text', () => {

@@ -29,7 +29,7 @@ function stringList(value, key, allowed) {
 
 /**
  * Validate and copy JSON-compatible author intent. contextBudget is optional
- * here because its default depends on viewport width. Expanded entries remain
+ * here because its default is independent of viewport width. Expanded entries remain
  * native references until resolvePresentation resolves them through the caller's
  * authoritative native identity index. No fallback name/label lookup is used.
  */
@@ -52,8 +52,8 @@ export function validatePresentation(config = {}) {
   const emphasis = stringList(own(config, 'emphasis') ? config.emphasis : [], 'emphasis', kinds);
   const result = {compartments, expanded, emphasis, grouping};
   if (own(config, 'contextBudget')) {
-    if (!Number.isInteger(config.contextBudget) || config.contextBudget < 0 || config.contextBudget > 8) {
-      fail('contextBudget must be an integer from 0 through 8');
+    if (!Number.isInteger(config.contextBudget) || config.contextBudget < 0 || config.contextBudget > 256) {
+      fail('contextBudget must be an integer from 0 through 256');
     }
     result.contextBudget = config.contextBudget;
   }
@@ -83,5 +83,5 @@ export function resolvePresentation(config = {}, {width = 1024, resolve} = {}) {
     }
     if (!expandedIds.includes(id)) expandedIds.push(id);
   }
-  return {...presentation, contextBudget: presentation.contextBudget ?? (width < 700 ? 4 : 6), expandedIds};
+  return {...presentation, contextBudget: presentation.contextBudget ?? 48, expandedIds};
 }

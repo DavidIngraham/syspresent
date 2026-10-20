@@ -1,14 +1,14 @@
-/** Display policy for bounded, translucent context around an authoritative native view.
+/** Display policy for bounded, translucent one-hop world context around an authoritative native view.
  * This is not another SysML query or diagram: graph edges retain their native kinds,
  * semantic endpoints and direction, and the authored active view is never changed.
  */
 import {ENGINEERING_RELATIONSHIPS} from './core/index.mjs';
-import {graphView} from './graph.mjs';
+import {graphView,isDeclarationKind} from './graph.mjs';
 import {edgeLayoutHints} from './notation.mjs';
 
 const allowedKinds=new Set(ENGINEERING_RELATIONSHIPS);
-const forbiddenKinds=new Set(['type','typing','specialization','owner','owningMembership','ownedMembership','documentation','membership','succession','transition']);
-const engineeringElement=/^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
+const forbiddenKinds=new Set(['type','specialization','owner','owningMembership','ownedMembership','documentation','membership','succession','transition']);
+const engineeringElement=/^(?:Package|Namespace)$|^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
 const compare=(a,b)=>a<b?-1:a>b?1:0;
 const edgeKey=edge=>JSON.stringify([edge.id,edge.source,edge.target,edge.kind]);
 // Rank declared engineering traces before a generic dependency, using only the
@@ -21,28 +21,33 @@ const kindOrder=new Map(['derive','derivation','refine','refinement','satisfy','
  * active native view. All filtered, unavailable and truncated neighbors are explicit.
  */
 export function surroundingContext(graph,activeView,options={}) {
- const {budget=6}=options;
+ const {budget=48}=options;
  if(!Number.isInteger(budget)||budget<0)throw new Error('Invalid surrounding context budget');
  const elements=new Map((graph.elements??[]).map(element=>[element.id,element]));
  const activeNodes=activeView.nodes??[],activeEdges=activeView.edges??[];
  const activeIds=[...new Set(activeNodes.map(node=>node.semanticId).filter(Boolean))].sort(compare);
  const active=new Set(activeIds),scope=options.scopeIds?new Set(options.scopeIds):null;
- const kinds=new Set((options.relationshipKinds??[...allowedKinds]).filter(kind=>allowedKinds.has(kind)&&!forbiddenKinds.has(kind)));
+ const kinds=new Set((options.relationshipKinds??[...allowedKinds,'typing','containment']).filter(kind=>(allowedKinds.has(kind)||['typing','containment'].includes(kind))&&!forbiddenKinds.has(kind)));
+ const nativePackageOwner=edge=>edge.kind==='containment'&&edge.nativeRole==='owner'&&/^(Package|Namespace)$/.test(elements.get(edge.source)?.kind??'');
+ const directType=edge=>edge.kind==='typing'&&/Usage$/.test(elements.get(edge.source)?.kind??'')&&elements.get(edge.target)?.kind===elements.get(edge.source)?.kind.replace(/Usage$/,'Definition');
+ const structural=id=>/^(PartUsage|PartDefinition|Package|Namespace)$/.test(elements.get(id)?.kind??'');
+ const structuralView=options.structural===true||options.relationshipKinds?.includes('containment')===true;
+ const allowed=(edge,anchor)=>kinds.has(edge.kind)&&(edge.kind!=='containment'||nativePackageOwner(edge)&&(structuralView||structural(anchor??(active.has(edge.source)?edge.source:edge.target))))&&(edge.kind!=='typing'||directType(edge));
  const representations=new Map();
  for(const node of [...activeNodes].sort((a,b)=>compare(a.id,b.id)))if(node.semanticId&&!representations.has(node.semanticId))representations.set(node.semanticId,node.id);
- const edges=[...new Map((graph.relationships??[]).map(edge=>[edgeKey(edge),edge])).values()].sort((a,b)=>compare(edgeKey(a),edgeKey(b)));
+ const edges=[...new Map([...(graph.relationships??[]),...(graph.containment??[]).filter(nativePackageOwner)].map(edge=>[edgeKey(edge),edge])).values()].sort((a,b)=>compare(edgeKey(a),edgeKey(b)));
  const omissions=[],seenOmissions=new Set();
  const omit=(edge,target,reason,anchor)=>{
   const key=JSON.stringify([edgeKey(edge),target,reason]);
   if(seenOmissions.has(key))return;
   seenOmissions.add(key);omissions.push({relationshipId:edge.id??null,target,anchor,reason});
  };
- const elementReason=id=>{
+ const elementReason=(id,edge)=>{
   const element=elements.get(id);
   if(!element)return 'unavailable';
   if(scope&&!scope.has(id))return 'outside-scope';
   if(element.layer==='metamodel'||element.metamodel===true)return 'metamodel-boundary';
-  if(!engineeringElement.test(element.kind??''))return 'element-policy';
+  if(!engineeringElement.test(element.kind??'')&&!(edge&&nativePackageOwner(edge)&&isDeclarationKind(element.kind)))return 'element-policy';
   return null;
  };
  const candidates=new Map();
@@ -50,18 +55,24 @@ export function surroundingContext(graph,activeView,options={}) {
   const sourceActive=active.has(edge.source),targetActive=active.has(edge.target);
   if(sourceActive===targetActive)continue;
   const target=sourceActive?edge.target:edge.source,anchor=sourceActive?edge.source:edge.target;
-  const reason=!kinds.has(edge.kind)?'relationship-policy':elementReason(target);
+  const reason=!allowed(edge,anchor)?'relationship-policy':elementReason(target,edge);
   if(reason){omit(edge,target,reason,anchor);continue;}
   if(!candidates.has(target))candidates.set(target,[]);
   candidates.get(target).push(edge);
  }
  // Round-robin by active anchor avoids letting one high-degree element monopolize
  // a small peripheral context budget. Shared neighbors consume only one slot.
- const priority=id=>Math.min(...candidates.get(id).map(edge=>kindOrder.get(edge.kind)??99));
- const chosen=new Set(),pending=new Map(activeIds.map(id=>[id,[...candidates.keys()].filter(target=>candidates.get(target).some(edge=>edge.source===id||edge.target===id)).sort((a,b)=>priority(a)-priority(b)||compare(a,b))]));
+ const priority=(target,anchor)=>Math.min(...candidates.get(target).filter(edge=>edge.source===anchor||edge.target===anchor).map(edge=>{
+  const structural=/^(Part(?:Usage|Definition)|Package|Namespace)$/.test(elements.get(anchor)?.kind??'');
+  if(structural){const order=['composition','containment','typing','connection','reference','flow'].indexOf(edge.kind);if(order>=0)return order;}
+  return 10+(kindOrder.get(edge.kind)??99);
+ }));
+ const byName=(a,b)=>compare(elements.get(a)?.name??elements.get(a)?.qualifiedName??a,elements.get(b)?.name??elements.get(b)?.qualifiedName??b)||compare(a,b);
+ const focus=options.focusId??options.focus,anchors=[...activeIds].sort((a,b)=>Number(b===focus)-Number(a===focus)||byName(a,b));
+ const chosen=new Set(),pending=new Map(anchors.map(id=>[id,[...candidates.keys()].filter(target=>candidates.get(target).some(edge=>edge.source===id||edge.target===id)).sort((a,b)=>priority(a,id)-priority(b,id)||byName(a,b))]));
  while(chosen.size<budget){
   let progress=false;
-  for(const id of activeIds){
+  for(const id of anchors){
    const queue=pending.get(id);
    while(queue.length&&chosen.has(queue[0]))queue.shift();
    if(queue.length&&chosen.size<budget){chosen.add(queue.shift());progress=true;}
@@ -76,7 +87,7 @@ export function surroundingContext(graph,activeView,options={}) {
  // Keep an explicit connection between two already chosen neighbors too. This
  // does not select more nodes or make a second-hop context expansion.
  for(const edge of edges)if(chosen.has(edge.source)&&chosen.has(edge.target)){
-  if(kinds.has(edge.kind))relationships.push(edge);
+  if(allowed(edge))relationships.push(edge);
   else omit(edge,edge.target,'relationship-policy',edge.source);
  }
  // A context node is a boundary, not a recursive expansion. Disclose known links
@@ -86,7 +97,7 @@ export function surroundingContext(graph,activeView,options={}) {
   if(sourceChosen===targetChosen)continue;
   const target=sourceChosen?edge.target:edge.source,anchor=sourceChosen?edge.source:edge.target;
   if(active.has(target))continue;
-  const reason=!kinds.has(edge.kind)?'relationship-policy':elementReason(target)??'depth';
+  const reason=!allowed(edge,anchor)?'relationship-policy':elementReason(target,edge)??'depth';
   omit(edge,target,reason,anchor);
  }
  const contextElements=[...chosen].map(id=>elements.get(id));
