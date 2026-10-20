@@ -1,0 +1,800 @@
+{
+  "engine": {
+    "version": "syspresent-19eaec64755f",
+    "capabilities": [
+      "type_facts",
+      "enum_values",
+      "evaluate_subject",
+      "symbol_attributes",
+      "unset_value",
+      "feature_values",
+      "inline_language",
+      "strict_conformance",
+      "parse_sources",
+      "complex_values",
+      "structured_values",
+      "measurement_refs",
+      "function_values",
+      "set_values",
+      "tensor_values",
+      "infinity_value",
+      "diagnostic_codes",
+      "schedule",
+      "final_time",
+      "metaobject_values",
+      "undetermined_value",
+      "performer",
+      "big_int_values",
+      "render_view",
+      "semantic_rendering_identity",
+      "export_model"
+    ]
+  },
+  "views": {
+    "sequence": {
+      "view": "BehaviorViews::sequence",
+      "kind": "sequence",
+      "stated": "view def SequenceView",
+      "notices": [],
+      "shown": [
+        "port-symbols",
+        "compartments",
+        "keywords"
+      ],
+      "nodes": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartupExchange__panel",
+          "qualifiedName": "DeskFan::StartupExchange::panel",
+          "id": "n0",
+          "kind": "part",
+          "name": "panel",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartupExchange__control",
+          "qualifiedName": "DeskFan::StartupExchange::control",
+          "id": "n1",
+          "kind": "part",
+          "name": "control",
+          "type": "",
+          "detail": ""
+        }
+      ],
+      "edges": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartupExchange__request",
+          "qualifiedName": "DeskFan::StartupExchange::request",
+          "from": "n0",
+          "to": "n1",
+          "label": "request",
+          "kind": "flow"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartupExchange__selfCheck",
+          "qualifiedName": "DeskFan::StartupExchange::selfCheck",
+          "from": "n1",
+          "to": "n1",
+          "label": "selfCheck",
+          "kind": "flow"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartupExchange__ready",
+          "qualifiedName": "DeskFan::StartupExchange::ready",
+          "from": "n1",
+          "to": "n0",
+          "label": "ready",
+          "kind": "flow"
+        }
+      ]
+    },
+    "state": {
+      "view": "BehaviorViews::states",
+      "kind": "state",
+      "stated": "view def StateTransitionView",
+      "notices": [],
+      "shown": [
+        "port-symbols",
+        "compartments",
+        "keywords"
+      ],
+      "nodes": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating",
+          "qualifiedName": "DeskFan::operating",
+          "id": "n0",
+          "kind": "state",
+          "name": "DeskFan::operating",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "synthetic",
+          "id": "n5",
+          "kind": "start",
+          "name": "",
+          "type": "",
+          "detail": "",
+          "parent": "n0"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__idle",
+          "qualifiedName": "DeskFan::operating::idle",
+          "id": "n1",
+          "kind": "state",
+          "name": "idle",
+          "type": "",
+          "detail": "initial",
+          "parent": "n0"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active",
+          "qualifiedName": "DeskFan::operating::active",
+          "id": "n2",
+          "kind": "state",
+          "name": "active",
+          "type": "",
+          "detail": "",
+          "parent": "n0"
+        },
+        {
+          "identityStatus": "synthetic",
+          "id": "n6",
+          "kind": "start",
+          "name": "",
+          "type": "",
+          "detail": "",
+          "parent": "n2"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active__accelerating",
+          "qualifiedName": "DeskFan::operating::active::accelerating",
+          "id": "n3",
+          "kind": "state",
+          "name": "accelerating",
+          "type": "",
+          "detail": "initial",
+          "parent": "n2"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active__steady",
+          "qualifiedName": "DeskFan::operating::active::steady",
+          "id": "n4",
+          "kind": "state",
+          "name": "steady",
+          "type": "",
+          "detail": "",
+          "parent": "n2"
+        }
+      ],
+      "edges": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating___401",
+          "qualifiedName": "DeskFan::operating::@1",
+          "from": "n5",
+          "to": "n1",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active___401",
+          "qualifiedName": "DeskFan::operating::active::@1",
+          "from": "n6",
+          "to": "n3",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating___404",
+          "qualifiedName": "DeskFan::operating::@4",
+          "from": "n1",
+          "to": "n2",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating___405",
+          "qualifiedName": "DeskFan::operating::@5",
+          "from": "n2",
+          "to": "n1",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active___404",
+          "qualifiedName": "DeskFan::operating::active::@4",
+          "from": "n3",
+          "to": "n4",
+          "label": "",
+          "kind": "transition"
+        }
+      ]
+    },
+    "cases": {
+      "view": "BehaviorViews::cases",
+      "kind": "case",
+      "stated": "render asCaseDiagram",
+      "notices": [],
+      "shown": [
+        "port-symbols",
+        "compartments",
+        "keywords"
+      ],
+      "nodes": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__StartFan",
+          "qualifiedName": "BehaviorViews::StartFan",
+          "id": "n0",
+          "kind": "use case def",
+          "name": "BehaviorViews::StartFan",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__SpinUp",
+          "qualifiedName": "BehaviorViews::SpinUp",
+          "id": "n1",
+          "kind": "analysis def",
+          "name": "BehaviorViews::SpinUp",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__StartupCheck",
+          "qualifiedName": "BehaviorViews::StartupCheck",
+          "id": "n2",
+          "kind": "verification def",
+          "name": "BehaviorViews::StartupCheck",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__launch",
+          "qualifiedName": "BehaviorViews::launch",
+          "id": "n3",
+          "kind": "use case",
+          "name": "BehaviorViews::launch",
+          "type": "",
+          "detail": ""
+        }
+      ],
+      "edges": []
+    },
+    "mixed": {
+      "view": "BehaviorViews::mixed",
+      "kind": "mixed",
+      "stated": "render asMixedDiagram",
+      "notices": [],
+      "shown": [
+        "port-symbols",
+        "compartments",
+        "keywords"
+      ],
+      "nodes": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__StartFan",
+          "qualifiedName": "BehaviorViews::StartFan",
+          "id": "n0",
+          "kind": "use case def",
+          "name": "BehaviorViews::StartFan",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__SpinUp",
+          "qualifiedName": "BehaviorViews::SpinUp",
+          "id": "n1",
+          "kind": "analysis def",
+          "name": "BehaviorViews::SpinUp",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__StartupCheck",
+          "qualifiedName": "BehaviorViews::StartupCheck",
+          "id": "n2",
+          "kind": "verification def",
+          "name": "BehaviorViews::StartupCheck",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__launch",
+          "qualifiedName": "BehaviorViews::launch",
+          "id": "n3",
+          "kind": "use case",
+          "name": "BehaviorViews::launch",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__control",
+          "qualifiedName": "BehaviorViews::control",
+          "id": "n21",
+          "kind": "part",
+          "name": "BehaviorViews::control",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating",
+          "qualifiedName": "DeskFan::operating",
+          "id": "n4",
+          "kind": "state",
+          "name": "DeskFan::operating",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "synthetic",
+          "id": "n9",
+          "kind": "start",
+          "name": "",
+          "type": "",
+          "detail": "",
+          "parent": "n4"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__idle",
+          "qualifiedName": "DeskFan::operating::idle",
+          "id": "n5",
+          "kind": "state",
+          "name": "idle",
+          "type": "",
+          "detail": "initial",
+          "parent": "n4"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active",
+          "qualifiedName": "DeskFan::operating::active",
+          "id": "n6",
+          "kind": "state",
+          "name": "active",
+          "type": "",
+          "detail": "",
+          "parent": "n4"
+        },
+        {
+          "identityStatus": "synthetic",
+          "id": "n10",
+          "kind": "start",
+          "name": "",
+          "type": "",
+          "detail": "",
+          "parent": "n6"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active__accelerating",
+          "qualifiedName": "DeskFan::operating::active::accelerating",
+          "id": "n7",
+          "kind": "state",
+          "name": "accelerating",
+          "type": "",
+          "detail": "initial",
+          "parent": "n6"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active__steady",
+          "qualifiedName": "DeskFan::operating::active::steady",
+          "id": "n8",
+          "kind": "state",
+          "name": "steady",
+          "type": "",
+          "detail": "",
+          "parent": "n6"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle",
+          "qualifiedName": "DeskFan::StartCycle",
+          "id": "n11",
+          "kind": "action def",
+          "name": "DeskFan::StartCycle",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "synthetic",
+          "id": "n12",
+          "kind": "initial",
+          "name": "start",
+          "nameSynthesized": true,
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__permission",
+          "qualifiedName": "DeskFan::StartCycle::permission",
+          "id": "n13",
+          "kind": "decision",
+          "name": "permission",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__prepare",
+          "qualifiedName": "DeskFan::StartCycle::prepare",
+          "id": "n14",
+          "kind": "fork",
+          "name": "prepare",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__energize",
+          "qualifiedName": "DeskFan::StartCycle::energize",
+          "id": "n15",
+          "kind": "action",
+          "name": "energize",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__recordRequest",
+          "qualifiedName": "DeskFan::StartCycle::recordRequest",
+          "id": "n16",
+          "kind": "action",
+          "name": "recordRequest",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__prepared",
+          "qualifiedName": "DeskFan::StartCycle::prepared",
+          "id": "n17",
+          "kind": "join",
+          "name": "prepared",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__running",
+          "qualifiedName": "DeskFan::StartCycle::running",
+          "id": "n18",
+          "kind": "action",
+          "name": "running",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle__refused",
+          "qualifiedName": "DeskFan::StartCycle::refused",
+          "id": "n19",
+          "kind": "action",
+          "name": "refused",
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        },
+        {
+          "identityStatus": "synthetic",
+          "id": "n20",
+          "kind": "final",
+          "name": "done",
+          "nameSynthesized": true,
+          "type": "",
+          "detail": "",
+          "parent": "n11"
+        }
+      ],
+      "edges": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating___401",
+          "qualifiedName": "DeskFan::operating::@1",
+          "from": "n9",
+          "to": "n5",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active___401",
+          "qualifiedName": "DeskFan::operating::active::@1",
+          "from": "n10",
+          "to": "n7",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating___404",
+          "qualifiedName": "DeskFan::operating::@4",
+          "from": "n5",
+          "to": "n6",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating___405",
+          "qualifiedName": "DeskFan::operating::@5",
+          "from": "n6",
+          "to": "n5",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__operating__active___404",
+          "qualifiedName": "DeskFan::operating::active::@4",
+          "from": "n7",
+          "to": "n8",
+          "label": "",
+          "kind": "transition"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___403",
+          "qualifiedName": "DeskFan::StartCycle::@3",
+          "from": "n12",
+          "to": "n13",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___404",
+          "qualifiedName": "DeskFan::StartCycle::@4",
+          "from": "n13",
+          "to": "n14",
+          "label": "[guardEnabled]",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___405",
+          "qualifiedName": "DeskFan::StartCycle::@5",
+          "from": "n13",
+          "to": "n19",
+          "label": "[not guardEnabled]",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4012",
+          "qualifiedName": "DeskFan::StartCycle::@12",
+          "from": "n14",
+          "to": "n15",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4013",
+          "qualifiedName": "DeskFan::StartCycle::@13",
+          "from": "n14",
+          "to": "n16",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4014",
+          "qualifiedName": "DeskFan::StartCycle::@14",
+          "from": "n15",
+          "to": "n17",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4015",
+          "qualifiedName": "DeskFan::StartCycle::@15",
+          "from": "n16",
+          "to": "n17",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4016",
+          "qualifiedName": "DeskFan::StartCycle::@16",
+          "from": "n17",
+          "to": "n18",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4017",
+          "qualifiedName": "DeskFan::StartCycle::@17",
+          "from": "n18",
+          "to": "n20",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "DeskFan__StartCycle___4018",
+          "qualifiedName": "DeskFan::StartCycle::@18",
+          "from": "n19",
+          "to": "n20",
+          "label": "",
+          "kind": "succession"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "BehaviorViews__launch",
+          "qualifiedName": "BehaviorViews::launch",
+          "from": "n3",
+          "to": "n0",
+          "label": "",
+          "kind": "typing"
+        }
+      ]
+    },
+    "fault": {
+      "view": "PowerSupply::tree",
+      "kind": "fault-tree",
+      "stated": "render asFaultTree",
+      "notices": [],
+      "shown": [
+        "port-symbols",
+        "compartments",
+        "keywords"
+      ],
+      "nodes": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__a",
+          "qualifiedName": "PowerSupply::a",
+          "id": "n0",
+          "kind": "basic event",
+          "name": "PowerSupply::a",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__b",
+          "qualifiedName": "PowerSupply::b",
+          "id": "n1",
+          "kind": "basic event",
+          "name": "PowerSupply::b",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__common",
+          "qualifiedName": "PowerSupply::common",
+          "id": "n2",
+          "kind": "basic event",
+          "name": "PowerSupply::common",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__left",
+          "qualifiedName": "PowerSupply::left",
+          "id": "n3",
+          "kind": "OR",
+          "name": "PowerSupply::left",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__right",
+          "qualifiedName": "PowerSupply::right",
+          "id": "n4",
+          "kind": "OR",
+          "name": "PowerSupply::right",
+          "type": "",
+          "detail": ""
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__loss",
+          "qualifiedName": "PowerSupply::loss",
+          "id": "n5",
+          "kind": "AND",
+          "name": "PowerSupply::loss",
+          "type": "",
+          "detail": ""
+        }
+      ],
+      "edges": [
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__al",
+          "qualifiedName": "PowerSupply::al",
+          "from": "n0",
+          "to": "n3",
+          "label": "",
+          "kind": "connection"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__cl",
+          "qualifiedName": "PowerSupply::cl",
+          "from": "n2",
+          "to": "n3",
+          "label": "",
+          "kind": "connection"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__br",
+          "qualifiedName": "PowerSupply::br",
+          "from": "n1",
+          "to": "n4",
+          "label": "",
+          "kind": "connection"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__cr",
+          "qualifiedName": "PowerSupply::cr",
+          "from": "n2",
+          "to": "n4",
+          "label": "",
+          "kind": "connection"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__lt",
+          "qualifiedName": "PowerSupply::lt",
+          "from": "n3",
+          "to": "n5",
+          "label": "",
+          "kind": "connection"
+        },
+        {
+          "identityStatus": "mapped",
+          "semanticId": "PowerSupply__rt",
+          "qualifiedName": "PowerSupply::rt",
+          "from": "n4",
+          "to": "n5",
+          "label": "",
+          "kind": "connection"
+        }
+      ]
+    }
+  }
+}

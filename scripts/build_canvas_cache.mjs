@@ -29,7 +29,7 @@ try{
  const provenance=JSON.parse(await readFile(resolve(option('--provenance','build/canvas-prototype/engine/provenance.json')),'utf8'));
  const render=view=>call('RenderView',{modelHash:parsed.modelHash,view,includeSemanticIdentity:true});
  const coverage=requirementSeeds.length?await render(runtimePackage+'::coverage'):{kind:'definition',nodes:[],edges:[]},scenes=parseStory(fileText(project,manifest.story)),views={};
- for(const name of new Set([...scenes.map(scene=>scene.view),...(manifest.entryView?[manifest.entryView]:[])]))views[name]=await render(name);
+ for(const name of new Set([...scenes.flatMap(scene=>[scene.view,...(scene.regions??[]).map(r=>r.view)]),...(manifest.entryView?[manifest.entryView]:[])]))views[name]=await render(name);
  const availableViews=exported.elements.filter(e=>e['@type']==='ViewUsage'&&e.qualifiedName&&e['sysx:sourceLine']&&!e.qualifiedName.startsWith(runtimePackage+'::')).map(e=>e.qualifiedName);
  const cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:engine.version,engineFingerprint:provenance.assets['sysml-wasm.wasm'].sha256,modelHash:parsed.modelHash,modelRoots:roots,requirementSeeds,runtimePackage,inputDigest:documentDigest(sources),sourceDigest:documentDigest(documents),exported,coverage,availableViews,views};
  await mkdir(dirname(output),{recursive:true});const data=JSON.stringify(cache);await writeFile(output,data);

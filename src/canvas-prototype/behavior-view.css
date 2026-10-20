@@ -1,0 +1,21 @@
+.node:has(>.behavior-face){overflow:visible}
+.node:has(>.behavior-case[data-shape="ellipse"]){border-radius:50%;padding:20px 25px}
+.node:has(>.behavior-case[data-shape="note"]){border-radius:0 14px 0 0}
+.node:has(>.behavior-behavior){border-radius:15px}
+.node:has(>.behavior-behavior[data-shape="region"]){border-style:dashed;border-radius:0}
+.behavior-face .detail{white-space:pre-wrap;text-align:left;overflow-wrap:anywhere}
+.behavior-fault-tree{align-items:center}
+.fault-symbol{display:block;margin:0 auto 4px;width:65px;height:48px;flex-shrink:0;fill:var(--paper,#fff);stroke:currentColor;stroke-width:2}
+.node:has(>.behavior-control){padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.node:has(>.behavior-control):before{display:none}
+.behavior-control{display:block;width:100%;height:100%;position:relative;align-content:center;text-align:center;padding:0;overflow:visible}
+.node.container .behavior-face>.detail{position:absolute;top:53px;left:10px;right:10px;margin-top:0}
+.behavior-case[data-shape="ellipse"]{padding:18px 26px;text-align:center}
+.behavior-control .behavior-control{min-width:100%;min-height:100%}
+.behavior-control .control-caption{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);font:11px/1.25 system-ui,sans-serif;white-space:pre;max-width:180px}
+.behavior-control[data-shape="start"],.behavior-control[data-shape="initial"],.behavior-control[data-shape="junction"]{border-radius:50%;background:currentColor}
+.behavior-control[data-shape="final"],.behavior-control[data-shape="end"],.behavior-control[data-shape="terminate"],.behavior-control[data-shape="terminate action"]{border:2px solid currentColor;border-radius:50%;padding:4px}
+.behavior-control[data-shape="final"]>.behavior-control,.behavior-control[data-shape="end"]>.behavior-control,.behavior-control[data-shape="terminate"]>.behavior-control,.behavior-control[data-shape="terminate action"]>.behavior-control{border-radius:50%;background:currentColor}
+.behavior-control[data-shape="fork"],.behavior-control[data-shape="join"]{background:currentColor}
+.behavior-control[data-shape="decision"]>.behavior-control,.behavior-control[data-shape="merge"]>.behavior-control,.behavior-control[data-shape="choice"]>.behavior-control{border:2px solid currentColor;background:var(--paper,#fff);transform:rotate(45deg);min-width:0;min-height:0;width:70%;height:70%;margin:15%}
+.behavior-control[data-shape="shallow history"],.behavior-control[data-shape="deep history"]{border:2px solid currentColor;border-radius:50%;font-weight:bold;font-size:20px}

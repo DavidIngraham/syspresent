@@ -199,3 +199,87 @@ Basic exploration now works with no manifest, story or prepared views. The optio
 Independent read-only review found two material intake defects: a conventionally named views-only source could lose its native roots, and a delayed fetch/read could overwrite a resumed project. Both were repaired and independently rechecked. The browser also exposed a hidden-stage ResizeObserver request with zero dimensions on Home; the viewer now ignores it and has a regression. A final independent followup ran 66 affected checks and reported no remaining material findings. All 276 canvas/worker tests pass. All four specification files parse natively without diagnostics, with specification hash `0d1582f0e45c8a0114692c782a6326ad3464ea3135e17b1e6b5b76025ff88333`. Native cache and static multi-demo build succeed; the engine/model pins remain unchanged.
 
 Rendered checks used 390×720 and 1024×768. The flashlight demo resolves 67 native elements and four authored views. Selecting only its model.sysml opens the actual Flashlight package, parts and verification case with no story or authored-view file. The browser-exported ZIP contains unchanged model.sysml, blank presentation sources and a two-field v2 descriptor (schemaVersion and title); importing that ZIP restores the same active native elements without diagnostics. A separate source named views.sysml containing an Uploaded package, a Sensor definition and its typed usage, but no requirements or native views, also opens correctly. Blue Dog selected from the landing page loads all 13,125 native elements, nine available views and six story scenes, settling on trafficCoexistence and trafficSafety. Local selection path/size/duplicate checks, folder-relative paths, archive traversal rejection, cache trust and legacy compatibility have automated coverage. Physical folder-picker behavior and iOS performance remain unverified; these checks do not establish representative-reader acceptance.
+
+
+## Native view regions, reader controls and routing
+
+The standalone workspace now supports graph, grid and sequence regions. Native
+tables and matrices use sticky headings, normal-size text, independent scrolling,
+column sizing and inspection. Table sorting preserves native record identity;
+matrix axes preserve native ordering. Exact cell selection, scrolling, sorting,
+column widths, graph cameras and coordinated comparisons are included in history.
+Multiple native relationship declarations in a matrix cell remain individually
+inspectable and explore with their original endpoints and direction. Blank cells
+are explicitly limited to the current view.
+
+Scenes accept additional native view regions, editable from the presentation
+editor. Wide spaces display them together; narrow spaces provide explicit tabs.
+Shared selection highlights matching identities without moving a region. Explicit
+exploration moves to the graph, and Back restores the previous surface.
+Cross-notation motion uses at most 24 native identities and measured visible
+anchors, rather than animating every grid record.
+
+State, case, mixed and fault-tree diagrams use behavior-specific graph faces.
+Sequence views preserve native participant/message order and self-messages on an
+independent scrollable surface. Unsupported native constructs remain disclosed.
+Native interaction fragments are not reconstructed from labels.
+
+View offers persistent All, None and Focused optional compartments (default All),
+and Square or Mind-map connection routing (default Square). Focused refers to
+explicit focus; first selection does not rearrange the scene. Mandatory behavior
+details remain visible. Curves retain terminals and arrow semantics and use safe
+corridors or square fallbacks around obstacles. Graph camera actions are disabled
+when the primary surface is a grid/sequence or is hidden by a narrow region tab.
+
+Validation for this change: 316 canvas/worker tests passed; Python tests passed
+(82 tests, one skipped). All four product specification files validate with the
+native compiler. Native/WASM parity, including actual grid fixtures with duplicate
+relationships and derivation direction, passed. The rebuilt native engine is clean
+revision `761d37ebd01ce37b69a46e0b9fc71671f46ac310`; the Blue Dog cache and static
+multi-demo build succeeded. Independent reviews covered region lifecycle, shared
+selection, history, native identity and notation, and curved-route safety; material
+findings were repaired and retested.
+
+Browser inspection used the new desk-fan view gallery at 1280x720 and a 390x844
+responsive viewport. It exercised the global controls, nested states, case shapes,
+mixed notation, shared-cause fault trees, ordered/self sequence messages, ordinary
+tables, narrow scrolling matrices, duplicate-relationship inspection and
+matrix-to-graph exploration with Back. The browser error log was empty in this
+review. This does not establish physical Safari performance or reader acceptance.
+
+The broader dependency Go suite was attempted but is not green: it includes
+package timeouts, absent pilot corpus/VCS prerequisites, a pre-existing rendering
+metadata expectation mismatch and system Node 18 crypto limitations. Focused native
+build, vet, grid/clone/identity tests and actual WASM checks passed. The unrelated
+legacy viewer JavaScript suite also cannot fully run against this minimal native
+checkout without its VS Code webview dependencies (jsdom, ELK and libavoid); 342
+other root JavaScript checks passed. These limitations are not reported as passes.
+
+
+## Structural prominence overview checkpoint
+
+Standalone models without authored entry scenes, views or focus now open a bounded
+system overview. Native child/descendant and distinct-neighbor counts determine
+structural prominence; separate roots are represented before balanced child rounds.
+Unfilled slots avoid asymmetric detail when a whole root round cannot fit. Named
+native elements qualify; library/generated plumbing does not. Counts describe the
+loaded projection, and descendant caps are disclosed. No aggregate model links
+are invented. View > System overview makes the same selection explicitly; Expand
+contents and normal Back/Forward retain the reading state.
+
+The full 13,125-element Blue Dog model was inspected in the browser at 1280x720
+and 390x844. Its authored first scene still opens first. Explicit overview showed
+seven root cards on wide screens and six on narrow screens, exact count badges,
+and no peripheral nodes. Selection, contents expansion, Back and the selection
+explanation were exercised. The header now refreshes after a resize restarts a
+transition. Browser error logging was empty. Full compartments remain visible by
+default; fit-to-screen text in long package documentation still requires zooming
+on narrow screens. This review does not establish reader acceptance or physical
+Safari performance.
+
+All 344 canvas tests passed, including port metrics and resize-restart regressions.
+The static multi-demo build and all four native product specification validations
+passed. Python tests passed (82 tests, one skipped). Independent review covered
+ranking, native scope/identity, projection bounds, comparison/history restoration,
+resize transitions and port count badges. Existing dependency-suite limitations
+recorded above remain unchanged.

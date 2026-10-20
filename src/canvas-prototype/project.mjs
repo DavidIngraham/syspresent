@@ -74,6 +74,11 @@ export function parseStory(markdown){
   if(scenes.some(s=>s.id===config.id))throw Error('Duplicate scene '+config.id);
   if(config.journey!==undefined&&(!Array.isArray(config.journey)||!config.journey.every(x=>typeof x==='string'&&x)))throw Error('Invalid scene journey');
   if(config.presentation!==undefined)validatePresentation(config.presentation);
+  if(config.regions!==undefined){
+   if(!Array.isArray(config.regions)||config.regions.length>3)throw Error('A scene supports up to three additional view regions');
+   const ids=new Set(['primary','comparison']);
+   for(const r of config.regions){if(!r||typeof r.id!=='string'||!r.id||ids.has(r.id)||typeof r.view!=='string'||!r.view||r.focus!==undefined&&(typeof r.focus!=='string'||!r.focus))throw Error('Invalid or duplicate scene region');ids.add(r.id);}
+  }
   if(!['right','bottom','left'].includes(config.panel?.placement??'right'))throw Error('Unsupported panel placement');
   previous={...config,bodyStart:match.index+match[0].length,markdown:''};scenes.push(previous);
  }

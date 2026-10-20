@@ -5,6 +5,7 @@
  */
 import {isDeclarationKind} from './graph.mjs';
 import {ENGINEERING_RELATIONSHIPS} from './core/index.mjs';
+import {createProminenceIndex} from './prominence.mjs';
 
 const engineeringKinds=new Set(ENGINEERING_RELATIONSHIPS);
 const requirementKinds=new Set(['RequirementDefinition','RequirementUsage']);
@@ -151,7 +152,10 @@ export function traceContext(graph,options={}){
   }
   return mode==='context'?priorities.get(edge.kind)??99:0;
  }));
- const targets=[...data.candidates.keys()].sort((a,b)=>priority(a)-priority(b)||(isStructuralElement(data.root)?compare(data.elements.get(a)?.qualifiedName??data.elements.get(a)?.name??a,data.elements.get(b)?.qualifiedName??data.elements.get(b)?.name??b):0)||compare(a,b)),pages=[];
+ // Prominence only resolves ties within the existing native role order; it
+ // cannot displace a containing element, typing bridge or directed trace role.
+ const prominence=createProminenceIndex(graph,{scopeIds:options.prominenceScopeIds??options.scopeIds});
+ const targets=[...data.candidates.keys()].sort((a,b)=>priority(a)-priority(b)||prominence.compare(a,b)),pages=[];
  let group=[],ids=new Set([focus]);
  for(const target of targets){
   const best=data.candidates.get(target)[0],addition=[target,...(best.bridge?[best.anchor]:[])];

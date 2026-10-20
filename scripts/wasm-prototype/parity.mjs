@@ -125,6 +125,78 @@ try {
   const boundedIDs = new Set(boundedRequirementView.nodes.map(node => node.semanticId));
   assert.ok(boundedIDs.has('Flashlight__light') && boundedIDs.has('Flashlight__massCheck'));
   assert.ok(!boundedIDs.has('Flashlight__controllable'), 'Depth-one context must not follow a newly added satisfier into another requirement');
+  const gridDocuments = [{ name: 'grid-parity.sysml', content: `package GridParity {
+    private import RequirementDerivation::*;
+    part fromPart;
+    part toPart;
+    dependency linkOne from fromPart to toPart;
+    dependency linkTwo from fromPart to toPart;
+    dependency backLink from toPart to fromPart;
+    requirement sourceReq;
+    requirement childReq;
+    #derivation connection derivationLink {
+      end :> derivedRequirements ::> childReq;
+      end :> originalRequirements ::> sourceReq;
+    }
+  }` }];
+  const gridParsed = await native.call('ParseSources', { documents: gridDocuments });
+  assert.deepEqual(await wasm.call('ParseSources', { documents: gridDocuments }), gridParsed, 'Grid fixture must parse identically');
+  assert.equal(gridParsed.diagnostics?.length || 0, 0, 'Grid fixture must compile without diagnostics');
+  const gridExportParams = { modelHash: gridParsed.modelHash, projection: 'declarations' };
+  const gridDeclarations = await native.call('ExportModel', gridExportParams);
+  assert.deepEqual(await wasm.call('ExportModel', gridExportParams), gridDeclarations, 'Grid declaration identities must agree');
+  const gridIDs = new Set(gridDeclarations.elements.map(element => element['@id']));
+  const gridParams = { modelHash: gridParsed.modelHash, view: '#matrix:GridParity', includeSemanticIdentity: true };
+  const matrix = await native.call('RenderView', gridParams);
+  assert.deepEqual(await wasm.call('RenderView', gridParams), matrix, 'Grid axes and every relationship occurrence must agree in native and WASM');
+  assert.equal(matrix.kind, 'matrix');
+  assert.equal(matrix.columnElements.length, matrix.columns.length - 1, 'Leading label column has no invented target identity');
+  const columns = new Map(matrix.columnElements.map(column => {
+    assert.ok(column.index > 0 && column.index < matrix.columns.length, 'Column index includes the leading label column');
+    assert.equal(column.name, matrix.columns[column.index]);
+    assert.equal(column.identityStatus, 'mapped');
+    assert.ok(gridIDs.has(column.semanticId), 'Column identity must be native declaration identity');
+    return [column.index, column];
+  }));
+  const expectedRelations = new Map([
+    ['GridParity__linkOne', ['GridParity__fromPart', 'GridParity__toPart', 'dependency']],
+    ['GridParity__linkTwo', ['GridParity__fromPart', 'GridParity__toPart', 'dependency']],
+    ['GridParity__backLink', ['GridParity__toPart', 'GridParity__fromPart', 'dependency']],
+    // Matrix derivation follows native original-to-derived axes, independently of diagram arrow conventions.
+    ['GridParity__derivationLink', ['GridParity__sourceReq', 'GridParity__childReq', 'derive']]
+  ]);
+  const foundRelations = new Set();
+  let duplicateCell;
+  for (const cell of matrix.relationshipCells) {
+    assert.ok(Number.isInteger(cell.row) && cell.row >= 0 && cell.row < matrix.rows.length);
+    const row = matrix.rows[cell.row], column = columns.get(cell.column);
+    assert.ok(column, 'Sparse cell must address a semantic target column');
+    assert.equal(row.identityStatus, 'mapped');
+    assert.ok(gridIDs.has(row.semanticId));
+    assert.ok(row.cells[cell.column], 'Sparse relationship records address nonempty legacy cells');
+    for (const relation of cell.relationships) {
+      assert.ok(expectedRelations.has(relation.semanticId), `Unexpected relationship ${relation.semanticId}`);
+      assert.ok(!foundRelations.has(relation.semanticId), 'Each declaration contributes one occurrence in this fixture');
+      assert.equal(relation.identityStatus, 'mapped');
+      assert.ok(gridIDs.has(relation.semanticId), 'Cell declaration must occur in native export');
+      assert.deepEqual([relation.sourceSemanticId, relation.targetSemanticId, relation.kind], expectedRelations.get(relation.semanticId));
+      assert.equal(relation.sourceSemanticId, row.semanticId, 'Native source remains the row axis');
+      assert.equal(relation.targetSemanticId, column.semanticId, 'Native target remains the column axis');
+      foundRelations.add(relation.semanticId);
+    }
+    if (cell.relationships.some(relation => relation.semanticId === 'GridParity__linkOne')) duplicateCell = cell;
+  }
+  assert.equal(foundRelations.size, expectedRelations.size, 'Repeated same-kind native relationships must not collapse');
+  assert.deepEqual(duplicateCell.relationships.map(relation => relation.semanticId), ['GridParity__linkOne', 'GridParity__linkTwo']);
+  assert.equal(matrix.rows[duplicateCell.row].cells[duplicateCell.column], 'dependency', 'Legacy display still deduplicates the relationship keyword');
+  const tableParams = { ...gridParams, view: '#table:GridParity' };
+  const table = await native.call('RenderView', tableParams);
+  assert.deepEqual(await wasm.call('RenderView', tableParams), table, 'Native table row identities must agree');
+  assert.equal(table.kind, 'table');
+  assert.ok(table.rows.some(row => row.semanticId === 'GridParity__fromPart'));
+  assert.equal(table.columnElements?.length || 0, 0, 'Property headings must not acquire matrix target identities');
+  assert.equal(table.relationshipCells?.length || 0, 0, 'Ordinary table values must not acquire fabricated relationships');
+  const gridContract = { parsed: gridParsed, declarations: gridDeclarations, matrix, table };
   const capturedViews = {};
   const captureCases = [
     { pseudo: '#action:Flashlight::turnOn', root: ['Flashlight', 'turnOn'], name: 'operation', definition: 'ActionFlowView' },
@@ -166,8 +238,8 @@ try {
   const contextIDs = new Set(portableContext.elements.map(element => element.id));
   for (const id of ['Flashlight__light', 'Flashlight__MassCheck', 'Flashlight__massCheck']) assert.ok(contextIDs.has(id), `Standalone requirement context lost native endpoint: ${id}`);
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView }, null, 2) + '\n');
-  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews),
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract }, null, 2) + '\n');
+  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size,
     views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: view.edges.length }])) }, null, 2));
 } finally { native.close(); }
 // Go remains resident by design. This harness owns the process lifetime.

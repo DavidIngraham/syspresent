@@ -10,7 +10,7 @@ test('entry screen exposes demos and local import without exposing empty model c
   const {document} = new JSDOM(html).window;
   assert.equal(document.getElementById('landing').hidden, false);
   for (const id of ['viewer-header', 'stage', 'viewer-footer']) assert.equal(document.getElementById(id).hidden, true);
-  assert.deepEqual([...document.querySelectorAll('[data-demo]')].map(e => e.dataset.demo), ['blue-dog', 'flashlight']);
+  assert.deepEqual([...document.querySelectorAll('[data-demo]')].map(e => e.dataset.demo), ['blue-dog', 'views', 'flashlight']);
   const files = document.getElementById('sysml-files');
   assert.equal(files.multiple, true);
   assert.equal(files.accept, '.sysml,.kerml');

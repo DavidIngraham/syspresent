@@ -104,3 +104,6 @@ body.landing-mode{height:auto;min-height:100dvh;overflow:auto}
 @media(max-width:600px){.landing-shell{width:calc(100% - 32px);padding-top:22px}.landing-intro{margin:28px 0 24px}.demo-grid{grid-template-columns:1fr;gap:12px}.demo-card{min-height:0;padding:20px;gap:10px}.demo-link{padding-top:2px}.landing-import{grid-template-columns:1fr;gap:18px;margin-top:24px;padding-top:24px}.landing-import-actions{align-items:stretch}.landing-import-actions button{min-height:46px}}
 
 @media(max-width:600px){.landing-intro{margin:22px 0 18px}.demo-card{padding:16px;gap:7px}.demo-description{font-size:.95rem;line-height:1.4}.landing-import-actions{display:grid;grid-template-columns:1fr 1fr}.landing-import-actions #open-sysml{grid-column:1/-1}}
+
+.node .prominence{display:block;margin-top:8px;font-size:11px;line-height:1.4;color:#526e70;overflow-wrap:anywhere}
+.node.port.overview-card{border-radius:8px}.node.port.overview-card .node-face{padding:10px;overflow:hidden}

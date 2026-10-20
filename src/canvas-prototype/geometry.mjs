@@ -46,7 +46,7 @@ function endpoints(a,b,sourceFraction=.5,targetFraction=.5){
  const attachment=(node,direction,fraction)=>direction.x?{x:node.x+(direction.x>0?node.width:0),y:node.y+node.height*fraction}:{x:node.x+node.width*fraction,y:node.y+(direction.y>0?node.height:0)};
  return [attachment(a,sourceDirection,sourceFraction),attachment(b,targetDirection,targetFraction),sourceDirection,targetDirection];
 }
-function connectionObstacles(edge,nodes){
+export function connectionObstacles(edge,nodes){
  const byID=new Map(nodes.map(n=>[n.id,n])),ancestors=new Set(),leafPortOwners=new Set();
  for(const id of [edge.source,edge.target]){let node=byID.get(id);if(node?.kind==='port'&&node.parentId&&!byID.get(node.parentId)?.headerHeight)leafPortOwners.add(node.parentId);const seen=new Set();while(node?.parentId&&!seen.has(node.parentId)){seen.add(node.parentId);ancestors.add(node.parentId);node=byID.get(node.parentId);}}
  return nodes.filter(n=>(n.opacity??1)>.08&&n.width>0&&n.height>0).flatMap(n=>ancestors.has(n.id)&&!leafPortOwners.has(n.id)?n.headerHeight?[{...n,height:n.headerHeight}]:[]:[n]);

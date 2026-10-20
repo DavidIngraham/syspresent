@@ -1,6 +1,7 @@
 /** Focused canvas prototype. Native typed relationships are the only semantic authority.
  * Geometry is disposable; semantic identities and native payloads remain unchanged.
  */
+import {representedIdentities,representations} from '../view-contract.mjs';
 const copy = value => structuredClone(value);
 export const ENGINEERING_RELATIONSHIPS = Object.freeze([
   'derive','derivation','refine','refinement','satisfy','satisfaction','verify','verification',
@@ -275,7 +276,7 @@ export function layoutScene(nativeView, options={}) {
   if(bounds.width>width||bounds.height>height)omissions.push({reason:'layout-overflow',message:'The scene needs scrolling or fewer elements to retain readable node sizes.'});
   return {...view,nodes:result,panels:reserved,bounds,omissions};
 }
-function semanticIds(scene){return [...new Set((scene.nodes??scene.view?.nodes??[]).map(node=>node.semanticId).filter(Boolean))];}
+function semanticIds(scene){return representedIdentities(scene.view??scene);}
 /** Plan honest semantic continuity; actual interpolation belongs to the renderer.
  * A disjoint same-notation view still needs a journey. Shared content can reflow
  * directly; changing notation uses GV even when the endpoint identities overlap.
@@ -283,12 +284,13 @@ function semanticIds(scene){return [...new Set((scene.nodes??scene.view?.nodes??
 export function planTransition(fromScene,toScene,options={}) {
   const previous=fromScene.view??fromScene,next=toScene.view??toScene;
   const oldIds=semanticIds(previous),newIds=semanticIds(next),duration=options.reducedMotion?0:360;
-  const correspondence=oldIds.filter(id=>newIds.includes(id)).map(semanticId=>({semanticId,fromRepresentationIds:previous.nodes.filter(node=>node.semanticId===semanticId).map(node=>node.id),toRepresentationIds:next.nodes.filter(node=>node.semanticId===semanticId).map(node=>node.id)}));
+  const correspondence=oldIds.filter(id=>newIds.includes(id)).map(semanticId=>({semanticId,fromRepresentationIds:representations(previous).filter(node=>node.semanticId===semanticId).map(node=>node.representationId),toRepresentationIds:representations(next).filter(node=>node.semanticId===semanticId).map(node=>node.representationId)}));
   if(previous.kind===next.kind&&correspondence.length&&!options.journey?.length)return {mode:'same-kind',journeyRequired:false,correspondence,stages:[{kind:'reflow',viewKind:next.kind,semanticIds:newIds,focusId:toScene.focus,duration}]};
   const route=options.graph&&fromScene.focus&&toScene.focus
     ? options.journey?.length?(options.journey[0]===fromScene.focus&&options.journey.at(-1)===toScene.focus?findExplicitRoute(options.graph,options.journey,options):{found:false,elements:[],relationships:[],omissions:[{reason:'explicit-route-endpoints'}]}):findHierarchyRoute(options.graph,{...options,from:fromScene.focus,to:toScene.focus})
     : {found:false,elements:[],relationships:[],omissions:[{reason:'missing-route-context'}]};
-  const journey=route.found?route.elements.map(element=>element.id):[],stages=[{kind:'gv-bridge',viewKind:'gv',semanticIds:oldIds,focusId:fromScene.focus,duration}];
+  const bounded=(ids,focus)=>[...new Set([focus,...ids].filter(Boolean))].slice(0,24);
+  const journey=route.found?route.elements.map(element=>element.id):[],stages=[{kind:'gv-bridge',viewKind:'gv',semanticIds:bounded(oldIds,fromScene.focus),focusId:fromScene.focus,duration}];
   if(route.found){
     // Overlapping three-element windows show each local hop without shrinking a
     // long route into one overview. Native relationship directions are intact.
@@ -299,6 +301,6 @@ export function planTransition(fromScene,toScene,options={}) {
         phase:route.commonAncestor?(index<=journey.indexOf(route.commonAncestor)?'ascent':'descent'):'explicit',duration});
     }
   }else stages.push({kind:'gv-journey',viewKind:'gv',semanticIds:[],focusId:toScene.focus,route:[],disconnected:true,duration});
-  stages.push({kind:'gv-gather',viewKind:'gv',semanticIds:newIds,focusId:toScene.focus,duration},{kind:'morph',viewKind:next.kind,semanticIds:newIds,focusId:toScene.focus,duration});
+  stages.push({kind:'gv-gather',viewKind:'gv',semanticIds:bounded(newIds,toScene.focus),focusId:toScene.focus,duration},{kind:'morph',viewKind:next.kind,semanticIds:bounded(newIds,toScene.focus),focusId:toScene.focus,duration});
   return {mode:previous.kind===next.kind?'same-kind-journey':'cross-kind',journeyRequired:true,correspondence,route,stages};
 }

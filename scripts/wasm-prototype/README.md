@@ -27,7 +27,7 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `19eaec64755ff229794bda0193d4be9db9ca1b10`
+The prototype dependency revision is `761d37ebd01ce37b69a46e0b9fc71671f46ac310`
 on David's local `david/syspresent-wasm-prototype` branch. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
@@ -128,3 +128,19 @@ Node profile, not a browser or iPad performance claim. The same project without
 helper previously required roughly 969 MB of linear memory during live declaration
 export; prepared native caches avoid that export during ordinary published startup.
 Live exports of large changed/imported projects remain a mobile memory limitation.
+
+
+## Native grid identity extension
+
+The current carried patch includes sparse matrix relationship-cell identities and
+column element identities in the native JSON and WASM render contract.
+`columnElements` preserves display-column indexes (including the leading label
+column); `relationshipCells` preserves native row/column indexes and all matching
+relationship declarations, with exact source/target direction. Ordinary table
+property headings do not acquire invented element identities. Native clone tests
+cover isolation. The parity harness compares actual native and WASM grid fixtures,
+including duplicate relationships and derivation direction. The protobuf/gRPC
+contract has not been extended by this change.
+
+Current source revision: `761d37ebd01ce37b69a46e0b9fc71671f46ac310` (clean).
+Carried-patch SHA-256: `fdfcc7b7677019189f2bb8e5d9e40e6b2ebf9803cbb80e471e359ae9ee6af15d`.

@@ -17,6 +17,7 @@ const inputs=await build({entryPoints:['src/canvas-prototype/app.mjs'],bundle:tr
 if(Object.keys(inputs.metafile.inputs).some(name=>name.includes('editors/vscode')))throw Error('Canvas prototype must not depend on VS Code source modules');
 const files=['app.js','app.js.map'];
 async function copy(from,to){await mkdir(dirname(join(output,to)),{recursive:true});await copyFile(from,join(output,to));files.push(to);}
+for(const name of ['grid-view.css','sequence-view.css','behavior-view.css','scene-regions.css'])await copy('src/canvas-prototype/'+name,name);
 await copy('src/canvas-prototype/index.html','index.html');await copy('src/canvas-prototype/canvas.css','canvas.css');await copy('LICENSE','LICENSE');await copy('THIRD_PARTY_NOTICES','THIRD_PARTY_NOTICES');
 for(const name of ['sysml-wasm.wasm','wasm_exec.js','provenance.json','OPENSYSML-LICENSE','GO-LICENSE'])await copy(join(engine,name),'engine/'+name);
 await copy('src/canvas-prototype/engine/worker.js','engine/worker.js');
@@ -54,8 +55,11 @@ for(const [name,data] of Object.entries(primaryFiles)){
 await writeArchive(primary,'project.zip');
 const flashlight=await readProjectDirectory(resolve('examples/canvas-prototype'));
 await writeArchive(flashlight,'demos/flashlight.zip');
+const viewDemo=await readProjectDirectory(resolve('examples/canvas-views'));
+await writeArchive(viewDemo,'demos/views.zip');
 const demos={schemaVersion:'syspresent.demos.v1',demos:[
  {id:'blue-dog',title:primary.manifest.title,description:'Explore the complete Blue Dog model through river traffic, requirements and recovery.',project:'project.zip',...(runtimeCacheHash?{runtimeCacheHash}:{})},
+ {id:'views',title:viewDemo.manifest.title,description:'Inspect matrices, tables, sequences, states, cases, mixed views and shared fault causes.',project:'demos/views.zip'},
  {id:'flashlight',title:flashlight.manifest.title,description:'A small model connecting a requirement, the flashlight assembly and switching behavior.',project:'demos/flashlight.zip'}
 ]};
 await writeFile(join(output,'demos.json'),JSON.stringify(demos,null,2)+'\n');files.push('demos.json');

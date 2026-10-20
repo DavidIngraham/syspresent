@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {JSDOM} from 'jsdom';
+import {sequenceLayout,mountSequence} from '../src/canvas-prototype/sequence-view.mjs';
+const {views}=JSON.parse(await readFile(new URL('fixtures/canvas-views/behaviors.native.json',import.meta.url)));
+const source=await readFile(new URL('../examples/notation-fixtures/model.sysml',import.meta.url),'utf8');
+test('native message order differs from declaration order; renderer retains order, direction and self message',()=>{
+ const native=structuredClone(views.sequence),before=structuredClone(native),view=sequenceLayout(native);
+ assert.deepEqual(native,before);
+ assert.deepEqual(view.edges.map(e=>e.semanticId),['DeskFan__StartupExchange__request','DeskFan__StartupExchange__selfCheck','DeskFan__StartupExchange__ready']);
+ assert.deepEqual(view.nodes.map(n=>n.semanticId),native.nodes.map(n=>n.semanticId));
+ assert.deepEqual(view.edges.map(e=>[e.source,e.target]),native.edges.map(e=>[e.from,e.to]));
+ assert.ok(view.edges[0].points[0].y<view.edges[1].points[0].y&&view.edges[1].points[0].y<view.edges[2].points[0].y);
+ assert.equal(view.edges[1].self,true);assert.equal(view.edges[1].points.length,4);
+ assert.equal(view.edges[1].sourceSemanticId,view.edges[1].targetSemanticId);
+ assert.ok(source.indexOf('message request')>source.indexOf('message ready'),'fixture declares messages in reverse causal order');
+});
+test('selecting native participants and messages remains stationary; explore is explicit and history restores scroll',()=>{
+ const dom=new JSDOM('<div id="host"></div>'),host=dom.window.document.getElementById('host'),selections=[],explorations=[];
+ const mounted=mountSequence(host,views.sequence,{onSelect:s=>selections.push(s),onExplore:s=>explorations.push(s),state:{scrollLeft:81,scrollTop:49}});
+ host.querySelectorAll('.sequence-message')[1].click();
+ assert.equal(selections.length,1);assert.equal(explorations.length,0);
+ assert.equal(selections[0].relationships[0].semanticId,'DeskFan__StartupExchange__selfCheck');
+ assert.deepEqual(mounted.getState(),{scrollLeft:81,scrollTop:49,selectedId:'DeskFan__StartupExchange__selfCheck'});
+ host.querySelector('.sequence-toolbar button').click();assert.equal(explorations.length,1);
+ const saved=mounted.getState();mounted.destroy();assert.equal(host.children.length,0);
+ const restored=mountSequence(host,views.sequence,{state:saved});
+ assert.deepEqual(restored.getState(),saved);
+ assert.equal(host.querySelectorAll('[aria-pressed="true"]').length,1);
+});
+test('native labels and notices stay literal, unsupported semantics are disclosed without fabricated arrows',()=>{
+ const native=structuredClone(views.sequence);native.edges[0].label='[guard] x < y & "start"';native.edges[1].kind='unknown-control';native.notices=['Native ordering is partial.'];native.fragments=[{kind:'parallel'}];
+ const before=structuredClone(native),dom=new JSDOM('<div></div>'),host=dom.window.document.querySelector('div');
+ mountSequence(host,native);
+ assert.match(host.textContent,/\[guard\] x < y & "start"/);
+ assert.match(host.textContent,/Native ordering is partial/);assert.match(host.textContent,/Unsupported sequence message kind/);assert.match(host.textContent,/fragments are not supported/);
+ assert.equal(host.querySelectorAll('.sequence-message-line').length,2);
+ assert.deepEqual(native,before);
+});
+test('multiple shared relationships highlight without moving or emitting; restoration retains all identities',()=>{
+ const dom=new JSDOM('<div></div>'),host=dom.window.document.querySelector('div'),changes=[];
+ let mounted=mountSequence(host,views.sequence,{state:{scrollLeft:35,scrollTop:48},onSelect:s=>changes.push(s)});
+ const ids=[views.sequence.edges[0].semanticId,views.sequence.edges[2].semanticId];
+ mounted.selectMany(ids);
+ assert.equal(host.querySelectorAll('.sequence-message.selected').length,2);assert.equal(changes.length,0);
+ const state=mounted.getState();assert.deepEqual(state,{scrollLeft:35,scrollTop:48,selectedId:null,selectedIds:ids});
+ assert.equal(host.querySelector('.sequence-toolbar button').disabled,true,'multiple highlights do not silently explore only one relationship');
+ mounted.destroy();mounted=mountSequence(host,views.sequence,{state});assert.deepEqual(mounted.getState(),state);assert.equal(host.querySelectorAll('.sequence-message.selected').length,2);
+ mounted.selectMany([...ids,'not-in-view']);assert.match(host.querySelector('.sequence-selection-notice').textContent,/1 selected element is not represented/);
+ assert.equal(mounted.getState().selectedIds.at(-1),'not-in-view');
+ host.querySelector('.sequence-message').click();assert.equal(mounted.getState().selectedIds,undefined);assert.equal(host.querySelectorAll('.sequence-message.selected').length,1);
+});

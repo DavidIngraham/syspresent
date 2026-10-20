@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {requirementActions,structuralActions,traceContext} from '../src/canvas-prototype/exploration.mjs';
-const element=(id,kind='RequirementUsage',extra={})=>({id,kind,name:id,description:'Native documentation for '+id,...extra});
+const element=(id,kind='RequirementUsage',extra={})=>({id,kind,name:id,layer:'project',native:{declaredName:extra.name??id},description:'Native documentation for '+id,...extra});
 const edge=(id,source,target,kind,extra={})=>({id,source,target,kind,label:'Native label '+id,authority:'native-api',...extra});
 const graph=(elements,relationships)=>({elements,relationships});
 const action=(g,id,mode)=>requirementActions(g,id).find(a=>a.mode===mode);
@@ -146,10 +146,10 @@ test('part contents and container are directional, retaining native owners and d
 test('package focus exposes native containing package and declaration contents without membership plumbing',()=>{
  const g=structureFixture();g.elements.push(element('doc','Documentation'),element('fake','PartUsage',{qualifiedName:'package::fake'}));g.containment.push(owns('package','doc'));
  const root=traceContext(g,{focus:'package',budget:5});
- assert.deepEqual(root.targets,['assembly','nested','type']);assert.ok(root.relationships.every(e=>e.kind==='containment'&&e.navigationOnly&&e.nativeRole==='owner'));
+ assert.deepEqual(root.targets,['type','assembly','nested']);assert.ok(root.relationships.every(e=>e.kind==='containment'&&e.navigationOnly&&e.nativeRole==='owner'));
  assert.ok(!ids(root).includes('doc'));assert.ok(!ids(root).includes('fake'));
  assert.deepEqual(traceContext(g,{focus:'nested',mode:'container'}).targets,['package']);
- assert.deepEqual(traceContext(g,{focus:'package',mode:'contents'}).targets,['assembly','nested','type']);
+ assert.deepEqual(traceContext(g,{focus:'package',mode:'contents'}).targets,['type','assembly','nested']);
  const definition=traceContext(g,{focus:'assembly'});assert.deepEqual(definition.targets,['package','part']);
  assert.match(root.summary.message,/Package ownership is location context/);
 });
@@ -180,4 +180,41 @@ test('package contents include native enumeration and concern declarations witho
  const result=traceContext(g,{focus:'p',mode:'contents',budget:7});assert.deepEqual(new Set(result.targets),new Set(declarations));assert.equal(result.summary.filtered,0);
  assert.deepEqual(traceContext(g,{focus:'r'}).targets,[]);
  assert.deepEqual(ids(traceContext(g,{focus:'EnumerationDefinition'})),['EnumerationDefinition','r']);
+});
+
+test('structural neighbor prominence ranks a substantial branch before an alphabetical leaf within native roles',()=>{
+ const g={elements:[element('whole','PartDefinition'),element('focus','PartUsage'),element('type','PartDefinition'),element('alpha','PartUsage'),element('zulu','PartUsage'),element('descendant','PartUsage')],
+  relationships:[edge('whole','whole','focus','composition'),edge('type','focus','type','typing'),edge('alpha','type','alpha','composition'),edge('zulu','type','zulu','composition'),edge('descendant','zulu','descendant','composition')]};
+ const result=traceContext(g,{focus:'focus',budget:4});
+ assert.deepEqual(result.targets,['whole','type','zulu']);
+ assert.deepEqual(result.typingBridges,['type']);
+ assert.ok(result.omissions.some(o=>o.target==='alpha'&&o.reason==='budget'));
+ assert.ok(!ids(result).includes('descendant'),'prominence must not expand another hop');
+ assert.deepEqual(result.relationships.map(e=>[e.id,e.source,e.target]),[['type','focus','type'],['whole','whole','focus'],['zulu','type','zulu']]);
+});
+
+test('prominence pagination keeps parallel native links, direction and typing bridges across deterministic pages',()=>{
+ const g={elements:[element('r'),element('definition','RequirementDefinition'),element('alpha','PartUsage'),element('zulu','PartUsage'),element('child','PartUsage')],
+  relationships:[edge('type','r','definition','typing'),edge('a','alpha','definition','satisfy'),edge('z1','zulu','definition','satisfy'),edge('z2','zulu','definition','satisfaction'),edge('child','zulu','child','composition')]};
+ const first=traceContext(g,{focus:'r',mode:'impact',budget:3}),second=traceContext(g,{focus:'r',mode:'impact',budget:3,page:1});
+ assert.deepEqual(first.targets,['zulu']);assert.deepEqual(second.targets,['alpha']);assert.equal(first.pages,2);
+ assert.deepEqual(first.relationships.map(e=>[e.id,e.source,e.target]),[['type','r','definition'],['z1','zulu','definition'],['z2','zulu','definition']]);
+ assert.deepEqual(first.typingBridges,['type']);assert.deepEqual(second.typingBridges,['type']);
+ const reversed={elements:[...g.elements].reverse(),relationships:[...g.relationships].reverse()};
+ assert.deepEqual(traceContext(reversed,{focus:'r',mode:'impact',budget:3}),first);
+});
+
+test('rank scope prevents out-of-system children from inflating an in-scope neighbor',()=>{
+ const g={elements:['r','alpha','zulu','outside1','outside2'].map(id=>element(id)),
+  relationships:[edge('a','alpha','r','derive'),edge('z','zulu','r','derive'),edge('o1','zulu','outside1','composition'),edge('o2','zulu','outside2','composition')]};
+ assert.deepEqual(traceContext(g,{focus:'r',mode:'derived',budget:3}).targets,['zulu','alpha']);
+ assert.deepEqual(traceContext(g,{focus:'r',mode:'derived',budget:3,scopeIds:['r','alpha','zulu']}).targets,['alpha','zulu']);
+});
+
+test('prominence scope ranks the active system without hiding a direct external engineering trace',()=>{
+ const g={elements:['r','alpha','outside'].map(id=>element(id)),relationships:[edge('a','alpha','r','derive'),edge('external','outside','r','derive')]};
+ const result=traceContext(g,{focus:'r',mode:'derived',prominenceScopeIds:['r','alpha'],budget:3});
+ assert.deepEqual(result.targets,['alpha','outside']);
+ assert.deepEqual(result.relationships.map(e=>[e.id,e.source,e.target]),[['a','alpha','r'],['external','outside','r']]);
+ assert.ok(!result.omissions.some(o=>o.reason==='outside-scope'));
 });

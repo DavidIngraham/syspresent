@@ -171,4 +171,12 @@ package SyspresentVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def <'SV-017'> automaticOverview {
+        doc /* Load reordered native project graphs with multiple roots, wrapper packages, disconnected branches, duplicated relationships, dense library definitions and ownership cycles. Check deterministic bounded branch selection, native scope and endpoint preservation, child and distinct-neighbor counts and disclosure. Confirm authored entry precedence; select without movement, expand contents and restore exact overview/camera with Back. Inspect large-model startup and phone/desktop readability separately from reader acceptance. */
+        objective acceptance {
+            verify SyspresentRequirements::InitialOverview::structuralProminence;
+            verify SyspresentRequirements::InitialOverview::overviewExploration;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
 }

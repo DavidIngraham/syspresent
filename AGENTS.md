@@ -10,12 +10,6 @@ Never open, reopen or submit upstream dependency PRs, including drafts, unless D
 
 Use native OpenSysML parsing, queries, evaluation and rendering semantics. Do not create a second SysML parser or infer relationships from labels. The current canvas architecture uses OpenSysML Go natively and as browser WASM in a worker, behind an explicit semantic/view contract. Syspresent owns its interactive renderer, dynamic layout, transitions, narrative and authoring policy. Do not add dependencies on the VS Code extension source for the new canvas; legacy reuse remains historical implementation, not the target architecture. Keep Blue Dog names out of generic code.
 
-## Delegation and review
-
-Use focused agents for separable substantial tasks, with explicit owned files, requirements, interface boundaries and checks. Keep small coupled edits local. The coordinator owns integration, cross-view semantics and consistent UX. Shared generated artifacts, mutations and integration checks must be serialized. Agents must not publish or open PRs independently.
-
-Use this focused delegation/review guidance for Syspresent; do not import the Blue Dog agent workflow. After substantive changes, ask an independent agent that did not author them for a read-only review. Resolve material findings and rerun affected checks. Review actual rendered stories for readability and navigation; verify model claims through native tools. Record the review scope and tests actually run. Agent approval does not establish engineering acceptance or permission to publish.
-
 ## Validation and publication
 
 Validate specification changes with the native compiler. Product tests must cover relationship direction, semantic identity, hidden context, snapshot immutability and behavior-specific notation, not only screenshots. Keep snapshot status separate from verification and approval. Run the affected build and checks before authorized publication. Confirm deployment dispatch without polling unless David asks to wait.

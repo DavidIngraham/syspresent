@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {surroundingContext,positionSurrounding} from '../src/canvas-prototype/context.mjs';
-const element=(id,kind='RequirementUsage',extra={})=>({id,kind,name:id,description:'Full documentation must not clutter peripheral context',...extra});
+const element=(id,kind='RequirementUsage',extra={})=>({id,kind,name:id,layer:'project',native:{declaredName:extra.name??id},description:'Full documentation must not clutter peripheral context',...extra});
 const edge=(id,source,target,kind='derive')=>({id,source,target,kind,label:kind,authority:'native-api'});
 const view={id:'native.requirements',kind:'requirement',nodes:[{id:'drawing:a',semanticId:'a',name:'A'},{id:'drawing:b',semanticId:'b',name:'B'}],edges:[{id:'native:ab',source:'drawing:a',target:'drawing:b',kind:'derive'}]};
 
@@ -138,4 +138,41 @@ test('native package declaration context includes enum and concern but ownership
  assert.equal(req.elements.length,0);assert.equal(req.omissions[0].reason,'relationship-policy');
  const explicit=surroundingContext(graph,{nodes:[{id:'r',semanticId:'req'}]},{relationshipKinds:['containment']});
  assert.deepEqual(explicit.elements.map(e=>e.id),['pkg']);
+});
+
+test('peripheral prominence favors rich neighbors while preserving focus and round-robin fairness',()=>{
+ const graph={elements:['a','b','alpha','zulu','from-b','child1','child2'].map(id=>element(id)),
+  relationships:[edge('a1','a','alpha'),edge('a2','a','zulu'),edge('b1','b','from-b'),edge('c1','zulu','child1','composition'),edge('c2','zulu','child2','composition')]};
+ const context=surroundingContext(graph,view,{budget:2,focusId:'a'});
+ assert.deepEqual(context.elements.map(e=>e.id),['zulu','from-b']);
+ assert.deepEqual(context.relationships.map(e=>[e.source,e.target]),[['a','zulu'],['b','from-b']]);
+ assert.ok(context.omissions.some(o=>o.target==='alpha'&&o.reason==='budget'));
+ assert.ok(context.omissions.some(o=>o.target==='child1'&&o.reason==='depth'));
+ assert.deepEqual(surroundingContext({...graph,elements:[...graph.elements].reverse(),relationships:[...graph.relationships].reverse()},view,{budget:2,focusId:'a'}).elements,context.elements);
+});
+
+test('native trace priority outranks prominence and duplicate relationships retain identity',()=>{
+ const graph={elements:['a','b','z-trace','alpha-hub','child1','child2'].map(id=>element(id)),
+  relationships:[edge('native1','z-trace','a'),edge('native2','z-trace','a'),edge('dep','a','alpha-hub','dependency'),edge('c1','alpha-hub','child1','composition'),edge('c2','alpha-hub','child2','composition')]};
+ const context=surroundingContext(graph,view,{budget:1,focusId:'a'});
+ assert.deepEqual(context.elements.map(e=>e.id),['z-trace']);
+ assert.deepEqual(context.relationships.map(e=>[e.id,e.source,e.target]),[['native1','z-trace','a'],['native2','z-trace','a']]);
+ assert.ok(context.omissions.some(o=>o.relationshipId==='dep'&&o.reason==='budget'));
+});
+
+test('peripheral ranking measures only explicit scope without allowing library hubs to monopolize it',()=>{
+ const graph={elements:[...['a','b','alpha','zulu','outside1','outside2'].map(id=>element(id)),element('library','RequirementUsage',{layer:'library'})],
+  relationships:[edge('a1','a','alpha'),edge('a2','a','zulu'),edge('l','a','library'),edge('c1','zulu','outside1','composition'),edge('c2','zulu','outside2','composition'),edge('l1','library','outside1','dependency'),edge('l2','library','outside2','dependency')]};
+ const scoped=surroundingContext(graph,view,{budget:1,focusId:'a',scopeIds:['a','b','alpha','zulu','library']});
+ assert.deepEqual(scoped.elements.map(e=>e.id),['alpha']);
+ const unscoped=surroundingContext(graph,view,{budget:1,focusId:'a'});
+ assert.deepEqual(unscoped.elements.map(e=>e.id),['zulu']);
+});
+
+test('peripheral rank scope keeps native cross-system neighbors available',()=>{
+ const graph={elements:['a','b','alpha','outside'].map(id=>element(id)),relationships:[edge('a1','a','alpha'),edge('outside','outside','a')]};
+ const context=surroundingContext(graph,view,{budget:2,focusId:'a',prominenceScopeIds:['a','b','alpha']});
+ assert.deepEqual(context.elements.map(e=>e.id),['alpha','outside']);
+ assert.deepEqual(context.relationships.map(e=>[e.id,e.source,e.target]),[['a1','a','alpha'],['outside','outside','a']]);
+ assert.ok(!context.omissions.some(o=>o.reason==='outside-scope'));
 });

@@ -74,3 +74,32 @@ The coordinator reports 73 Python tests and 45 Node tests passing on 17 October 
 ## Release interpretation
 
 This matrix does not accept any first-release verification case. Keep bound-attribute evaluation and configured-record details within their explicit limits. Keep prepared execution metadata distinct from observed execution truth. Complete acceptance checks before claiming release acceptance. Exercise all required native kinds in the packaged browser, run the end-to-end CI build, and retain actual reader-study evidence separately from automated checks. Reassess this matrix after code changes; older counts in `docs/implementation-status.md` are historical checkpoints, not current suite totals.
+
+
+## Standalone workspace surfaces (October 2026)
+
+The earlier rows describe the previous viewer unless their evidence explicitly
+names the standalone canvas. The standalone workspace now dispatches graph,
+sequence and grid surfaces, using native projections for all supported view kinds.
+
+| Requirement | Status | Evidence and limits |
+| --- | --- | --- |
+| SP-056 | Implemented locally | Native tables/matrices retain normal-size text, scrolling, column sizing and identity-based inspection; grid/contract/app tests and responsive browser checks. |
+| SP-057 | Implemented locally | Persistent All/None/Focused compartments, default All; mandatory behavior details remain. Settings/app tests and browser checks. |
+| SP-058 | Implemented locally | Square/Mind-map routes retain endpoints, direction and obstacle safety; routing regressions and browser inspection. |
+| SP-059 | Implemented locally | Coordinated regions, shared multi-selection, exact grid/sequence history and bounded transition anchors; app/region tests and browser matrix-to-graph navigation. |
+
+These checks do not establish reader acceptance, complete SysML notation coverage,
+or physical iOS/Safari performance. Native unsupported-construct notices remain
+visible; interaction fragments are not locally invented.
+
+
+## Automatic system overview
+
+| Requirement | Status | Evidence and limits |
+| --- | --- | --- |
+| SP-092 | Implemented locally | Native ownership scope, distinct-neighbor counts, damped structural ranking, balanced shallow branches, wrapper handling and deterministic caps; permutation, duplicate, cyclic, deep and boundary tests. Counts reflect the available native projection. |
+| SP-093 | Implemented locally | Explicit overview and contents actions, stable selection, authored-entry precedence, Back/Forward and comparison restoration; app tests and shared neighbor-priority regressions. Prominence does not establish engineering criticality. |
+
+SV-017 remains inconclusive pending the broader acceptance procedure; automated
+regressions and browser inspection are software evidence, not reader acceptance.

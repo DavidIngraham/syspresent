@@ -178,6 +178,20 @@ package SyspresentRequirements {
             comment scope /* First release */
         }
     }
+    package ViewSurfaces {
+        requirement <'SP-056'> semanticViewRegions {
+            doc /* Native case, mixed, fault-tree, state, action and structural views shall use appropriate graph notation. Native sequence views shall retain participant and message order in a dedicated scrollable region. Native tables and matrices shall use readable scrollable grid regions with persistent headings and explicit row, column and relationship-cell selection where native identity is supplied. Multiple native relationships in a cell shall retain their individual identities and direction. Blank cells shall describe absence within the selected view, not prove absence from the model. Browser code shall not infer identities or relationships from formatted text. */
+        }
+        requirement <'SP-057'> readerDisplaySettings {
+            doc /* A global UI control shall offer All, None and Focused optional compartments, defaulting to All. Focused refers to the explicitly focused element and shall not rearrange the scene on first selection. Reader choices shall persist locally when browser storage is available and take precedence over authored initial compartment settings. Explicit per-element expansion or collapse may override the current reader mode until it is changed. Mandatory behavior labels, guards, native state details and gate meaning shall remain visible in every mode. */
+        }
+        requirement <'SP-058'> connectionStyles {
+            doc /* A global UI control shall offer Square orthogonal and Mind-map curved connection routing. A routing choice shall preserve native relationship identity, endpoints, actual ports, direction, arrow meaning and view membership. Curves shall avoid unrelated tiles and reserved labels, retaining safe routing corridors where a direct curve is unavailable. The setting shall persist locally when browser storage is available. */
+        }
+        requirement <'SP-059'> regionNavigation {
+            doc /* View regions shall share semantic selection without automatic scrolling or layout changes. Explicit exploration shall open native relationships and Back shall restore the previous region selection, scroll, sort, column sizing and comparison state. Graph regions shall retain independent cameras; grid and sequence gestures shall scroll their own reading regions. Wide displays shall support simultaneous comparison, while narrow displays shall provide explicit region tabs with readable content. Cross-notation journeys shall use a bounded set of actual identities and visible representation anchors without animating an entire large grid. Additional scene regions shall round-trip through ordinary Markdown and project files. */
+        }
+    }
     package Reuse {
         requirement <'SP-060'> declarativeReuse {
             doc /* An unrelated model shall use the exporter and explorer by changing only model sources, native views/queries, story content and declarative configuration, without project-specific JavaScript. */
@@ -248,6 +262,14 @@ package SyspresentRequirements {
         requirement <'SP-091'> discoveredProjectMetadata {
             doc /* The application and CI build shall discover supplied source and asset files by file conventions and discover model roots, requirement indexes and native views through native engine results. Tool versions, digests, cache indexes and snapshot provenance shall be generated rather than manually authored. Explicit navigation scope, starting viewpoint or focus, narrative content, custom dependency files and intentional publication exclusions remain author choices. Omitted navigation overrides shall use disclosed deterministic defaults. Invalid or ambiguous references and unresolved dependencies shall produce diagnostics rather than inferred model semantics. A prepared native index shall require publisher integrity, exact source and engine checks; cached semantic data additionally requires the parsed native model identity. */
             comment scope /* First release */
+        }
+    }
+    package InitialOverview {
+        requirement <'SP-092'> structuralProminence {
+            doc /* In the absence of an authored scene, starting view or explicit starting focus, the viewer shall open a bounded system overview selected deterministically from native project structure. Ranking shall combine meaningful direct children, damped descendants, distinct connected elements and cross-branch connectivity while keeping ownership separate from engineering relationships. Library content, generated helpers and relationship plumbing shall not dominate automatic selection. Native scope boundaries and disconnected branches shall be respected; single-child package wrappers may be traversed without inventing relationships. Selection shall balance shallow branches before filling deeper detail, use stable tie-breaking, and disclose counts, omitted content and the limits of the loaded relationship projection. Structural prominence shall not be presented as engineering criticality. */
+        }
+        requirement <'SP-093'> overviewExploration {
+            doc /* Readers shall be able to request the system overview explicitly, select elements without changing layout, and expand their contents through explicit bounded exploration. Back shall restore the overview, its explanation, selection and camera. An overview shall not automatically add a large peripheral neighborhood. Native relationship direction and identity shall remain unchanged. The same prominence signals shall prioritize exploration candidates within the existing relationship-role priorities without changing authored scene membership. */
         }
     }
     package Acceptance {

@@ -5,6 +5,7 @@
 import {ENGINEERING_RELATIONSHIPS} from './core/index.mjs';
 import {graphView,isDeclarationKind} from './graph.mjs';
 import {edgeLayoutHints} from './notation.mjs';
+import {createProminenceIndex} from './prominence.mjs';
 
 const allowedKinds=new Set(ENGINEERING_RELATIONSHIPS);
 const forbiddenKinds=new Set(['type','specialization','owner','owningMembership','ownedMembership','documentation','membership','succession','transition']);
@@ -67,9 +68,9 @@ export function surroundingContext(graph,activeView,options={}) {
   if(structural){const order=['composition','containment','typing','connection','reference','flow'].indexOf(edge.kind);if(order>=0)return order;}
   return 10+(kindOrder.get(edge.kind)??99);
  }));
- const byName=(a,b)=>compare(elements.get(a)?.name??elements.get(a)?.qualifiedName??a,elements.get(b)?.name??elements.get(b)?.qualifiedName??b)||compare(a,b);
- const focus=options.focusId??options.focus,anchors=[...activeIds].sort((a,b)=>Number(b===focus)-Number(a===focus)||byName(a,b));
- const chosen=new Set(),pending=new Map(anchors.map(id=>[id,[...candidates.keys()].filter(target=>candidates.get(target).some(edge=>edge.source===id||edge.target===id)).sort((a,b)=>priority(a,id)-priority(b,id)||byName(a,b))]));
+ const prominence=createProminenceIndex(graph,{scopeIds:options.prominenceScopeIds??options.scopeIds});
+ const focus=options.focusId??options.focus,anchors=[...activeIds].sort((a,b)=>Number(b===focus)-Number(a===focus)||prominence.compare(a,b));
+ const chosen=new Set(),pending=new Map(anchors.map(id=>[id,[...candidates.keys()].filter(target=>candidates.get(target).some(edge=>edge.source===id||edge.target===id)).sort((a,b)=>priority(a,id)-priority(b,id)||prominence.compare(a,b))]));
  while(chosen.size<budget){
   let progress=false;
   for(const id of anchors){

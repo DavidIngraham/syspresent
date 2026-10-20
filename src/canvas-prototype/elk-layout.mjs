@@ -5,10 +5,11 @@ import ELK from 'elkjs/lib/elk-api.js';
 import {projectView} from './core/index.mjs';
 import {graphArea,routeOrthogonal} from './geometry.mjs';
 import {edgeLayoutHints} from './notation.mjs';
+import {applyBehaviorLayout} from './behavior-view.mjs';
 
 export const createLayoutEngine = options => new ELK({algorithms:['layered'],...options});
-const behavioralKinds=new Set(['action','activity','state']);
-const sizes=new Map([['initial',[28,28]],['final',[32,32]],['fork',[80,8]],['join',[80,8]],['decision',[44,44]],['merge',[44,44]],['start',[28,28]],['end',[32,32]]]);
+const behavioralKinds=new Set(['action','activity','state','sequence','fault-tree','mixed']);
+const sizes=new Map([['initial',[28,28]],['final',[32,32]],['fork',[80,8]],['join',[80,8]],['decision',[44,44]],['merge',[44,44]],['choice',[44,44]],['junction',[20,20]],['shallow history',[36,36]],['deep history',[36,36]],['terminate action',[32,32]],['start',[28,28]],['end',[32,32]]]);
 const overlap=(a,b,gap=0)=>a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.height+gap&&a.y+a.height+gap>b.y;
 const segmentHits=(a,b,n)=>a.x===b.x?a.x>n.x+.01&&a.x<n.x+n.width-.01&&Math.max(a.y,b.y)>n.y+.01&&Math.min(a.y,b.y)<n.y+n.height-.01:a.y===b.y&&a.y>n.y+.01&&a.y<n.y+n.height-.01&&Math.max(a.x,b.x)>n.x+.01&&Math.min(a.x,b.x)<n.x+n.width-.01;
 const simplify=points=>points.filter((p,i)=>!i||p.x!==points[i-1].x||p.y!==points[i-1].y).filter((p,i,all)=>!i||i===all.length-1||!(all[i-1].x===p.x&&p.x===all[i+1].x||all[i-1].y===p.y&&p.y===all[i+1].y));
@@ -35,7 +36,7 @@ function projectEmbeddedPorts(view){
  });
  return {...view,nodes,edges};
 }
-function orientation(edge,behavioral,viewKind){return !behavioral&&edgeLayoutHints(edge,{viewKind}).rank==='target-above-source'?[edge.target,edge.source,true]:[edge.source,edge.target,false];}
+function orientation(edge,behavioral,viewKind){return (viewKind==='fault-tree'||!behavioral&&edgeLayoutHints(edge,{viewKind}).rank==='target-above-source')?[edge.target,edge.source,true]:[edge.source,edge.target,false];}
 function partitions(nodes,edges,capacity){
  const ranks=new Map(nodes.map(n=>[n.id,0]));
  // Cyclic dependency sets are not given artificial ordering constraints.
@@ -129,7 +130,7 @@ function readLayout(view,data,laid,options,profile){
 export async function layoutDiagram(nativeView,options={}){
  const {width=1000,height=700,elk}=options;if(!elk?.layout)throw Error('layoutDiagram requires an ELK engine');
  if(!Number.isFinite(width)||width<=0||!Number.isFinite(height)||height<=0)throw Error('Invalid viewport');
- const view=projectEmbeddedPorts(projectView(nativeView)),area=options.panels?.length?graphArea(width,height,options.panels):{width,height};
+ const view=applyBehaviorLayout(projectEmbeddedPorts(projectView(nativeView))),area=options.panels?.length?graphArea(width,height,options.panels):{width,height};
  if(!view.nodes.length)return {...view,nodes:[],edges:[],ports:[],diagnostics:[],bounds:{x:0,y:0,width:1,height:1},layoutEngine:'elk-layered'};
  const rootCount=view.nodes.filter(n=>!n.parentId).length,behavioral=behavioralKinds.has(view.kind),profiles=[{gap:32}];
  if(!behavioral&&rootCount>2&&area.width<700)for(const capacity of [2,1])profiles.push({gap:28,capacity});

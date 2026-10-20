@@ -155,8 +155,63 @@ New author projects use `syspresent.project.v2`. For example, the complete Blue 
 
 Even this file is optional. File conventions discover SysML/KerML sources, `story.md`, and ordinary assets. `views.sysml` and SysML files under `views/` are presentation-owned editable files by convention; use `views` to choose a different editable subset. A blank presentation view file and story are provided when absent. `sources` is an optional exact source-file selection, useful for intentional exclusions; supplied dependency files must still be included. No SysML syntax is parsed by JavaScript for discovery.
 
-`navigation.roots` expresses the intended engineering journey boundary, not a completeness claim or a hard exploration barrier. When omitted, native source roots supply a deterministic default. Optional `navigation.view` and `navigation.focus` select a preferred starting point; otherwise the first story scene or a discovered model root starts exploration. Title is optional. An explicit `story` path overrides the conventional file. `publication.scope` defaults to `complete`; choose `scoped` only for a deliberately partial supplied project. Narrative sequence, annotations, evidence provenance and review intent cannot be inferred from model topology and remain authored content.
+`navigation.roots` expresses the intended engineering journey boundary, not a completeness claim or a hard exploration barrier. When omitted, native source roots supply a deterministic default. Optional `navigation.view` and `navigation.focus` select a preferred starting point; otherwise the first story scene or an automatic overview of discovered model roots starts exploration. Title is optional. An explicit `story` path overrides the conventional file. `publication.scope` defaults to `complete`; choose `scoped` only for a deliberately partial supplied project. Narrative sequence, annotations, evidence provenance and review intent cannot be inferred from model topology and remain authored content.
 
 Native model roots, requirement seeds and the view catalog are discovered from ParseSources/ExportModel results. They are no longer author-maintained lists. The native build writes cache indexes, direct-source and complete-source digests, parsed model identity and engine fingerprint. The static builder writes a demo catalog, packaged demo files, viewer provenance and immutable snapshot hashes. A publisher-trusted cache index requires the exact input digest and engine identity before helping construct the native query; exported semantics require the subsequent native parse hash and complete source digest as well. Uploaded files do not supply their own publisher trust.
 
 Existing v1 bundles retain their original explicit contract. New v2 exports contain the compact author descriptor and ordinary files, while derived runtime indexes stay out of project.json. Captured presentation-view files and edited Markdown survive export/reimport. Frozen old snapshots are never rewritten by migration. The documented native-cache and static-build commands remain suitable for CI; adding model files no longer requires rebuilding hand-authored source/root/requirement lists.
+
+
+## Graph, sequence and grid regions
+
+The scene controller hosts graph, sequence and grid renderers through semantic representation records. A representation may be a graph node, sequence participant/message, table row, matrix column or relationship occurrence in a matrix cell. Identity comes from the native engine; labels are never lookup keys. Native matrix relationships retain their own endpoint convention, including original-to-derived derivation. They are not added blindly to the general graph ancestry index.
+
+Grid regions retain ordinary text size, sticky headings, scroll position, explicit sorting and column widths. Sequence regions retain native participant and message order; vertical distance does not assert elapsed time. Graph regions use independent cameras. Selection coordinates highlights without scrolling or rearrangement; explicit exploration opens the exact native relationship. Back restores the region navigation state. Wide screens show comparisons simultaneously and narrow screens use explicit region tabs.
+
+A scene may add `regions: [{"id":"verification","view":"Views::verificationMatrix"}]` alongside its primary `view`. Region references are native view identities, with optional `title` and `focus`. The editor's Additional view regions field saves these references into Markdown. Find > Compare alongside adds a temporary comparison. Neither operation changes model selection semantics.
+
+The View menu offers global Compartments (All, None, Focused) and Connection routing (Square, Mind-map). All is the initial compartment mode. These reader preferences persist locally where storage is available, override authored initial compartment preferences, and are not exported as changes to the author's scene. Explicit per-element expansion/collapse remains available. Focused follows explicit model focus, not first-click selection. Required behavior text remains visible in every mode.
+
+Square routing uses orthogonal routes. Mind-map uses native-terminal tangent curves when the enclosing control geometry is clear; otherwise it rounds safe routing corridors. Endpoint identities, native ports and notation markers remain unchanged.
+
+
+## Automatic system overview
+
+Without an authored scene, entry view or explicit entry focus, standalone loading
+selects an automatic system overview from the configured/discovered native roots.
+View > System overview requests it explicitly at any time. The initial budget is
+nine active tiles on wide screens and six on narrow screens. Resizing an existing
+overview preserves its selection; explicitly requesting it again uses the current
+budget. No peripheral neighborhood is added to the overview.
+
+Scope follows native owner/composition edges, not qualified-name prefixes. Ranking
+uses 3*log2(1+direct children) + log2(1+descendants) +
+2*log2(1+distinct engineering neighbors) + 2*log2(1+cross-branch neighbors).
+Ownership and composition contribute only to structure; typing, metadata and
+library plumbing do not inflate connection counts. Parallel links to one neighbor
+count once. Direct child/neighbor counts are exact within the eligible loaded
+scope; descendant walks stop at 256 identities or 4096 adjacency inspections and
+explicitly disclose lower bounds. Immutable graph/scope indexes are cached.
+
+Selection first represents distinct native roots within budget, then balances
+immediate branches before adding deeper content. With multiple roots, a child round
+requires room for one child from every still-expandable represented root; spare
+slots stay unused rather than showing arbitrary asymmetric detail. Eligibility
+requires a native declared name or short name; generated qualified names alone
+do not qualify. Single-child package wrappers
+may be skipped; actual part/behavior boundaries are retained. Native edges between
+selected identities remain unchanged, and omitted descendants do not acquire
+aggregate links. Ties use native qualified names and semantic IDs. Disconnected
+branches remain selectable even when no engineering links join them.
+
+Cards show children and distinct-neighbor counts. Overview selection explains the
+policy, its loaded-projection limits and omitted-record counts; its list is bounded
+to 100 entries for large models, with Find available for other elements. Selecting
+a structural element exposes Expand contents; its bounded contents view uses the
+same prominence ordering within existing relationship priorities. Action/state
+views retain their native actions. Selection is stationary, while explicit
+expansion and Back retain normal navigation/camera history. Opening the overview
+activates the primary region; Back restores any former comparison and selected tab.
+Authored scenes keep their membership and entry precedence. Prominence is a
+presentation heuristic, never a safety, verification or engineering-criticality
+judgment. Native links absent from the loaded projection cannot influence ranking.

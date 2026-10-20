@@ -2,7 +2,7 @@
 
 Self-guided engineering stories and focused model exploration, authored in Markdown and grounded in native SysML data. The new graph canvas is a static JavaScript application with OpenSysML Go/WASM in a worker and the same engine natively for CI. Live presentation and model-evolution timelines are follow-on work.
 
-The standalone canvas prototype implements focused traversal, native view resolution, animated General View journeys, measured floating prose, and a small portable presentation editor. The previous viewer and its examples remain available separately; the new canvas does not yet replace their full notation coverage. The [requirement evidence matrix](docs/requirements-evidence.md) separates implemented behavior from remaining acceptance work. Representative-reader acceptance has not been conducted.
+The standalone canvas prototype implements focused traversal, native view resolution, animated General View journeys, measured floating prose, and a small portable presentation editor. The workspace supports graph, sequence, table and matrix surfaces, including native state, case, mixed and fault-tree notation. The previous viewer and its examples remain available separately. The [requirement evidence matrix](docs/requirements-evidence.md) separates implemented behavior from remaining acceptance work. Representative-reader acceptance has not been conducted.
 
 ## Build and author
 
@@ -27,7 +27,7 @@ npm run build:canvas
 python3 -m http.server 8783 --directory build/canvas-prototype/site
 ```
 
-The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783. The default example includes the complete Blue Dog model with six focused story scenes. The build prepares the initial native graph and views for faster mobile startup; the browser still loads all sources into WASM for exploration. The build also produces a complete static-site ZIP and retains a content-addressed archive. Project > Export project ZIP saves ordinary model, view and Markdown files. Activity/internal-view capture preserves native notation; arbitrary focused-graph capture is explicitly unsupported for now.
+The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783. The default example includes the complete Blue Dog model with six focused story scenes. The build prepares the initial native graph and views for faster mobile startup; the browser still loads all sources into WASM for exploration. The build also produces a complete static-site ZIP and retains a content-addressed archive. Project > Export project ZIP saves ordinary model, view and Markdown files. Models without an authored starting view open a bounded system overview ranked by native children and connections. View > System overview also opens it explicitly; child/neighbor counts explain the selection, and Expand contents drills into a subsystem. The view gallery demonstrates coordinated regions and native grids. View controls persist All (default), None or Focused compartments and Square or Mind-map connection routing. Activity/internal-view capture preserves native notation; arbitrary focused-graph capture is explicitly unsupported for now.
 
 ## Previous viewer examples
 
