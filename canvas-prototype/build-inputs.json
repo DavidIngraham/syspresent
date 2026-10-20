@@ -32,7 +32,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/preferences.mjs": {
-      "bytes": 4635,
+      "bytes": 4627,
       "imports": [],
       "format": "esm"
     },
@@ -42,7 +42,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/context.mjs": {
-      "bytes": 12240,
+      "bytes": 13927,
       "imports": [
         {
           "path": "src/canvas-prototype/core/index.mjs",
@@ -78,9 +78,14 @@
       ],
       "format": "esm"
     },
-    "src/canvas-prototype/peripheral.mjs": {
-      "bytes": 10917,
+    "src/canvas-prototype/neighborhood.mjs": {
+      "bytes": 17483,
       "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        },
         {
           "path": "src/canvas-prototype/context.mjs",
           "kind": "import-statement",
@@ -94,9 +99,30 @@
       ],
       "format": "esm"
     },
+    "src/canvas-prototype/camera.mjs": {
+      "bytes": 8783,
+      "imports": [],
+      "format": "esm"
+    },
     "src/canvas-prototype/motion.mjs": {
       "bytes": 3030,
       "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/journey-camera.mjs": {
+      "bytes": 5284,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/camera.mjs",
+          "kind": "import-statement",
+          "original": "./camera.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/motion.mjs",
+          "kind": "import-statement",
+          "original": "./motion.mjs"
+        }
+      ],
       "format": "esm"
     },
     "src/canvas-prototype/documentation.mjs": {
@@ -168,7 +194,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 59620,
+      "bytes": 64899,
       "imports": [
         {
           "path": "src/canvas-prototype/departures.mjs",
@@ -191,9 +217,19 @@
           "original": "./context.mjs"
         },
         {
-          "path": "src/canvas-prototype/peripheral.mjs",
+          "path": "src/canvas-prototype/neighborhood.mjs",
           "kind": "import-statement",
-          "original": "./peripheral.mjs"
+          "original": "./neighborhood.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/journey-camera.mjs",
+          "kind": "import-statement",
+          "original": "./journey-camera.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/camera.mjs",
+          "kind": "import-statement",
+          "original": "./camera.mjs"
         },
         {
           "path": "src/canvas-prototype/peripheral-routing.mjs",
@@ -254,7 +290,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 516441
+      "bytes": 563415
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -265,43 +301,49 @@
           "bytesInOutput": 9829
         },
         "src/canvas-prototype/departures.mjs": {
-          "bytesInOutput": 7888
+          "bytesInOutput": 7885
         },
         "src/canvas-prototype/graph.mjs": {
           "bytesInOutput": 4277
         },
         "src/canvas-prototype/core/index.mjs": {
-          "bytesInOutput": 15627
+          "bytesInOutput": 15630
         },
         "src/canvas-prototype/exploration.mjs": {
-          "bytesInOutput": 15336
+          "bytesInOutput": 15277
         },
         "src/canvas-prototype/preferences.mjs": {
-          "bytesInOutput": 3812
+          "bytesInOutput": 3797
         },
         "src/canvas-prototype/notation.mjs": {
           "bytesInOutput": 3893
         },
         "src/canvas-prototype/context.mjs": {
-          "bytesInOutput": 11617
+          "bytesInOutput": 8566
         },
         "src/canvas-prototype/geometry.mjs": {
-          "bytesInOutput": 15758
+          "bytesInOutput": 15748
         },
         "src/canvas-prototype/peripheral-routing.mjs": {
-          "bytesInOutput": 11586
+          "bytesInOutput": 11299
         },
-        "src/canvas-prototype/peripheral.mjs": {
-          "bytesInOutput": 11106
+        "src/canvas-prototype/neighborhood.mjs": {
+          "bytesInOutput": 18609
+        },
+        "src/canvas-prototype/camera.mjs": {
+          "bytesInOutput": 8764
         },
         "src/canvas-prototype/motion.mjs": {
-          "bytesInOutput": 3230
+          "bytesInOutput": 3233
+        },
+        "src/canvas-prototype/journey-camera.mjs": {
+          "bytesInOutput": 5157
         },
         "src/canvas-prototype/documentation.mjs": {
           "bytesInOutput": 1593
         },
         "src/canvas-prototype/elk-layout.mjs": {
-          "bytesInOutput": 26990
+          "bytesInOutput": 26978
         },
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 1698
@@ -313,10 +355,10 @@
           "bytesInOutput": 7521
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 67642
+          "bytesInOutput": 73527
         }
       },
-      "bytes": 246523
+      "bytes": 270483
     }
   }
 }

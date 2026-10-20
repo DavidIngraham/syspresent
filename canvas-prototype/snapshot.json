@@ -1,12 +1,12 @@
 {
   "schemaVersion": "syspresent.canvas-prototype.v1",
-  "revision": "a8fa7d233284e0b4e86d299278a8b1903a620bcc",
+  "revision": "bd09a1aee3e2ca13034bae6e34bb3bc533c6b928",
   "dirty": false,
   "assets": {
-    "app.js": "249d64b612ca08ad5cab5a5372f822f0ee3dc6d111a96180ed58f871eaa1be9d",
-    "app.js.map": "20b81b7700a5386c021d32782c8187d837efaae41fd72e95f4cd18b7181678f2",
-    "index.html": "361819df0062c53a50f07f755d412d1aa7ae2eaf834f39e2503739289a9e36d9",
-    "canvas.css": "00973da9e2f25c751022b288470e23d17976e4ab1dab78284d78e36ea9f4ff3a",
+    "app.js": "effeff3f76429156e52820a982eec082b08a10b2c95035981ce779915ac2f7cc",
+    "app.js.map": "157fbb1e4141108f7b491a3a9dd58006c87a93da973b3da9db6f51c840d91298",
+    "index.html": "067469963aac554adc649315c509ffa183731405a980d43ee2d9660928a90778",
+    "canvas.css": "0a8c562d7f7c89922d624b988106a81b039cc71e7611cb909cc56456f78bec90",
     "LICENSE": "ddd8327daa7878abe8284332d97059ff64738ef747356c8d8997c77533f968e4",
     "THIRD_PARTY_NOTICES": "3d96ebb51ec88c36a1616fce291977d3c1c3edcb19fe7caa9071dffabe667aee",
     "engine/sysml-wasm.wasm": "f3bfacd95afe70551d39cfbc119ea7455a77d1e421f27a7ebb264d3a2cf2d0fe",
@@ -110,12 +110,12 @@
     "example/models/vehicle/verification.sysml": "c629a0275a7ff62aeeb6e92fde5a6917e088fcb6d694d2c66794de204ea7d8ea",
     "example/tools/publishing/reference.sysml": "368bbeee73f050d8a612662906399db3842e1896717a1c8ee1d0c5b91d7618ab",
     "example/views.sysml": "629be1e3d5344e5b1846c27bd93a619c75d5a62a76f6bbdec317aaf84bef909e",
-    "example/story.md": "0ed934181e61b97c072a80e1bfea8713ef3b341db178170c692a9cea4fbb1190",
+    "example/story.md": "7f29953cc7831ba0fdb18ca673ee3e7d51071f7fedbca65a6915073d90e154ea",
     "example/source.json": "71cba55a59067a6f4cf5dacc683af80f739f57fad19bb4fafe5dbbb2020a69d4",
     "example/models/README.md": "54f9c9133c9ad61e109eb603817d2244b2608370f2b55992cba975dc2e9334f2",
     "example/runtime-cache.json": "82eaf3f782ed6f9ce93e1a45085b5008ca5af80f208c65882be421f67313ec9b",
-    "project.zip": "82d14bc5fb39e1c9cadc6587ba07715585e8899a18a6978ee38ee9d31c9781cf",
-    "build-inputs.json": "de6d6fcabd0046b60c91fa86edd01e34b1d2ed3a34cbb72b08f4a8b63f7a02f9"
+    "project.zip": "7e19cc903243cf86e5a83601eea11261a4dd2fb16c73e46991aba65341de1c97",
+    "build-inputs.json": "2ed57e037f81afc9479b406f452055075bd717e73d85efecb62e4a1d956d714f"
   },
   "engine": {
     "schemaVersion": 1,

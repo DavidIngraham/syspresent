@@ -318,20 +318,20 @@ function firstContact(node, destination, obstacle) {
 }
 function exitPosition(node, width, height, obstacles) {
   const margin = 24;
-  const candidates2 = [
+  const candidates = [
     { side: "left", x: -node.width - margin, y: node.y },
     { side: "right", x: width + margin, y: node.y },
     { side: "top", x: node.x, y: -node.height - margin },
     { side: "bottom", x: node.x, y: height + margin }
   ];
-  for (const candidate of candidates2) {
+  for (const candidate of candidates) {
     const swept = { x: Math.min(node.x, candidate.x), y: Math.min(node.y, candidate.y), width: node.width + Math.abs(node.x - candidate.x), height: node.height + Math.abs(node.y - candidate.y) };
     candidate.obstructions = obstacles.filter((obstacle) => !overlaps(node, obstacle) && overlaps(swept, obstacle)).length;
     candidate.fadeUntil = Math.min(1, ...obstacles.map((obstacle) => firstContact(node, candidate, obstacle)));
     candidate.fadeUntil = Math.max(0, candidate.fadeUntil - 5e-3);
     candidate.distance = Math.abs(candidate.x - node.x) + Math.abs(candidate.y - node.y);
   }
-  return candidates2.sort((a, b) => a.obstructions - b.obstructions || a.distance - b.distance)[0];
+  return candidates.sort((a, b) => a.obstructions - b.obstructions || a.distance - b.distance)[0];
 }
 function planDepartures(frames, { width, height, panels = [], offsets, clearAt = 0.28, arriveAfter = 0.31, contextAfter = 0.78 } = {}) {
   if (!Array.isArray(frames) || !frames.length) throw new TypeError("Departure planning requires frames");
@@ -508,7 +508,7 @@ function engineeringContext(graph, options = {}) {
   wanted.add(focus);
   const queue = [[focus, 0]];
   while (queue.length) {
-    const [id, distance] = queue.shift();
+    const [id, distance2] = queue.shift();
     for (const edge of policy.edges) {
       if (edge.source !== id && edge.target !== id) continue;
       const target = edge.source === id ? edge.target : edge.source;
@@ -522,7 +522,7 @@ function engineeringContext(graph, options = {}) {
         continue;
       }
       if (wanted.has(target)) continue;
-      if (distance >= depth) {
+      if (distance2 >= depth) {
         omit(edge, target, "depth");
         continue;
       }
@@ -531,7 +531,7 @@ function engineeringContext(graph, options = {}) {
         continue;
       }
       wanted.add(target);
-      queue.push([target, distance + 1]);
+      queue.push([target, distance2 + 1]);
     }
   }
   return copy({ elements: [...wanted].map((id) => policy.elements.get(id)), relationships: policy.edges.filter((edge) => policy.kinds.has(edge.kind) && wanted.has(edge.source) && wanted.has(edge.target)), omissions });
@@ -777,7 +777,7 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
   if (!modes[mode]) throw new Error("Unknown exploration mode: " + mode);
   const { elements, edges, incident } = prepared;
   const root = elements.get(focus), structural = isStructuralElement(root) && ["context", "contents", "container"].includes(mode);
-  const omissions = [], seen = /* @__PURE__ */ new Set(), anchors = /* @__PURE__ */ new Map([[focus, null]]), candidates2 = /* @__PURE__ */ new Map(), unavailable = /* @__PURE__ */ new Set(), filtered = /* @__PURE__ */ new Set();
+  const omissions = [], seen = /* @__PURE__ */ new Set(), anchors = /* @__PURE__ */ new Map([[focus, null]]), candidates = /* @__PURE__ */ new Map(), unavailable = /* @__PURE__ */ new Set(), filtered = /* @__PURE__ */ new Set();
   const kinds2 = options.relationshipKinds ? new Set(options.relationshipKinds) : null;
   const nodeKinds = options.elementKinds ? new Set(options.elementKinds) : null;
   const scope = options.scopeIds ? new Set(options.scopeIds) : null;
@@ -800,7 +800,7 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
   const rootReason = reason(focus);
   if (rootReason) {
     omit(null, focus, rootReason, null);
-    return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason, root };
+    return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason, root };
   }
   if (requirementKinds.has(root.kind) || root.kind === "PartUsage" && ["context", "contents"].includes(mode)) for (const edge of incident.get(focus) ?? []) {
     if (!["type", "typing"].includes(edge.kind) || edge.source !== focus && edge.target !== focus) continue;
@@ -818,10 +818,10 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
       continue;
     }
     if (!anchors.has(target)) anchors.set(target, edge);
-    if (root.kind === "PartUsage" && mode === "context" && (!kinds2 || kinds2.has(edge.kind))) candidates2.set(target, [{ edge, anchor: focus, bridge: null }]);
+    if (root.kind === "PartUsage" && mode === "context" && (!kinds2 || kinds2.has(edge.kind))) candidates.set(target, [{ edge, anchor: focus, bridge: null }]);
   }
-  if (structuralModes.has(mode) && !isStructuralElement(root)) return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: "not-structural", root };
-  if (mode !== "context" && !structuralModes.has(mode) && !requirementKinds.has(root.kind)) return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: "not-requirement", root };
+  if (structuralModes.has(mode) && !isStructuralElement(root)) return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason: "not-structural", root };
+  if (mode !== "context" && !structuralModes.has(mode) && !requirementKinds.has(root.kind)) return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason: "not-requirement", root };
   for (const [anchor, bridge] of anchors) for (const edge of incident.get(anchor) ?? []) {
     if (edge.source !== anchor && edge.target !== anchor) continue;
     const target = edge.source === anchor ? edge.target : edge.source;
@@ -836,12 +836,12 @@ function projection(graph, focus, mode, options = {}, prepared = prepare(graph))
       (excluded === "unavailable" ? unavailable : filtered).add(target);
       continue;
     }
-    if (!candidates2.has(target)) candidates2.set(target, []);
-    candidates2.get(target).push({ edge, anchor, bridge });
+    if (!candidates.has(target)) candidates.set(target, []);
+    candidates.get(target).push({ edge, anchor, bridge });
   }
-  for (const target of candidates2.keys()) filtered.delete(target);
-  for (const links of candidates2.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare(a.anchor, b.anchor) || compare(edgeKey(a.edge), edgeKey(b.edge)));
-  return { elements, edges, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: null, root };
+  for (const target of candidates.keys()) filtered.delete(target);
+  for (const links of candidates.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare(a.anchor, b.anchor) || compare(edgeKey(a.edge), edgeKey(b.edge)));
+  return { elements, edges, anchors, candidates, omissions, unavailable, filtered, rootReason: null, root };
 }
 function summaryFor(data, mode, shown, total) {
   const unavailable = data.unavailable.size, filtered = data.filtered.size;
@@ -998,8 +998,8 @@ function validatePresentation(config = {}) {
   const emphasis = stringList(own(config, "emphasis") ? config.emphasis : [], "emphasis", kinds);
   const result = { compartments, expanded, emphasis, grouping };
   if (own(config, "contextBudget")) {
-    if (!Number.isInteger(config.contextBudget) || config.contextBudget < 0 || config.contextBudget > 8) {
-      fail("contextBudget must be an integer from 0 through 8");
+    if (!Number.isInteger(config.contextBudget) || config.contextBudget < 0 || config.contextBudget > 256) {
+      fail("contextBudget must be an integer from 0 through 256");
     }
     result.contextBudget = config.contextBudget;
   }
@@ -1025,7 +1025,7 @@ function resolvePresentation(config = {}, { width = 1024, resolve: resolve2 } = 
     }
     if (!expandedIds.includes(id)) expandedIds.push(id);
   }
-  return { ...presentation, contextBudget: presentation.contextBudget ?? (width < 700 ? 4 : 6), expandedIds };
+  return { ...presentation, contextBudget: presentation.contextBudget ?? 48, expandedIds };
 }
 
 // src/canvas-prototype/notation.mjs
@@ -1124,22 +1124,27 @@ function markerDefinition(name) {
 
 // src/canvas-prototype/context.mjs
 var allowedKinds2 = new Set(ENGINEERING_RELATIONSHIPS);
-var forbiddenKinds = /* @__PURE__ */ new Set(["type", "typing", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership", "succession", "transition"]);
-var engineeringElement2 = /^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
+var forbiddenKinds = /* @__PURE__ */ new Set(["type", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership", "succession", "transition"]);
+var engineeringElement2 = /^(?:Package|Namespace)$|^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
 var compare2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var edgeKey2 = (edge) => JSON.stringify([edge.id, edge.source, edge.target, edge.kind]);
 var kindOrder = new Map(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification", "allocate", "allocation", "composition", "connection", "reference", "flow", "item-flow", "control-flow", "causation", "dependency"].map((kind, index) => [kind, index]));
 function surroundingContext(graph, activeView, options = {}) {
-  const { budget = 6 } = options;
+  const { budget = 48 } = options;
   if (!Number.isInteger(budget) || budget < 0) throw new Error("Invalid surrounding context budget");
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
   const activeNodes = activeView.nodes ?? [], activeEdges = activeView.edges ?? [];
   const activeIds = [...new Set(activeNodes.map((node) => node.semanticId).filter(Boolean))].sort(compare2);
   const active2 = new Set(activeIds), scope = options.scopeIds ? new Set(options.scopeIds) : null;
-  const kinds2 = new Set((options.relationshipKinds ?? [...allowedKinds2]).filter((kind) => allowedKinds2.has(kind) && !forbiddenKinds.has(kind)));
+  const kinds2 = new Set((options.relationshipKinds ?? [...allowedKinds2, "typing", "containment"]).filter((kind) => (allowedKinds2.has(kind) || ["typing", "containment"].includes(kind)) && !forbiddenKinds.has(kind)));
+  const nativePackageOwner = (edge) => edge.kind === "containment" && edge.nativeRole === "owner" && /^(Package|Namespace)$/.test(elements.get(edge.source)?.kind ?? "");
+  const directType = (edge) => edge.kind === "typing" && /Usage$/.test(elements.get(edge.source)?.kind ?? "") && elements.get(edge.target)?.kind === elements.get(edge.source)?.kind.replace(/Usage$/, "Definition");
+  const structural = (id) => /^(PartUsage|PartDefinition|Package|Namespace)$/.test(elements.get(id)?.kind ?? "");
+  const structuralView = options.structural === true || options.relationshipKinds?.includes("containment") === true;
+  const allowed = (edge, anchor) => kinds2.has(edge.kind) && (edge.kind !== "containment" || nativePackageOwner(edge) && (structuralView || structural(anchor ?? (active2.has(edge.source) ? edge.source : edge.target)))) && (edge.kind !== "typing" || directType(edge));
   const representations = /* @__PURE__ */ new Map();
   for (const node of [...activeNodes].sort((a, b) => compare2(a.id, b.id))) if (node.semanticId && !representations.has(node.semanticId)) representations.set(node.semanticId, node.id);
-  const edges = [...new Map((graph.relationships ?? []).map((edge) => [edgeKey2(edge), edge])).values()].sort((a, b) => compare2(edgeKey2(a), edgeKey2(b)));
+  const edges = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter(nativePackageOwner)].map((edge) => [edgeKey2(edge), edge])).values()].sort((a, b) => compare2(edgeKey2(a), edgeKey2(b)));
   const omissions = [], seenOmissions = /* @__PURE__ */ new Set();
   const omit = (edge, target, reason, anchor) => {
     const key = JSON.stringify([edgeKey2(edge), target, reason]);
@@ -1147,32 +1152,41 @@ function surroundingContext(graph, activeView, options = {}) {
     seenOmissions.add(key);
     omissions.push({ relationshipId: edge.id ?? null, target, anchor, reason });
   };
-  const elementReason = (id) => {
+  const elementReason = (id, edge) => {
     const element2 = elements.get(id);
     if (!element2) return "unavailable";
     if (scope && !scope.has(id)) return "outside-scope";
     if (element2.layer === "metamodel" || element2.metamodel === true) return "metamodel-boundary";
-    if (!engineeringElement2.test(element2.kind ?? "")) return "element-policy";
+    if (!engineeringElement2.test(element2.kind ?? "") && !(edge && nativePackageOwner(edge) && isDeclarationKind(element2.kind))) return "element-policy";
     return null;
   };
-  const candidates2 = /* @__PURE__ */ new Map();
+  const candidates = /* @__PURE__ */ new Map();
   for (const edge of edges) {
     const sourceActive = active2.has(edge.source), targetActive = active2.has(edge.target);
     if (sourceActive === targetActive) continue;
     const target = sourceActive ? edge.target : edge.source, anchor = sourceActive ? edge.source : edge.target;
-    const reason = !kinds2.has(edge.kind) ? "relationship-policy" : elementReason(target);
+    const reason = !allowed(edge, anchor) ? "relationship-policy" : elementReason(target, edge);
     if (reason) {
       omit(edge, target, reason, anchor);
       continue;
     }
-    if (!candidates2.has(target)) candidates2.set(target, []);
-    candidates2.get(target).push(edge);
+    if (!candidates.has(target)) candidates.set(target, []);
+    candidates.get(target).push(edge);
   }
-  const priority = (id) => Math.min(...candidates2.get(id).map((edge) => kindOrder.get(edge.kind) ?? 99));
-  const chosen = /* @__PURE__ */ new Set(), pending = new Map(activeIds.map((id) => [id, [...candidates2.keys()].filter((target) => candidates2.get(target).some((edge) => edge.source === id || edge.target === id)).sort((a, b) => priority(a) - priority(b) || compare2(a, b))]));
+  const priority = (target, anchor) => Math.min(...candidates.get(target).filter((edge) => edge.source === anchor || edge.target === anchor).map((edge) => {
+    const structural2 = /^(Part(?:Usage|Definition)|Package|Namespace)$/.test(elements.get(anchor)?.kind ?? "");
+    if (structural2) {
+      const order = ["composition", "containment", "typing", "connection", "reference", "flow"].indexOf(edge.kind);
+      if (order >= 0) return order;
+    }
+    return 10 + (kindOrder.get(edge.kind) ?? 99);
+  }));
+  const byName = (a, b) => compare2(elements.get(a)?.name ?? elements.get(a)?.qualifiedName ?? a, elements.get(b)?.name ?? elements.get(b)?.qualifiedName ?? b) || compare2(a, b);
+  const focus = options.focusId ?? options.focus, anchors = [...activeIds].sort((a, b) => Number(b === focus) - Number(a === focus) || byName(a, b));
+  const chosen = /* @__PURE__ */ new Set(), pending = new Map(anchors.map((id) => [id, [...candidates.keys()].filter((target) => candidates.get(target).some((edge) => edge.source === id || edge.target === id)).sort((a, b) => priority(a, id) - priority(b, id) || byName(a, b))]));
   while (chosen.size < budget) {
     let progress = false;
-    for (const id of activeIds) {
+    for (const id of anchors) {
       const queue = pending.get(id);
       while (queue.length && chosen.has(queue[0])) queue.shift();
       if (queue.length && chosen.size < budget) {
@@ -1183,12 +1197,12 @@ function surroundingContext(graph, activeView, options = {}) {
     if (!progress) break;
   }
   const relationships = [];
-  for (const [target, links] of candidates2) {
+  for (const [target, links] of candidates) {
     if (chosen.has(target)) relationships.push(...links);
     else for (const edge of links) omit(edge, target, "budget", active2.has(edge.source) ? edge.source : edge.target);
   }
   for (const edge of edges) if (chosen.has(edge.source) && chosen.has(edge.target)) {
-    if (kinds2.has(edge.kind)) relationships.push(edge);
+    if (allowed(edge)) relationships.push(edge);
     else omit(edge, edge.target, "relationship-policy", edge.source);
   }
   for (const edge of edges) {
@@ -1196,7 +1210,7 @@ function surroundingContext(graph, activeView, options = {}) {
     if (sourceChosen === targetChosen) continue;
     const target = sourceChosen ? edge.target : edge.source, anchor = sourceChosen ? edge.source : edge.target;
     if (active2.has(target)) continue;
-    const reason = !kinds2.has(edge.kind) ? "relationship-policy" : elementReason(target) ?? "depth";
+    const reason = !allowed(edge, anchor) ? "relationship-policy" : elementReason(target, edge) ?? "depth";
     omit(edge, target, reason, anchor);
   }
   const contextElements = [...chosen].map((id) => elements.get(id));
@@ -1227,67 +1241,11 @@ function surroundingContext(graph, activeView, options = {}) {
     }
   };
 }
-var overlap = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
-var center = (rect) => ({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
-var clamp2 = (value, min, max2) => Math.max(min, Math.min(max2, value));
 function decisionOrder(edge) {
   const { rank } = edgeLayoutHints(edge, { viewKind: "general" });
   if (rank === "target-above-source") return { above: edge.target, below: edge.source };
   if (rank === "source-above-target") return { above: edge.source, below: edge.target };
   return null;
-}
-function positionSurrounding(context, activePositionedNodes, area, options = {}) {
-  const { width = 108, height = 52, gap = 12, obstacles = [] } = options;
-  if (![area?.x, area?.y, area?.width, area?.height, width, height, gap].every(Number.isFinite) || area.width <= 0 || area.height <= 0 || width <= 0 || height <= 0 || gap < 0) throw new Error("Invalid surrounding context geometry");
-  const active2 = activePositionedNodes ?? [], known = new Map(active2.map((node) => [node.id, node]));
-  const left = area.x, top = area.y, right = left + area.width, bottom = top + area.height;
-  const hull = active2.length ? { x: Math.min(...active2.map((n) => n.x)), y: Math.min(...active2.map((n) => n.y)), width: Math.max(...active2.map((n) => n.x + n.width)) - Math.min(...active2.map((n) => n.x)), height: Math.max(...active2.map((n) => n.y + n.height)) - Math.min(...active2.map((n) => n.y)) } : area;
-  const nodes = [], boundaryMarkers = [], omissions = [...context.omissions], occupied = [...active2, ...obstacles];
-  const anchorFor = (node) => {
-    const links = context.view.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
-    const anchors = links.map((edge) => known.get(edge.source === node.id ? edge.target : edge.source)).filter(Boolean);
-    if (!anchors.length) return center(hull);
-    return { x: anchors.reduce((sum, n) => sum + center(n).x, 0) / anchors.length, y: anchors.reduce((sum, n) => sum + center(n).y, 0) / anchors.length };
-  };
-  for (const [index, node] of context.view.nodes.entries()) {
-    const anchor = anchorFor(node), candidatePoints = [];
-    const xs = [left + gap, right - width - gap, clamp2(anchor.x - width / 2, left + gap, right - width - gap)], ys = [top + gap, bottom - height - gap, clamp2(anchor.y - height / 2, top + gap, bottom - height - gap)];
-    for (const activeNode of active2) {
-      xs.push(activeNode.x - width - gap, activeNode.x + activeNode.width + gap);
-      ys.push(activeNode.y - height - gap, activeNode.y + activeNode.height + gap);
-    }
-    for (const x of xs) for (const y of ys) {
-      const candidate = { x, y, width, height };
-      if (x < left || y < top || x + width > right || y + height > bottom) continue;
-      if (occupied.some((other) => overlap(candidate, other, gap))) continue;
-      const ordered = context.view.edges.filter((edge) => edge.source === node.id || edge.target === node.id).every((edge) => {
-        const order = decisionOrder(edge);
-        if (!order) return true;
-        const other = known.get(edge.source === node.id ? edge.target : edge.source);
-        if (!other) return true;
-        return order.above === node.id ? candidate.y + candidate.height + gap <= other.y : other.y + other.height + gap <= candidate.y;
-      });
-      if (!ordered) continue;
-      candidatePoints.push(candidate);
-    }
-    candidatePoints.sort((a, b) => (options.placementScore?.(a, node, known) ?? 0) - (options.placementScore?.(b, node, known) ?? 0) || Number(overlap(a, hull)) - Number(overlap(b, hull)) || Math.hypot(center(a).x - anchor.x, center(a).y - anchor.y) - Math.hypot(center(b).x - anchor.x, center(b).y - anchor.y) || a.y - b.y || a.x - b.x);
-    if (candidatePoints.length) {
-      const placed = { ...node, ...candidatePoints[0] };
-      nodes.push(placed);
-      occupied.push(placed);
-      known.set(placed.id, placed);
-      continue;
-    }
-    const points = [{ x: left, y: clamp2(anchor.y, top, bottom) }, { x: right, y: clamp2(anchor.y, top, bottom) }, { x: clamp2(anchor.x, left, right), y: top }, { x: clamp2(anchor.x, left, right), y: bottom }];
-    points.sort((a, b) => Math.hypot(a.x - anchor.x, a.y - anchor.y) - Math.hypot(b.x - anchor.x, b.y - anchor.y) || a.y - b.y || a.x - b.x);
-    const point = points[index % points.length];
-    boundaryMarkers.push({ ...node, ...point, width: 0, height: 0, kind: "context-boundary", boundary: true, interactive: false });
-    const link = context.view.edges.find((edge) => edge.source === node.id || edge.target === node.id);
-    omissions.push({ target: node.semanticId, anchor: link ? link.semanticSource === node.semanticId ? link.semanticTarget : link.semanticSource : null, reason: "context-space", relationshipId: link?.id ?? null });
-  }
-  const byReason = {};
-  for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
-  return { ...context.view, nodes, edges: context.view.edges, boundaryMarkers, omissions, boundary: { ...context.boundary, omitted: omissions.length, byReason, cards: nodes.length, markers: boundaryMarkers.length } };
 }
 
 // src/canvas-prototype/geometry.mjs
@@ -1297,12 +1255,12 @@ function graphArea(width, height, panels = []) {
   const left = 16, top = 16, right = Math.max(left + 1, width - 16), bottom = Math.max(top + 1, height - 60);
   const xs = [left, right, ...panels.flatMap((p) => [Math.max(left, p.x - 16), Math.min(right, p.x + p.width + 16)])];
   const ys = [top, bottom, ...panels.flatMap((p) => [Math.max(top, p.y - 16), Math.min(bottom, p.y + p.height + 16)])];
-  const candidates2 = [];
+  const candidates = [];
   for (const x of xs) for (const r of xs) for (const y of ys) for (const b of ys) {
     const rect = { x, y, width: r - x, height: b - y };
-    if (rect.width > 0 && rect.height > 0 && !panels.some((p) => overlaps2(rect, p))) candidates2.push(rect);
+    if (rect.width > 0 && rect.height > 0 && !panels.some((p) => overlaps2(rect, p))) candidates.push(rect);
   }
-  return candidates2.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? { x: left, y: top, width: right - left, height: bottom - top };
+  return candidates.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? { x: left, y: top, width: right - left, height: bottom - top };
 }
 function fitNodes(nodes, area) {
   const minX = nodes.length ? Math.min(...nodes.map((n) => n.x)) : 0, minY = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 0;
@@ -1365,8 +1323,8 @@ function endpoints(a, b, sourceFraction = 0.5, targetFraction = 0.5) {
   const normal = (side) => ({ NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } })[side];
   const defaultDirection = vertical ? { x: 0, y: bc.y > ac.y ? 1 : -1 } : { x: bc.x > ac.x ? 1 : -1, y: 0 };
   const sourceDirection = normal(a.kind === "port" ? a.portSide ?? a.side : "") ?? defaultDirection, targetDirection = normal(b.kind === "port" ? b.portSide ?? b.side : "") ?? { x: -defaultDirection.x, y: -defaultDirection.y };
-  const attachment2 = (node, direction, fraction) => direction.x ? { x: node.x + (direction.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (direction.y > 0 ? node.height : 0) };
-  return [attachment2(a, sourceDirection, sourceFraction), attachment2(b, targetDirection, targetFraction), sourceDirection, targetDirection];
+  const attachment = (node, direction, fraction) => direction.x ? { x: node.x + (direction.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (direction.y > 0 ? node.height : 0) };
+  return [attachment(a, sourceDirection, sourceFraction), attachment(b, targetDirection, targetFraction), sourceDirection, targetDirection];
 }
 function connectionObstacles(edge, nodes) {
   const byID = new Map(nodes.map((n) => [n.id, n])), ancestors = /* @__PURE__ */ new Set(), leafPortOwners = /* @__PURE__ */ new Set();
@@ -1418,18 +1376,18 @@ function clearLeader(box, points, nodes, labels) {
   return to ? { from, to } : null;
 }
 function labelCandidates(points, width, height) {
-  const candidates2 = [];
+  const candidates = [];
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     if (length2 < 8) continue;
     for (const t of [0.5, 0.25, 0.75]) {
       const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
       if (a.y === b.y) {
-        candidates2.push({ x: x - width / 2, y: y - height - 3, score: length2 }, { x: x - width / 2, y: y + 3, score: length2 - 1 });
-      } else candidates2.push({ x: x + 5, y: y - height / 2, score: length2 - 2 }, { x: x - width - 5, y: y - height / 2, score: length2 - 3 });
+        candidates.push({ x: x - width / 2, y: y - height - 3, score: length2 }, { x: x - width / 2, y: y + 3, score: length2 - 1 });
+      } else candidates.push({ x: x + 5, y: y - height / 2, score: length2 - 2 }, { x: x - width - 5, y: y - height / 2, score: length2 - 3 });
     }
   }
-  return candidates2.sort((a, b) => b.score - a.score);
+  return candidates.sort((a, b) => b.score - a.score);
 }
 function routeEdges(edges, nodes, options = {}) {
   const byID = new Map(nodes.map((n) => [n.id, n])), labels = [], ports = /* @__PURE__ */ new Map();
@@ -1515,7 +1473,7 @@ function routeConnectsEndpoints(points, edge, nodes, tolerance = 0.7) {
 
 // src/canvas-prototype/peripheral-routing.mjs
 var eps = 0.05;
-var overlap2 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var overlap = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 var length = (points) => points.slice(1).reduce((s, p, i) => s + Math.abs(p.x - points[i].x) + Math.abs(p.y - points[i].y), 0);
 var simplify2 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
 var segments = (points) => (points ?? []).slice(1).map((p, i) => [points[i], p]);
@@ -1555,11 +1513,6 @@ function peripheralRoutingMetrics(edges, activeEdges = []) {
   });
   return metrics;
 }
-function isLongPeripheralDetour(points) {
-  if ((points ?? []).length < 2) return false;
-  const first = points[0], last = points.at(-1), direct = Math.abs(first.x - last.x) + Math.abs(first.y - last.y), total = length(points);
-  return total - direct > 120 && total > direct * 3;
-}
 var peripheralRouteScore = (m) => m.blocked * 1e8 + m.crossings * 1e6 + m.overlapLength * 1e4 + m.length + m.bends * 12;
 var normals = { NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } };
 function terminals(a, b) {
@@ -1589,7 +1542,7 @@ function cardObstacles(edge, nodes) {
 }
 var segmentHitsRect = (a, b, r) => Math.abs(a.x - b.x) < eps ? a.x > r.x + eps && a.x < r.x + r.width - eps && Math.max(a.y, b.y) > r.y + eps && Math.min(a.y, b.y) < r.y + r.height - eps : a.y > r.y + eps && a.y < r.y + r.height - eps && Math.max(a.x, b.x) > r.x + eps && Math.min(a.x, b.x) < r.x + r.width - eps;
 var segmentBox = (a, b, pad = 1) => ({ x: Math.min(a.x, b.x) - pad, y: Math.min(a.y, b.y) - pad, width: Math.abs(a.x - b.x) + pad * 2, height: Math.abs(a.y - b.y) + pad * 2 });
-var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap2(box, n, 3)) && !labels.some((r) => overlap2(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap2(box, segmentBox(a, b, 1))));
+var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap(box, n, 3)) && !labels.some((r) => overlap(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap(box, segmentBox(a, b, 1))));
 function labelFor(edge, points, nodes, labels, paths, area, measureLabel) {
   if (!edge.label) return null;
   const measured = measureLabel?.(edge.label) ?? { width: String(edge.label).length * 6.5 + 4, height: 14 }, size = { width: Math.max(1, measured.width), height: Math.max(1, measured.height) }, slots = [];
@@ -1666,126 +1619,421 @@ function routePeripheralEdges(edges, nodes, area, { activeEdges = [], obstacles 
   return peripheralRouteScore(second.metrics) < peripheralRouteScore(first.metrics) ? second : first;
 }
 
-// src/canvas-prototype/peripheral.mjs
-var overlaps3 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
-var inside = (r, a) => r.x >= a.x && r.y >= a.y && r.x + r.width <= a.x + a.width && r.y + r.height <= a.y + a.height;
-function segmentCrosses(a, b, r, pad = 2) {
-  const box = { x: r.x - pad, y: r.y - pad, width: r.width + 2 * pad, height: r.height + 2 * pad };
-  return a.x === b.x ? a.x > box.x && a.x < box.x + box.width && Math.max(a.y, b.y) > box.y && Math.min(a.y, b.y) < box.y + box.height : a.y > box.y && a.y < box.y + box.height && Math.max(a.x, b.x) > box.x && Math.min(a.x, b.x) < box.x + box.width;
-}
-var directions = { NORTH: { x: 0, y: -1 }, SOUTH: { x: 0, y: 1 }, EAST: { x: 1, y: 0 }, WEST: { x: -1, y: 0 } };
-function attachment(node, side, fraction) {
-  const d = directions[side];
-  return d.x ? { x: node.x + (d.x > 0 ? node.width : 0), y: node.y + node.height * fraction } : { x: node.x + node.width * fraction, y: node.y + (d.y > 0 ? node.height : 0) };
-}
-function candidates(edge, anchor, area, measureLabel) {
-  const order = decisionOrder(edge), sides = order ? [order.above === anchor.id ? "SOUTH" : "NORTH"] : ["NORTH", "SOUTH", "EAST", "WEST"];
-  const label2 = edge.label || edge.kind, size = measureLabel?.(label2) ?? { width: String(label2).length * 6.5 + 4, height: 14 }, out = [];
-  for (const side of sides) for (const fraction of [0.5, 0.4, 0.6, 0.25, 0.75, 0.125, 0.875, 0.2, 0.8]) for (const length2 of [28, 36, 20]) {
-    const d = directions[side], start2 = attachment(anchor, side, fraction), end = { x: start2.x + d.x * length2, y: start2.y + d.y * length2 };
-    const markerBox = { x: end.x - 5, y: end.y - 5, width: 10, height: 10 };
-    if (!inside(markerBox, area)) continue;
-    const middle = { x: (start2.x + end.x) / 2, y: (start2.y + end.y) / 2 };
-    const labels = d.y ? [{ x: middle.x + 7, y: middle.y - size.height / 2, ...size }, { x: middle.x - size.width - 7, y: middle.y - size.height / 2, ...size }] : [{ x: middle.x - size.width / 2, y: middle.y - size.height - 5, ...size }, { x: middle.x - size.width / 2, y: middle.y + 5, ...size }];
-    for (const labelBox of labels) if (inside(labelBox, area)) out.push({ start: start2, end, side, markerBox, labelBox, label: label2 });
+// src/canvas-prototype/neighborhood.mjs
+var compare3 = (a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+var overlap2 = (a, b, g = 0) => a.x < b.x + b.width + g && a.x + a.width + g > b.x && a.y < b.y + b.height + g && a.y + a.height + g > b.y;
+var center = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
+var clamp2 = (v, min, max2) => Math.max(min, Math.min(max2, v));
+var bounds = (rects) => {
+  const x = Math.min(...rects.map((r) => r.x)), y = Math.min(...rects.map((r) => r.y));
+  return { x, y, width: Math.max(...rects.map((r) => r.x + r.width)) - x, height: Math.max(...rects.map((r) => r.y + r.height)) - y };
+};
+var pathBoxes = (edges) => edges.flatMap((e) => (e.points ?? []).slice(1).map((b, i) => {
+  const a = e.points[i];
+  return { x: Math.min(a.x, b.x) - 5, y: Math.min(a.y, b.y) - 5, width: Math.abs(a.x - b.x) + 10, height: Math.abs(a.y - b.y) + 10 };
+}));
+function prepareNeighborhood(context, activeNodes, area, options = {}) {
+  const { width = 156, height = 70, gap = 72, activeEdges = [], labelObstacles = [], obstacles = [], measureLabel } = options;
+  if (![area?.x, area?.y, area?.width, area?.height, width, height, gap].every(Number.isFinite) || area.width <= 0 || area.height <= 0 || width <= 0 || height <= 0 || gap < 0) throw new Error("Invalid neighborhood geometry");
+  const active2 = activeNodes ?? [], known = new Map(active2.map((n) => [n.id, n])), drafts = [...context.view.nodes].sort((a, b) => compare3(a.name, b.name) || compare3(a.id, b.id));
+  const byID = new Map(drafts.map((n) => [n.id, { ...n, width: Number.isFinite(n.width) && n.width > 0 ? n.width : width, height: Number.isFinite(n.height) && n.height > 0 ? n.height : height }])), edges = context.view.edges ?? [], orders = edges.map(decisionOrder).filter(Boolean), hull = active2.length ? bounds(active2) : area;
+  const blocked = [...active2, ...obstacles, ...labelObstacles, ...pathBoxes(activeEdges)], nodes = [], notices = [];
+  const limits2 = new Map(drafts.map((n) => [n.id, { min: -Infinity, max: Infinity }]));
+  const lower = (id) => known.has(id) ? known.get(id).y : limits2.get(id)?.min ?? -Infinity;
+  const upper = (id) => known.has(id) ? known.get(id).y : limits2.get(id)?.max ?? Infinity;
+  const nodeHeight = (id) => known.get(id)?.height ?? byID.get(id)?.height ?? height;
+  const rankGap = (id) => Math.max(gap, orders.filter((o) => o.above === id || o.below === id).length * 10 + 24);
+  for (let i = 0; i < drafts.length + 1; i++) {
+    let changed = false;
+    for (const { above, below } of orders) {
+      const lo = limits2.get(below), hi = limits2.get(above), nextMin = lower(above) + nodeHeight(above) + rankGap(above), nextMax = upper(below) - nodeHeight(above) - rankGap(above);
+      if (lo && nextMin > lo.min) {
+        lo.min = nextMin;
+        changed = true;
+      }
+      if (hi && nextMax < hi.max) {
+        hi.max = nextMax;
+        changed = true;
+      }
+    }
+    if (!changed) break;
   }
-  return out;
-}
-function preparePeripheral(context, activeNodes, area, options = {}) {
-  const { obstacles = [], measureLabel, activeEdges = [], labelObstacles = [] } = options;
-  const active2 = new Map(activeNodes.map((n) => [n.id, n]));
-  const routingOptions = { activeEdges, obstacles: labelObstacles, measureLabel };
-  const fullRoutes = (placed2) => {
-    const ids = new Set([...activeNodes, ...placed2.nodes].map((n) => n.id));
-    return routePeripheralEdges(context.view.edges.filter((e) => ids.has(e.source) && ids.has(e.target)), [...activeNodes, ...placed2.nodes], area, routingOptions);
+  const remaining = new Set(drafts.map((n) => n.id)), ordered = [];
+  while (remaining.size) {
+    const ready = [...remaining].filter((id) => !orders.some((o) => o.below === id && remaining.has(o.above))).sort(compare3);
+    if (!ready.length) {
+      notices.push({ reason: "context-rank-conflict", targets: [...remaining] });
+      ordered.push(...[...remaining].sort(compare3));
+      break;
+    }
+    for (const id of ready) {
+      ordered.push(id);
+      remaining.delete(id);
+    }
+  }
+  for (const id of ordered) {
+    const node = byID.get(id), width2 = node.width, height2 = node.height, links = edges.filter((e) => e.source === id || e.target === id), linked = links.map((e) => known.get(e.source === id ? e.target : e.source)).filter(Boolean), activeAnchors = linked.filter((n) => active2.some((a) => a.id === n.id)), anchors = activeAnchors.length ? activeAnchors : linked, anchor = anchors.length ? { x: anchors.reduce((s, n) => s + center(n).x, 0) / anchors.length, y: anchors.reduce((s, n) => s + center(n).y, 0) / anchors.length } : center(hull);
+    let { min, max: max2 } = limits2.get(id);
+    for (const { above, below } of orders) {
+      if (below === id && known.has(above)) min = Math.max(min, known.get(above).y + known.get(above).height + rankGap(above));
+      if (above === id && known.has(below)) max2 = Math.min(max2, known.get(below).y - height2 - rankGap(id));
+    }
+    if (min > max2) {
+      notices.push({ reason: "context-rank-conflict", target: node.semanticId });
+      min = -Infinity;
+      max2 = Infinity;
+    }
+    const idealY = clamp2(anchor.y - height2 / 2, min, max2), idealX = anchor.x - width2 / 2, dx = width2 + gap, dy = height2 + gap;
+    let placed = null;
+    for (let ring = 0; ring < drafts.length + blocked.length + 8 && !placed; ring++) {
+      const candidates = [];
+      const ranked = orders.some((o) => o.above === id || o.below === id);
+      for (let row = ranked ? 0 : -ring; row <= (ranked ? 0 : ring); row++) for (let col = -ring; col <= ring; col++) {
+        if (Math.max(Math.abs(row), Math.abs(col)) !== ring) continue;
+        for (const offset of [0, dx / 2]) {
+          const candidate = { x: idealX + col * dx + offset, y: clamp2(idealY + row * dy, min, max2), width: width2, height: height2 };
+          if (blocked.some((other) => overlap2(candidate, other, gap / 2))) continue;
+          const stemBlocked = orders.some((order) => {
+            const other = active2.find((n) => n.id === (order.above === id ? order.below : order.below === id ? order.above : null));
+            if (!other) return false;
+            const x = candidate.x + candidate.width / 2, top = order.below === id ? other.y + other.height : candidate.y + height2, bottom = order.below === id ? candidate.y : other.y;
+            return nodes.some((n) => x > n.x - 6 && x < n.x + n.width + 6 && n.y < bottom && n.y + n.height > top);
+          });
+          if (stemBlocked) continue;
+          candidates.push(candidate);
+        }
+      }
+      candidates.sort((a, b) => Math.abs(center(a).x - anchor.x) + Math.abs(center(a).y - anchor.y) - Math.abs(center(b).x - anchor.x) - Math.abs(center(b).y - anchor.y) || a.y - b.y || a.x - b.x);
+      if (candidates.length) placed = { ...node, ...candidates[0], context: true, fit: false, parentId: null };
+    }
+    if (!placed) throw new Error("Unable to place neighborhood tile in world space");
+    nodes.push(placed);
+    blocked.push(placed);
+    known.set(id, placed);
+  }
+  const allNodes = [...active2, ...nodes], extent = bounds([...allNodes, ...obstacles, ...labelObstacles, area]), padding = Math.max(60, gap * 2), worldBounds = { x: extent.x - padding, y: extent.y - padding, width: extent.width + padding * 2, height: extent.height + padding * 2 };
+  const attachments = /* @__PURE__ */ new Map(), sideFor = (a, b) => {
+    const order = edges.find((e) => e.source === a.id && e.target === b.id || e.target === a.id && e.source === b.id), rank = order && decisionOrder(order);
+    if (rank) return rank.above === a.id ? "SOUTH" : "NORTH";
+    const ac = center(a), bc = center(b);
+    return Math.abs(bc.y - ac.y) > Math.abs(bc.x - ac.x) * 0.65 ? bc.y >= ac.y ? "SOUTH" : "NORTH" : bc.x >= ac.x ? "EAST" : "WEST";
   };
-  let placed = positionSurrounding(context, activeNodes, area, options), routing = fullRoutes(placed);
-  if (routing.metrics.crossings || routing.metrics.overlapLength || routing.metrics.blocked) {
-    const placementScore = (candidate, node, known) => context.view.edges.filter((e) => e.source === node.id || e.target === node.id).reduce((score, e) => {
-      const other = known.get(e.source === node.id ? e.target : e.source);
-      if (!other) return score;
-      const a = { x: candidate.x + candidate.width / 2, y: candidate.y + candidate.height / 2 }, b = { x: other.x + other.width / 2, y: other.y + other.height / 2 }, path = [a, { x: a.x, y: b.y }, b];
-      return score + activeEdges.reduce((sum, edge) => {
-        const c = routeConflicts(path, edge.points);
-        return sum + c.crossings * 1e4 + c.overlapLength * 100;
-      }, 0);
-    }, 0);
-    const alternative = positionSurrounding(context, activeNodes, area, { ...options, placementScore }), alternativeRouting = fullRoutes(alternative);
-    if (alternative.nodes.length >= placed.nodes.length && peripheralRouteScore(alternativeRouting.metrics) < peripheralRouteScore(routing.metrics)) {
-      placed = alternative;
-      routing = alternativeRouting;
+  for (const node of allNodes) {
+    const incident = edges.filter((e) => e.source === node.id || e.target === node.id);
+    for (const side of ["NORTH", "SOUTH", "EAST", "WEST"]) {
+      const neighbors = incident.map((e) => ({ edge: e, other: known.get(e.source === node.id ? e.target : e.source) })).filter(({ other }) => other && sideFor(node, other) === side);
+      neighbors.sort((a, b) => {
+        const ac = center(a.other), bc = center(b.other);
+        return (side === "NORTH" || side === "SOUTH" ? ac.x - bc.x : ac.y - bc.y) || compare3(a.edge.id, b.edge.id);
+      });
+      const byDistance = [...neighbors].sort((a, b) => Math.abs(center(b.other).x - center(node).x) - Math.abs(center(a.other).x - center(node).x) || compare3(a.edge.id, b.edge.id));
+      neighbors.forEach(({ edge }, i) => {
+        const fraction = (i + 1) / (neighbors.length + 1), point = side === "NORTH" || side === "SOUTH" ? { x: node.x + node.width * fraction, y: node.y + (side === "SOUTH" ? node.height : 0) } : { x: node.x + (side === "EAST" ? node.width : 0), y: node.y + node.height * fraction };
+        attachments.set(`${edge.id}:${node.id}`, { ...point, side, lane: (byDistance.findIndex((n) => n.edge.id === edge.id) + 1) / (neighbors.length + 1) });
+      });
     }
   }
-  const continuedCards = [];
-  const longDetour = (edge) => isLongPeripheralDetour(edge.points);
-  while ((routing.metrics.crossings >= 2 || routing.metrics.overlapLength || routing.edges.some(longDetour)) && placed.nodes.length) {
-    const scores = placed.nodes.map((node) => ({ node, score: routing.edges.filter((e) => e.source === node.id || e.target === node.id).reduce((sum, edge) => sum + (longDetour(edge) ? 1e3 : 0) + [...activeEdges, ...routing.edges.filter((e) => e.id !== edge.id)].reduce((value, other) => {
-      const c = routeConflicts(edge.points, other.points);
-      return value + c.crossings * 1e3 + c.overlapLength * 10;
-    }, 0), 0) })).sort((a, b) => b.score - a.score || String(a.node.id).localeCompare(String(b.node.id)));
-    if (!scores[0]?.score) break;
-    const removed = scores[0].node, links = routing.edges.filter((e) => e.source === removed.id || e.target === removed.id), reason = links.some(longDetour) ? "long-detour" : links.some((edge) => [...activeEdges, ...routing.edges.filter((e) => e.id !== edge.id)].some((other) => routeConflicts(edge.points, other.points).overlapLength)) ? "shared-route" : "dense-crossing";
-    continuedCards.push({ ...removed, continuationReason: reason });
-    placed = { ...placed, nodes: placed.nodes.filter((n) => n.id !== removed.id) };
-    routing = fullRoutes(placed);
-  }
-  const routedByID = new Map(routing.edges.map((e) => [e.id, e]));
-  const connected = new Set(routing.edges.filter((e) => !e.routingBlocked).flatMap((e) => [e.source, e.target]));
-  placed = { ...placed, nodes: placed.nodes.filter((n) => connected.has(n.id)) };
-  const cards = new Map(placed.nodes.map((n) => [n.id, n])), missing = new Map(context.view.nodes.filter((n) => !cards.has(n.id)).map((n) => [n.id, n]));
-  const nodes = placed.nodes, boundaryMarkers = [], edges = [], stubEdges = [], omissions = [...placed.omissions];
-  const occupied = [...activeNodes, ...nodes, ...obstacles], reserved = routing.edges.flatMap((e) => e.labelBox ? [e.labelBox] : []), paths = [...activeEdges, ...routing.edges.filter((e) => !e.routingBlocked)].flatMap((e) => (e.points ?? []).slice(1).map((end, i) => {
-    const start2 = e.points[i];
-    return { start: start2, end, x: Math.min(start2.x, end.x), y: Math.min(start2.y, end.y), width: Math.abs(start2.x - end.x), height: Math.abs(start2.y - end.y) };
-  })), routedEdges = [];
-  for (const edge of context.view.edges) {
-    const sourceKnown = active2.has(edge.source) || cards.has(edge.source), targetKnown = active2.has(edge.target) || cards.has(edge.target);
-    if (sourceKnown && targetKnown) {
-      const routed = routedByID.get(edge.id);
-      edges.push(edge);
-      if (routed && !routed.routingBlocked) routedEdges.push(routed);
-      else omissions.push({ relationshipId: edge.semanticId ?? edge.id, reason: "context-route-space" });
-      continue;
-    }
-    const anchor = active2.get(edge.source) ?? active2.get(edge.target), neighbor = missing.get(edge.source) ?? missing.get(edge.target);
-    if (!anchor || !neighbor) {
-      omissions.push({ relationshipId: edge.semanticId ?? edge.id, target: neighbor?.semanticId ?? edge.semanticTarget, reason: "context-link-space" });
-      continue;
-    }
-    const choices = candidates(edge, anchor, area, measureLabel).filter((candidate) => {
-      if (occupied.some((n) => overlaps3(candidate.markerBox, n, 3) || overlaps3(candidate.labelBox, n, 3))) return false;
-      if (reserved.some((r) => overlaps3(candidate.markerBox, r, 4) || overlaps3(candidate.labelBox, r, 4))) return false;
-      if (occupied.some((n) => n.id !== anchor.id && segmentCrosses(candidate.start, candidate.end, n))) return false;
-      if (reserved.some((r) => segmentCrosses(candidate.start, candidate.end, r))) return false;
-      if (paths.some((path) => segmentCrosses(candidate.start, candidate.end, path, 4) || segmentCrosses(path.start, path.end, candidate.labelBox, 3) || segmentCrosses(path.start, path.end, candidate.markerBox, 3))) return false;
-      return true;
+  let routed = [];
+  const fanCandidates = /* @__PURE__ */ new Map();
+  const sorted = [...edges].sort((a, b) => compare3(a.id, b.id));
+  for (const edge of sorted) {
+    const endpoints2 = /* @__PURE__ */ new Set([edge.source, edge.target]), proxyNodes = allNodes.flatMap((node) => {
+      if (!endpoints2.has(node.id)) return [node];
+      const point = attachments.get(`${edge.id}:${node.id}`);
+      if (!point) return [node];
+      const interior = { ...node, id: `interior:${node.id}`, x: node.x + 6, y: node.y + 6, width: Math.max(0, node.width - 12), height: Math.max(0, node.height - 12), parentId: null };
+      return [interior, { ...node, ...point, width: 0.01, height: 0.01, kind: "port", portSide: point.side, parentId: null }];
     });
-    const candidateCost = (candidate) => paths.reduce((score, path) => {
-      const c = routeConflicts([candidate.start, candidate.end], [path.start, path.end]);
-      return score + c.crossings * 1e4 + c.overlapLength * 100;
-    }, 0);
-    choices.sort((a, b) => candidateCost(a) - candidateCost(b));
-    const choice = choices[0];
-    if (!choice) {
-      omissions.push({ relationshipId: edge.semanticId ?? edge.id, target: neighbor.semanticId, anchor: anchor.semanticId, reason: "context-continuation-space" });
-      continue;
+    const routingOptions = { activeEdges: [...activeEdges, ...routed.filter((e) => !e.routingBlocked)], obstacles: [...obstacles, ...labelObstacles], measureLabel, candidateBudget: 4, reverse: false, visibilitySearches: 0 };
+    const routingEdge = { ...edge, label: "" };
+    let result = routePeripheralEdges([routingEdge], proxyNodes, worldBounds, routingOptions).edges[0];
+    const order = decisionOrder(edge);
+    if (order) {
+      const above = known.get(order.above), below = known.get(order.below), top = attachments.get(`${edge.id}:${order.above}`), bottom = attachments.get(`${edge.id}:${order.below}`);
+      if (above && below && top?.side === "SOUTH" && bottom?.side === "NORTH" && bottom.y - top.y > 20) {
+        let laneMin = top.y + 8, laneMax = bottom.y - 8;
+        for (const obstacle of [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])]) {
+          if (top.x > obstacle.x - 5 && top.x < obstacle.x + obstacle.width + 5 && obstacle.y >= top.y + 8 && obstacle.y < bottom.y) laneMax = Math.min(laneMax, obstacle.y - 8);
+          if (bottom.x > obstacle.x - 5 && bottom.x < obstacle.x + obstacle.width + 5 && obstacle.y + obstacle.height > top.y && obstacle.y + obstacle.height <= bottom.y - 8) laneMin = Math.max(laneMin, obstacle.y + obstacle.height + 8);
+        }
+        const lane = laneMin + (laneMax - laneMin) * top.lane, path = [{ x: top.x, y: top.y }, { x: top.x, y: lane }, { x: bottom.x, y: lane }, { x: bottom.x, y: bottom.y }], points = edge.source === order.above ? path : [...path].reverse(), candidate = { ...edge, points, routingBlocked: false, d: points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ") };
+        const avoids = laneMin <= laneMax && ![...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])].some((r) => pathBoxes([candidate]).some((box) => overlap2(box, r)));
+        if (avoids && routeIsClear(points, edge, allNodes, { orthogonalOnly: true })) {
+          fanCandidates.set(edge.id, candidate);
+        }
+        if (avoids && routeIsClear(points, edge, allNodes, { orthogonalOnly: true }) && peripheralRouteScore(peripheralRoutingMetrics([candidate], routingOptions.activeEdges)) < peripheralRouteScore(peripheralRoutingMetrics([result], routingOptions.activeEdges))) result = candidate;
+      }
     }
-    const id = `continuation:${edge.id}:${anchor.id}:${neighbor.id}`, sourceIsAnchor = edge.source === anchor.id;
-    const marker = { ...neighbor, id, x: choice.end.x, y: choice.end.y, width: 0, height: 0, kind: "context-boundary", boundary: true, interactive: false, continuationDirection: choice.side, relationshipId: edge.semanticId ?? edge.id };
-    boundaryMarkers.push(marker);
-    reserved.push(choice.markerBox, choice.labelBox);
-    paths.push({ start: choice.start, end: choice.end, x: Math.min(choice.start.x, choice.end.x), y: Math.min(choice.start.y, choice.end.y), width: Math.abs(choice.start.x - choice.end.x), height: Math.abs(choice.start.y - choice.end.y) });
-    const points = sourceIsAnchor ? [choice.start, choice.end] : [choice.end, choice.start];
-    stubEdges.push({ ...edge, source: sourceIsAnchor ? anchor.id : id, target: sourceIsAnchor ? id : anchor.id, points, d: points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" "), label: choice.label, labelBox: choice.labelBox, x: choice.labelBox.x, y: choice.labelBox.y + choice.labelBox.height * 0.78, continuation: true, routingBlocked: false });
+    if (result.routingBlocked) result = routePeripheralEdges([routingEdge], proxyNodes, worldBounds, { ...routingOptions, candidateBudget: 8, visibilitySearches: 1 }).edges[0];
+    result = { ...result, label: edge.label };
+    if (!result.routingBlocked && (!routeIsClear(result.points, edge, allNodes, { orthogonalOnly: true }) || !routeConnectsEndpoints(result.points, edge, allNodes))) result = { ...result, points: [], d: "", routingBlocked: true };
+    if (result.routingBlocked) {
+      const fallback = routePeripheralEdges([routingEdge], allNodes, worldBounds, { ...routingOptions, candidateBudget: 16, visibilitySearches: 2 }).edges[0];
+      if (!fallback.routingBlocked && routeIsClear(fallback.points, edge, allNodes, { orthogonalOnly: true }) && routeConnectsEndpoints(fallback.points, edge, allNodes)) result = { ...fallback, label: edge.label };
+    }
+    routed.push(result);
   }
+  const allFans = routed.map((edge) => fanCandidates.get(edge.id) ?? edge);
+  if (peripheralRouteScore(peripheralRoutingMetrics(allFans, activeEdges)) < peripheralRouteScore(peripheralRoutingMetrics(routed, activeEdges))) routed = allFans;
+  const protectedRects = [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])];
+  const safe = (edge) => routeConnectsEndpoints(edge.points, edge, allNodes) && routeIsClear(edge.points, edge, allNodes, { orthogonalOnly: true }) && !pathBoxes([edge]).some((box) => protectedRects.some((r) => overlap2(box, r)));
+  const clipPoints = (points) => {
+    const paths = [];
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i];
+      if (Math.abs(a.x - b.x) < 0.01) {
+        if (a.x < area.x || a.x > area.x + area.width) continue;
+        const low = Math.max(Math.min(a.y, b.y), area.y), high = Math.min(Math.max(a.y, b.y), area.y + area.height);
+        if (low <= high) paths.push([{ x: a.x, y: low }, { x: a.x, y: high }]);
+      } else {
+        if (a.y < area.y || a.y > area.y + area.height) continue;
+        const low = Math.max(Math.min(a.x, b.x), area.x), high = Math.min(Math.max(a.x, b.x), area.x + area.width);
+        if (low <= high) paths.push([{ x: low, y: a.y }, { x: high, y: a.y }]);
+      }
+    }
+    return paths;
+  };
+  const visibleCrossings = (edge, other) => clipPoints(edge.points).reduce((total, path) => total + other.reduce((sum, e) => sum + routeConflicts(path, e.points ?? []).crossings, 0), 0);
+  const laneScore = (metrics, edge, other) => metrics.blocked * 1e12 + metrics.overlapLength * 1e8 + visibleCrossings(edge, other) * 1e7 + metrics.crossings * 1e5 + metrics.length + metrics.bends * 12;
+  for (let pass = 0; pass < 3; pass++) {
+    let improved = false;
+    for (let index = 0; index < routed.length; index++) {
+      const current = routed[index];
+      if (current.routingBlocked) continue;
+      const other = [...activeEdges, ...routed.filter((_, i) => i !== index)], metric = peripheralRoutingMetrics([current], other);
+      if (metric.overlapLength < 0.05 && !metric.crossings) continue;
+      let best = current, bestScore = laneScore(metric, current, other);
+      for (let segment = 0; segment < current.points.length - 1; segment++) for (const offset of [-7, 7, -14, 14, -28, 28, -49, 49, -98, 98, -196, 196]) {
+        const points = current.points.map((p) => ({ ...p })), a = points[segment], b = points[segment + 1];
+        if (Math.abs(a.x - b.x) < 0.01) {
+          a.x += offset;
+          b.x += offset;
+        } else if (Math.abs(a.y - b.y) < 0.01) {
+          a.y += offset;
+          b.y += offset;
+        } else continue;
+        const candidate = { ...current, points };
+        if (!safe(candidate)) continue;
+        const score = laneScore(peripheralRoutingMetrics([candidate], other), candidate, other);
+        if (score < bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+      if (best !== current) {
+        routed[index] = { ...best, d: best.points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ") };
+        improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+  const reserved = [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])], corridors = pathBoxes([...activeEdges, ...routed]);
+  for (const edge of routed) {
+    if (!edge.label || edge.routingBlocked) continue;
+    const measured = measureLabel?.(edge.label) ?? { width: String(edge.label).length * 6.5 + 4, height: 14 }, size = { width: Math.max(1, measured.width), height: Math.max(1, measured.height) }, slots = [];
+    for (let i = 1; i < edge.points.length; i++) {
+      const a = edge.points[i - 1], b = edge.points[i];
+      for (const fraction of [0.5, 0.25, 0.75]) {
+        const x = a.x + (b.x - a.x) * fraction, y = a.y + (b.y - a.y) * fraction;
+        if (a.y === b.y) slots.push({ x: x - size.width / 2, y: y - size.height - 8, ...size }, { x: x - size.width / 2, y: y + 8, ...size });
+        else slots.push({ x: x + 8, y: y - size.height / 2, ...size }, { x: x - size.width - 8, y: y - size.height / 2, ...size });
+      }
+    }
+    const box = slots.find((box2) => box2.x >= worldBounds.x && box2.y >= worldBounds.y && box2.x + box2.width <= worldBounds.x + worldBounds.width && box2.y + box2.height <= worldBounds.y + worldBounds.height && ![...allNodes, ...reserved, ...corridors].some((r) => overlap2(box2, r, 2)));
+    if (box) {
+      edge.labelBox = box;
+      edge.x = box.x;
+      edge.y = box.y + box.height * 0.78;
+      reserved.push(box);
+    } else edge.labelOmitted = true;
+  }
+  const routing = { edges: routed, metrics: peripheralRoutingMetrics(routed, activeEdges) };
+  const omissions = [...context.omissions ?? []], routedEdges = routing.edges.filter((e) => !e.routingBlocked);
+  for (const edge of routing.edges.filter((e) => e.routingBlocked)) omissions.push({ relationshipId: edge.semanticId ?? edge.id, source: edge.semanticSource, target: edge.semanticTarget, reason: "context-route-unavailable" });
+  const omittedLabels = routedEdges.filter((e) => e.labelOmitted);
+  if (omittedLabels.length) notices.push({ reason: "context-label-space", relationships: omittedLabels.map((e) => e.semanticId ?? e.id), count: omittedLabels.length });
+  if (routing.metrics.blocked) notices.push({ reason: "context-route-unavailable", count: routing.metrics.blocked });
+  if (routing.metrics.crossings || routing.metrics.overlapLength) notices.push({ reason: "context-route-conflict", ...routing.metrics });
   const byReason = {};
   for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
-  const finalized = [...routedEdges, ...stubEdges], routingMetrics = peripheralRoutingMetrics(finalized, activeEdges);
-  const notices = routingMetrics.crossings || routingMetrics.overlapLength ? [{ reason: "context-route-conflict", ...routingMetrics }] : [];
-  if (continuedCards.length) notices.push({ reason: "context-route-continuation", targets: continuedCards.map((n) => n.semanticId), reasons: continuedCards.map((n) => ({ target: n.semanticId, reason: n.continuationReason })), continued: stubEdges.length });
-  const fallbacks = routing.edges.filter((e) => e.routingBlocked);
-  if (fallbacks.length) notices.push({ reason: "context-route-fallback", relationships: fallbacks.map((e) => e.semanticId ?? e.id), continued: fallbacks.filter((e) => stubEdges.some((stub) => stub.id === e.id)).length, unrepresented: fallbacks.filter((e) => !stubEdges.some((stub) => stub.id === e.id)).length });
-  return { ...placed, nodes, edges, stubEdges, routedEdges: finalized, routingMetrics, notices, boundaryMarkers, omissions, boundary: { ...placed.boundary, cards: nodes.length, markers: boundaryMarkers.length, omitted: omissions.length, byReason } };
+  const finalBounds = bounds([worldBounds, ...routedEdges.flatMap((e) => [...(e.points ?? []).map((p) => ({ ...p, width: 0, height: 0 })), ...e.labelBox ? [e.labelBox] : []])]);
+  return { ...context.view, nodes, edges, routedEdges, stubEdges: [], boundaryMarkers: [], worldBounds: finalBounds, routingMetrics: routing.metrics, notices, omissions, boundary: { ...context.boundary, cards: nodes.length, markers: 0, omitted: omissions.length, byReason } };
+}
+
+// src/canvas-prototype/camera.mjs
+var CAMERA_LIMITS = Object.freeze({ minScale: 5e-3, maxScale: 4 });
+var finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
+function limits(options = {}) {
+  const minScale = clamp3(finite(options.minScale, CAMERA_LIMITS.minScale), CAMERA_LIMITS.minScale, CAMERA_LIMITS.maxScale);
+  return { minScale, maxScale: clamp3(finite(options.maxScale, CAMERA_LIMITS.maxScale), minScale, CAMERA_LIMITS.maxScale) };
+}
+var clamp3 = (value, min, max2) => Math.max(min, Math.min(max2, value));
+function createCamera(camera = {}, options = {}) {
+  const { minScale, maxScale } = limits(options);
+  return { x: finite(camera?.x, 0), y: finite(camera?.y, 0), scale: clamp3(finite(camera?.scale, 1), minScale, maxScale) };
+}
+function panCamera(camera, dx, dy) {
+  const c = createCamera(camera);
+  return { ...c, x: c.x + finite(dx, 0), y: c.y + finite(dy, 0) };
+}
+function zoomCameraAt(camera, point, factor, options = {}) {
+  const c = createCamera(camera, options), { minScale, maxScale } = limits(options);
+  const scale = clamp3(c.scale * Math.max(1e-4, finite(factor, 1)), minScale, maxScale);
+  const world = { x: (point.x - c.x) / c.scale, y: (point.y - c.y) / c.scale };
+  return { x: point.x - world.x * scale, y: point.y - world.y * scale, scale };
+}
+function fitCameraToBounds(bounds2, area, padding = 24, options = {}) {
+  if (!bounds2 || !area || ![bounds2.x, bounds2.y, bounds2.width, bounds2.height, area.x, area.y, area.width, area.height].every(Number.isFinite) || bounds2.width < 0 || bounds2.height < 0 || area.width <= 0 || area.height <= 0) return createCamera({}, options);
+  const inset = Math.max(0, finite(padding, 24)), { minScale, maxScale } = limits(options);
+  const scale = clamp3(Math.min(Math.max(1, area.width - inset * 2) / Math.max(1, bounds2.width), Math.max(1, area.height - inset * 2) / Math.max(1, bounds2.height)), minScale, maxScale);
+  return { x: area.x + area.width / 2 - (bounds2.x + bounds2.width / 2) * scale, y: area.y + area.height / 2 - (bounds2.y + bounds2.height / 2) * scale, scale };
+}
+function graphTarget(target, element2) {
+  if (!target || !element2.contains(target)) return false;
+  if (target.closest?.("article,aside,dialog,#selection,#canvas-tools,#loading,[data-camera-ignore]")) return false;
+  if (target.closest?.(".node,[data-relationship],[data-camera-surface]")) return true;
+  return !target.closest?.('button,a,input,textarea,select,summary,[contenteditable="true"],[role="button"]');
+}
+var midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+var distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function bindCameraControls({ element: element2, getCamera, setCamera, onChange, onGestureStart, getViewportArea, shouldHandleTarget = graphTarget, minScale = 5e-3, maxScale = 4, dragThreshold = 5 }) {
+  if (!element2 || typeof getCamera !== "function" || typeof setCamera !== "function") throw new TypeError("Camera controls require element, getCamera and setCamera");
+  const options = { minScale, maxScale }, points = /* @__PURE__ */ new Map(), listeners = [], captures = /* @__PURE__ */ new Set();
+  const pointerHost = element2.ownerDocument ?? element2;
+  let gesture = null, moved = false, suppressClick = false, disposed = false;
+  const local = (event) => {
+    const r = element2.getBoundingClientRect();
+    return { x: event.clientX - r.left, y: event.clientY - r.top };
+  };
+  const accept = (event) => shouldHandleTarget(event.target, element2, event);
+  const listen = (host, type, fn, options2) => {
+    host.addEventListener(type, fn, options2);
+    listeners.push(() => host.removeEventListener(type, fn, options2));
+  };
+  const emit = (camera, source) => {
+    const next = createCamera(camera, options), current = createCamera(getCamera(), options);
+    if (next.x === current.x && next.y === current.y && next.scale === current.scale) return;
+    setCamera(next, { source });
+    onChange?.(next, { source });
+  };
+  const rebase = () => {
+    gesture = { camera: createCamera(getCamera(), options), points: [...points.values()].map((p) => ({ ...p })) };
+  };
+  const capture2 = () => {
+    for (const id of points.keys()) if (!captures.has(id)) {
+      try {
+        element2.setPointerCapture?.(id);
+        captures.add(id);
+      } catch {
+      }
+    }
+  };
+  const begin = (source) => {
+    if (!moved) {
+      moved = true;
+      suppressClick = true;
+      onGestureStart?.({ source });
+      if (gesture) gesture.camera = createCamera(getCamera(), options);
+    }
+    capture2();
+  };
+  const down = (event) => {
+    if (disposed || event.button > 0 || points.has(event.pointerId) || points.size >= 2 || !accept(event)) return;
+    if (!points.size) {
+      moved = false;
+      suppressClick = false;
+    }
+    points.set(event.pointerId, local(event));
+    rebase();
+    if (points.size === 2) {
+      begin("pinch");
+      event.preventDefault();
+    }
+  };
+  const move = (event) => {
+    if (!points.has(event.pointerId) || !gesture) return;
+    points.set(event.pointerId, local(event));
+    const current = [...points.values()], base = gesture.points;
+    if (current.length === 2 && base.length === 2) {
+      begin("pinch");
+      event.preventDefault();
+      const origin = midpoint(...base), now = midpoint(...current), ratio = distance(...current) / Math.max(1, distance(...base));
+      const zoomed = zoomCameraAt(gesture.camera, origin, ratio, options);
+      emit({ ...zoomed, x: zoomed.x + now.x - origin.x, y: zoomed.y + now.y - origin.y }, "pinch");
+    } else if (current.length === 1 && base.length === 1) {
+      const dx = current[0].x - base[0].x, dy = current[0].y - base[0].y;
+      if (!moved && Math.hypot(dx, dy) < dragThreshold) return;
+      begin("pan");
+      event.preventDefault();
+      emit(panCamera(gesture.camera, dx, dy), "pan");
+    }
+  };
+  const release = (id) => {
+    if (captures.delete(id)) try {
+      element2.releasePointerCapture?.(id);
+    } catch {
+    }
+  };
+  const up = (event) => {
+    if (!points.has(event.pointerId)) return;
+    points.delete(event.pointerId);
+    release(event.pointerId);
+    if (points.size) rebase();
+    else gesture = null;
+  };
+  const cancel = (event) => {
+    if (!points.has(event.pointerId)) return;
+    suppressClick = true;
+    points.clear();
+    gesture = null;
+    for (const id of [...captures]) release(id);
+  };
+  const click = (event) => {
+    if (suppressClick && event.detail !== 0 && accept(event)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressClick = false;
+    }
+  };
+  const wheel = (event) => {
+    if (!accept(event) || !Number.isFinite(event.deltaY) || !event.deltaY) return;
+    event.preventDefault();
+    onGestureStart?.({ source: "wheel" });
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element2.getBoundingClientRect().height : 1;
+    emit(zoomCameraAt(getCamera(), local(event), Math.exp(clamp3(-event.deltaY * unit * 2e-3, -2, 2)), options), "wheel");
+  };
+  const key = (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !accept(event) || !["+", "=", "-", "0", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    onGestureStart?.({ source: "keyboard" });
+    const r = element2.getBoundingClientRect(), area = getViewportArea?.();
+    const usable = area && [area.x, area.y, area.width, area.height].every(Number.isFinite) && area.width > 0 && area.height > 0;
+    const center2 = usable ? { x: area.x + area.width / 2, y: area.y + area.height / 2 } : { x: r.width / 2, y: r.height / 2 };
+    let next;
+    if (event.key === "+" || event.key === "=") next = zoomCameraAt(getCamera(), center2, 1.25, options);
+    else if (event.key === "-") next = zoomCameraAt(getCamera(), center2, 0.8, options);
+    else if (event.key === "0") next = createCamera({}, options);
+    else if (event.key === "ArrowLeft") next = panCamera(getCamera(), 48, 0);
+    else if (event.key === "ArrowRight") next = panCamera(getCamera(), -48, 0);
+    else if (event.key === "ArrowUp") next = panCamera(getCamera(), 0, 48);
+    else if (event.key === "ArrowDown") next = panCamera(getCamera(), 0, -48);
+    if (next) emit(next, "keyboard");
+  };
+  listen(element2, "pointerdown", down);
+  listen(pointerHost, "pointermove", move, { passive: false });
+  listen(pointerHost, "pointerup", up);
+  listen(pointerHost, "pointercancel", cancel);
+  listen(element2, "lostpointercapture", cancel);
+  listen(element2, "click", click, true);
+  listen(element2, "wheel", wheel, { passive: false });
+  listen(element2, "keydown", key);
+  return () => {
+    disposed = true;
+    points.clear();
+    gesture = null;
+    for (const id of [...captures]) release(id);
+    for (const remove of listeners) remove();
+  };
 }
 
 // src/canvas-prototype/motion.mjs
@@ -1851,15 +2099,82 @@ function samplePolyline(points, count = 20) {
   for (let i = 1; i < points.length; i++) lengths.push(lengths.at(-1) + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
   const total = lengths.at(-1);
   return Array.from({ length: count }, (_, i) => {
-    const distance = total * i / (count - 1);
+    const distance2 = total * i / (count - 1);
     let j = 1;
-    while (j < lengths.length - 1 && lengths[j] < distance) j++;
-    const amount = (distance - lengths[j - 1]) / (lengths[j] - lengths[j - 1] || 1);
+    while (j < lengths.length - 1 && lengths[j] < distance2) j++;
+    const amount = (distance2 - lengths[j - 1]) / (lengths[j] - lengths[j - 1] || 1);
     return { x: points[j - 1].x + (points[j].x - points[j - 1].x) * amount, y: points[j - 1].y + (points[j].y - points[j - 1].y) * amount };
   });
 }
 function visibleTrackKeys(frames, collection) {
   return [...new Set(frames.flatMap((frame2) => frame2[collection].filter((item) => (item.opacity ?? 1) > 0).map((item) => item.key)))];
+}
+
+// src/canvas-prototype/journey-camera.mjs
+var clamp4 = (value, min, max2) => Math.max(min, Math.min(max2, value));
+var validNode = (node) => node && (node.opacity ?? 1) > 0 && [node.x, node.y, node.width, node.height].every(Number.isFinite) && node.width >= 0 && node.height >= 0;
+var identity2 = (node) => node.semanticId ?? node.key ?? node.id;
+function boundsFor(nodes) {
+  if (!nodes.length) return null;
+  const x = Math.min(...nodes.map((n) => n.x)), y = Math.min(...nodes.map((n) => n.y));
+  return { x, y, width: Math.max(...nodes.map((n) => n.x + n.width)) - x, height: Math.max(...nodes.map((n) => n.y + n.height)) - y };
+}
+function frameArea(frame2) {
+  const area = frame2.area;
+  if (area && [area.x, area.y, area.width, area.height].every(Number.isFinite) && area.width > 0 && area.height > 0) return { ...area };
+  return { x: 0, y: 0, width: Math.max(1, Number.isFinite(frame2.width) ? frame2.width : 1e3), height: Math.max(1, Number.isFinite(frame2.height) ? frame2.height : 700) };
+}
+function focusNode(frame2, nodes) {
+  const focus = frame2.focus ?? frame2.view?.focus;
+  return nodes.find((n) => identity2(n) === focus || n.id === focus || n.key === focus);
+}
+function viewpoint(frame2, nodes, { maximumScale = 0.78, padding = 24 } = {}) {
+  const area = frameArea(frame2), bounds2 = boundsFor(nodes);
+  if (!bounds2) return createCamera();
+  const fit = fitCameraToBounds(bounds2, area, padding), scale = Math.min(maximumScale, fit.scale);
+  const focus = focusNode(frame2, nodes), center2 = focus ? { x: focus.x + focus.width / 2, y: focus.y + focus.height / 2 } : { x: bounds2.x + bounds2.width / 2, y: bounds2.y + bounds2.height / 2 };
+  const desired = { x: area.x + area.width / 2 - center2.x * scale, y: area.y + area.height / 2 - center2.y * scale };
+  const marginX = Math.min(padding, area.width / 2), marginY = Math.min(padding, area.height / 2);
+  const minX = area.x + marginX - bounds2.x * scale, maxX = area.x + area.width - marginX - (bounds2.x + bounds2.width) * scale;
+  const minY = area.y + marginY - bounds2.y * scale, maxY = area.y + area.height - marginY - (bounds2.y + bounds2.height) * scale;
+  return createCamera({ x: minX <= maxX ? clamp4(desired.x, minX, maxX) : fit.x, y: minY <= maxY ? clamp4(desired.y, minY, maxY) : fit.y, scale });
+}
+function normalizedOffsets(frames, offsets) {
+  if (offsets === void 0) return frames.map((_, index) => index / (frames.length - 1 || 1));
+  if (frames.length === 1 && offsets.length === 1 && offsets[0] === 0) return [0];
+  if (offsets.length !== frames.length || offsets[0] !== 0 || offsets.at(-1) !== 1 || offsets.some((value, index) => !Number.isFinite(value) || index > 0 && value <= offsets[index - 1])) throw new TypeError("Journey camera offsets must strictly increase from 0 to 1 for every frame");
+  return [...offsets];
+}
+function journeyCameraTrack(frames, { initialCamera = createCamera(), finalCamera = createCamera(), offsets } = {}) {
+  if (!Array.isArray(frames) || !frames.length) throw new TypeError("Journey camera requires at least one prepared frame");
+  const start2 = createCamera(initialCamera), finish = createCamera(finalCamera), times = normalizedOffsets(frames, offsets), poses = [];
+  const add = (progress, camera, phase, frameIndex) => poses.push({ progress, camera: createCamera(camera), phase, frameIndex });
+  if (frames.length === 1) {
+    add(0, finish, "destination", 0);
+    add(1, finish, "destination", 0);
+  } else {
+    add(0, start2, "source", 0);
+    if (frames.length > 2) {
+      const routeIds = /* @__PURE__ */ new Set();
+      for (const frame2 of frames.slice(1, -1)) for (const node of frame2.nodes ?? []) if (validNode(node) && !node.context) routeIds.add(identity2(node));
+      const source = frames[0], sourceNodes = (source.nodes ?? []).filter(validNode), focus = focusNode(source, sourceNodes);
+      const openingNodes = sourceNodes.filter((node) => routeIds.has(identity2(node)) || node === focus);
+      if (openingNodes.length) add(Math.min(0.1, times[1] * 0.5), viewpoint(source, openingNodes, { maximumScale: 0.82 }), "open-route", 0);
+      for (let index = 1; index < frames.length - 1; index++) {
+        const frame2 = frames[index], nodes = (frame2.nodes ?? []).filter((node) => validNode(node) && !node.context);
+        add(times[index], viewpoint(frame2, nodes), "follow-route", index);
+      }
+    } else {
+      const source = frames[0], destination = frames[1], a = focusNode(source, (source.nodes ?? []).filter(validNode)), b = focusNode(destination, (destination.nodes ?? []).filter(validNode));
+      const area = frameArea(source), travel = a && b ? Math.hypot(a.x + a.width / 2 - b.x - b.width / 2, a.y + a.height / 2 - b.y - b.height / 2) : 0;
+      if (travel > Math.min(area.width, area.height) * 0.35) {
+        add(0.5, viewpoint(source, [a, b], { maximumScale: 0.9 }), "reflow", 0);
+      }
+    }
+    add(1, finish, "destination", frames.length - 1);
+  }
+  const track = poses.map((p) => p.camera), cameraOffsets = poses.map((p) => p.progress);
+  return { poses, track, offsets: cameraOffsets, sample: (progress) => createCamera(sampleTrack(track, cameraOffsets, Number.isFinite(progress) ? clamp4(progress, 0, 1) : 0)) };
 }
 
 // src/canvas-prototype/documentation.mjs
@@ -1928,12 +2243,12 @@ function projectEmbeddedPorts(view) {
   }
   const edges = view.edges.map((edge) => {
     const result = { ...edge };
-    for (const [endpoint3, field, attachment2] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
+    for (const [endpoint3, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
       const pin = edge[field] ?? edge[field === "fromPort" ? "from_port" : "to_port"];
       if (!pin) continue;
       const id = attachments.get(JSON.stringify([edge[endpoint3], pin]));
       if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint3]);
-      result[attachment2] = id;
+      result[attachment] = id;
     }
     return result;
   });
@@ -2118,12 +2433,12 @@ async function layoutDiagram(nativeView, options = {}) {
   const rootCount = view.nodes.filter((n) => !n.parentId).length, behavioral = behavioralKinds.has(view.kind), profiles2 = [{ gap: 32 }];
   if (!behavioral && rootCount > 2 && area.width < 700) for (const capacity of [2, 1]) profiles2.push({ gap: 28, capacity });
   if (!behavioral && rootCount >= 3 && rootCount <= 9 && requirementFanout(view)) profiles2.push({ gap: 32, balanced: true });
-  const candidates2 = [];
+  const candidates = [];
   for (const profile of profiles2) {
     try {
       const data = makeGraph(view, options, profile), laid = await elk.layout(data.graph), candidate = readLayout(view, data, laid, options, profile);
       scoreLayout(candidate, area);
-      candidates2.push(candidate);
+      candidates.push(candidate);
       let previous = candidate;
       const seen = /* @__PURE__ */ new Set();
       for (let retry = 0; !behavioral && profile.capacity && retry < 3; retry++) {
@@ -2134,16 +2449,16 @@ async function layoutDiagram(nativeView, options = {}) {
         seen.add(key);
         const alternate = { ...profile, anchorSides }, joint = makeGraph(view, options, alternate), result = readLayout(view, joint, await elk.layout(joint.graph), options, alternate);
         scoreLayout(result, area);
-        candidates2.push(result);
+        candidates.push(result);
         previous = result;
       }
     } catch (error) {
-      candidates2.push({ ...view, nodes: [], edges: view.edges.map((e) => ({ ...e, points: [], routingBlocked: true })), ports: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered", layoutScore: 1e9, diagnostics: [{ reason: "layout-failed", message: error.message }] });
+      candidates.push({ ...view, nodes: [], edges: view.edges.map((e) => ({ ...e, points: [], routingBlocked: true })), ports: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, layoutEngine: "elk-layered", layoutScore: 1e9, diagnostics: [{ reason: "layout-failed", message: error.message }] });
     }
   }
-  candidates2.sort((a, b) => a.layoutScore - b.layoutScore);
-  if (!candidates2.some((candidate) => candidate.nodes.length)) throw Error(candidates2[0]?.diagnostics[0]?.message ?? "ELK could not lay out the native diagram");
-  return candidates2[0];
+  candidates.sort((a, b) => a.layoutScore - b.layoutScore);
+  if (!candidates.some((candidate) => candidate.nodes.length)) throw Error(candidates[0]?.diagnostics[0]?.message ?? "ELK could not lay out the native diagram");
+  return candidates[0];
 }
 function requirementFanout(view) {
   if (!["requirement", "definition", "general"].includes(view.kind) || view.nodes.some((n) => n.parentId) || view.edges.length !== view.nodes.length - 1) return false;
@@ -2224,7 +2539,7 @@ function optimizeRoutes(edges, nodes) {
   }
 }
 function relocateLabels(edges, nodes, allEdges = edges) {
-  const distance = (box, points) => {
+  const distance2 = (box, points) => {
     const center2 = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     return Math.min(...points.slice(1).map((b, i) => {
       const a = points[i];
@@ -2236,18 +2551,18 @@ function relocateLabels(edges, nodes, allEdges = edges) {
     if (!box) continue;
     const crossed = edge.points.slice(1).some((p, i) => segmentHits(edge.points[i], p, box));
     const left = Math.min(...nodes.map((n) => n.x)), right = Math.max(...nodes.map((n) => n.x + n.width));
-    if (!crossed && box.x >= left && box.x + box.width <= right && distance(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
-    const candidates2 = [];
+    if (!crossed && box.x >= left && box.x + box.width <= right && distance2(box, edge.points) < Math.max(box.width, box.height) / 2 + 12) continue;
+    const candidates = [];
     for (let i = 1; i < edge.points.length; i++) {
       const a = edge.points[i - 1], b = edge.points[i], length2 = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
       for (const t of [0.5, 0.25, 0.75]) {
         const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-        if (a.y === b.y) candidates2.push({ ...box, x: x - box.width / 2, y: y - box.height - 5, score: length2 }, { ...box, x: x - box.width / 2, y: y + 5, score: length2 - 1 });
-        else candidates2.push({ ...box, x: x + 5, y: y - box.height / 2, score: length2 }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length2 - 1 });
+        if (a.y === b.y) candidates.push({ ...box, x: x - box.width / 2, y: y - box.height - 5, score: length2 }, { ...box, x: x - box.width / 2, y: y + 5, score: length2 - 1 });
+        else candidates.push({ ...box, x: x + 5, y: y - box.height / 2, score: length2 }, { ...box, x: x - box.width - 5, y: y - box.height / 2, score: length2 - 1 });
       }
     }
     const labelScore = (candidate) => candidate.score - 12 * (Math.max(0, left - candidate.x) + Math.max(0, candidate.x + candidate.width - right));
-    const replacement = candidates2.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap3(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap3(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
+    const replacement = candidates.sort((a, b) => labelScore(b) - labelScore(a)).find((candidate) => !nodes.some((n) => overlap3(candidate, n, 3)) && !allEdges.some((other) => other !== edge && other.labelBox && overlap3(candidate, other.labelBox, 4)) && !allEdges.some((other) => other.points.slice(1).some((p, i) => segmentHits(other.points[i], p, { x: candidate.x - 2, y: candidate.y - 2, width: candidate.width + 4, height: candidate.height + 4 }))));
     if (replacement) {
       delete replacement.score;
       edge.labelBox = replacement;
@@ -3405,7 +3720,7 @@ var button = (text, fn) => {
   e.onclick = () => Promise.resolve(fn()).catch(report);
   return e;
 };
-var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [], future: [], presentation: {}, traceRequest: null };
+var state = { engine: null, project: null, graph: null, views: /* @__PURE__ */ new Map(), scenes: [], sceneIndex: 0, focus: null, selected: null, view: null, displayed: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, revision: 0, loadRevision: 0, animations: [], transitioning: false, provenance: null, history: [], future: [], presentation: {}, traceRequest: null, camera: createCamera(), cameraRevision: 0, neighborhoodBudget: null };
 var report = (error) => {
   $("status").textContent = error.message || String(error);
   $("editor-error").textContent = error.message || String(error);
@@ -3539,7 +3854,7 @@ async function compile(project) {
 }
 function busy(value) {
   $("loading").hidden = !value;
-  for (const id of ["previous", "next", "scenes", "standalone", "return", "fit", "find-toggle", "edit"]) $(id).disabled = value;
+  for (const id of ["previous", "next", "scenes", "standalone", "return", "fit", "show-neighborhood", "zoom-in", "zoom-out", "find-toggle", "edit"]) $(id).disabled = value;
 }
 async function loadProject(project) {
   const revision = ++state.loadRevision;
@@ -3559,7 +3874,7 @@ async function loadProject(project) {
     throw error;
   }
   if (revision !== state.loadRevision) return;
-  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map() });
+  Object.assign(state, compiled, { sceneIndex: 0, selected: null, exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map(), neighborhoodBudget: null });
   busy(false);
   updateLists();
   $("editor-error").textContent = "";
@@ -3665,9 +3980,10 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
   const routed = fitted.edges;
   const labelObstacles = [...routed.filter((e) => e.labelBox).map((e, i) => ({ ...e.labelBox, id: "label-obstacle:" + i })), ...active2.flatMap((n) => n.portLabelBox ? [{ ...n.portLabelBox, id: "port-label:" + n.id }] : [])];
   const routeObstacles = routed.flatMap((e) => e.points.slice(1).map((p, i) => ({ id: "route:" + e.id + ":" + i, x: Math.min(p.x, e.points[i].x) - 3, y: Math.min(p.y, e.points[i].y) - 3, width: Math.max(6, Math.abs(p.x - e.points[i].x) + 6), height: Math.max(6, Math.abs(p.y - e.points[i].y) + 6) })));
-  const context = surroundingContext(state.graph, layout, { budget: displayPreferences().contextBudget });
-  const fringe = preparePeripheral(context, active2, area, { width: 104, height: 56, gap: 10, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize });
-  const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.22, context: true, displayDetail: "", displayID: "" }));
+  const budget = state.neighborhoodBudget ?? displayPreferences().contextBudget, context = surroundingContext(state.graph, layout, { budget: journey ? Math.min(8, budget) : budget, focus });
+  context.view.nodes = context.view.nodes.map((node) => ({ ...node, ...measureCard(document, node, "") }));
+  const fringe = prepareNeighborhood(context, active2, area, { width: 160, height: 80, gap: 72, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize });
+  const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.3, context: true, displayDetail: "", displayID: "" }));
   const markers = fringe.boundaryMarkers.map((n) => ({ ...n, scale: 1, opacity: 0.22, context: true, interactive: false }));
   const nodes = [...active2, ...ghosts, ...markers], counts = /* @__PURE__ */ new Map(), byID = /* @__PURE__ */ new Map();
   for (const n of nodes) {
@@ -3683,7 +3999,7 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: edgeAppearance(e, { viewKind: view.kind }) })).filter((p) => !p.appearance.supported).map((p) => ({ reason: "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
   const omissions = [...layout.omissions ?? view.omissions ?? [], ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
-  return { view, nodes, edges, area, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics };
+  return { view, focus, journey, nodes, edges, area, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics, worldBounds: fringe.worldBounds, neighborhood: { shown: context.elements.length, total: context.elements.length + new Set(context.omissions.filter((o) => o.reason === "budget").map((o) => o.target)).size, budget } };
 }
 function face(n) {
   const host = el("span", void 0, "node-face");
@@ -3727,17 +4043,55 @@ function visualNode(n) {
   };
   return node;
 }
-var rectValues = (n) => ({ x: n.x, y: n.y, width: n.width, height: n.height, scale: n.scale ?? 1, opacity: n.opacity ?? 1 });
+var rectValues = (n) => ({ x: n.x, y: n.y, width: n.width, height: n.height, scale: n.scale ?? 1, opacity: n.opacity ?? 1, context: n.context ? 1 : 0 });
 function presenceTrack(frames, key, collection) {
   return frames.map((f, index) => {
     const item = f[collection].find((n) => n.key === key);
     if (item) return item;
     let nearest;
-    for (let distance = 1; distance < frames.length && !nearest; distance++) nearest = frames[index - distance]?.[collection].find((n) => n.key === key) ?? frames[index + distance]?.[collection].find((n) => n.key === key);
+    for (let distance2 = 1; distance2 < frames.length && !nearest; distance2++) nearest = frames[index - distance2]?.[collection].find((n) => n.key === key) ?? frames[index + distance2]?.[collection].find((n) => n.key === key);
     return { ...nearest, opacity: 0 };
   });
 }
-async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel } = {}) {
+function applyCamera(value) {
+  state.camera = createCamera(value);
+  const c = state.camera;
+  $("graph-world").style.transform = `translate(${c.x}px,${c.y}px) scale(${c.scale})`;
+}
+function cameraCenter() {
+  const a = state.visualSnapshot?.area ?? graphArea($("stage").clientWidth, $("stage").clientHeight);
+  return { x: a.x + a.width / 2, y: a.y + a.height / 2 };
+}
+function takeCameraControl() {
+  ++state.cameraRevision;
+  state.motion?.finish();
+}
+function zoomBy(factor) {
+  takeCameraControl();
+  applyCamera(zoomCameraAt(state.camera, cameraCenter(), factor));
+}
+function fitNeighborhood() {
+  takeCameraControl();
+  const f = state.visualSnapshot;
+  if (f?.worldBounds) applyCamera(fitCameraToBounds(f.worldBounds, f.area, 20));
+  $("camera-menu").open = false;
+}
+async function resetCamera() {
+  ++state.cameraRevision;
+  if (state.transitioning && state.pendingDestination) await frame(state.view);
+  else state.motion?.finish();
+  applyCamera(createCamera());
+  $("camera-menu").open = false;
+}
+async function moreNeighbors() {
+  if (!state.view) return;
+  remember();
+  state.neighborhoodBudget = Math.min(256, (state.neighborhoodBudget ?? displayPreferences().contextBudget) + 48);
+  await frame(state.view);
+  $("camera-menu").open = false;
+}
+async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, cameraTarget = state.camera } = {}) {
+  const cameraFrom = { ...state.camera }, cameraTo = createCamera(cameraTarget);
   clearTrace();
   cancelAnimations();
   const destination = frames.at(-1), svg = $("connections"), host = $("nodes"), stage = $("stage");
@@ -3752,11 +4106,12 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
   }
   svg.append(defs);
   const offsets = frames.length === 5 ? [0, 0.18, 0.5, 0.74, 1] : frames.map((_, i) => i / (frames.length - 1 || 1));
+  const cameraTrack = journeyCameraTrack(frames, { initialCamera: cameraFrom, finalCamera: cameraTo, offsets });
   const departurePlan = planDepartures(frames, { width: stage.clientWidth, height: stage.clientHeight, panels: destination.panels ?? [], offsets });
   stage.dataset.departureCount = String(departurePlan.departures.length);
-  const nodeKeys = visibleTrackKeys(frames, "nodes"), edgeKeys = visibleTrackKeys(frames, "edges").sort((a, b) => {
+  const nodeKeys = visibleTrackKeys(frames, "nodes"), edgeKeys = visibleTrackKeys(frames, "edges").sort((a2, b) => {
     const edge = (key) => destination.edges.find((e) => e.key === key) ?? frames.flatMap((f) => f.edges).find((e) => e.key === key);
-    return Number(!!edge(b)?.context) - Number(!!edge(a)?.context);
+    return Number(!!edge(b)?.context) - Number(!!edge(a2)?.context);
   });
   const nodeTracks = nodeKeys.map((key) => {
     const track = presenceTrack(frames, key, "nodes"), latest = destination.nodes.find((n) => n.key === key) ?? track.filter((n) => n.opacity > 0).at(-1), node = visualNode(latest);
@@ -3801,7 +4156,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     };
     svg.append(group);
     const numeric = track.map((e) => {
-      const r = { opacity: e.opacity ?? 1, x: e.x ?? 0, y: e.y ?? 0, labelOpacity: e.label && !e.labelOmitted ? 1 : 0, journey: e.journey ? 1 : 0 };
+      const r = { opacity: e.opacity ?? 1, x: e.x ?? 0, y: e.y ?? 0, labelOpacity: e.label && !e.labelOmitted ? 1 : 0, journey: e.journey ? 1 : 0, context: e.context ? 1 : 0 };
       for (const [i, p] of e.points.entries()) {
         r["x" + i] = p.x;
         r["y" + i] = p.y;
@@ -3811,9 +4166,14 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     return { key, group, line, oldLine, hit, text, latest, track: numeric };
   });
   const draw = (progress, clock) => {
+    const contextFade = duration ? Math.max(0, 1 - clock / 0.16, (clock - 0.84) / 0.16) : 1;
+    applyCamera(cameraTrack.sample(progress));
     const nodes = [], edges = [];
     for (const item of nodeTracks) {
       const r = departurePlan.sampleNode(item.key, progress, (p) => sampleTrack(item.track, offsets, p)), n = item.node;
+      if (r.context > 0.5) r.opacity *= contextFade;
+      n.classList.toggle("peripheral", r.context > 0.5);
+      n.dataset.context = String(r.context > 0.5);
       n.style.width = r.width / (r.scale || 1) + "px";
       n.style.height = r.height / (r.scale || 1) + "px";
       n.style.transform = `translate(${r.x}px,${r.y}px) scale(${r.scale})`;
@@ -3834,7 +4194,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
         item.oldFace.style.opacity = 1 - fade;
         item.newFace.style.opacity = fade;
       }
-      nodes.push({ ...item.latest, ...r });
+      nodes.push({ ...item.latest, ...r, context: r.context > 0.5 });
     }
     const currentNodes = nodes.map((n) => ({ ...n, id: n.key, parentId: n.parentId ? nodes.find((p) => p.id === n.parentId)?.key : void 0 }));
     const sampledEdges = edgeTracks.map((item) => ({ item, r: sampleTrack(item.track, offsets, progress) })), journeySizes = /* @__PURE__ */ new Map();
@@ -3845,8 +4205,9 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     });
     const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text) => journeySizes.get(text) }).map((route2) => [route2.id, route2]));
     const shapeFor = ({ item, r }) => {
+      if (r.context > 0.5 && r.journey < 0.5 && contextFade < 0.01) return { points: [], edge: { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey }, journeyEdge: false };
       const interpolated = Array.from({ length: 20 }, (_, i) => ({ x: r["x" + i], y: r["y" + i] }));
-      const edge = { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey };
+      const edge = { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, context: r.context > 0.5 && r.journey < 0.5 };
       let points = clock === 1 ? item.latest.routePoints ?? [] : interpolated, liveLabel;
       const journeyEdge = clock !== 1 && r.journey > 0.5;
       if (journeyEdge) {
@@ -3862,13 +4223,13 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     };
     const shapes = new Map(sampledEdges.map((sample) => [sample.item.key, shapeFor(sample)]));
     const visibleNodes = currentNodes.filter((n) => (n.opacity ?? 1) > 0.08), visibleIDs = new Set(visibleNodes.map((n) => n.id));
-    const currentActive = sampledEdges.filter(({ item, r }) => !item.latest.context && r.opacity > 0.01).map(({ item, r }) => {
+    const currentActive = sampledEdges.filter(({ item, r }) => (r.context < 0.5 || r.journey > 0.5) && r.opacity > 0.01).map(({ item, r }) => {
       const shape = shapes.get(item.key), box = shape.liveLabel?.labelBox ?? item.latest.labelBox;
       const labelBox = shape.liveLabel?.labelBox ?? (box && (clock === 1 || clock > 0.85) ? { ...box, x: r.x, y: r.y - box.height * 0.78 } : void 0);
       return { ...shape.edge, points: shape.points, ...labelBox ? { labelBox } : {} };
     }).filter((edge) => edge.points.length > 1 && visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
-    if (clock > 0 && clock < 1) {
-      const contextSizes = /* @__PURE__ */ new Map(), movingContext = sampledEdges.filter(({ item, r }) => item.latest.context && r.opacity > 0.01).map(({ item }) => {
+    if (clock > 0 && clock < 1 && contextFade > 0.01) {
+      const contextSizes = /* @__PURE__ */ new Map(), movingContext = sampledEdges.filter(({ item, r }) => r.context > 0.5 && r.journey < 0.5 && r.opacity > 0.01).map(({ item }) => {
         const shape = shapes.get(item.key), text = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text.length * 7), height: 16 }, old = contextSizes.get(text);
         contextSizes.set(text, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
         return { ...shape.edge, points: shape.points };
@@ -3883,17 +4244,17 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
         }
       }
     }
-    const currentContext = sampledEdges.filter(({ item, r }) => item.latest.context && r.opacity > 0.01).map(({ item }) => {
+    const currentContext = sampledEdges.filter(({ item, r }) => r.context > 0.5 && r.journey < 0.5 && r.opacity > 0.01).map(({ item }) => {
       const shape = shapes.get(item.key);
       return { ...shape.edge, points: shape.points };
     });
-    const visibleLabels = [...currentActive.flatMap((edge) => edge.labelBox ? [edge.labelBox] : []), ...sampledEdges.filter(({ item, r }) => item.latest.context && clock > 0.85 && r.labelOpacity > 0.05).flatMap(({ item, r }) => {
+    const visibleLabels = [...currentActive.flatMap((edge) => edge.labelBox ? [edge.labelBox] : []), ...sampledEdges.filter(({ item, r }) => r.context > 0.5 && r.journey < 0.5 && clock > 0.85 && r.labelOpacity > 0.05).flatMap(({ item, r }) => {
       const box = shapes.get(item.key).liveLabel?.labelBox ?? item.latest.labelBox;
       return box ? [{ ...box, x: shapes.get(item.key).liveLabel?.x ?? r.x, y: (shapes.get(item.key).liveLabel?.y ?? r.y) - box.height * 0.78, id: "live-label:" + item.key }] : [];
     })];
     for (const { item, r } of sampledEdges) {
       const { points, edge, journeyEdge, liveLabel } = shapes.get(item.key);
-      const pathOf = (path2) => path2.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), signature = points.slice(1).map((p, i) => Math.abs(p.x - points[i].x) < 0.01 ? "V" : "H").filter((v, i, a) => !i || v !== a[i - 1]).join("");
+      const pathOf = (path2) => path2.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "), signature = points.slice(1).map((p, i) => Math.abs(p.x - points[i].x) < 0.01 ? "V" : "H").filter((v, i, a2) => !i || v !== a2[i - 1]).join("");
       if (clock !== 1 && item.signature && signature !== item.signature) {
         item.outgoingPoints = item.drawnPoints;
         item.routeChangedAt = clock;
@@ -3910,7 +4271,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
         else penultimate.x = points.at(-1).x;
       }
       const protectedPaths = [...currentActive, ...currentContext.filter((other) => other.id !== edge.id)];
-      const oldClear = outgoing && routeIsClear(outgoing, edge, currentNodes.concat(visibleLabels), { orthogonalOnly: true }) && routeConnectsEndpoints(outgoing, edge, currentNodes) && (!item.latest.context || peripheralRouteScore(peripheralRoutingMetrics([{ ...edge, points: outgoing }], protectedPaths)) <= peripheralRouteScore(peripheralRoutingMetrics([{ ...edge, points }], protectedPaths)));
+      const oldClear = outgoing && routeIsClear(outgoing, edge, currentNodes.concat(visibleLabels), { orthogonalOnly: true }) && routeConnectsEndpoints(outgoing, edge, currentNodes) && (!edge.context || peripheralRouteScore(peripheralRoutingMetrics([{ ...edge, points: outgoing }], protectedPaths)) <= peripheralRouteScore(peripheralRoutingMetrics([{ ...edge, points }], protectedPaths)));
       item.oldLine.setAttribute("d", oldClear ? pathOf(outgoing) : "");
       item.oldLine.style.opacity = oldClear ? 1 - routeFade : 0;
       const path = pathOf(points);
@@ -3920,8 +4281,8 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
       item.signature = signature;
       item.drawnPoints = points;
       const traveling = duration && clock > 0 && clock < 1, emphasis = traveling && !journeyEdge ? 0.2 + 0.8 * Math.abs(Math.cos(Math.PI * clock)) : 1;
-      const endpoints2 = [currentNodes.find((n) => n.id === edge.source), currentNodes.find((n) => n.id === edge.target)], presence = Math.min(1, ...endpoints2.map((n) => n ? (n.opacity ?? 1) / (n.context ? 0.22 : 1) : 0));
-      const effectiveOpacity = points.length ? r.opacity * emphasis * presence : 0;
+      const endpoints2 = [currentNodes.find((n) => n.id === edge.source), currentNodes.find((n) => n.id === edge.target)], presence = Math.min(1, ...endpoints2.map((n) => n ? (n.opacity ?? 1) / (n.context ? 0.3 : 1) : 0));
+      const effectiveOpacity = points.length ? r.opacity * emphasis * presence * (edge.context ? contextFade : 1) : 0;
       item.group.style.opacity = effectiveOpacity;
       item.group.style.pointerEvents = effectiveOpacity > 0.1 ? "auto" : "none";
       item.group.setAttribute("aria-hidden", String(effectiveOpacity < 0.05));
@@ -3938,10 +4299,16 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
     stage.dataset.motionProgress = String(clock);
     state.visualSnapshot = { ...destination, nodes, edges };
   };
+  const a = destination.area;
+  $("graph-viewport").style.clipPath = `inset(${a.y}px ${Math.max(0, stage.clientWidth - a.x - a.width)}px ${Math.max(0, stage.clientHeight - a.y - a.height)}px ${a.x}px)`;
+  const neighborhood = destination.neighborhood;
+  $("more-neighbors").hidden = !neighborhood || neighborhood.shown >= neighborhood.total;
+  $("more-neighbors").disabled = (neighborhood?.budget ?? 0) >= 256;
+  $("more-neighbors").textContent = neighborhood ? `More neighbors (${neighborhood.shown} of ${neighborhood.total})` : "More neighbors";
   const omissions = destination.omissions;
   $("transition").dataset.notice = String(!!caption);
-  $("context-details").hidden = !omissions.length;
-  $("context-details").textContent = `Context (${omissions.length})`;
+  $("context-details").hidden = !omissions.length && !neighborhood?.shown;
+  $("context-details").textContent = neighborhood?.shown ? `Neighbors (${neighborhood.shown})` : "Context limits";
   $("transition").textContent = caption || `${destination.view.kind} \xB7 ${destination.view.nodes.length} active elements`;
   const motion = startTimeline({ duration: state.reduce ? 0 : duration, update: draw });
   state.motion = motion;
@@ -3968,7 +4335,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel }
 async function frame(view, caption = "", duration = 0, focus = state.focus) {
   if (state.transitioning && state.pendingDestination) {
     const pending = state.pendingDestination;
-    return transitionTo(pending.view, pending.focus, { animate: false, allowDisconnected: true, journey: pending.journey });
+    return transitionTo(pending.view, pending.focus, { animate: false, allowDisconnected: true, journey: pending.journey, camera: pending.cameraRevision === state.cameraRevision ? pending.camera : state.camera });
   }
   const revision = ++state.revision, panels = panelGeometry(view), destination = await prepareFrame(view, focus, panels), previous = state.visualSnapshot;
   if (revision !== state.revision) return;
@@ -3978,8 +4345,8 @@ function gather(ids, relationships) {
   const set = new Set(ids), elements = state.graph.elements.filter((e) => set.has(e.id));
   return graphView(state.graph, { elements, relationships: (relationships ?? state.graph.relationships).filter((e) => set.has(e.source) && set.has(e.target)) }, "General View journey");
 }
-async function transitionTo(view, focus, { animate = true, journey, allowDisconnected = false } = {}) {
-  const revision = ++state.revision, previous = state.view;
+async function transitionTo(view, focus, { animate = true, journey, allowDisconnected = false, camera = createCamera() } = {}) {
+  const revision = ++state.revision, previous = state.view, cameraRevision = state.cameraRevision;
   const savedJourney = journey?.length > 1 && resolve(journey[0]) === state.previousFocus && resolve(journey.at(-1)) === focus ? journey.map(resolve) : void 0;
   const plan = previous ? planTransition({ view: previous, focus: state.previousFocus }, { view, focus }, { graph: state.graph, scopeIds: state.exploring ? void 0 : scopeIds(), reducedMotion: state.reduce, journey: savedJourney }) : null;
   if (savedJourney && !plan?.route?.found) throw Error("Saved journey no longer resolves within the presentation boundary");
@@ -3989,7 +4356,7 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
   for (const p of $("stage").querySelectorAll(".narrative-outgoing")) p.remove();
   $("selection").hidden = true;
   state.transitioning = true;
-  state.pendingDestination = { view, focus, journey };
+  state.pendingDestination = { view, focus, journey, camera, cameraRevision };
   state.lastTransition = plan;
   let oldPanel;
   try {
@@ -4005,7 +4372,7 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
       oldPanel?.remove();
       return;
     }
-    if (state.visualSnapshot && animate && !state.reduce) {
+    if (state.visualSnapshot && animate && !state.reduce && cameraRevision === state.cameraRevision) {
       frames.push(state.visualSnapshot);
       if (plan?.journeyRequired && !disconnected) {
         for (const step of plan.stages.filter((step2) => step2.viewKind === "gv")) {
@@ -4022,7 +4389,8 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
       oldPanel?.remove();
       return;
     }
-    const result = await paintFrames(frames, { duration: frames.length > 2 ? Math.max(1700, (frames.length - 1) * 420) : frames.length > 1 ? 780 : 0, caption: disconnected ? "No engineering route \xB7 explicit view jump" : plan?.route?.strategy === "ownership-ancestor" ? "Model ownership route \xB7 location, not derivation" : "", outgoingPanel: oldPanel });
+    if (cameraRevision !== state.cameraRevision) frames.splice(0, frames.length, target);
+    const result = await paintFrames(frames, { duration: frames.length > 2 ? Math.max(1700, (frames.length - 1) * 420) : frames.length > 1 ? 780 : 0, caption: disconnected ? "No engineering route \xB7 explicit view jump" : plan?.route?.strategy === "ownership-ancestor" ? "Model ownership route \xB7 location, not derivation" : "", outgoingPanel: oldPanel, cameraTarget: cameraRevision === state.cameraRevision ? camera : state.camera });
     if (result.cancelled || revision !== state.revision) return;
     state.view = view;
     state.focus = focus;
@@ -4044,6 +4412,7 @@ async function showScene(index, animate = true, { record = false } = {}) {
   if (record) remember();
   state.sceneIndex = index;
   state.exploring = false;
+  state.neighborhoodBudget = null;
   state.selected = null;
   state.traceRequest = null;
   state.traceInfo = null;
@@ -4064,7 +4433,7 @@ async function showScene(index, animate = true, { record = false } = {}) {
     state.history = savedHistory;
     state.future = savedFuture;
     restoreValues(saved);
-    if (saved.view) await transitionTo(saved.view, saved.focus, { animate: false, allowDisconnected: true });
+    if (saved.view) await transitionTo(saved.view, saved.focus, { animate: false, allowDisconnected: true, camera: saved.camera });
     throw error;
   } finally {
     updateExplorationControls();
@@ -4079,10 +4448,10 @@ function displayPreferences() {
   return resolvePresentation(state.presentation, { width: $("stage").clientWidth, resolve });
 }
 function snapshot() {
-  return { view: state.pendingDestination?.view ?? state.view, focus: state.pendingDestination?.focus ?? state.focus, sceneIndex: state.sceneIndex, exploring: state.exploring, selected: state.selected, expanded: [...state.expanded], collapsed: [...state.collapsed], presentation: structuredClone(state.presentation), traceRequest: structuredClone(state.traceRequest), traceInfo: structuredClone(state.traceInfo ?? null) };
+  return { view: state.pendingDestination?.view ?? state.view, focus: state.pendingDestination?.focus ?? state.focus, sceneIndex: state.sceneIndex, exploring: state.exploring, selected: state.selected, expanded: [...state.expanded], collapsed: [...state.collapsed], presentation: structuredClone(state.presentation), traceRequest: structuredClone(state.traceRequest), traceInfo: structuredClone(state.traceInfo ?? null), camera: { ...state.camera }, neighborhoodBudget: state.neighborhoodBudget };
 }
 function restoreValues(target) {
-  Object.assign(state, { sceneIndex: target.sceneIndex, exploring: target.exploring, selected: target.selected, expanded: new Set(target.expanded), collapsed: new Set(target.collapsed), presentation: structuredClone(target.presentation), traceRequest: structuredClone(target.traceRequest) });
+  Object.assign(state, { sceneIndex: target.sceneIndex, exploring: target.exploring, selected: target.selected, expanded: new Set(target.expanded), collapsed: new Set(target.collapsed), presentation: structuredClone(target.presentation), traceRequest: structuredClone(target.traceRequest), neighborhoodBudget: target.neighborhoodBudget ?? null });
   state.traceInfo = structuredClone(target.traceInfo ?? null);
 }
 function remember() {
@@ -4118,7 +4487,7 @@ async function restoreHistory(direction) {
   updateExplorationControls();
   const revision = state.revision + 1;
   try {
-    await transitionTo(target.view, target.focus, { allowDisconnected: true });
+    await transitionTo(target.view, target.focus, { allowDisconnected: true, camera: target.camera });
     if (revision !== state.revision) return;
     $("scenes").value = state.sceneIndex;
     updateExplorationControls();
@@ -4129,13 +4498,14 @@ async function restoreHistory(direction) {
     from.push(target);
     restoreValues(current);
     updateExplorationControls();
-    await transitionTo(current.view, current.focus, { animate: false, allowDisconnected: true });
+    await transitionTo(current.view, current.focus, { animate: false, allowDisconnected: true, camera: current.camera });
     throw error;
   }
 }
 async function openExploration(view, id, { request = null, info = null, record = true } = {}) {
   const previous = snapshot(), history = [...state.history], future = [...state.future];
   if (record) remember();
+  state.neighborhoodBudget = null;
   state.exploring = true;
   state.traceRequest = request;
   state.traceInfo = info;
@@ -4154,7 +4524,7 @@ async function openExploration(view, id, { request = null, info = null, record =
     state.future = future;
     restoreValues(previous);
     updateExplorationControls();
-    if (previous.view) await transitionTo(previous.view, previous.focus, { animate: false, allowDisconnected: true });
+    if (previous.view) await transitionTo(previous.view, previous.focus, { animate: false, allowDisconnected: true, camera: previous.camera });
     throw error;
   }
 }
@@ -4356,7 +4726,12 @@ function bind() {
     }
   };
   $("return").onclick = () => showScene(state.sceneIndex, true, { record: true }).catch(report);
-  $("fit").onclick = () => frame(state.view).catch(report);
+  $("fit").onclick = () => resetCamera().catch(report);
+  $("show-neighborhood").onclick = fitNeighborhood;
+  $("zoom-in").onclick = () => zoomBy(1.25);
+  $("zoom-out").onclick = () => zoomBy(0.8);
+  $("more-neighbors").onclick = () => moreNeighbors().catch(report);
+  bindCameraControls({ element: $("stage"), getViewportArea: () => state.visualSnapshot?.area, getCamera: () => state.camera, setCamera: applyCamera, onGestureStart: takeCameraControl, shouldHandleTarget: (target) => target === $("stage") || !!target?.closest?.("#graph-viewport") });
   $("reduce").setAttribute("aria-pressed", state.reduce);
   $("reduce").onclick = () => {
     state.reduce = !state.reduce;
@@ -4398,9 +4773,12 @@ function bind() {
   };
   $("context-details").onclick = () => {
     $("information").classList.remove("statement");
-    $("information-title").textContent = "Context boundaries";
-    const omissions = state.displayOmissions ?? state.displayed?.omissions ?? [];
-    $("information-text").textContent = omissions.map(contextNotice).join("\n") + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
+    $("information-title").textContent = "Prepared neighborhood";
+    const omissions = state.displayOmissions ?? state.displayed?.omissions ?? [], n = state.visualSnapshot?.neighborhood;
+    const summary = n ? `${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.
+
+` : "";
+    $("information-text").textContent = summary + omissions.map(contextNotice).join("\n") + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
     $("information").showModal();
   };
   $("edit").onclick = openEditor;
@@ -4480,9 +4858,26 @@ function bind() {
   $("about").onclick = () => {
     $("information").classList.remove("statement");
     $("information-title").textContent = "Engine and project details";
-    $("information-text").textContent = JSON.stringify({ engine: state.provenance, project: state.project.manifest, modelHash: state.modelHash, graph: { elements: state.graph.elements.length, relationships: state.graph.relationships.length }, routing: state.visualSnapshot?.routingMetrics, view: state.view.id, lastTransition: state.lastTransition, notice: state.exported.notice }, null, 2);
+    $("information-text").textContent = JSON.stringify({ engine: state.provenance, project: state.project.manifest, modelHash: state.modelHash, graph: { elements: state.graph.elements.length, relationships: state.graph.relationships.length }, routing: state.visualSnapshot?.routingMetrics, camera: state.camera, neighborhood: state.visualSnapshot?.neighborhood, view: state.view.id, lastTransition: state.lastTransition, notice: state.exported.notice }, null, 2);
     $("information").showModal();
   };
+  let keyboardFocus = false;
+  document.addEventListener("keydown", () => {
+    keyboardFocus = true;
+  }, true);
+  document.addEventListener("pointerdown", () => {
+    keyboardFocus = false;
+  }, true);
+  $("nodes").addEventListener("focusin", (event) => {
+    if (!keyboardFocus || state.transitioning || !event.target.matches(".node")) return;
+    const a = state.visualSnapshot?.area;
+    if (!a) return;
+    const r = event.target.getBoundingClientRect(), s = $("stage").getBoundingClientRect(), x = r.x - s.x, y = r.y - s.y;
+    if (x < a.x || y < a.y || x + r.width > a.x + a.width || y + r.height > a.y + a.height) {
+      takeCameraControl();
+      applyCamera({ ...state.camera, x: state.camera.x + a.x + a.width / 2 - x - r.width / 2, y: state.camera.y + a.y + a.height / 2 - y - r.height / 2 });
+    }
+  });
   $("stage").onclick = (e) => {
     if (e.target === $("stage") || e.target === $("nodes") || e.target === $("connections")) {
       clearTrace();
@@ -4495,7 +4890,7 @@ function bind() {
     resize = setTimeout(() => {
       if (state.transitioning && state.pendingDestination) {
         const pending = state.pendingDestination;
-        transitionTo(pending.view, pending.focus, { journey: pending.journey, allowDisconnected: true }).catch(report);
+        transitionTo(pending.view, pending.focus, { journey: pending.journey, allowDisconnected: true, camera: pending.cameraRevision === state.cameraRevision ? pending.camera : state.camera }).catch(report);
       } else if (state.view) frame(state.view).catch(report);
     }, 100);
   }).observe($("stage"));
