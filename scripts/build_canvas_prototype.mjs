@@ -1,11 +1,12 @@
-import {documentsFor,requirementCoverageSource} from '../src/canvas-prototype/project.mjs';
+import {documentsFor,requirementCoverageSource,normalizeProject,packProject} from '../src/canvas-prototype/project.mjs';
+import {readProjectDirectory,documentDigest} from './canvas_project_files.mjs';
 import {retainSnapshot} from './canvas_snapshot.mjs';
 import {build} from 'esbuild';
 import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {resolve,join,dirname} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {zipSync,strToU8} from 'fflate';
+import {zipSync,unzipSync} from 'fflate';
 const args=process.argv.slice(2),option=(name,fallback)=>args.includes(name)?args[args.indexOf(name)+1]:fallback;
 const output=resolve(option('--output','build/canvas-prototype/site'));
 const engine=resolve(option('--engine','build/canvas-prototype/engine'));
@@ -26,22 +27,38 @@ await copy('node_modules/elkjs/lib/elk-api.js','notices/elk-api.js');
 await copy('node_modules/elkjs/package.json','notices/elkjs-package.json');
 await copy('package-lock.json','notices/package-lock.json');
 await copy('node_modules/elkjs/lib/elk-worker.js','notices/elk-worker-source.js');
-const manifest=JSON.parse(await readFile(join(project,'project.json'),'utf8'));
+let primary=await readProjectDirectory(project);
 if(cachePath){
- const data=await readFile(resolve(cachePath)),cache=JSON.parse(data),engineInfo=JSON.parse(await readFile(join(engine,'provenance.json'),'utf8')),sourceFiles={};
- for(const name of [...manifest.modelSources,...manifest.viewSources])sourceFiles[name]=await readFile(join(project,name));
- const roots=manifest.modelRoots??cache.modelRoots;if(!Array.isArray(roots)||!roots.length)throw Error('Prepared native cache requires native model roots');
- let runtimePackage='SyspresentRuntimeContext';while(roots.includes(runtimePackage))runtimePackage+='X';
- const documents=[...documentsFor({manifest,files:sourceFiles}),{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,manifest.requirementSeeds)}];
- if(cache.engineVersion!==engineInfo.version||cache.engineFingerprint!==engineInfo.assets['sysml-wasm.wasm'].sha256||cache.sourceDigest!==createHash('sha256').update(JSON.stringify(documents)).digest('hex'))throw Error('Prepared native cache does not match the model and engine');
- runtimeCacheHash=createHash('sha256').update(data).digest('hex');manifest.runtimeCache='runtime-cache.json';manifest.assets=[...new Set([...(manifest.assets??[]),manifest.runtimeCache])];
+ const data=await readFile(resolve(cachePath)),cache=JSON.parse(data),engineInfo=JSON.parse(await readFile(join(engine,'provenance.json'),'utf8'));
+ const sources=documentsFor(primary),roots=cache.modelRoots,seeds=cache.requirementSeeds;
+ if(!cache.inputDigest||!Array.isArray(roots)||!roots.length||!Array.isArray(seeds))throw Error('Prepared native cache needs rebuilding with discovered model roots and requirement index');
+ let runtimePackage=cache.runtimePackage??'SyspresentRuntimeContext';if(!cache.runtimePackage)while(roots.includes(runtimePackage))runtimePackage+='X';
+ const documents=[...sources,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,seeds)}];
+ if(cache.engineVersion!==engineInfo.version||cache.engineFingerprint!==engineInfo.assets['sysml-wasm.wasm'].sha256||cache.inputDigest!==documentDigest(sources)||cache.sourceDigest!==documentDigest(documents))throw Error('Prepared native cache does not match the model and engine');
+ runtimeCacheHash=createHash('sha256').update(data).digest('hex');
+ primary=normalizeProject({manifest:primary.authorManifest??primary.manifest,files:{...primary.files,'runtime-cache.json':new Uint8Array(data)}});
+ primary.manifest.runtimeCache='runtime-cache.json';primary.manifest.assets=[...new Set([...(primary.manifest.assets??[]),'runtime-cache.json'])];
 }
-for(const name of ['project.json',...manifest.modelSources,...manifest.viewSources,manifest.story,...manifest.assets]){
- if(name==='project.json'){await writeFile(join(output,'example/project.json'),JSON.stringify(manifest,null,2)+'\n');files.push('example/project.json');}
- else await copy(cachePath&&name===manifest.runtimeCache?resolve(cachePath):join(project,name),'example/'+name);
+// Repackage through the same portable-project contract used by browser imports.
+// Fixed ZIP timestamps keep retained snapshots independent of local file mtimes.
+function portableFiles(value){return unzipSync(packProject(value));}
+async function writeArchive(value,destination){
+ await mkdir(dirname(join(output,destination)),{recursive:true});
+ await writeFile(join(output,destination),zipSync(portableFiles(value),{level:6,mtime:new Date(1980,0,2)}));files.push(destination);
 }
-const projectFiles={};for(const name of ['project.json',...manifest.modelSources,...manifest.viewSources,manifest.story,...manifest.assets])projectFiles[name]=new Uint8Array(await readFile(join(output,'example',name)));
-await writeFile(join(output,'project.zip'),zipSync(projectFiles,{level:6,mtime:new Date(1980,0,2)}));files.push('project.zip');
+const primaryFiles=portableFiles(primary);
+for(const [name,data] of Object.entries(primaryFiles)){
+ await mkdir(dirname(join(output,'example',name)),{recursive:true});
+ await writeFile(join(output,'example',name),data);files.push('example/'+name);
+}
+await writeArchive(primary,'project.zip');
+const flashlight=await readProjectDirectory(resolve('examples/canvas-prototype'));
+await writeArchive(flashlight,'demos/flashlight.zip');
+const demos={schemaVersion:'syspresent.demos.v1',demos:[
+ {id:'blue-dog',title:primary.manifest.title,description:'Explore the complete Blue Dog model through river traffic, requirements and recovery.',project:'project.zip',...(runtimeCacheHash?{runtimeCacheHash}:{})},
+ {id:'flashlight',title:flashlight.manifest.title,description:'A small model connecting a requirement, the flashlight assembly and switching behavior.',project:'demos/flashlight.zip'}
+]};
+await writeFile(join(output,'demos.json'),JSON.stringify(demos,null,2)+'\n');files.push('demos.json');
 const buildToken=createHash('sha256');for(const name of [...files].sort()){buildToken.update(name+'\0');buildToken.update(await readFile(join(output,name)));}const version=buildToken.digest('hex').slice(0,20);
 const html=(await readFile(join(output,'index.html'),'utf8')).replace('<head>','<head>'+(runtimeCacheHash?'<meta name="syspresent-runtime-cache" content="'+runtimeCacheHash+'">':'')+'<meta name="syspresent-build" content="'+version+'">').replace('src="./app.js"','src="./app.js?v='+version+'"').replace('href="./canvas.css"','href="./canvas.css?v='+version+'"');await writeFile(join(output,'index.html'),html);
 await writeFile(join(output,'build-inputs.json'),JSON.stringify(inputs.metafile,null,2));files.push('build-inputs.json');

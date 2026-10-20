@@ -222,7 +222,7 @@ package SyspresentRequirements {
             comment scope /* Canvas architecture baseline */
         }
         requirement <'SP-085'> portableProject {
-            doc /* A presentation project shall use ordinary files for model and required library sources, authored SysML views, Markdown, assets and a small manifest with dependencies and entry points. Folder or ZIP import/export shall preserve those files; individual Markdown import/export shall also be supported. */
+            doc /* A presentation project shall use ordinary files for model and required library sources, authored SysML views, Markdown and assets. A small optional manifest shall express author intent and overrides rather than duplicate discoverable indexes. Folder or ZIP import/export shall preserve those files; individual Markdown import/export shall also be supported. Existing versioned project bundles and immutable snapshots shall remain readable under their original contract. */
             comment scope /* Canvas architecture baseline; complete browser round-trip not implied by prototype */
         }
         requirement <'SP-086'> standaloneExploration {
@@ -240,6 +240,14 @@ package SyspresentRequirements {
         requirement <'SP-089'> basicRebuildValidation {
             doc /* A rebuild shall identify scene, route and annotation references that no longer resolve and allow authors to repair them. Immutable published snapshots shall remain unchanged. Automatic semantic change adjudication, deep model history and mandatory change-review workflows are outside the current scope. */
             comment scope /* Canvas architecture baseline */
+        }
+        requirement <'SP-090'> landingAndImport {
+            doc /* The standalone demo shall open on a landing page offering available demos and local SysML or KerML file selection, folder import where supported and portable project ZIP import. Basic exploration shall not require a project manifest, authored views or a story. User model files shall be processed locally by the browser WASM engine without upload to an application server. Opening the landing page shall not load a demo model or initialize its semantic engine before a selection. Readers shall be able to return to the landing page and resume the loaded model. */
+            comment scope /* First release */
+        }
+        requirement <'SP-091'> discoveredProjectMetadata {
+            doc /* The application and CI build shall discover supplied source and asset files by file conventions and discover model roots, requirement indexes and native views through native engine results. Tool versions, digests, cache indexes and snapshot provenance shall be generated rather than manually authored. Explicit navigation scope, starting viewpoint or focus, narrative content, custom dependency files and intentional publication exclusions remain author choices. Omitted navigation overrides shall use disclosed deterministic defaults. Invalid or ambiguous references and unresolved dependencies shall produce diagnostics rather than inferred model semantics. A prepared native index shall require publisher integrity, exact source and engine checks; cached semantic data additionally requires the parsed native model identity. */
+            comment scope /* First release */
         }
     }
     package Acceptance {

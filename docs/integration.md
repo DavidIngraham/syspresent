@@ -42,7 +42,7 @@ Reusable selection belongs in SysML view definitions and usages, using native ex
 
 The static-site editor loads a project, explores its model, captures viewpoints into authored views/scenes and exports them. Initial system-model sources remain read-only; view and presentation sources are editable. A first click/tap/key selection exposes contextual actions without moving the graph. Explicit refocus/expand/viewpoint actions trigger rearrangement. Leaving a guided scene collapses prose to Return to scene; returning restores authored context.
 
-A portable project uses ordinary files: model and required library sources, authored views, Markdown, assets and a small manifest naming dependencies and entry points. Folder/ZIP import/export is the intended project format. Individual Markdown import/export remains supported. Exported SysML view declarations must accompany scenes that depend on them; a screenshot or cached layout is not a substitute for their semantic definition.
+A portable project uses ordinary files: model and required library sources, authored views, Markdown, assets and an optional small manifest expressing author intent and entry-point overrides. Folder/ZIP import/export is the intended project format. Individual Markdown import/export remains supported. Exported SysML view declarations must accompany scenes that depend on them; a screenshot or cached layout is not a substitute for their semantic definition.
 
 Publications include the complete project by default. Scoped publications remain possible and disclose unavailable targets separately from hidden diagram context. Frozen snapshots retain exact model/story/runtime content. Rebuilds report broken references and routes; automatic deep change history, semantic adjudication and compulsory reapproval are outside the agreed current scope.
 
@@ -133,3 +133,30 @@ The camera transforms the graph layer only. Measured prose and controls stay in 
 
 
 Journey camera choreography uses the same continuous clock as graph geometry. It opens around relevant source route elements, follows the actual focus in intermediate GV windows, then settles at the destination active fit. The camera follows prepared model route geometry rather than fitting unrelated neighbors. A large same-notation reflow may use a modest pullback. Camera positions are presentation data, not model locations. An input handoff finishes current motion before applying the gesture; a camera revision guard prevents a pending layout response from overwriting a gesture that started while geometry was being prepared. Context fading follows each sampled frame's active/context role, so an ancestor link remains visible during the journey even when it becomes background context at the destination.
+
+
+## Landing page and project discovery
+
+The demo root opens a landing page rather than loading a model immediately. It offers the packaged Blue Dog and flashlight examples, local multi-file SysML/KerML selection, a folder selection where supported and project ZIP import. The WASM and layout workers start only after a model is chosen. Home returns to the landing page; Resume retains the loaded model. A requested demo can be linked directly with `?demo=blue-dog` or `?demo=flashlight`. Model sources are processed in the browser, without an application upload endpoint.
+
+Basic exploration needs only model files and any custom library sources that the model imports. A manifest, story and predeclared views are optional. The importer retains filenames, rejects duplicate selected paths, and uses folder-relative paths when supplied. ZIP intake also accepts a single enclosing project folder. Parse errors remain native diagnostics; the importer does not guess missing library semantics. Built-in runtime libraries remain pinned with the engine.
+
+New author projects use `syspresent.project.v2`. For example, the complete Blue Dog author descriptor contains only its schema, title and intentionally selected navigation roots:
+
+```json
+{
+  "schemaVersion": "syspresent.project.v2",
+  "title": "My system",
+  "navigation": {
+    "roots": ["MySystem"]
+  }
+}
+```
+
+Even this file is optional. File conventions discover SysML/KerML sources, `story.md`, and ordinary assets. `views.sysml` and SysML files under `views/` are presentation-owned editable files by convention; use `views` to choose a different editable subset. A blank presentation view file and story are provided when absent. `sources` is an optional exact source-file selection, useful for intentional exclusions; supplied dependency files must still be included. No SysML syntax is parsed by JavaScript for discovery.
+
+`navigation.roots` expresses the intended engineering journey boundary, not a completeness claim or a hard exploration barrier. When omitted, native source roots supply a deterministic default. Optional `navigation.view` and `navigation.focus` select a preferred starting point; otherwise the first story scene or a discovered model root starts exploration. Title is optional. An explicit `story` path overrides the conventional file. `publication.scope` defaults to `complete`; choose `scoped` only for a deliberately partial supplied project. Narrative sequence, annotations, evidence provenance and review intent cannot be inferred from model topology and remain authored content.
+
+Native model roots, requirement seeds and the view catalog are discovered from ParseSources/ExportModel results. They are no longer author-maintained lists. The native build writes cache indexes, direct-source and complete-source digests, parsed model identity and engine fingerprint. The static builder writes a demo catalog, packaged demo files, viewer provenance and immutable snapshot hashes. A publisher-trusted cache index requires the exact input digest and engine identity before helping construct the native query; exported semantics require the subsequent native parse hash and complete source digest as well. Uploaded files do not supply their own publisher trust.
+
+Existing v1 bundles retain their original explicit contract. New v2 exports contain the compact author descriptor and ordinary files, while derived runtime indexes stay out of project.json. Captured presentation-view files and edited Markdown survive export/reimport. Frozen old snapshots are never rewritten by migration. The documented native-cache and static-build commands remain suitable for CI; adding model files no longer requires rebuilding hand-authored source/root/requirement lists.

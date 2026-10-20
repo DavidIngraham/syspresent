@@ -1,19 +1,9 @@
 {
-  "schemaVersion": "syspresent.project.v1",
+  "schemaVersion": "syspresent.project.v2",
   "title": "A flashlight: requirement, assembly and switching",
-  "systemOfInterest": [
-    "Flashlight"
-  ],
-  "modelSources": [
-    "model.sysml"
-  ],
-  "viewSources": [
-    "views.sysml"
-  ],
-  "story": "story.md",
-  "assets": [],
-  "publication": {
-    "scope": "complete"
-  },
-  "entryView": "CanvasViews::requirements"
+  "navigation": {
+    "roots": [
+      "Flashlight"
+    ]
+  }
 }

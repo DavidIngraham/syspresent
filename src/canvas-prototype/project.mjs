@@ -1,17 +1,68 @@
 import {validatePresentation} from './preferences.mjs';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
-const SCHEMA='syspresent.project.v1';
-export function projectPath(name){if(typeof name!=='string'||!name||name.startsWith('/')||name.includes('\\')||name.includes(':')||name.split('/').some(x=>x==='..'||x==='.'||!x))throw Error('Invalid project path: '+name);return name;}
-export const fileText=(project,name)=>{const value=project.files[projectPath(name)];if(value===undefined)throw Error('Missing project file: '+name);return typeof value==='string'?value:strFromU8(value);};
+const SCHEMA='syspresent.project.v1',AUTHOR_SCHEMA='syspresent.project.v2';
+const sourceFile=name=>/\.(sysml|kerml)$/i.test(name);
+const conventionalView=name=>name==='views.sysml'||/^views\/.+\.sysml$/i.test(name);
+const reservedSource=name=>name.split('/').at(-1).startsWith('__syspresent_');
+const strings=(value,label,{empty=true}={})=>{if(!Array.isArray(value)||(!empty&&!value.length)||!value.every(x=>typeof x==='string'&&x)||new Set(value).size!==value.length)throw Error('Invalid '+label);return value;};
+export function projectPath(name){if(typeof name!=='string'||!name||name.startsWith('/')||name.includes('\\')||name.includes(':')||/[\u0000-\u001f\u007f]/.test(name)||name.split('/').some(x=>x==='..'||x==='.'||!x))throw Error('Invalid project path: '+name);return name;}
+export const fileText=(project,name)=>{projectPath(name);if(!Object.hasOwn(project.files,name))throw Error('Missing project file: '+name);const value=project.files[name];return typeof value==='string'?value:strFromU8(value);};
+// File discovery identifies paths and editable presentation files only. Native
+// parsing supplies every semantic root, identity, relationship and view usage.
+export function normalizeProject(project,{title}={}){
+ if(!project||!project.files||typeof project.files!=='object')throw Error('Project requires files');
+ const files=Object.fromEntries(Object.entries(project.files).map(([name,value])=>[projectPath(name),value]));
+ let author=project.authorManifest??project.manifest;
+ if(project.manifest?.schemaVersion===SCHEMA)return {...project,files};
+ if(author&&author.schemaVersion!==AUTHOR_SCHEMA)throw Error('Unsupported project manifest');
+ author=author??{schemaVersion:AUTHOR_SCHEMA};
+ for(const field of ['modelSources','viewSources','systemOfInterest','modelRoots','requirementSeeds','entryView','entryFocus','runtimeCache'])if(Object.hasOwn(author,field))throw Error('Computed project field is not authored in v2: '+field);
+ if(author.title!==undefined&&(typeof author.title!=='string'||!author.title.trim()))throw Error('Invalid project title');
+ const discovered=Object.keys(files).filter(sourceFile).sort();
+ for(const name of discovered)if(reservedSource(name))throw Error('Reserved runtime source filename: '+name);
+ const sources=author.sources===undefined?discovered:strings(author.sources,'project sources',{empty:false}).map(projectPath);
+ if(!sources.length)throw Error('Project requires at least one SysML or KerML source');
+ for(const name of sources){if(!sourceFile(name))throw Error('Project source must be SysML or KerML: '+name);fileText({files},name);}
+ const viewSources=author.views===undefined?sources.filter(conventionalView):strings(author.views,'project views').map(projectPath);
+ for(const name of viewSources){if(!sourceFile(name))throw Error('Project view source must be SysML or KerML: '+name);fileText({files},name);}
+ if(!viewSources.length){if(Object.hasOwn(files,'views.sysml')&&!sources.includes('views.sysml'))throw Error('Existing views.sysml must be included as a source or editable view');files['views.sysml']??='';viewSources.push('views.sysml');}
+ const story=projectPath(author.story??'story.md');
+ if(author.story!==undefined)fileText({files},story);else files[story]??='';
+ if(sourceFile(story)||story==='project.json')throw Error('Story must be a separate presentation file');
+ const navigation=author.navigation??{};
+ if(!navigation||typeof navigation!=='object'||Array.isArray(navigation))throw Error('Invalid project navigation');
+ const roots=navigation.roots===undefined?[]:strings(navigation.roots,'navigation roots');
+ for(const key of ['view','focus'])if(navigation[key]!==undefined&&(typeof navigation[key]!=='string'||!navigation[key]))throw Error('Invalid navigation '+key);
+ const scope=author.publication?.scope??'complete';if(!['complete','scoped'].includes(scope))throw Error('Publication scope must be complete or scoped');
+ const allSources=new Set([...sources,...viewSources]);
+ const manifest={schemaVersion:SCHEMA,title:author.title??title??'Imported model',modelSources:sources.filter(name=>!viewSources.includes(name)),viewSources:[...viewSources],systemOfInterest:[...roots],story,assets:Object.keys(files).filter(name=>name!=='project.json'&&name!==story&&!allSources.has(name)).sort(),publication:{scope},...(Object.hasOwn(files,'runtime-cache.json')?{runtimeCache:'runtime-cache.json'}:{}),...(navigation.view?{entryView:navigation.view}:{}),...(navigation.focus?{entryFocus:navigation.focus}:{}),...(author.source!==undefined?{source:author.source}:{})};
+ return {...project,files,manifest,authorManifest:author};
+}
 export function validateProject(project){
+ if(project?.manifest?.schemaVersion!==SCHEMA)Object.assign(project,normalizeProject(project));
  const m=project.manifest;if(m?.schemaVersion!==SCHEMA)throw Error('Unsupported project manifest');
- for(const key of ['modelSources','viewSources','systemOfInterest'])if(!Array.isArray(m[key])||!m[key].length||!m[key].every(x=>typeof x==='string'&&x))throw Error('Project requires '+key);
- if(m.requirementSeeds!==undefined&&(!Array.isArray(m.requirementSeeds)||!m.requirementSeeds.length||!m.requirementSeeds.every(x=>typeof x==='string'&&x)))throw Error('Invalid native requirement seeds');
- if(m.modelRoots!==undefined&&(!Array.isArray(m.modelRoots)||!m.modelRoots.length||!m.modelRoots.every(x=>typeof x==='string'&&x)))throw Error('Invalid native model roots');
+ for(const name of Object.keys(project.files))projectPath(name);
+ for(const key of ['modelSources','viewSources','systemOfInterest'])strings(m[key],'project '+key,{empty:!!project.authorManifest});
+ if(!m.modelSources.length&&!m.viewSources.length)throw Error('Project requires source files');
+ if(m.requirementSeeds!==undefined)strings(m.requirementSeeds,'native requirement seeds',{empty:!!project.authorManifest});
+ if(m.modelRoots!==undefined)strings(m.modelRoots,'native model roots',{empty:false});
+ for(const name of [...m.modelSources,...m.viewSources])if(reservedSource(name))throw Error('Reserved runtime source filename: '+name);
  for(const name of [...m.modelSources,...m.viewSources,m.story,...(m.assets??[])])fileText(project,name);
  if(new Set([...m.modelSources,...m.viewSources]).size!==m.modelSources.length+m.viewSources.length)throw Error('Model and view source files must be separate');
  if(!['complete','scoped'].includes(m.publication?.scope))throw Error('Publication scope must be complete or scoped');
  return project;
+}
+// Runtime indexes and generated caches never become authoring requirements.
+export function projectDescriptor(project){
+ validateProject(project);if(!project.authorManifest)return project.manifest;
+ const author={...project.authorManifest},m=project.manifest;
+ if(author.title!==undefined||m.title!=='Imported model')author.title=m.title;
+ const actualSources=[...m.modelSources,...m.viewSources].sort(),discovered=Object.keys(project.files).filter(sourceFile).sort();
+ if(author.sources!==undefined||JSON.stringify(actualSources)!==JSON.stringify(discovered))author.sources=actualSources;else delete author.sources;
+ const conventional=actualSources.filter(conventionalView),views=[...m.viewSources].sort();
+ if(author.views!==undefined||JSON.stringify(views)!==JSON.stringify(conventional))author.views=views;else delete author.views;
+ if(author.story!==undefined||m.story!=='story.md')author.story=m.story;else delete author.story;
+ return author;
 }
 export function parseStory(markdown){
  const scenes=[],pattern=/^```syspresent\s*\n([\s\S]*?)\n```[ \t]*$/gm;let previous;
@@ -30,13 +81,15 @@ export function parseStory(markdown){
  return scenes.map(({bodyStart,...scene})=>scene);
 }
 export function writeStory(title,scenes){return '# '+title+'\n\n'+scenes.map(({markdown,...config})=>'```syspresent\n'+JSON.stringify({...config,type:'scene'})+'\n```\n\n'+(markdown??'').trim()+'\n').join('\n');}
-export function packProject(project){validateProject(project);const files={};for(const [name,data] of Object.entries(project.files))files[projectPath(name)]=typeof data==='string'?strToU8(data):data;files['project.json']=strToU8(JSON.stringify(project.manifest,null,2)+'\n');return zipSync(files,{level:6});}
+export function packProject(project){validateProject(project);const files=Object.create(null);for(const [name,data] of Object.entries(project.files))files[projectPath(name)]=typeof data==='string'?strToU8(data):data;files['project.json']=strToU8(JSON.stringify(projectDescriptor(project),null,2)+'\n');return zipSync(files,{level:6});}
 export function unpackProject(bytes){
- let expanded=0;const files=unzipSync(bytes,{filter:entry=>{projectPath(entry.name.replace(/\/$/,''));if(entry.name.endsWith('/'))return false;if(entry.originalSize>64*1024*1024||(expanded+=entry.originalSize)>160*1024*1024)throw Error('Project archive exceeds prototype size limit');return true;}});
- if(!files['project.json'])throw Error('Project archive requires project.json at its root');
- return validateProject({manifest:JSON.parse(strFromU8(files['project.json'])),files});
+ let expanded=0;let files=unzipSync(bytes,{filter:entry=>{projectPath(entry.name.replace(/\/$/,''));if(entry.name.endsWith('/'))return false;if(entry.originalSize>64*1024*1024||(expanded+=entry.originalSize)>160*1024*1024)throw Error('Project archive exceeds prototype size limit');return true;}});
+ const names=Object.keys(files),folder=names[0]?.split('/')[0];
+ if(names.length&&names.every(name=>name.includes('/')&&name.split('/')[0]===folder))files=Object.fromEntries(names.map(name=>[name.slice(folder.length+1),files[name]]));
+ const manifest=files['project.json']?JSON.parse(strFromU8(files['project.json'])):undefined;
+ return validateProject({manifest,files});
 }
-export function documentsFor(project){return [...project.manifest.modelSources,...project.manifest.viewSources].map(name=>({name,content:fileText(project,name),language:name.endsWith('.kerml')?'kerml':'sysml'}));}
+export function documentsFor(project){return [...project.manifest.modelSources,...project.manifest.viewSources].map(name=>({name,content:fileText(project,name),language:/\.kerml$/i.test(name)?'kerml':'sysml'}));}
 export function appendScene(project,scene){
  const scenes=parseStory(fileText(project,project.manifest.story));if(scenes.some(s=>s.id===scene.id))throw Error('Scene ID already exists');
  scenes.push(scene);project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);return scenes;
@@ -73,4 +126,19 @@ export async function verifiedRuntimeCache(project,{trustedHash,engineVersion,en
  const cache=JSON.parse(fileText(project,filename));
  if(cache.schemaVersion!=='syspresent.native-cache.v1'||cache.engineVersion!==engineVersion||cache.engineFingerprint!==engineFingerprint||cache.modelHash!==modelHash||cache.sourceDigest!==await sourceDigest(documents))return null;
  return cache;
+}
+
+// A publisher-trusted cache may accelerate native index preparation. This does
+// not authorize reusing exported semantics before the actual native parse.
+export async function verifiedRuntimeIndex(project,{trustedHash,engineVersion,engineFingerprint,documents}){
+ const filename=project.manifest.runtimeCache;if(!filename||!trustedHash)return null;
+ const value=project.files[filename],bytes=typeof value==='string'?new TextEncoder().encode(value):value;
+ if(!bytes)return null;
+ const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
+ if(hash!==trustedHash)return null;
+ let cache;try{cache=JSON.parse(fileText(project,filename));}catch{return null;}
+ if(cache.schemaVersion!=='syspresent.native-cache.v1'||cache.engineVersion!==engineVersion||cache.engineFingerprint!==engineFingerprint||cache.inputDigest!==await sourceDigest(documents))return null;
+ if(!Array.isArray(cache.modelRoots)||!cache.modelRoots.length||!cache.modelRoots.every(x=>typeof x==='string'&&x)||!Array.isArray(cache.requirementSeeds)||!cache.requirementSeeds.every(x=>typeof x==='string'&&x))return null;
+ if(cache.runtimePackage!==undefined&&(typeof cache.runtimePackage!=='string'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(cache.runtimePackage)))return null;
+ return {modelRoots:[...cache.modelRoots],requirementSeeds:[...cache.requirementSeeds],...(cache.runtimePackage!==undefined?{runtimePackage:cache.runtimePackage}:{})};
 }

@@ -1,3 +1,6 @@
+import {showLanding} from './landing.mjs';
+import {projectFromSelection} from './browser-project.mjs';
+import {discoverNativeIndex} from './native-project.mjs';
 import {planDepartures} from './departures.mjs';
 import {requirementActions,structuralActions,isStructuralElement,traceContext} from './exploration.mjs';
 import {resolvePresentation,validatePresentation,PRESENTATION_RELATIONSHIP_KINDS} from './preferences.mjs';
@@ -14,61 +17,88 @@ import {edgeAppearance,markerDefinition} from './notation.mjs';
 import {createSemanticEngine} from './engine/client.mjs';
 import {engineeringContext,findEngineeringRoute,findHierarchyRoute,planTransition,directTypingContext} from './core/index.mjs';
 import {adaptNativeView,modelGraph,graphView,requireNativeIdentity} from './graph.mjs';
-import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,appendScene,captureViewSource,requirementCoverageSource,verifiedRuntimeCache} from './project.mjs';
-const trustedCacheHash=document.querySelector('meta[name="syspresent-runtime-cache"]')?.content;
+import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,appendScene,captureViewSource,requirementCoverageSource,verifiedRuntimeCache,verifiedRuntimeIndex,projectPath} from './project.mjs';
 const buildVersion=document.querySelector('meta[name="syspresent-build"]')?.content||'development';
 const $=id=>document.getElementById(id),el=(name,text,cls)=>{const e=document.createElement(name);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
 const button=(text,fn)=>{const e=el('button',text);e.type='button';e.onclick=()=>Promise.resolve(fn()).catch(report);return e;};
 const state={engine:null,project:null,graph:null,views:new Map(),scenes:[],sceneIndex:0,focus:null,selected:null,view:null,displayed:null,exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),reduce:matchMedia('(prefers-reduced-motion: reduce)').matches,revision:0,loadRevision:0,animations:[],transitioning:false,provenance:null,history:[],future:[],presentation:{},traceRequest:null,camera:createCamera(),cameraRevision:0,neighborhoodBudget:null};
-const report=error=>{$('status').textContent=error.message||String(error);$('editor-error').textContent=error.message||String(error);console.error(error);};
+const report=error=>{const message=error.message||String(error);$('status').textContent=message;$('editor-error').textContent=message;if(!$('landing').hidden){$('landing-error').textContent=message;$('landing-error').hidden=false;$('landing-status').textContent='';}console.error(error);};
 const element=id=>state.graph?.elements.find(e=>e.id===id),label=id=>element(id)?.name||id;
 function resolveInGraph(graph,value){const exact=graph?.elements.find(e=>e.id===value);if(exact)return exact.id;const matches=graph?.elements.filter(e=>e.qualifiedName===value)??[];if(matches.length>1)throw Error('Ambiguous native qualified reference: '+value);return matches[0]?.id;}
 const resolve=value=>resolveInGraph(state.graph,value);
 const qname=id=>element(id)?.qualifiedName;
 const scene=()=>state.scenes[state.sceneIndex];
 function scopeIds(){const roots=state.project.manifest.systemOfInterest;return state.graph.elements.filter(e=>roots.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);}
-function status(text){$('status').textContent=text;$('loading-phase').textContent=text;}
+function status(text){$('status').textContent=text;$('loading-phase').textContent=text;if(!$('landing').hidden)$('landing-status').textContent=text;}
 function inline(parent,text){let start=0;for(const m of text.matchAll(/\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g)){parent.append(document.createTextNode(text.slice(start,m.index)));parent.append(el(m[1]?'strong':m[2]?'code':'em',m[1]??m[2]??m[3]));start=m.index+m[0].length;}parent.append(document.createTextNode(text.slice(start)));}
 function markdown(text){const host=el('div');let paragraph=[],list;const flush=()=>{if(paragraph.length){const p=el('p');inline(p,paragraph.join(' '));host.append(p);paragraph=[];}list=null;};for(const line of text.split('\n')){const heading=/^(#{1,6})\s+(.+)$/.exec(line),item=/^[-*]\s+(.+)$/.exec(line);if(heading){flush();host.append(el('h'+Math.min(6,Number(heading[1].length)+1),heading[2]));}else if(item){if(paragraph.length)flush();if(!list){list=el('ul');host.append(list);}const li=el('li');inline(li,item[1]);list.append(li);}else if(!line.trim())flush();else paragraph.push(line);}flush();return host;}
-async function exampleProject(){const response=await fetch('./project.zip?v='+buildVersion);if(!response.ok)throw Error('Example project unavailable');return unpackProject(new Uint8Array(await response.arrayBuffer()));}
-async function compile(project){
+let engineReady, demoCatalog;
+async function ensureEngine(){
+ if(engineReady)return engineReady;
+ status('Starting the model engine…');
+ state.layoutEngine??=createLayoutEngine({workerUrl:new URL('./layout/elk-worker.js?v='+buildVersion,location.href).href});
+ state.engine=createSemanticEngine({assetBase:new URL('./engine/',location.href),assetVersion:buildVersion,workerURL:new URL('./engine/worker.js?v='+buildVersion,location.href)});
+ engineReady=(async()=>{state.engineInfo=await state.engine.ready;const response=await fetch('./engine/provenance.json?v='+buildVersion);if(!response.ok)throw Error('Model engine provenance is unavailable.');state.provenance=await response.json();})().catch(error=>{state.engine?.terminate();engineReady=null;throw error;});
+ return engineReady;
+}
+async function demos(){
+ if(demoCatalog)return demoCatalog;
+ const response=await fetch('./demos.json?v='+buildVersion);if(!response.ok)throw Error('Demo catalog is unavailable. You can still open your own model files.');
+ const catalog=await response.json();if(catalog.schemaVersion!=='syspresent.demos.v1'||!Array.isArray(catalog.demos))throw Error('Unsupported demo catalog');
+ const seen=new Set();for(const item of catalog.demos){if(typeof item.id!=='string'||!item.id||seen.has(item.id)||typeof item.title!=='string')throw Error('Invalid demo catalog');seen.add(item.id);projectPath(item.project);}
+ demoCatalog=catalog.demos;return demoCatalog;
+}
+async function openDemo(id){
+ const request=++state.loadRevision;++state.revision;busy(true);$('landing-error').hidden=true;status('Opening demo…');
+ try{const demo=(await demos()).find(item=>item.id===id);if(!demo)throw Error('Demo not found: '+id);const response=await fetch('./'+demo.project+'?v='+buildVersion);if(!response.ok)throw Error('Demo files are unavailable.');const bytes=new Uint8Array(await response.arrayBuffer());if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:demo.runtimeCacheHash,loadToken:request});}
+ catch(error){if(request===state.loadRevision)throw error;}finally{if(request===state.loadRevision)busy(false);}
+}
+function home(){++state.loadRevision;++state.revision;cancelAnimations();$('project-menu').open=false;$('selection').hidden=true;$('find').hidden=true;for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();busy(false);showLanding(document,true);$('landing-status').textContent='';$('landing-error').hidden=true;$('resume-model').hidden=!state.view;document.title='Syspresent';}
+async function compile(project,{cacheHash=state.trustedCacheHash,progress=status}={}){
  const documents=documentsFor(project),scenes=parseStory(fileText(project,project.manifest.story));
- let parsed,exported,roots=project.manifest.modelRoots,runtimePackage='SyspresentRuntimeContext';
+ const m=project.manifest;
+ let parsed,exported,roots=m.modelRoots,seeds=m.requirementSeeds,runtimePackage;
  const check=result=>{const errors=(result.diagnostics??[]).filter(d=>String(d.severity).toLowerCase().includes('error'));if(errors.length)throw Error(errors.map(d=>`${d.message} (${d.span?.file??'source'}:${d.span?.startLine??'?'})`).join('\n'));if(!result.modelHash)throw Error('Native engine returned no model identity');};
- if(!roots?.length){
+ const index=await verifiedRuntimeIndex(project,{trustedHash:cacheHash,engineVersion:state.engineInfo?.version,engineFingerprint:state.provenance?.assets?.['sysml-wasm.wasm']?.sha256,documents});
+ if(index){roots=index.modelRoots;seeds=index.requirementSeeds;runtimePackage=index.runtimePackage;}
+ if(!roots?.length||seeds===undefined||!runtimePackage){
   parsed=await state.engine.call('ParseSources',{documents});check(parsed);
   exported=await state.engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
-  const rootIDs=(parsed.roots??[]).flatMap(r=>r.childIds??[]);roots=exported.elements.filter(e=>rootIDs.includes(e['@id'])&&e.qualifiedName).map(e=>e.qualifiedName);
+  const discovered=discoverNativeIndex(parsed,exported,{modelDocumentCount:m.modelSources.length});
+  roots=roots?.length?roots:discovered.modelRoots;seeds??=discovered.requirementSeeds;
+  runtimePackage='SyspresentRuntimeContext';const names=new Set(exported.elements.map(e=>e.qualifiedName));while(names.has(runtimePackage))runtimePackage+='X';
  }
- while(roots.includes(runtimePackage))runtimePackage+='X';
- status('Resolving the complete project with OpenSysML WASM…');
- const allDocuments=[...documents,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,project.manifest.requirementSeeds)}];
+ if(!roots.length)throw Error('No named model declarations were found in the supplied files.');
+ progress('Resolving the complete project with OpenSysML WASM…');
+ const allDocuments=[...documents,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,seeds)}];
  parsed=await state.engine.call('ParseSources',{documents:allDocuments});check(parsed);
- const cache=await verifiedRuntimeCache(project,{trustedHash:trustedCacheHash,engineVersion:state.engineInfo?.version,engineFingerprint:state.provenance?.assets?.['sysml-wasm.wasm']?.sha256,documents:allDocuments,modelHash:parsed.modelHash});
- status('Loading model declarations and requirement relationships…');
- exported=cache?.exported??await state.engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
+ const cache=await verifiedRuntimeCache(project,{trustedHash:cacheHash,engineVersion:state.engineInfo?.version,engineFingerprint:state.provenance?.assets?.['sysml-wasm.wasm']?.sha256,documents:allDocuments,modelHash:parsed.modelHash});
+ progress('Loading model declarations and requirement relationships…');
+ exported=structuredClone(cache?.exported??await state.engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'}));
  if(!Array.isArray(exported.elements))throw Error('Native model export has no element array');
- if(project.manifest.modelRoots?.length){const modelRootIDs=parsed.roots.slice(0,project.manifest.modelSources.length).flatMap(r=>r.childIds??[]),actual=exported.elements.filter(e=>modelRootIDs.includes(e['@id'])&&e.qualifiedName).map(e=>e.qualifiedName);const missing=actual.filter(name=>!roots.includes(name));if(missing.length)throw Error('Native model roots need rebuilding: '+missing.join(', '));}
- const coverage=requireNativeIdentity(adaptNativeView(cache?.coverage??await state.engine.call('RenderView',{modelHash:parsed.modelHash,view:runtimePackage+'::coverage',includeSemanticIdentity:true}),runtimePackage+'::coverage'));
+ if(m.modelRoots?.length){const modelRootIDs=parsed.roots.slice(0,m.modelSources.length).flatMap(r=>r.childIds??[]),actual=exported.elements.filter(e=>modelRootIDs.includes(e['@id'])&&e.qualifiedName).map(e=>e.qualifiedName);const missing=actual.filter(name=>!roots.includes(name));if(missing.length)throw Error('Native model roots need rebuilding: '+missing.join(', '));}
+ const coverage=requireNativeIdentity(adaptNativeView(seeds.length?(cache?.coverage??await state.engine.call('RenderView',{modelHash:parsed.modelHash,view:runtimePackage+'::coverage',includeSemanticIdentity:true})):{kind:'definition',nodes:[],edges:[]},runtimePackage+'::coverage'));
  exported.elements=exported.elements.filter(e=>e.qualifiedName!==runtimePackage&&!e.qualifiedName?.startsWith(runtimePackage+'::'));
  const availableViews=exported.elements.filter(e=>e['@type']==='ViewUsage'&&e.qualifiedName&&e['sysx:sourceLine']).map(e=>e.qualifiedName);
- const needed=new Set([...scenes.map(s=>s.view),...(project.manifest.entryView?[project.manifest.entryView]:[])]),views=new Map();
- for(const name of needed){if(!availableViews.includes(name))throw Error('Native view does not resolve: '+name);status('Preparing '+(scenes.find(s=>s.view===name)?.title||'model view')+'…');const raw=cache?.views?.[name]??await state.engine.call('RenderView',{modelHash:parsed.modelHash,view:name,includeSemanticIdentity:true});views.set(name,requireNativeIdentity(adaptNativeView(raw,name)));}
+ const needed=new Set([...scenes.map(s=>s.view),...(m.entryView?[m.entryView]:[])]),views=new Map();
+ for(const name of needed){if(!availableViews.includes(name))throw Error('Native view does not resolve: '+name);progress('Preparing '+(scenes.find(s=>s.view===name)?.title||'model view')+'…');const raw=cache?.views?.[name]??await state.engine.call('RenderView',{modelHash:parsed.modelHash,view:name,includeSemanticIdentity:true});views.set(name,requireNativeIdentity(adaptNativeView(raw,name)));}
+ if(!m.systemOfInterest.length)m.systemOfInterest=[...roots];
  const graph=modelGraph(exported.elements,[...views.values(),coverage]);
- for(const root of project.manifest.systemOfInterest)if(!graph.elements.some(e=>e.qualifiedName===root))throw Error('System of interest does not resolve: '+root);
+ for(const root of project.manifest.systemOfInterest)if(!resolveInGraph(graph,root))throw Error('System of interest does not resolve: '+root);
  const byName=value=>resolveInGraph(graph,value);
  for(const [sceneIndex,item] of scenes.entries()){resolvePresentation(item.presentation,{resolve:byName});if(item.journey?.length&&(byName(item.journey.at(-1))!==byName(item.focus)||(sceneIndex>0&&byName(item.journey[0])!==byName(scenes[sceneIndex-1].focus))))throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);if(!views.has(item.view))throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);if(!byName(item.focus))throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);for(let i=1;i<(item.journey??[]).length;i++){const from=byName(item.journey[i-1]),to=byName(item.journey[i]);if(!from||!to||!findEngineeringRoute(graph,{from,to,maxHops:1}).found&&!findHierarchyRoute(graph,{from,to,maxHops:1}).found)throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);}}
  const scoped=graph.elements.filter(e=>project.manifest.systemOfInterest.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);
  for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
+ if(m.entryFocus&&!byName(m.entryFocus))throw Error('Starting element does not resolve: '+m.entryFocus);
  return {project,modelHash:parsed.modelHash,exported,graph,views,scenes,coverage,availableViews};
 }
-function busy(value){$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
-async function loadProject(project){
- const revision=++state.loadRevision;++state.revision;busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
- let compiled;try{compiled=await compile(validateProject(project));}catch(error){if(revision===state.loadRevision){busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;}throw error;}if(revision!==state.loadRevision)return;
+function busy(value){$('landing').setAttribute('aria-busy',String(value));for(const control of $('landing').querySelectorAll('button:not(#resume-model)'))control.disabled=value;$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
+async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken}={}){
+ const revision=loadToken??++state.loadRevision;if(revision!==state.loadRevision)return;++state.revision;$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
+ let compiled;try{await ensureEngine();if(revision!==state.loadRevision)return;compiled=await compile(validateProject(project),{cacheHash,progress:text=>{if(revision===state.loadRevision)status(text);}});}catch(error){if(revision!==state.loadRevision)return;busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision)return;
  Object.assign(state,compiled,{sceneIndex:0,selected:null,exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null});
- busy(false);updateLists();$('editor-error').textContent='';$('project-menu').open=false;
- if(state.scenes.length)await showScene(0,false);else {state.focus=resolve(project.manifest.systemOfInterest[0]);await explore(state.focus);}
+ state.trustedCacheHash=cacheHash??null;showLanding(document,false);document.title=project.manifest.title+' · Syspresent';$('resume-model').hidden=false;busy(false);updateLists();$('editor-error').textContent='';$('project-menu').open=false;
+ if(state.scenes.length)await showScene(0,false);else {state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}
  status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
  $('boundary').textContent=project.manifest.publication.scope==='scoped'?'Scoped publication · traversal stays within supplied model':'Complete project · standalone exploration available';
 }
@@ -333,6 +363,7 @@ function contextNotice(notice){
  return `${prefix}: ${notice.reason} · ${name} (${target})`;
 }
 function bind(){
+ $('open-folder').hidden=!('webkitdirectory' in $('folder-files'));
  for(const kind of PRESENTATION_RELATIONSHIP_KINDS){const option=el('option',kind);option.value=kind;$('presentation-emphasis').append(option);}
  $('explore-back').onclick=()=>restoreHistory('back').catch(report);$('explore-forward').onclick=()=>restoreHistory('forward').catch(report);$('trace-next').onclick=()=>followTrace(state.traceRequest.focus,state.traceRequest.mode,state.traceInfo.page+1).catch(report);$('trace-previous').onclick=()=>followTrace(state.traceRequest.focus,state.traceRequest.mode,state.traceInfo.page-1).catch(report);
  $('previous').onclick=()=>showScene(state.sceneIndex-1).catch(report);$('next').onclick=()=>showScene(state.sceneIndex+1).catch(report);$('scenes').onchange=()=>showScene(Number($('scenes').value)).catch(report);$('standalone').onclick=async()=>{try{await openExploration(state.view,state.focus);}catch(error){report(error);}};$('return').onclick=()=>showScene(state.sceneIndex,true,{record:true}).catch(report);
@@ -344,13 +375,17 @@ function bind(){
  $('edit').onclick=openEditor;$('view-file').onchange=()=>{$('view-source').value=fileText(state.project,$('view-file').value);};
  $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation();scene().presentation=presentation;scene().title=$('scene-title').value;scene().markdown=$('scene-prose').value;scene().panel={placement:$('panel-placement').value};state.project.files[state.project.manifest.story]=writeStory(state.project.manifest.title,state.scenes);updateLists();$('editor').close();await showScene(state.sceneIndex,false);}catch(e){report(e);}};
  $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project);$('editor').close();}catch(e){report(e);}};
- $('import-project').onclick=()=>{$('project-file').click();};$('project-file').onchange=async()=>{try{const file=$('project-file').files[0];if(file)await loadProject(unpackProject(new Uint8Array(await file.arrayBuffer())));}catch(e){report(e);}finally{$('project-file').value='';}};
- $('import-markdown').onclick=()=>{$('markdown-file').click();};$('markdown-file').onchange=async()=>{try{const file=$('markdown-file').files[0];if(file){const project=structuredClone(state.project);project.files[project.manifest.story]=await file.text();await loadProject(project);}}catch(e){report(e);}finally{$('markdown-file').value='';}};
- $('export-project').onclick=()=>{try{download('syspresent-project.zip',packProject(state.project),'application/zip');$('project-menu').open=false;}catch(e){report(e);}};$('export-markdown').onclick=()=>{download('story.md',fileText(state.project,state.project.manifest.story),'text/markdown');$('project-menu').open=false;};$('load-example').onclick=()=>exampleProject().then(loadProject).catch(report);
+ $('open-sysml').onclick=()=>$('sysml-files').click();$('open-folder').onclick=()=>$('folder-files').click();$('landing-project').onclick=()=>$('project-file').click();
+ for(const [id,folder] of [['sysml-files',false],['folder-files',true]])$(id).onchange=async()=>{const request=++state.loadRevision;++state.revision;try{if($(id).files.length){busy(true);$('landing-error').hidden=true;const project=await projectFromSelection($(id).files,{folder});if(request!==state.loadRevision)return;await loadProject(project,{cacheHash:null,loadToken:request});}}catch(error){if(request===state.loadRevision)report(error);}finally{if(request===state.loadRevision)busy(false);$(id).value='';}};
+ for(const demo of document.querySelectorAll('[data-demo]'))demo.onclick=()=>openDemo(demo.dataset.demo).catch(report);
+ $('home').onclick=home;$('resume-model').onclick=async()=>{++state.loadRevision;++state.revision;busy(false);showLanding(document,false);document.title=state.project.manifest.title+' · Syspresent';await frame(state.view).catch(report);};
+ $('import-project').onclick=()=>{$('project-file').click();};$('project-file').onchange=async()=>{const request=++state.loadRevision;++state.revision;try{const file=$('project-file').files[0];if(file){busy(true);const bytes=new Uint8Array(await file.arrayBuffer());if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:null,loadToken:request});}}catch(e){if(request===state.loadRevision)report(e);}finally{if(request===state.loadRevision)busy(false);$('project-file').value='';}};
+ $('import-markdown').onclick=()=>{$('markdown-file').click();};$('markdown-file').onchange=async()=>{const request=++state.loadRevision;++state.revision;try{const file=$('markdown-file').files[0];if(file){busy(true);const project=structuredClone(state.project);project.files[project.manifest.story]=await file.text();if(request!==state.loadRevision)return;await loadProject(project,{loadToken:request});}}catch(e){if(request===state.loadRevision)report(e);}finally{if(request===state.loadRevision)busy(false);$('markdown-file').value='';}};
+ $('export-project').onclick=()=>{try{download('syspresent-project.zip',packProject(state.project),'application/zip');$('project-menu').open=false;}catch(e){report(e);}};$('export-markdown').onclick=()=>{download('story.md',fileText(state.project,state.project.manifest.story),'text/markdown');$('project-menu').open=false;};$('load-example').textContent='Choose another demo';$('load-example').onclick=home;
  $('about').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent='Engine and project details';$('information-text').textContent=JSON.stringify({engine:state.provenance,project:state.project.manifest,modelHash:state.modelHash,graph:{elements:state.graph.elements.length,relationships:state.graph.relationships.length},routing:state.visualSnapshot?.routingMetrics,camera:state.camera,neighborhood:state.visualSnapshot?.neighborhood,view:state.view.id,lastTransition:state.lastTransition,notice:state.exported.notice},null,2);$('information').showModal();};
  let keyboardFocus=false;document.addEventListener('keydown',()=>{keyboardFocus=true;},true);document.addEventListener('pointerdown',()=>{keyboardFocus=false;},true);$('nodes').addEventListener('focusin',event=>{if(!keyboardFocus||state.transitioning||!event.target.matches('.node'))return;const a=state.visualSnapshot?.area;if(!a)return;const r=event.target.getBoundingClientRect(),s=$('stage').getBoundingClientRect(),x=r.x-s.x,y=r.y-s.y;if(x<a.x||y<a.y||x+r.width>a.x+a.width||y+r.height>a.y+a.height){takeCameraControl();applyCamera({...state.camera,x:state.camera.x+a.x+a.width/2-x-r.width/2,y:state.camera.y+a.y+a.height/2-y-r.height/2});}});
  $('stage').onclick=e=>{if(e.target===$('stage')||e.target===$('nodes')||e.target===$('connections')){clearTrace();$('selection').hidden=true;}};
- let resize;new ResizeObserver(()=>{clearTimeout(resize);resize=setTimeout(()=>{if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;transitionTo(pending.view,pending.focus,{journey:pending.journey,allowDisconnected:true,camera:pending.cameraRevision===state.cameraRevision?pending.camera:state.camera}).catch(report);}else if(state.view)frame(state.view).catch(report);},100);}).observe($('stage'));
+ let resize;new ResizeObserver(()=>{clearTimeout(resize);resize=setTimeout(()=>{if($('stage').hidden||$('stage').clientWidth<=0||$('stage').clientHeight<=0)return;if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;transitionTo(pending.view,pending.focus,{journey:pending.journey,allowDisconnected:true,camera:pending.cameraRevision===state.cameraRevision?pending.camera:state.camera}).catch(report);}else if(state.view)frame(state.view).catch(report);},100);}).observe($('stage'));
 }
-async function start(){bind();busy(true);state.layoutEngine=createLayoutEngine({workerUrl:new URL('./layout/elk-worker.js?v='+buildVersion,location.href).href});state.engine=createSemanticEngine({assetBase:new URL('./engine/',location.href),assetVersion:buildVersion,workerURL:new URL('./engine/worker.js?v='+buildVersion,location.href)});const [project,info]=await Promise.all([exampleProject(),state.engine.ready]);state.engineInfo=info;state.provenance=await fetch('./engine/provenance.json?v='+buildVersion).then(r=>r.ok?r.json():info);await loadProject(project);}
+async function start(){bind();busy(false);showLanding(document,true);const demo=new URLSearchParams(location.search).get('demo');if(demo)await openDemo(demo);}
 start().catch(report);

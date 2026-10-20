@@ -1,9 +1,11 @@
+import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateProject,packProject,unpackProject,parseStory,writeStory,documentsFor,captureViewSource,projectPath,appendScene,fileText} from '../src/canvas-prototype/project.mjs';
+import {readProjectDirectory} from '../scripts/canvas_project_files.mjs';
 import {modelGraph,adaptNativeView,requireNativeIdentity} from '../src/canvas-prototype/graph.mjs';
-async function example(){const root=new URL('../examples/canvas-prototype/',import.meta.url),manifest=JSON.parse(await readFile(new URL('project.json',root))),files={};for(const name of [...manifest.modelSources,...manifest.viewSources,manifest.story])files[name]=await readFile(new URL(name,root),'utf8');return {manifest,files};}
+async function example(){return readProjectDirectory(fileURLToPath(new URL('../examples/canvas-prototype/',import.meta.url)));}
 test('ordinary project ZIP and Markdown round-trip without changing system sources',async()=>{const project=await example();validateProject(project);const original=fileText(project,'model.sysml'),scenes=parseStory(fileText(project,'story.md'));appendScene(project,{...scenes[0],id:'captured',title:'Captured native view'});const roundtrip=unpackProject(packProject(project));assert.equal(fileText(roundtrip,'model.sysml'),original);assert.deepEqual(parseStory(fileText(roundtrip,'story.md')),parseStory(fileText(project,'story.md')));assert.deepEqual(documentsFor(roundtrip),documentsFor(project));});
 test('project boundaries, missing assets and malformed scene references fail explicitly',async()=>{for(const name of ['../secret','/root/a','a\\b','C:/x','a//b'])assert.throws(()=>projectPath(name));const p=await example();delete p.files['views.sysml'];assert.throws(()=>validateProject(p),/Missing project file/);assert.throws(()=>parseStory('```syspresent\n{"type":"scene","id":"x"}\n```'),/requires/);});
 test('captured view references native qualified identities and writes declarative SysML',()=>{const source=captureViewSource({name:'scene4',qualifiedNames:['A::one','A::two words','A::one']});assert.match(source,/view scene4 : GeneralView/);assert.equal((source.match(/expose/g)||[]).length,2);assert.ok(source.includes("'A'::'two words'"));});

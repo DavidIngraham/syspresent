@@ -14,8 +14,8 @@ const coverage={kind:'requirement',nodes:native.nodes,edges:native.edges};
 const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfInterest:['Model'],modelSources:['model.sysml'],viewSources:['views.sysml'],story:'story.md',assets:[],publication:{scope:'complete'}};
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
-async function harness({reducedMotion=true,secondScene=false,contextNeighbor=false,traceFixture=false,structuralFixture=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,size={width:1000,height:700}}={}){
- let resizeCallback;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:'Model::orphan'})+'\n```\n\nOther context.';
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,contextNeighbor=false,traceFixture=false,structuralFixture=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,size={width:1000,height:700}}={}){
+ let workerCount=0,resizeCallback;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:'Model::orphan'})+'\n```\n\nOther context.';
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
  const fixtureRaw=raw.map(e=>structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
@@ -24,8 +24,8 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};const ownRealm=value=>{if(value===null||typeof value!=='object')return value;if(ArrayBuffer.isView(value))return new window.Uint8Array(value);if(Array.isArray(value))return window.Array.from(value,ownRealm);if(value instanceof Set)return new window.Set([...value].map(ownRealm));if(value instanceof Map)return new window.Map([...value].map(([k,v])=>[ownRealm(k),ownRealm(v)]));return window.Object.fromEntries(Object.entries(value).map(([k,v])=>[k,ownRealm(v)]));};window.structuredClone=value=>ownRealm(structuredClone(value));window.ResizeObserver=class{constructor(fn){resizeCallback=fn;}observe(){}};
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return size.width;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return size.height;}});
- window.fetch=async url=>({ok:true,arrayBuffer:async()=>packProject({manifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('project.json')?manifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});
- window.Worker=class{constructor(url){this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
+ window.fetch=async url=>({ok:true,arrayBuffer:async()=>packProject({manifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?manifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});
+ window.Worker=class{constructor(url){workerCount++;this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
   else if(method==='ExportModel')respond({elements:structuredClone([...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...(secondScene?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
@@ -33,7 +33,7 @@ async function harness({reducedMotion=true,secondScene=false,contextNeighbor=fal
   else if(method==='RenderView'&&params.view.startsWith('#'))pendingRender=()=>respond({kind:'interconnection',nodes:[native.nodes[1]],edges:[]});
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(native));
  }terminate(){}};
- window.eval(outputFiles[0].text);await until(()=>window.document.querySelectorAll('.node[data-context=\"false\"]').length===2&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
+ window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>window.document.querySelectorAll('.node[data-context=\"false\"]').length===2&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
  return {window,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('a delayed native view cannot overwrite a newer scene navigation',async()=>{
@@ -290,4 +290,45 @@ test('neighbor disclosure counts prepared tiles rather than conflating offscreen
  const h=await harness({contextNeighbor:true}),d=h.document;assert.equal(d.getElementById('context-details').textContent,'Neighbors (1)');
  d.getElementById('context-details').click();assert.equal(d.getElementById('information-title').textContent,'Prepared neighborhood');
  assert.match(d.getElementById('information-text').textContent,/1 of 1 eligible one-hop neighbors prepared/);assert.match(d.getElementById('information-text').textContent,/real tile/);h.window.close();
+});
+
+
+test('landing does not start a model engine or load a project until the user chooses',async()=>{
+ const h=await harness({landingOnly:true}),d=h.document;
+ assert.equal(d.getElementById('landing').hidden,false);assert.equal(d.getElementById('stage').hidden,true);
+ assert.equal(d.querySelectorAll('#nodes .node').length,0);assert.equal(h.workerCount(),0);
+ assert.equal(d.getElementById('landing').getAttribute('aria-busy'),'false');
+ d.querySelector('[data-demo="flashlight"]').click();
+ await until(()=>d.querySelectorAll('#nodes .node').length===2&&!d.getElementById('stage').hidden);
+ d.getElementById('home').click();assert.equal(d.getElementById('landing').hidden,false);assert.equal(d.getElementById('stage').hidden,true);
+ d.getElementById('resume-model').click();assert.equal(d.getElementById('landing').hidden,true);h.window.close();
+});
+
+test('a plain SysML selection opens exploration without a manifest or authored story',async()=>{
+ const h=await harness({landingOnly:true}),d=h.document,input=d.getElementById('sysml-files'),bytes=new TextEncoder().encode('package Model {}');
+ Object.defineProperty(input,'files',{configurable:true,value:[{name:'model.sysml',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]});
+ input.dispatchEvent(new h.window.Event('change'));
+ await until(()=>!d.getElementById('stage').hidden&&d.getElementById('status').textContent.startsWith('OpenSysML WASM'));
+ assert.equal(d.getElementById('return').hidden,true);assert.equal(d.getElementById('narrative').hidden,true);assert.equal(d.querySelector('#nodes .node[data-semantic-id="Model"]')!==null,true);
+ assert.equal(d.getElementById('editor-error').textContent,'');h.window.close();
+});
+
+
+test('resuming the current model cancels an older demo fetch before native intake',async()=>{
+ const h=await harness(),d=h.document,fetch=h.window.fetch;let release;
+ h.window.fetch=async url=>String(url).includes('small.zip')?await new Promise(resolve=>{release=()=>resolve({ok:true,arrayBuffer:async()=>packProject({manifest:{...manifest,title:'Delayed replacement'},files}).buffer});}):fetch(url);
+ d.getElementById('home').click();d.querySelector('[data-demo="flashlight"]').click();await until(()=>!!release);d.getElementById('resume-model').click();release();
+ await new Promise(r=>setTimeout(r,40));assert.equal(d.title,'Fixture · Syspresent');assert.equal(d.getElementById('landing').hidden,true);h.window.close();
+});
+
+test('resuming the current model cancels an older file read before native intake',async()=>{
+ const h=await harness(),d=h.document,input=d.getElementById('sysml-files');let release;
+ Object.defineProperty(input,'files',{configurable:true,value:[{name:'replacement.sysml',size:20,arrayBuffer:()=>new Promise(resolve=>{release=()=>resolve(new TextEncoder().encode('package Model {}').buffer);})}]});
+ d.getElementById('home').click();input.dispatchEvent(new h.window.Event('change'));await until(()=>!!release);d.getElementById('resume-model').click();release();
+ await new Promise(r=>setTimeout(r,40));assert.equal(d.title,'Fixture · Syspresent');assert.equal(d.getElementById('landing').hidden,true);h.window.close();
+});
+
+
+test('Home ignores the hidden canvas resize instead of reporting a zero-size layout error',async()=>{
+ const h=await harness(),d=h.document;d.getElementById('home').click();h.resize(0,0);await new Promise(r=>setTimeout(r,140));assert.equal(d.getElementById('landing-error').hidden,true);assert.equal(d.getElementById('landing-error').textContent,'');h.window.close();
 });
