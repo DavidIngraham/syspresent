@@ -103,3 +103,50 @@ visible; interaction fragments are not locally invented.
 
 SV-017 remains inconclusive pending the broader acceptance procedure; automated
 regressions and browser inspection are software evidence, not reader acceptance.
+
+
+## Canvas story publishing (21 October 2026)
+
+SP-094 through SP-097 have local implementation evidence in `story-content.mjs`,
+`figure-view.mjs`, the scene controller and the native publication validator.
+`tests/canvas-story-content.test.mjs` covers exact identity and ambiguity,
+missing/unsafe assets, ZIP/Markdown fidelity, chapter consistency, safe prose,
+execution provenance, publication mismatch and image resource lifecycle.
+`tests/canvas-app.test.mjs` covers stationary link selection, hidden-context
+exploration/return, figure tabs/enlargement, contents/browser history, invalid-edit
+rollback, edited-project sharing and resizing during scene navigation.
+
+The full canvas/worker run passed 357 tests before the final navigation repair;
+the affected app/content run then passed 70 tests, including resize/URL and
+stale-link recovery regressions. Native parsing of all product specification sources passed. Native
+cache preparation and the static-site build passed against the updated Blue Dog
+source b94b6e0, using the existing native/WASM engine pin. Source file hashes and
+complete model ZIP round trips are checked by the Blue Dog fixture test.
+
+Real in-app Chromium checks at the default 1280-by-720 viewport and an explicit
+390-by-844 viewport inspected the course/rig figure regions, chapter navigation,
+figure enlargement, context-card expansion and model-versioned sharing links.
+Expanding context retained the prose panel rectangle and made its content
+scrollable. Native rig views were narrowed after the first phone inspection.
+These are responsive browser checks, not physical Safari or reader-study
+acceptance. SV-018 remains inconclusive pending its broader acceptance procedure.
+
+## Complete Blue Dog story (21 October 2026)
+
+The source now contains 31 scenes in 14 contiguous chapters, with three bundled
+figures. The complete canvas/worker suite passed 359 tests, and all five canvas
+publication-staging tests passed. Native parsing, story-reference validation,
+view rendering and static packaging passed. A native-cache audit confirmed that
+all 31 authored focus elements occur in their selected views and that each view
+contains at most eight nodes. The pinned Blue Dog source hashes remain unchanged
+from b94b6e0; only presentation views, narrative and assets were authored.
+
+In-app Chromium loaded the full story and its chapter selector. Desktop review
+covered a logical scenario, physical assembly and closing chapter. A 390-by-844
+viewport check covered the IC-01 input figure, region tabs and scrollable prose;
+the viewport was restored afterward. No browser errors were reported during
+these checks. This is responsive inspection, not physical-device acceptance.
+
+This validates the publication software and content bindings. No boat analysis
+was rerun and no physical verification, residual-risk acceptance or representative
+reader study is claimed by this publication.

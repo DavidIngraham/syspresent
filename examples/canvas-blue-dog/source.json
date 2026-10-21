@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/DavidIngraham/sv-blue-dog",
-  "revision": "b12b079855002466a8a95b54a5dba88e8ffc0611",
+  "revision": "b94b6e0231587b52cb5bec800dba408456ca701d",
   "files": [
     {
       "path": "models/README.md",
-      "sha256": "54f9c9133c9ad61e109eb603817d2244b2608370f2b55992cba975dc2e9334f2"
+      "sha256": "9db60cc779dd1fb20a59f2f3578f42b802c75568789b5400daad6a1e2cb0b509"
     },
     {
       "path": "models/analyses/actuation.sysml",
@@ -56,7 +56,7 @@
     },
     {
       "path": "models/analyses/integrated-candidate.sysml",
-      "sha256": "3ced89feaa63a914deef0e0d9b332410cbc157442c4e55b60c5741e4098d47c5"
+      "sha256": "9eab58e1ce9d4d79d57b6fe7c0740fda867ac4286c687f1786673a620c5f0c7b"
     },
     {
       "path": "models/analyses/location-traffic-risk.sysml",
@@ -153,6 +153,10 @@
     {
       "path": "models/configurations/energy.sysml",
       "sha256": "9a67f9f74fa51fb67f2749cf3b4e12615014f383b365a48043f3461999d6c7b8"
+    },
+    {
+      "path": "models/configurations/ic01.sysml",
+      "sha256": "0b953814697ff78defa9931de9c23813a23ca90eb1a2cd7121f4d755064a221f"
     },
     {
       "path": "models/configurations/operating.sysml",
@@ -296,55 +300,55 @@
     },
     {
       "path": "models/missions/transgorge.sysml",
-      "sha256": "812df8e4bc9344a0482db82b8f5c1e3a142be4b9981e711e46223c2930f34ad4"
+      "sha256": "57ca69fabdcf360c123713094876f7fe11789e9461986f02c6b74339b2f87143"
     },
     {
       "path": "models/missions/verification.sysml",
-      "sha256": "5ae5adaa114a172275767b534360413b2c4f0ba1c6519fe7a99dbd388de15795"
+      "sha256": "569f3a2725e31135054dd8f937da1beb9ed047a748456db9d69587ffc47e49f0"
     },
     {
       "path": "models/vehicle/allocations.sysml",
-      "sha256": "c0c86cf5b530124473d05428330306c69d15e292e8ad6442155f056fa256da3e"
+      "sha256": "f779f459f6e2e15fd786c42aa061e35b28fc76d0e82ab6fb70abe8b3c775a4a9"
     },
     {
       "path": "models/vehicle/architecture.sysml",
-      "sha256": "db1072bf54fd69621fd8b76e8e917da23fa24f4a49fbc81d6dd7583b89b80a93"
+      "sha256": "1a60afdd4ad1f8e76d83e0a179b36d9f277d4af2f29e682dd2dd9a161f8c0349"
     },
     {
       "path": "models/vehicle/decisions.sysml",
-      "sha256": "f2d3bfad908b0e1db99ba77b087a08b3b667c9b5cecf1c44e398aaee68ad76fd"
+      "sha256": "34d3a1300b2285eebf39236d2c6b929fd6599d8f428d3ab32e9a29da431e1076"
     },
     {
       "path": "models/vehicle/method.sysml",
-      "sha256": "7f10401543f1d2b0b3d1f087de449bccfb0cec2ee9f6d6d52384055b86d4b8b2"
+      "sha256": "9e825a3d7b867406d246d7adbce4e41be60ae3f26ef2950aeea1a7963fd4a934"
     },
     {
       "path": "models/vehicle/mission-logic.sysml",
-      "sha256": "9c3d92951d8714c8adb2efd84f9c77c5429193f6efdb31b187cfc708a733aa96"
+      "sha256": "58dff51cedf09ac7cea8d4b2b03032b3b60052833ede7f9e8ce567ce6865da23"
     },
     {
       "path": "models/vehicle/requirement-basis.sysml",
-      "sha256": "69393c8a8bbeaae65b1070bff35139262654c53c75aa8b6dac2fecdb0bb301bb"
+      "sha256": "ebc7926d8b2ea96f4a76da88210270987a2576215beb7d1c4daa7386342be0a9"
     },
     {
       "path": "models/vehicle/requirements.sysml",
-      "sha256": "096f1f03fad9f774f970cf3da5f6430cd5ed474486ed889e172813b4c84f7e7d"
+      "sha256": "53ccdd473d66090777742923d721a52351deaee799b08a49e05619bb94412503"
     },
     {
       "path": "models/vehicle/source-evidence.sysml",
-      "sha256": "ec459f03ea4da6e11541c07ac1638c930c42d83ac84081c84c8aaac7d464b6e3"
+      "sha256": "028ba4009dc681ed1cc3205d6f6385dba8062931303645fb1347030f6b84c8f6"
     },
     {
       "path": "models/vehicle/structure.sysml",
-      "sha256": "feda56513de7e79917f32f591aaf966a6ece1dc0ab2528b5aa747838325d70f2"
+      "sha256": "9256a63e0971f1ccd9173766c4e49bdc0f29f22b649c1043bb1831fdfe9a8a6d"
     },
     {
       "path": "models/vehicle/use-cases.sysml",
-      "sha256": "d64171edcdce1055d191e6baa2b5eb7a045505a4406c15f625c660f3909fa822"
+      "sha256": "a309fd7bb4c876ea09f62538ccef30849218eba87a8c282d30fb35057fb1902c"
     },
     {
       "path": "models/vehicle/verification.sysml",
-      "sha256": "c629a0275a7ff62aeeb6e92fde5a6917e088fcb6d694d2c66794de204ea7d8ea"
+      "sha256": "b66bdf139f5fafcf9161701287da082f5c192e5fe326e1aba93ff295982277e9"
     },
     {
       "path": "tools/publishing/reference.sysml",

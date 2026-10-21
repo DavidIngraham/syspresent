@@ -283,3 +283,34 @@ passed. Python tests passed (82 tests, one skipped). Independent review covered
 ranking, native scope/identity, projection bounds, comparison/history restoration,
 resize transitions and port count badges. Existing dependency-suite limitations
 recorded above remain unchanged.
+
+
+## Chaptered stories and supporting figures
+
+The canvas now supports named chapters, Contents, direct scene/chapter URLs,
+publication-version checks, bundled figure regions, model links in prose and
+model-linked context/evidence cards. See [the format and authoring guide](canvas-story-content.md)
+and [the local evidence record](requirements-evidence.md#canvas-story-publishing-21-october-2026).
+
+The default source snapshot is now sv-blue-dog b94b6e0: 86 model SysML files plus
+the publishing reference, the model README and authored views. The complete
+newcomer story now contains 31 scenes across 14 chapters, with course, rig and
+IC-01 input figures. The earlier source and feature counts above describe
+historical milestones. The flashlight example demonstrates prepared analysis
+provenance, without claiming a physical measurement.
+
+## Complete Blue Dog introduction
+
+The authored sequence covers the Gorge challenge; requirements and owner
+constraints; operating scenarios; logical responsibilities; traffic; recovery
+and capsize; sail and actuator trades; IC-01 and coupled sizing; structure and
+wet service; energy; physical equipment; supervisory policy; evidence and risk;
+and the qualification campaign. Every chapter has native model references.
+Chapter transitions permit an explicit view jump when no engineering route
+connects the selected endpoints; story order does not fabricate model links.
+
+The narrative distinguishes finite Gorge acceptance from future repeated/ocean
+operation, nominal inputs from measurements, logical scenarios from executable
+policy, and numerical closure from physical qualification. Older evidence keeps
+its own configuration and revision. Authoring did not modify the pinned Blue Dog
+model or execute a new boat-analysis campaign.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "syspresent.project.v2",
-  "title": "Blue Dog: river traffic and recovery",
+  "title": "Blue Dog: from the Gorge challenge to a defined boat",
   "navigation": {
     "roots": [
       "GorgeChallenge",
@@ -9,7 +9,12 @@
       "BlueDogMissionLogic",
       "BlueDogRequirementVerification",
       "BlueDogMethod",
-      "BlueDogSatisfaction"
+      "BlueDogSatisfaction",
+      "BlueDogLogicalArchitecture",
+      "BlueDogPhysicalArchitecture",
+      "BlueDogIC01",
+      "BlueDogSailTrade",
+      "BlueDogDesignDecisions"
     ]
   }
 }

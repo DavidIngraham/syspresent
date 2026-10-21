@@ -1,6 +1,8 @@
 package BlueDogStructure {
     private import ScalarValues::*;
     private import RequirementDerivation::*;
+    private import ModelingMetadata::refinement;
+    private import SI::*;
     doc /* Owner-selected FDM plus wet-layup construction. Acceptance uses qualified material evidence and validated load/functional envelopes.
      * Provisional numerical screening values live in BlueDogStructuralBasis. */
     requirement def <'T-001'> HybridConstruction {
@@ -10,14 +12,14 @@ package BlueDogStructure {
         metadata rationale : ModelingMetadata::Rationale { text = "Owner-selected construction architecture. PETG is the initial candidate, not a qualified material."; }
     }
     requirement hybridConstruction : HybridConstruction;
-    dependency basisHybridConstruction from hybridConstruction to BlueDog::DesignIntent { metadata rationale : ModelingMetadata::Rationale { text = "Selected design allocation; the numerical value is not logically implied by the parent requirement."; } }
+    dependency basisHybridConstruction from hybridConstruction to BlueDog::DesignIntent { metadata rationale : ModelingMetadata::Rationale { text = "The owner constrains the shell construction process independently of mission performance."; } }
     requirement def <'T-100'> StructuralIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The primary structure shall carry its declared limit loads throughout the specified wet exposure. */
         comment conditions /* Apply T-101 through T-109 independently. Current screening allocations do not cover impact, fatigue, buckling or qualified adhesive strength. */
     }
     requirement structuralIntegrity : StructuralIntegrity;
-    dependency structuralBasis from structuralIntegrity to BlueDogRequirements::wetMechanicalIntegrity;
+    dependency structuralBasis from structuralIntegrity to BlueDogRequirements::wetMechanicalIntegrity { metadata rationale : ModelingMetadata::Rationale { text = "Changes to wet exposure and joint integrity require review of structural loads, material bounds and test evidence."; } }
     requirement def <'T-101'> BendingStrength {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each primary structural member shall retain nonnegative bending-strength margin under the applicable limit-load cases. */
@@ -119,7 +121,7 @@ package BlueDogStructure {
         require constraint acceptance { caseCoverageAccepted and minimumOpeningClearanceM > 0 }
     }
     requirement loadedFreeboard : LoadedFreeboard;
-    dependency basisLoadedFreeboard from loadedFreeboard to BlueDogRequirements::stabilityAndFouling { metadata rationale : ModelingMetadata::Rationale { text = "Selected design allocation; the numerical value is not logically implied by the parent requirement."; } }
+    dependency basisLoadedFreeboard from loadedFreeboard to BlueDogRequirements::stabilityAndFouling { metadata rationale : ModelingMetadata::Rationale { text = "The selected intact operating cases determine downflooding clearances; a sealed deck edge is not an opening."; } }
     requirement def <'T-111'> ReserveBuoyancy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall retain sufficient buoyancy to support its loaded weight throughout the applicable casualty-flotation cases. */
@@ -130,8 +132,8 @@ package BlueDogStructure {
         require constraint acceptance { caseCoverageAccepted and loadedWeightN > 0 and availableBuoyancyN >= loadedWeightN }
     }
     requirement reserveBuoyancy : ReserveBuoyancy;
-    dependency flotationPurpose from reserveBuoyancy to GorgeChallenge::casualtyFlotation;
-    dependency basisReserveBuoyancy from reserveBuoyancy to BlueDogRequirements::stabilityAndFouling { metadata rationale : ModelingMetadata::Rationale { text = "Selected design allocation; the numerical value is not logically implied by the parent requirement."; } }
+    dependency flotationPurpose from reserveBuoyancy to GorgeChallenge::casualtyFlotation { metadata rationale : ModelingMetadata::Rationale { text = "Buoyancy assessment supports casualty flotation but does not establish damage stability, retained components or safe retrieval. Changes to casualty cases require a new assessment."; } }
+    dependency basisReserveBuoyancy from reserveBuoyancy to BlueDogRequirements::stabilityAndFouling { metadata rationale : ModelingMetadata::Rationale { text = "Capsize and flooding cases drive the required buoyancy assessment; intact reserve-volume screens do not establish casualty flotation."; } }
     requirement def <'T-112'> LaunchClearance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The loaded vessel shall retain the site-qualified bottom clearance throughout the selected launch and retrieval paths. */
@@ -143,7 +145,7 @@ package BlueDogStructure {
         require constraint acceptance { siteEvidenceAccepted and immersedDepthM > 0 and requiredClearanceM > 0 and availableDepthM - immersedDepthM >= requiredClearanceM }
     }
     requirement launchClearance : LaunchClearance;
-    dependency basisLaunchClearance from launchClearance to BlueDogRequirements::soloLaunch { metadata rationale : ModelingMetadata::Rationale { text = "Selected design allocation; the numerical value is not logically implied by the parent requirement."; } }
+    dependency basisLaunchClearance from launchClearance to BlueDogRequirements::soloLaunch { metadata rationale : ModelingMetadata::Rationale { text = "The launch concept determines site and appendage clearances; actual surveyed paths must support the one-person launch claim."; } }
     requirement def <'T-113'> PrintTileEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each structural tile shall fit the 250 mm cubic print-job envelope in its selected build configuration. */
@@ -152,10 +154,10 @@ package BlueDogStructure {
         attribute jobYM : Real;
         attribute jobZM : Real;
         attribute slicerEvidenceAccepted : Boolean;
-        require constraint acceptance { slicerEvidenceAccepted and jobXM > 0 and jobYM > 0 and jobZM > 0 and jobXM <= 0.25 and jobYM <= 0.25 and jobZM <= 0.25 }
+        require constraint acceptance { slicerEvidenceAccepted and BlueDogRequirements::PrintJobEnvelopeCriterion(jobXM * 1 [m], jobYM * 1 [m], jobZM * 1 [m], BlueDogRequirements::printBuildLimit) }
     }
     requirement printTileEnvelope : PrintTileEnvelope;
-    dependency basisPrintTileEnvelope from printTileEnvelope to BlueDogRequirements::desktopManufacture { metadata rationale : ModelingMetadata::Rationale { text = "Selected design allocation; the numerical value is not logically implied by the parent requirement."; } }
+    #refinement dependency basisPrintTileEnvelope from printTileEnvelope to BlueDogRequirements::desktopManufacture { metadata rationale : ModelingMetadata::Rationale { text = "Applies the same owner print-job envelope to structural tiles with accepted slicer evidence. The native system predicate supplies the common dimensional bounds."; } }
     // Compatibility projection for numerical adapters; authority is the analysis basis.
     analysis def MaterialInputs :> BlueDogStructuralBasis::Inputs;
     analysis material : MaterialInputs;
@@ -163,7 +165,7 @@ package BlueDogStructure {
 
 
 
-    dependency materialSource from MaterialInputs to hybridConstruction;
+    dependency materialSource from MaterialInputs to hybridConstruction { metadata rationale : ModelingMetadata::Rationale { text = "Material input assumptions depend on the owner construction concept; a process change requires new property evidence and analysis inputs."; } }
     satisfy hybridConstruction by BlueDog::Architecture::missionContext.boat.hullAndRig.printedHull;
     satisfy bendingStrength by BlueDog::Architecture::missionContext.boat.hullAndRig;
     satisfy appendageDeflection by BlueDog::Architecture::missionContext.boat.hullAndRig;

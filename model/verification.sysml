@@ -179,4 +179,14 @@ package SyspresentVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def <'SV-018'> storyPublishing {
+        doc /* Round-trip chapters, figure bytes, evidence metadata and native links through Markdown/ZIP. Reject missing assets, unsafe paths, unresolved/ambiguous model targets, conflicting chapters and incomplete run context. Exercise direct links, publication mismatch, contents, browser history and edited-project sharing. Confirm stationary semantic selection, hidden-target disclosure, explicit exploration/return, figure enlargement and narrow-screen tabs. Inspect desktop/mobile layout and assess representative-reader comprehension separately. */
+        objective acceptance {
+            verify SyspresentRequirements::StoryPublishing::chapterNavigation;
+            verify SyspresentRequirements::StoryPublishing::figureRegions;
+            verify SyspresentRequirements::StoryPublishing::narrativeLinks;
+            verify SyspresentRequirements::StoryPublishing::contextualEvidence;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
 }

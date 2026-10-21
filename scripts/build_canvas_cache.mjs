@@ -4,6 +4,7 @@ import {resolve,join,dirname} from 'node:path';
 import {documentsFor,parseStory,fileText,requirementCoverageSource} from '../src/canvas-prototype/project.mjs';
 import {discoverNativeIndex} from '../src/canvas-prototype/native-project.mjs';
 import {readProjectDirectory,documentDigest} from './canvas_project_files.mjs';
+import {validateProjectStory} from './canvas_story_validation.mjs';
 const args=process.argv.slice(2),option=(name,fallback)=>args.includes(name)?args[args.indexOf(name)+1]:fallback;
 const projectRoot=resolve(option('--project','examples/canvas-blue-dog')),output=resolve(option('--output','build/canvas-prototype/runtime-cache.json'));
 const project=await readProjectDirectory(projectRoot),manifest=project.manifest,sources=documentsFor(project);
@@ -26,6 +27,7 @@ try{
  const parsed=await call('ParseSources',{documents});
  if((parsed.diagnostics??[]).some(d=>String(d.severity).toLowerCase().includes('error')))throw Error('Native model has errors: '+JSON.stringify(parsed.diagnostics));
  const exported=await call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
+ await validateProjectStory(project,{exported});
  const provenance=JSON.parse(await readFile(resolve(option('--provenance','build/canvas-prototype/engine/provenance.json')),'utf8'));
  const render=view=>call('RenderView',{modelHash:parsed.modelHash,view,includeSemanticIdentity:true});
  const coverage=requirementSeeds.length?await render(runtimePackage+'::coverage'):{kind:'definition',nodes:[],edges:[]},scenes=parseStory(fileText(project,manifest.story)),views={};

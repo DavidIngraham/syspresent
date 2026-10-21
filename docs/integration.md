@@ -215,3 +215,13 @@ activates the primary region; Back restores any former comparison and selected t
 Authored scenes keep their membership and entry precedence. Prominence is a
 presentation heuristic, never a safety, verification or engineering-criticality
 judgment. Native links absent from the loaded projection cannot influence ranking.
+
+
+## Canvas story publishing
+
+Chapters, bundled figure regions, native prose links and contextual evidence cards
+are documented in [canvas story content](canvas-story-content.md). The native view
+remains the primary scene; figures share responsive region layout. Shared demo
+links check the publication archive digest and native model identity. Authored
+evidence categories never become native verdicts. Build and browser validation
+resolve references using native declarations and preserve source/asset bytes.

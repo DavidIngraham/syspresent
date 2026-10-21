@@ -1,4 +1,6 @@
 import {showLanding} from './landing.mjs';
+import {validateStoryContent,renderMarkdown,renderContext,chapterGroups,sceneFromURL,sceneURL,checkSharedModel} from './story-content.mjs';
+import {createAssetURLs,mountFigure} from './figure-view.mjs';
 import {loadReaderSettings,saveReaderSettings,compartmentVisible} from './reader-settings.mjs';
 import {connectionPath} from './routing-style.mjs';
 import {rendererFamily,supportsView,representedIdentities} from './view-contract.mjs';
@@ -42,8 +44,6 @@ const qname=id=>element(id)?.qualifiedName;
 const scene=()=>state.scenes[state.sceneIndex];
 function scopeIds(){const roots=state.project.manifest.systemOfInterest;return state.graph.elements.filter(e=>roots.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);}
 function status(text){$('status').textContent=text;$('loading-phase').textContent=text;if(!$('landing').hidden)$('landing-status').textContent=text;}
-function inline(parent,text){let start=0;for(const m of text.matchAll(/\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g)){parent.append(document.createTextNode(text.slice(start,m.index)));parent.append(el(m[1]?'strong':m[2]?'code':'em',m[1]??m[2]??m[3]));start=m.index+m[0].length;}parent.append(document.createTextNode(text.slice(start)));}
-function markdown(text){const host=el('div');let paragraph=[],list;const flush=()=>{if(paragraph.length){const p=el('p');inline(p,paragraph.join(' '));host.append(p);paragraph=[];}list=null;};for(const line of text.split('\n')){const heading=/^(#{1,6})\s+(.+)$/.exec(line),item=/^[-*]\s+(.+)$/.exec(line);if(heading){flush();host.append(el('h'+Math.min(6,Number(heading[1].length)+1),heading[2]));}else if(item){if(paragraph.length)flush();if(!list){list=el('ul');host.append(list);}const li=el('li');inline(li,item[1]);list.append(li);}else if(!line.trim())flush();else paragraph.push(line);}flush();return host;}
 let engineReady, demoCatalog;
 async function ensureEngine(){
  if(engineReady)return engineReady;
@@ -60,9 +60,9 @@ async function demos(){
  const seen=new Set();for(const item of catalog.demos){if(typeof item.id!=='string'||!item.id||seen.has(item.id)||typeof item.title!=='string')throw Error('Invalid demo catalog');seen.add(item.id);projectPath(item.project);}
  demoCatalog=catalog.demos;return demoCatalog;
 }
-async function openDemo(id){
+async function openDemo(id,{readURL=false}={}){
  const request=++state.loadRevision;++state.revision;busy(true);$('landing-error').hidden=true;status('Opening demo…');
- try{const demo=(await demos()).find(item=>item.id===id);if(!demo)throw Error('Demo not found: '+id);const response=await fetch('./'+demo.project+'?v='+buildVersion);if(!response.ok)throw Error('Demo files are unavailable.');const bytes=new Uint8Array(await response.arrayBuffer());if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:demo.runtimeCacheHash,loadToken:request});}
+ try{const demo=(await demos()).find(item=>item.id===id);if(!demo)throw Error('Demo not found: '+id);const response=await fetch('./'+demo.project+'?v='+buildVersion);if(!response.ok)throw Error('Demo files are unavailable.');const bytes=new Uint8Array(await response.arrayBuffer());if(demo.publication){const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');if(digest!==demo.publication)throw Error('Published project bytes do not match the catalog snapshot. Reload the publication.');}if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:demo.runtimeCacheHash,loadToken:request,publication:demo.publication,demo:id,readURL});}
  catch(error){if(request===state.loadRevision)throw error;}finally{if(request===state.loadRevision)busy(false);}
 }
 function home(){++state.loadRevision;++state.revision;cancelAnimations();$('project-menu').open=false;$('selection').hidden=true;$('find').hidden=true;for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();busy(false);showLanding(document,true);$('landing-status').textContent='';$('landing-error').hidden=true;$('resume-model').hidden=!state.view;document.title='Syspresent';}
@@ -101,8 +101,9 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=status
  for(const [sceneIndex,item] of scenes.entries()){resolvePresentation(item.presentation,{resolve:byName});if(item.journey?.length&&(byName(item.journey.at(-1))!==byName(item.focus)||(sceneIndex>0&&byName(item.journey[0])!==byName(scenes[sceneIndex-1].focus))))throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);if(!views.has(item.view))throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);if(!byName(item.focus))throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);for(let i=1;i<(item.journey??[]).length;i++){const from=byName(item.journey[i-1]),to=byName(item.journey[i]);if(!from||!to||!findEngineeringRoute(graph,{from,to,maxHops:1}).found&&!findHierarchyRoute(graph,{from,to,maxHops:1}).found)throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);}}
  const scoped=graph.elements.filter(e=>project.manifest.systemOfInterest.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);
  for(const item of scenes)for(const region of item.regions??[])if(region.focus&&!byName(region.focus))throw Error(`Scene ${item.id}: region ${region.id} focus does not resolve`);
- for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
+ for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found&&!b.allowDisconnected)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
  if(m.entryFocus&&!byName(m.entryFocus))throw Error('Starting element does not resolve: '+m.entryFocus);
+ validateStoryContent(scenes,{files:project.files,pathFor:projectPath,resolve:byName});
  return {project,modelHash:parsed.modelHash,exported,graph,views,scenes,coverage,availableViews};
 }
 let rankingScope;
@@ -112,28 +113,33 @@ function prominenceScope(){
  return rankingScope.ids;
 }
 function busy(value){$('landing').setAttribute('aria-busy',String(value));for(const control of $('landing').querySelectorAll('button:not(#resume-model)'))control.disabled=value;$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','system-overview','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
-async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken}={}){
+async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,demo=null,publication=null,readURL=false}={}){
  const revision=loadToken??++state.loadRevision;if(revision!==state.loadRevision)return;++state.revision;$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
  let compiled;try{await ensureEngine();if(revision!==state.loadRevision)return;compiled=await compile(validateProject(project),{cacheHash,progress:text=>{if(revision===state.loadRevision)status(text);}});}catch(error){if(revision!==state.loadRevision)return;busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision)return;
- disposeSurfaces();Object.assign(state,compiled,{sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});
+ let initialScene=0;try{if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){busy(false);throw error;}
+ disposeSurfaces();state.assetURLs?.destroy();$('narrative').removeAttribute('data-scene-id');Object.assign(state,compiled,{demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.assetURLs=createAssetURLs(project.files);
  state.trustedCacheHash=cacheHash??null;showLanding(document,false);document.title=project.manifest.title+' · Syspresent';$('resume-model').hidden=false;busy(false);updateLists();$('editor-error').textContent='';$('project-menu').open=false;
- if(state.scenes.length)await showScene(0,false);else if(project.manifest.entryView||project.manifest.entryFocus){state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}else await openSystemOverview({record:false});
+ if(state.scenes.length)await showScene(initialScene,false,{urlMode:'replace'});else if(project.manifest.entryView||project.manifest.entryFocus){state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}else await openSystemOverview({record:false});
  status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
  $('boundary').textContent=project.manifest.publication.scope==='scoped'?'Scoped publication · traversal stays within supplied model':'Complete project · standalone exploration available';
 }
 function updateLists(){
- $('scenes').replaceChildren();for(const [i,s]of state.scenes.entries()){const option=el('option',`${i+1}. ${s.title}`);option.value=i;$('scenes').append(option);}
+ $('scenes').replaceChildren();for(const group of chapterGroups(state.scenes)){const host=group.id?el('optgroup'):$('scenes');if(group.id){host.label=group.title;$('scenes').append(host);}for(const {scene:s,index:i}of group.scenes){const option=el('option',`${i+1}. ${s.title}`);option.value=i;host.append(option);}}
+ $('contents').disabled=!state.scenes.length;$('share-scene').disabled=!state.scenes.length;
  $('views').replaceChildren();for(const name of state.availableViews){const option=el('option',name);option.value=name;$('views').append(option);}
  $('view-file').replaceChildren();for(const name of state.project.manifest.viewSources){const option=el('option',name);option.value=name;$('view-file').append(option);}
 }
 function panelGeometry(view=state.view){
- const panel=$('narrative'),stage=$('stage');if(state.exploring||!scene()){panel.hidden=true;return [];}
- panel.hidden=false;panel.replaceChildren(el('div',`Scene ${state.sceneIndex+1} of ${state.scenes.length}`,'scene-count'),el('h2',scene().title),markdown(scene().markdown));
+ const panel=$('narrative'),stage=$('stage');if(panel.dataset.sceneId&&!panel.hidden){state.narrativeState??={};state.narrativeState[panel.dataset.sceneId]={open:[...panel.querySelectorAll('details')].map(d=>d.open),scrollTop:panel.scrollTop};}if(state.exploring||!scene()){panel.hidden=true;return [];}
+ const group=chapterGroups(state.scenes).find(g=>g.scenes.some(s=>s.index===state.sceneIndex)),position=group?.scenes.findIndex(s=>s.index===state.sceneIndex)??0;
+ const progress=scene().chapter?`${scene().chapter.title} · ${position+1} of ${group.scenes.length} · Scene ${state.sceneIndex+1} of ${state.scenes.length}`:`Scene ${state.sceneIndex+1} of ${state.scenes.length}`;
+ const options={resolve,onSelect:selectNarrative,labelFor:label};
+ panel.hidden=false;panel.replaceChildren(el('div',progress,'scene-count'),el('h2',scene().title),renderMarkdown(document,scene().markdown,options),renderContext(document,scene().context,options));panel.dataset.sceneId=scene().id;const savedNarrative=state.narrativeState?.[scene().id];if(savedNarrative)for(const [i,detail]of [...panel.querySelectorAll('details')].entries())detail.open=savedNarrative.open[i]??false;
  const width=stage.clientWidth,height=stage.clientHeight,narrow=width<700,placement=narrow?'bottom':scene().panel?.placement??'right';
  panel.style.cssText='';panel.style.width=(narrow?width-24:Math.min(390,Math.max(280,width*.3)))+'px';
  if(placement==='bottom'){panel.style.width=width-24+'px';panel.style.left='12px';panel.style.bottom='58px';panel.style.maxHeight=(narrow?Math.max(140,Math.min(height*(height<560&&(view?.nodes.length??0)>3 ? .30 : .42),height-260)):Math.max(140,height*.25))+'px';}
  else {panel.style.top='16px';panel.style[placement==='left'?'left':'right']='16px';panel.style.maxHeight=Math.max(140,height-90)+'px';}
- const a=panel.getBoundingClientRect(),b=stage.getBoundingClientRect();return [{id:'narrative',x:a.x-b.x,y:a.y-b.y,width:a.width,height:a.height}];
+ const a=panel.getBoundingClientRect(),b=stage.getBoundingClientRect();panel.style.height=a.height+'px';panel.scrollTop=savedNarrative?.scrollTop??0;return [{id:'narrative',x:a.x-b.x,y:a.y-b.y,width:a.width,height:a.height}];
 }
 function sizeView(view,focus,{compact=false}={}){return {...view,nodes:view.nodes.map(n=>{
  const preferences=displayPreferences(),expanded=compartmentVisible(n,{mode:state.reader.compartments,focus,expanded:state.expanded,collapsed:state.collapsed}),documentation=documentationFor(state.graph,n.semanticId);
@@ -280,8 +286,9 @@ async function paintFrames(frames,{duration=0,caption='',outgoingPanel,cameraTar
 async function frame(view,caption='',duration=0,focus=state.focus){if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;return transitionTo(pending.view,pending.focus,{animate:false,allowDisconnected:true,journey:pending.journey,camera:pending.cameraRevision===state.cameraRevision?pending.camera:state.camera});}const revision=++state.revision;saveSurfaces();disposeSurfaces();const panels=panelGeometry(view);if(rendererFamily(view)!=='graph'){await renderSurfaces(view,focus,panels,revision);return;}const destination=await prepareFrame(view,focus,panels),previous=state.visualSnapshot;if(revision!==state.revision)return;const result=await paintFrames(duration&&previous?[previous,destination]:[destination],{duration,caption});if(!result?.cancelled&&revision===state.revision)await renderSurfaces(view,focus,panels,revision);return result;}
 
 function sceneRegions(view=state.view){
- const regions=[{id:'primary',view,focus:state.focus,title:view?.title||'Primary view'}];
+ const regions=[{id:'primary',view,focus:state.focus,title:'Model'}];
  if(!state.exploring)for(const r of scene()?.regions??[])regions.push({...r,view:state.views.get(r.view),focus:resolve(r.focus??scene().focus)});
+ if(!state.exploring)for(const figure of scene()?.figures??[])regions.push({id:figure.id,title:figure.title,figure,view:{id:'figure:'+figure.id,title:figure.title,kind:'figure'}});
  if(state.comparison)regions.push({...state.comparison,id:'comparison'});
  return regions.filter(r=>r.view);
 }
@@ -323,8 +330,8 @@ async function renderSurfaces(view,focus,panels,revision){
   if(!region.visible||region.id==='primary'&&rendererFamily(region.view)==='graph')continue;
   const host=el('section',undefined,'view-region');host.setAttribute('aria-label',region.title||region.view.title);host.dataset.regionId=region.id;
   const r=region.area;host.style.cssText=`left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px`;$('view-regions').append(host);
-  const key=region.id+':'+region.view.id,family=rendererFamily(region.view),options={state:structuredClone(state.surfaceStates[key]??{}),selectedId:state.selected,selectedIds:[...state.selectedIds],labelFor:label,onSelect:selection=>selectSurface(selection,key),onExplore:selection=>exploreSurface(selection).catch(report),onStateChange:value=>{if(revision===state.revision)state.surfaceStates[key]=structuredClone(value);}};
-  const controller=await(family==='grid'?mountGrid(host,region.view,options):family==='sequence'?mountSequence(host,region.view,options):mountGraphRegion(host,sizeView(region.view,region.focus??focus),{...options,elk:state.layoutEngine,routing:state.reader.routing,measureLabel:labelSize}));
+  const key=region.id+':'+region.view.id,family=region.figure?'figure':rendererFamily(region.view),options={state:structuredClone(state.surfaceStates[key]??{}),selectedId:state.selected,selectedIds:[...state.selectedIds],labelFor:label,onSelect:selection=>selectSurface(selection,key),onExplore:selection=>exploreSurface(selection).catch(report),onStateChange:value=>{if(revision===state.revision)state.surfaceStates[key]=structuredClone(value);}};
+  const controller=await(family==='figure'?mountFigure(host,region.figure,{...options,resolve,onSelect:selectNarrative,assetURL:path=>state.assetURLs.get(path),onEnlarge:enlargeFigure}):family==='grid'?mountGrid(host,region.view,options):family==='sequence'?mountSequence(host,region.view,options):mountGraphRegion(host,sizeView(region.view,region.focus??focus),{...options,elk:state.layoutEngine,routing:state.reader.routing,measureLabel:labelSize}));
   if(revision!==state.revision){controller.destroy();host.remove();return;}
   if(family==='graph'||JSON.stringify(options.selectedIds)!==JSON.stringify(state.selectedIds))controller.selectMany?.(state.selectedIds);
   state.surfaces.push({id:region.id,key,family,controller,area:r});
@@ -378,13 +385,45 @@ async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=f
  $('boundary').textContent=!scopeIds().includes(focus)?'Outside presentation boundary · loaded model context':state.project.manifest.publication.scope==='scoped'?'Scoped publication · supplied model context only':'Complete project · standalone exploration available';
  }finally{oldPanel?.remove();if(revision===state.revision){state.transitioning=false;$('stage').setAttribute('aria-busy','false');state.pendingDestination=null;}}
 }
-async function showScene(index,animate=true,{record=false}={}){
+async function showScene(index,animate=true,{record=false,urlMode='push'}={}){
  if(index<0||index>=state.scenes.length)return;
- const saved=snapshot(),savedHistory=[...state.history],savedFuture=[...state.future];
+ const saved=snapshot(),savedHistory=[...state.history],savedFuture=[...state.future],savedURL=location.href;
  if(record)remember();state.sceneIndex=index;state.exploring=false;state.neighborhoodBudget=null;state.traceRequest=null;state.traceInfo=null;state.comparison=null;state.activeRegion='primary';state.presentation=structuredClone(state.scenes[index].presentation??{});state.expanded=new Set();state.collapsed=new Set();updateExplorationControls();const s=scene();const focus=resolve(s.focus),view=state.views.get(s.view);
- let navigationRevision;try{if(!focus||!view)throw Error('Scene focus or native view is unavailable');const pending=transitionTo(view,focus,{animate,journey:s.journey,allowDisconnected:true});navigationRevision=state.revision;await pending;}
- catch(error){if(navigationRevision!==undefined&&navigationRevision!==state.revision)return;state.history=savedHistory;state.future=savedFuture;restoreValues(saved);if(saved.view)await transitionTo(saved.view,saved.focus,{animate:false,allowDisconnected:true,camera:saved.camera});throw error;}
+ let navigationRevision;try{if(!focus||!view)throw Error('Scene focus or native view is unavailable');syncSceneURL(urlMode);const pending=transitionTo(view,focus,{animate,journey:s.journey,allowDisconnected:true});navigationRevision=state.revision;await pending;}
+ catch(error){if(navigationRevision!==undefined&&navigationRevision!==state.revision)return;state.history=savedHistory;state.future=savedFuture;restoreValues(saved);if(urlMode!=='none')history.replaceState(null,'',savedURL);if(saved.view)await transitionTo(saved.view,saved.focus,{animate:false,allowDisconnected:true,camera:saved.camera});throw error;}
  finally{updateExplorationControls();$('scenes').value=state.sceneIndex;$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;$('return').hidden=!state.exploring||!state.scenes.length;$('standalone').hidden=state.exploring;}
+}
+function syncSceneURL(mode='replace'){
+ if(!state.demo||!scene()||mode==='none')return;
+ const url=sceneURL(location.href,{scene:scene().id,modelHash:state.modelHash,demo:state.demo,publication:state.publication});
+ if(url!==location.href)history[mode==='push'?'pushState':'replaceState'](null,'',url);
+}
+function selectNarrative(id){
+ select(id);
+ const represented=sceneRegions().some(r=>!r.figure&&representedIdentities(r.view).includes(id));
+ if(!represented)$('selection').append(el('p','This element is loaded but outside the displayed views. Choose Focus to explore it.','projection-note'));
+ else if($('graph-viewport').hidden&&rendererFamily(state.view)==='graph'&&representedIdentities(state.view).includes(id))$('selection').append(button('Show model view',async()=>{saveSurfaces();state.activeRegion='primary';await frame(state.view);}));
+}
+function enlargeFigure(figure){
+ $('figure-title').textContent=figure.title;
+ mountFigure($('figure-detail'),figure,{assetURL:path=>state.assetURLs.get(path),resolve,onSelect:id=>{$('figure-dialog').close();selectNarrative(id);},labelFor:label});
+ $('figure-dialog').showModal();
+}
+function openContents(){
+ const body=$('contents-list');body.replaceChildren();
+ for(const group of chapterGroups(state.scenes)){const section=el('section');section.append(el('h3',group.title));const list=el('ol');for(const {scene:s,index}of group.scenes){const item=el('li'),link=el(state.demo?'a':'button',s.title);if(state.demo)link.href=sceneURL(location.href,{scene:s.id,modelHash:state.modelHash,demo:state.demo,publication:state.publication});if(index===state.sceneIndex)link.setAttribute('aria-current','step');link.onclick=e=>{if(state.demo&&(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey))return;e.preventDefault();$('contents-dialog').close();showScene(index).catch(report);};item.append(link);list.append(item);}section.append(list);body.append(section);}
+ $('contents-dialog').showModal();
+}
+function shareScene(){
+ $('share-note').textContent=state.demo?'This link opens this scene and checks the model version. Keep the original publication URL when sharing a frozen review.':'This local project has no published URL. Export its project ZIP to share the story, model and figures together.';
+ $('share-url').hidden=!state.demo;$('copy-scene-link').hidden=!state.demo;
+ if(state.demo)$('share-url').value=sceneURL(location.href,{scene:scene().id,modelHash:state.modelHash,demo:state.demo,publication:state.publication});
+ $('share-dialog').showModal();if(state.demo)$('share-url').select();
+}
+function editorStoryContent(){
+ const id=$('chapter-id').value.trim(),title=$('chapter-title').value.trim();
+ if(!!id!==!!title)throw Error('Chapter ID and title must be supplied together');
+ return {chapter:id?{id,title}:undefined,figures:JSON.parse($('scene-figures').value||'[]'),context:JSON.parse($('scene-context').value||'[]')};
 }
 function displayPreferences(){return {...resolvePresentation(state.presentation,{width:$('stage').clientWidth,resolve}),compartments:({all:'expanded',none:'compact',focused:'auto'})[state.reader.compartments]};}
 function snapshot(){saveSurfaces();return {view:state.pendingDestination?.view??state.view,focus:state.pendingDestination?.focus??state.focus,sceneIndex:state.sceneIndex,exploring:state.exploring,selected:state.selected,selectedIds:[...state.selectedIds],expanded:[...state.expanded],collapsed:[...state.collapsed],presentation:structuredClone(state.presentation),traceRequest:structuredClone(state.traceRequest),traceInfo:structuredClone(state.traceInfo??null),camera:{...state.camera},neighborhoodBudget:state.neighborhoodBudget,surfaceStates:structuredClone(state.surfaceStates),comparison:state.comparison,activeRegion:state.activeRegion};}
@@ -454,7 +493,7 @@ function traceEdge(edge,key){
 }
 function download(name,bytes,type){const blob=new Blob([bytes],{type}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
 function editorPresentation(){const config={compartments:$('presentation-compartments').value,expanded:$('presentation-expanded').value.split('\n').map(s=>s.trim()).filter(Boolean),emphasis:[...$('presentation-emphasis').selectedOptions].map(o=>o.value),grouping:$('presentation-grouping').value};if($('presentation-context').value!=='')config.contextBudget=Number($('presentation-context').value);resolvePresentation(config,{resolve});return validatePresentation(config);}
-function openEditor(){if(!state.project)return;$('scene-regions').value=(scene()?.regions??[]).map(r=>r.view).join('\n');$('scene-title').value=scene()?.title||'New scene';$('scene-prose').value=scene()?.markdown||'';$('panel-placement').value=scene()?.panel?.placement||'right';$('view-source').value=fileText(state.project,$('view-file').value);const p=validatePresentation(scene()?.presentation);$('presentation-compartments').value=p.compartments;$('presentation-expanded').value=p.expanded.join('\n');for(const o of [...$('presentation-emphasis').options])o.selected=p.emphasis.includes(o.value);$('presentation-context').value=p.contextBudget??'';$('presentation-grouping').value=p.grouping;$('editor-error').textContent='';$('editor').showModal();}
+function openEditor(){if(!state.project)return;$('chapter-id').value=scene()?.chapter?.id??'';$('chapter-title').value=scene()?.chapter?.title??'';$('scene-figures').value=JSON.stringify(scene()?.figures??[],null,2);$('scene-context').value=JSON.stringify(scene()?.context??[],null,2);$('scene-regions').value=(scene()?.regions??[]).map(r=>r.view).join('\n');$('scene-title').value=scene()?.title||'New scene';$('scene-prose').value=scene()?.markdown||'';$('panel-placement').value=scene()?.panel?.placement||'right';$('view-source').value=fileText(state.project,$('view-file').value);const p=validatePresentation(scene()?.presentation);$('presentation-compartments').value=p.compartments;$('presentation-expanded').value=p.expanded.join('\n');for(const o of [...$('presentation-emphasis').options])o.selected=p.emphasis.includes(o.value);$('presentation-context').value=p.contextBudget??'';$('presentation-grouping').value=p.grouping;$('editor-error').textContent='';$('editor').showModal();}
 async function capture(){
  if(!state.view)throw Error('Open a view before capturing a scene');let viewName=state.view.id;
  const project=structuredClone(state.project),number=state.scenes.length+1;
@@ -478,6 +517,11 @@ function omissionDisclosure(omissions,overview){
  return heading+'\n\n'+omissions.slice(0,100).map(contextNotice).join('\n')+(omissions.length>100?`\n\nShowing 100 of ${omissions.length} omitted records. Use Find to locate another named model element.`:'');
 }
 function bind(){
+ $('contents').onclick=openContents;$('share-scene').onclick=shareScene;
+ $('copy-scene-link').onclick=async()=>{try{await navigator.clipboard.writeText($('share-url').value);$('share-note').textContent='Scene link copied.';}catch{$('share-url').focus();$('share-url').select();$('share-note').textContent='Select and copy the scene link below.';}};
+ const navigateURL=()=>{if(!state.project||!state.demo)return;const demo=new URLSearchParams(location.search).get('demo');if(demo!==state.demo){if(demo)openDemo(demo,{readURL:true}).catch(report);else home();return;}try{checkSharedModel(location.href,state.modelHash,state.publication);const index=sceneFromURL(location.href,state.scenes);if(index!==state.sceneIndex||state.exploring)showScene(index,false,{urlMode:'none'}).catch(report);}catch(error){report(error);}};
+ window.addEventListener('popstate',navigateURL);window.addEventListener('hashchange',navigateURL);
+
  $('global-compartments').value=state.reader.compartments;$('global-routing').value=state.reader.routing;
  for(const [id,key]of [['global-compartments','compartments'],['global-routing','routing']])$(id).onchange=async()=>{try{state.reader={...state.reader,[key]:$(id).value};try{saveReaderSettings(localStorage,state.reader);}catch{}if(key==='compartments'){state.expanded.clear();state.collapsed.clear();}if(state.view)await frame(state.view);}catch(e){report(e);}};
  $('open-folder').hidden=!('webkitdirectory' in $('folder-files'));
@@ -492,7 +536,7 @@ function bind(){
  $('open-view').onclick=()=>openNative(false).catch(report);$('compare-view').onclick=()=>openNative(true).catch(report);
  $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent=state.view?.overview?'Overview selection':'Prepared neighborhood';const omissions=state.displayOmissions??state.displayed?.omissions??[],n=state.visualSnapshot?.neighborhood;const summary=state.view?.overview?(state.view.overview.summary.message+'\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n'):n?`${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.\n\n`:'';$('information-text').textContent=summary+omissionDisclosure(omissions,!!state.view?.overview)+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
  $('edit').onclick=openEditor;$('view-file').onchange=()=>{$('view-source').value=fileText(state.project,$('view-file').value);};
- $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project);$('editor').close();await showScene(index,false);}catch(e){report(e);}};
+ $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{...editorStoryContent(),presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project);$('editor').close();await showScene(index,false);}catch(e){report(e);}};
  $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project);$('editor').close();}catch(e){report(e);}};
  $('open-sysml').onclick=()=>$('sysml-files').click();$('open-folder').onclick=()=>$('folder-files').click();$('landing-project').onclick=()=>$('project-file').click();
  for(const [id,folder] of [['sysml-files',false],['folder-files',true]])$(id).onchange=async()=>{const request=++state.loadRevision;++state.revision;try{if($(id).files.length){busy(true);$('landing-error').hidden=true;const project=await projectFromSelection($(id).files,{folder});if(request!==state.loadRevision)return;await loadProject(project,{cacheHash:null,loadToken:request});}}catch(error){if(request===state.loadRevision)report(error);}finally{if(request===state.loadRevision)busy(false);$(id).value='';}};
@@ -506,5 +550,5 @@ function bind(){
  $('stage').onclick=e=>{if(e.target===$('stage')||e.target===$('nodes')||e.target===$('connections')){clearTrace();$('selection').hidden=true;}};
  let resize;new ResizeObserver(()=>{clearTimeout(resize);resize=setTimeout(()=>{if($('stage').hidden||$('stage').clientWidth<=0||$('stage').clientHeight<=0)return;if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;transitionTo(pending.view,pending.focus,{journey:pending.journey,allowDisconnected:true,camera:pending.cameraRevision===state.cameraRevision?pending.camera:state.camera}).catch(report);}else if(state.view)frame(state.view).catch(report);},100);}).observe($('stage'));
 }
-async function start(){bind();busy(false);showLanding(document,true);const demo=new URLSearchParams(location.search).get('demo');if(demo)await openDemo(demo);}
+async function start(){bind();busy(false);showLanding(document,true);const demo=new URLSearchParams(location.search).get('demo');if(demo)await openDemo(demo,{readURL:true});}
 start().catch(report);

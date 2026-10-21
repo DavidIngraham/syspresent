@@ -142,4 +142,27 @@ package GorgeChallengeVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def PassageQualificationVerification {
+        doc /* Review the approved course, configuration and predeclared admission evidence, then independently reconstruct the ordered finite gate crossings and complete attempt history. Exercise skipped/reversed/touched gates, operator updates, motor thrust, grounding and restart. A complete circuit is insufficient when another governing challenge obligation failed or evidence is missing. Safe unassisted righting preserves qualification only with required safety capability; recovery after disqualification cannot transfer partial progress into a new attempt. Accept C-000 only after every applicable C-001, C-003 through C-010 and C-012 through C-027 obligation has its own accepted evidence or justified coverage in the same attempt. */
+        objective acceptance {
+            verify GorgeChallenge::transGorgeChallenge;
+            verify GorgeChallenge::courseCompletion;
+            verify GorgeChallenge::unassistedAttempt;
+            verify GorgeChallenge::sailingPropulsion;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def ObservationAndInterventionVerification {
+        doc /* Measure acquisition-to-shore delivery under an available link, including current position, operating mode and health. Interrupt and restore the link; inspect durable backlog replay and continued autonomous control. Exercise authenticated emergency abort and manual-control commands with independent observation of the commanded response and persistent disqualification. Passive monitoring must not change mission state. Distinguish an unavailable link from a failed delivery on an available link. The demonstration must cover the installed vessel and shore endpoints; software queue tests alone do not establish communication service. */
+        objective acceptance {
+            verify GorgeChallenge::liveObservation;
+            verify GorgeChallenge::emergencyIntervention;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def RestrictedWatersVerification {
+        doc /* Review the applicable chart, dam and lock exclusions, local restrictions and current notice baseline for the configured course. Independently compare the complete observed vessel envelope and position uncertainty against approved exclusion geometry throughout the attempt. Exercise approach, navigation-loss and no-feasible-maneuver cases in a controlled test or simulation; do not enter prohibited waters to test the response. A route-planner clearance result is supporting analysis, not evidence that actual operation remained outside restrictions. */
+        objective acceptance { verify GorgeChallenge::restrictedWaters; }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
 }

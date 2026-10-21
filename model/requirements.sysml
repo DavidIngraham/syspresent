@@ -286,4 +286,18 @@ package SyspresentRequirements {
             comment scope /* First release acceptance; sample size and quantitative thresholds pending owner review */
         }
     }
+    package StoryPublishing {
+        requirement <'SP-094'> chapterNavigation {
+            doc /* Authors shall group contiguous scenes into named chapters. Readers shall browse chapter contents, see progress, and open a direct scene or chapter URL. Shared published scene links shall identify the story/model publication and report changed or missing targets rather than silently select a substitute. Local edited projects shall not masquerade as hosted publications. */
+        }
+        requirement <'SP-095'> figureRegions {
+            doc /* Scenes shall present bundled image figures with alternative text, captions, source/context provenance and optional native model references. Figures shall occupy coordinated regions beside the model, use explicit region tabs when space is constrained, and support enlargement without losing the authored scene. Export shall preserve the referenced asset bytes. */
+        }
+        requirement <'SP-096'> narrativeLinks {
+            doc /* Authored prose links shall resolve exact native model identities or qualified names. Selection shall highlight without moving the graph, disclose a loaded target outside displayed views, and offer explicit exploration and return. Missing or ambiguous required references shall fail publication and edited-project validation. Author HTML and link protocols shall not execute code. */
+        }
+        requirement <'SP-097'> contextualEvidence {
+            doc /* Scenes shall support compact authored explanations of challenge requirements, owner constraints, assumptions, provisional allocations, decisions, candidates, analyses and evidence, each linked to native records. Prepared analysis and recorded execution shall retain explicit source, configuration and input context; recorded execution shall require a run identity. Authored classification shall not imply a native verdict, accepted evidence or engineering approval. */
+        }
+    }
 }

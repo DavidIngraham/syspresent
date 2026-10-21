@@ -1,4 +1,5 @@
 import {validatePresentation} from './preferences.mjs';
+import {validateStoryContent} from './story-content.mjs';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 const SCHEMA='syspresent.project.v1',AUTHOR_SCHEMA='syspresent.project.v2';
 const sourceFile=name=>/\.(sysml|kerml)$/i.test(name);
@@ -50,6 +51,7 @@ export function validateProject(project){
  for(const name of [...m.modelSources,...m.viewSources,m.story,...(m.assets??[])])fileText(project,name);
  if(new Set([...m.modelSources,...m.viewSources]).size!==m.modelSources.length+m.viewSources.length)throw Error('Model and view source files must be separate');
  if(!['complete','scoped'].includes(m.publication?.scope))throw Error('Publication scope must be complete or scoped');
+ validateStoryContent(parseStory(fileText(project,m.story)),{files:project.files,pathFor:projectPath});
  return project;
 }
 // Runtime indexes and generated caches never become authoring requirements.
@@ -83,7 +85,7 @@ export function parseStory(markdown){
   previous={...config,bodyStart:match.index+match[0].length,markdown:''};scenes.push(previous);
  }
  if(previous)previous.markdown=markdown.slice(previous.bodyStart).trim();
- return scenes.map(({bodyStart,...scene})=>scene);
+ const result=scenes.map(({bodyStart,...scene})=>scene);validateStoryContent(result);return result;
 }
 export function writeStory(title,scenes){return '# '+title+'\n\n'+scenes.map(({markdown,...config})=>'```syspresent\n'+JSON.stringify({...config,type:'scene'})+'\n```\n\n'+(markdown??'').trim()+'\n').join('\n');}
 export function packProject(project){validateProject(project);const files=Object.create(null);for(const [name,data] of Object.entries(project.files))files[projectPath(name)]=typeof data==='string'?strToU8(data):data;files['project.json']=strToU8(JSON.stringify(projectDescriptor(project),null,2)+'\n');return zipSync(files,{level:6});}

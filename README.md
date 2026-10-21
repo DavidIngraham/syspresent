@@ -6,6 +6,7 @@ The standalone canvas prototype implements focused traversal, native view resolu
 
 ## Build and author
 
+- [Canvas stories](docs/canvas-story-content.md): chapters, scene links, figures, semantic prose and evidence context.
 - [Authoring](docs/authoring.md): Markdown, native references, prepared evidence and closing arguments.
 - [Configuration](docs/configuration.md): entry points, filters, context limits and presentation preferences.
 - [Snapshot assembly](docs/building.md): export, build, validate and package commands.
@@ -27,7 +28,7 @@ npm run build:canvas
 python3 -m http.server 8783 --directory build/canvas-prototype/site
 ```
 
-The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783. The default example includes the complete Blue Dog model with six focused story scenes. The build prepares the initial native graph and views for faster mobile startup; the browser still loads all sources into WASM for exploration. The build also produces a complete static-site ZIP and retains a content-addressed archive. Project > Export project ZIP saves ordinary model, view and Markdown files. Models without an authored starting view open a bounded system overview ranked by native children and connections. View > System overview also opens it explicitly; child/neighbor counts explain the selection, and Expand contents drills into a subsystem. The view gallery demonstrates coordinated regions and native grids. View controls persist All (default), None or Focused compartments and Square or Mind-map connection routing. Activity/internal-view capture preserves native notation; arbitrary focused-graph capture is explicitly unsupported for now.
+The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783. The default example includes the complete Blue Dog model with 31 scenes across 14 chapters, introducing the Gorge challenge, requirements, scenarios, logical and physical architecture, design trades, IC-01 and verification. The build prepares the initial native graph and views for faster mobile startup; the browser still loads all sources into WASM for exploration. The build also produces a complete static-site ZIP and retains a content-addressed archive. Project > Export project ZIP saves ordinary model, view and Markdown files. Models without an authored starting view open a bounded system overview ranked by native children and connections. View > System overview also opens it explicitly; child/neighbor counts explain the selection, and Expand contents drills into a subsystem. The view gallery demonstrates coordinated regions and native grids. View controls persist All (default), None or Focused compartments and Square or Mind-map connection routing. Activity/internal-view capture preserves native notation; arbitrary focused-graph capture is explicitly unsupported for now.
 
 ## Previous viewer examples
 

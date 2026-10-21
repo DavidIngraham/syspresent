@@ -4,7 +4,7 @@ package BlueDogRequirementVerification {
      * Named requirement conditions are normative qualification definitions;
      * rationale and notes are explanatory. */
     verification def <'V-M-001'> RoundTripVerification {
-        doc /* Apply the M-001 qualification conditions. Use the timestamped trajectory and intervention/propulsion log. Missing gate crossings or disqualifying events prevent a completion verdict. */
+        doc /* Apply the complete M-001 qualification conditions and GorgeChallengeVerification::PassageQualificationVerification acceptance strategy. Correlate the observed trajectory with safety-capability, energy-reserve, external-command, propulsion and qualification histories. Test safe unassisted righting separately from capsize with safety loss, motor use or external assistance. Missing gate crossings, missing evidence or disqualifying events prevent a completion verdict. */
         objective acceptance {
             verify BlueDogRequirements::roundTrip;
         }
@@ -213,9 +213,13 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-001'> EnvironmentalEnvelopeVerification {
-        doc /* Apply the N-001 qualification conditions. Exercise operational functions concurrently during profile qualification. */
+        doc /* Select the current Gorge profile and record configuration, load state, exposure duration, instrumentation and acceptance criteria before testing. Exercise required functions concurrently in physically realizable operating and recovery wind/wave/current combinations. Include N-014 course-derived recovery exposure, the complete N-041 freshwater/spray history and N-043 enclosure immersion checks before and after exposure. Inspect retained safety capability and distinguish structural survival from safe autonomous continuation. Shared equipment tests support the installed-vessel argument only with justified applicability. Ocean profiles require their own future plan and are not accepted by this case. */
         objective acceptance {
             verify BlueDogRequirements::environmentalEnvelope;
+            verify BlueDogRequirements::gorgeEnvironment;
+            verify BlueDogRequirements::gorgeSurvivalWind;
+            verify BlueDogRequirements::freshwaterExposure;
+            verify BlueDogRequirements::enclosureSealing;
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
@@ -513,7 +517,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-205'> EnergyEvidenceReadinessVerification {
-        doc /* Apply the E-205 qualification conditions. Use the sustained-operations evidence checklist. */
+        doc /* Apply the E-205 qualification conditions to the selected finite or repeating profile. Review configuration-specific installed loads, resources, battery limits, initial energy, reserve route, time resolution, uncertainty, provenance and acceptance disposition. A supplied acceptance Boolean is an input to the predicate, not an automated review of those records. */
         objective acceptance {
             verify BlueDogRequirements::energyEvidenceReadiness;
         }
@@ -586,6 +590,29 @@ package BlueDogRequirementVerification {
         objective acceptance {
             verify BlueDogStructure::printTileEnvelope;
         }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'V-N-003'> StabilityAndFoulingVerification {
+        doc /* Integrate the declared capsize and vegetation campaigns for the same installed configuration. Use N-051/N-052 only when the passive-righting strategy is selected; retain the independent C-018 post-capsize shore-recovery obligation. Review separate weed passage, appendage snag, blockage and powered-recovery outcomes against N-053 through N-056, including subsequent control and safety capability. Check that damage, fouling or energy consumed by one exposure does not invalidate the claimed next operating state. Separate campaign results require a justified combination argument; no automatic capsize disqualification or motor-assisted qualification is permitted. */
+        objective acceptance { verify BlueDogRequirements::stabilityAndFouling; }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'V-Q-001'> MissionCapabilityVerification {
+        doc /* For the declared loaded configuration and reproducible route/weather ensemble, establish whole-route sailing capability from accepted sailing, maneuver, energy and recovery evidence. Retain failed routes and holds in exposure accounting. Independently assess preservation of mission-critical functions across the same exposure, including interacting faults and recoveries. Review Q-101 through Q-103 and L-103/L-104 evidence; the provisional L-101/L-102 study target cannot substitute for functional coverage or safety disposition. Numerical screens, a successful isolated course and uncalibrated simulation completion fractions do not close the installed-vessel capability claim. */
+        objective acceptance {
+            verify BlueDogRequirements::cruisePerformance;
+            verify BlueDogRequirements::missionReliability;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'V-E-203'> PeakSupplyCapabilityVerification {
+        doc /* Measure coincident installed withdrawal demand for each admitted mode and transition, including sensing, signaling, actuation and recovery. Disable harvesting and exercise conservative battery temperature, state of charge, end-of-service capacity, conversion losses and declared uncertainty. Compare each demand with demonstrated supply capability using E-203, and observe voltage-dependent loss of required function and protective trips. A component nameplate or summed nominal power does not establish installed peak delivery. */
+        objective acceptance { verify BlueDogRequirements::peakSupplyCapability; }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def <'V-T-001'> ConstructionArchitectureVerification {
+        doc /* Inspect the as-built primary shell, bill of materials, manufacturing records and representative sections to establish the owner-selected FDM substrate and wet-layup glass/epoxy construction. Identify configuration, process and departures explicitly. This inspection establishes construction identity only; material, joint, load, durability and flotation acceptance remain separate objectives. */
+        objective acceptance { verify BlueDogStructure::hybridConstruction; }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
 }

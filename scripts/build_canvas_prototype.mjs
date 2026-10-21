@@ -1,6 +1,7 @@
 import {documentsFor,requirementCoverageSource,normalizeProject,packProject} from '../src/canvas-prototype/project.mjs';
 import {readProjectDirectory,documentDigest} from './canvas_project_files.mjs';
 import {retainSnapshot} from './canvas_snapshot.mjs';
+import {validateProjectStory} from './canvas_story_validation.mjs';
 import {build} from 'esbuild';
 import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {resolve,join,dirname} from 'node:path';
@@ -11,7 +12,7 @@ const args=process.argv.slice(2),option=(name,fallback)=>args.includes(name)?arg
 const output=resolve(option('--output','build/canvas-prototype/site'));
 const engine=resolve(option('--engine','build/canvas-prototype/engine'));
 const project=resolve(option('--project','examples/canvas-blue-dog'));
-const cachePath=option('--runtime-cache');let runtimeCacheHash;
+const cachePath=option('--runtime-cache');let runtimeCacheHash,cacheDeclarations;
 await mkdir(join(output,'engine'),{recursive:true});await mkdir(join(output,'example'),{recursive:true});await mkdir(join(output,'notices'),{recursive:true});
 const inputs=await build({entryPoints:['src/canvas-prototype/app.mjs'],bundle:true,format:'esm',target:['es2022'],outfile:join(output,'app.js'),metafile:true,sourcemap:true});
 if(Object.keys(inputs.metafile.inputs).some(name=>name.includes('editors/vscode')))throw Error('Canvas prototype must not depend on VS Code source modules');
@@ -37,15 +38,19 @@ if(cachePath){
  const documents=[...sources,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,seeds)}];
  if(cache.engineVersion!==engineInfo.version||cache.engineFingerprint!==engineInfo.assets['sysml-wasm.wasm'].sha256||cache.inputDigest!==documentDigest(sources)||cache.sourceDigest!==documentDigest(documents))throw Error('Prepared native cache does not match the model and engine');
  runtimeCacheHash=createHash('sha256').update(data).digest('hex');
+ cacheDeclarations=cache.exported;
  primary=normalizeProject({manifest:primary.authorManifest??primary.manifest,files:{...primary.files,'runtime-cache.json':new Uint8Array(data)}});
  primary.manifest.runtimeCache='runtime-cache.json';primary.manifest.assets=[...new Set([...(primary.manifest.assets??[]),'runtime-cache.json'])];
 }
 // Repackage through the same portable-project contract used by browser imports.
 // Fixed ZIP timestamps keep retained snapshots independent of local file mtimes.
 function portableFiles(value){return unzipSync(packProject(value));}
+const publications=new Map();
 async function writeArchive(value,destination){
+ await validateProjectStory(value,{native:join(engine,'sysml-native'),...(value===primary&&cacheDeclarations?{exported:cacheDeclarations}:{})});
  await mkdir(dirname(join(output,destination)),{recursive:true});
- await writeFile(join(output,destination),zipSync(portableFiles(value),{level:6,mtime:new Date(1980,0,2)}));files.push(destination);
+ const bytes=zipSync(portableFiles(value),{level:6,mtime:new Date(1980,0,2)});publications.set(destination,createHash('sha256').update(bytes).digest('hex'));
+ await writeFile(join(output,destination),bytes);files.push(destination);
 }
 const primaryFiles=portableFiles(primary);
 for(const [name,data] of Object.entries(primaryFiles)){
@@ -58,10 +63,11 @@ await writeArchive(flashlight,'demos/flashlight.zip');
 const viewDemo=await readProjectDirectory(resolve('examples/canvas-views'));
 await writeArchive(viewDemo,'demos/views.zip');
 const demos={schemaVersion:'syspresent.demos.v1',demos:[
- {id:'blue-dog',title:primary.manifest.title,description:'Explore the complete Blue Dog model through river traffic, requirements and recovery.',project:'project.zip',...(runtimeCacheHash?{runtimeCacheHash}:{})},
+ {id:'blue-dog',title:primary.manifest.title,description:'Explore the Gorge challenge, sail trade, IC-01 candidate, traffic safety and recovery.',project:'project.zip',...(runtimeCacheHash?{runtimeCacheHash}:{})},
  {id:'views',title:viewDemo.manifest.title,description:'Inspect matrices, tables, sequences, states, cases, mixed views and shared fault causes.',project:'demos/views.zip'},
  {id:'flashlight',title:flashlight.manifest.title,description:'A small model connecting a requirement, the flashlight assembly and switching behavior.',project:'demos/flashlight.zip'}
 ]};
+for(const demo of demos.demos)demo.publication=publications.get(demo.project);
 await writeFile(join(output,'demos.json'),JSON.stringify(demos,null,2)+'\n');files.push('demos.json');
 const buildToken=createHash('sha256');for(const name of [...files].sort()){buildToken.update(name+'\0');buildToken.update(await readFile(join(output,name)));}const version=buildToken.digest('hex').slice(0,20);
 const html=(await readFile(join(output,'index.html'),'utf8')).replace('<head>','<head>'+(runtimeCacheHash?'<meta name="syspresent-runtime-cache" content="'+runtimeCacheHash+'">':'')+'<meta name="syspresent-build" content="'+version+'">').replace('src="./app.js"','src="./app.js?v='+version+'"').replace('href="./canvas.css"','href="./canvas.css?v='+version+'"');await writeFile(join(output,'index.html'),html);

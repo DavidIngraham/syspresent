@@ -63,7 +63,7 @@ package BlueDogSourceEvidence {
     }
     dependency regulation11Basis from BlueDogRequirements::regulatoryClassification to regulation11;
     part regulation12 : SourceNote {
-        doc /* For now S-005 retains classification review and S-004 retains mode-dependent conspicuity. The 2.4 m race limit is a relevant candidate design constraint, not yet a proven legal safe harbor or a user-selected hull limit. USCG's public FAQ uses transportation capability to explain vessel status, including transportation of services. [USCG navigation FAQ](https://navcen.uscg.gov/navigation-rules-faqs) */
+        doc /* For now S-005 retains classification review and S-004 retains mode-dependent conspicuity. The source discussion concerns a 2.4 m race limit, which does not establish a legal safe harbor. The current independent Gorge challenge separately imposes the owner-selected 1.2 m overall limit in C-010; neither length establishes regulatory classification. USCG's public FAQ uses transportation capability to explain vessel status, including transportation of services. [USCG navigation FAQ](https://navcen.uscg.gov/navigation-rules-faqs) */
         attribute :>> urls = ("https://navcen.uscg.gov/navigation-rules-faqs");
     }
     dependency regulation12Basis from BlueDogRequirements::regulatoryClassification to regulation12;

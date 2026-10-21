@@ -107,3 +107,20 @@ body.landing-mode{height:auto;min-height:100dvh;overflow:auto}
 
 .node .prominence{display:block;margin-top:8px;font-size:11px;line-height:1.4;color:#526e70;overflow-wrap:anywhere}
 .node.port.overview-card{border-radius:8px}.node.port.overview-card .node-face{padding:10px;overflow:hidden}
+
+/* Story content remains unscaled and scrolls inside its measured region. */
+.model-link{display:inline;border:0;border-radius:2px;padding:0;background:transparent;color:#205e64;text-decoration:underline;text-underline-offset:3px;font:inherit;cursor:pointer}
+.model-link:hover{background:#e4f0ed}.model-link:focus-visible,a:focus-visible{outline:3px solid #bf722e;outline-offset:3px}
+.model-references{display:flex;gap:.4rem 1rem;flex-wrap:wrap;margin:.5rem 0;font-size:.85rem}
+.story-context{font-size:.88rem}.context-card{border-top:1px solid var(--line);margin-top:.6rem;padding-top:.3rem}.context-card>summary{padding:.4rem 0;line-height:1.4}
+.evidence-details{font-size:.85rem}.evidence-details summary{padding:.4rem 0}.evidence-details dl{margin:.5rem 0}.evidence-details dt{font-weight:650}.evidence-details dd{margin:0 0 .5rem;overflow-wrap:anywhere}
+.evidence-details pre,#narrative pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.8rem}.evidence-note{color:#526e70}
+.figure-region{overflow:auto;background:white}.figure-region figure{margin:0;padding:12px;display:flex;flex-direction:column;min-height:100%;gap:8px}
+.figure-region img{display:block;width:100%;height:clamp(120px,55%,460px);max-height:55vh;object-fit:contain;flex:1;min-height:120px}
+.figure-region figcaption{font-size:.9rem;overflow-wrap:anywhere}.figure-region figcaption p{margin:.5rem 0}.figure-region details summary{padding:.3rem 0}
+#figure-dialog{width:min(1200px,calc(100% - 24px))}#figure-detail img{max-height:65vh;height:auto;flex:none}#figure-detail figure{min-height:0}
+#contents-list h3{font-size:1rem;margin:1.2rem 0 .4rem}#contents-list ol{padding-left:1.5rem;margin:0}#contents-list a,#contents-list button{display:block;color:#205e64;padding:.45rem .2rem;text-decoration:none}#contents-list [aria-current]{font-weight:700;background:#edf4f2;border-radius:4px}
+#share-url{width:100%;margin:.5rem 0 1rem}header nav{max-width:55%}#narrative a{color:#205e64;overflow-wrap:anywhere}
+@media(max-width:700px){header nav{max-width:100%}.figure-region figure{padding:8px}.figure-region figcaption{font-size:.85rem}}
+
+#contents-list button{border:0;background:transparent;text-align:left;width:100%;font:inherit}

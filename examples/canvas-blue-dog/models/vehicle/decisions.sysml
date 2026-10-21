@@ -20,9 +20,9 @@ package BlueDogDesignDecisions {
     part holdingDrive : Decision {
         attribute :>> disposition = "Evaluate non-backdrivable gearing as an option, not a selected or qualified component.";
         attribute :>> evidenceNeeded = "Motor-off holding under shock, wear, temperature and lubrication changes; moving efficiency, controller demand, jam and power-loss recovery tests.";
-        metadata rationale : ModelingMetadata::Rationale { text = "Zero motor holding current can reduce daily energy consumption, but gear friction and trim movement still consume energy. A locked gearbox retains the last mast angle and requires explicit storm and capsize assessment."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Zero motor holding current can reduce finite mission energy consumption, but gear friction and trim movement still consume energy. A locked gearbox retains the last mast angle and requires explicit storm and capsize assessment."; }
     }
-    dependency holdingEnergy from holdingDrive to BlueDogRequirements::sustainedEnergyFeasibility;
+    dependency holdingEnergy from holdingDrive to BlueDogRequirements::multiDayEndurance;
     dependency holdingRecovery from holdingDrive to BlueDogRequirements::capsizeControlRecovery;
     dependency holdingCalculation from holdingDrive to MarineActuation::DrivePower;
 
