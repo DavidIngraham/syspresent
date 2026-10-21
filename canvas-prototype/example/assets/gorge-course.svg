@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="440" viewBox="0 0 840 440">
+<rect width="840" height="440" rx="16" fill="#f5f8f6"/>
+<g font-family="system-ui,sans-serif" fill="#243d42"><text x="32" y="45" font-size="24" font-weight="700">Bingen–Stevenson–Bingen</text><text x="32" y="73" font-size="16">One autonomous circuit under sail</text>
+<path d="M35 155 Q230 100 420 156 T805 155 L805 315 Q620 365 420 310 T35 315Z" fill="#d7ebef"/>
+<path d="M695 220 L155 220 Q105 245 155 275 L695 275" fill="none" stroke="#246a74" stroke-width="5"/>
+<path d="M390 210 L370 220 L390 230 M470 265 L490 275 L470 285" fill="none" stroke="#246a74" stroke-width="4"/>
+<path d="M695 180 V307" stroke="#996c35" stroke-width="4" stroke-dasharray="8 6"/>
+<circle cx="160" cy="248" r="9" fill="#b45d47"/><circle cx="695" cy="178" r="9" fill="#43805c"/>
+<text x="80" y="132" font-size="19" font-weight="650">Stevenson</text><text x="80" y="156" font-size="15">Buoy 16 rounding</text>
+<text x="600" y="125" font-size="19" font-weight="650">Bingen</text><text x="570" y="149" font-size="15">Departure / finish gate</text>
+<text x="320" y="200" font-size="16">Outbound</text><text x="440" y="306" font-size="16">Return</text>
+<text x="32" y="388" font-size="16">Schematic of gate order; geographic geometry and exclusions are omitted.</text>
+<text x="32" y="414" font-size="14" fill="#536f73">Source: TransGorgeCourse in the bundled Blue Dog model.</text></g></svg>

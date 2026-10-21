@@ -3,22 +3,25 @@
   "demos": [
     {
       "id": "blue-dog",
-      "title": "Blue Dog: river traffic and recovery",
-      "description": "Explore the complete Blue Dog model through river traffic, requirements and recovery.",
+      "title": "Blue Dog: from the Gorge challenge to a defined boat",
+      "description": "Explore the Gorge challenge, sail trade, IC-01 candidate, traffic safety and recovery.",
       "project": "project.zip",
-      "runtimeCacheHash": "78fad0d479070bf2a4a2354573edb328a8323e7fbeda281c37a7446f9f382874"
+      "runtimeCacheHash": "3781fa72cfd2549b295acb6eef1e43d97dd47c86003abde8c507d36295b038e2",
+      "publication": "125f41c0f93aa70e6cd39aaef1b8f309bcac5cac391f7467519d293d6223b288"
     },
     {
       "id": "views",
       "title": "A desk fan: behavior, grids and shared failures",
       "description": "Inspect matrices, tables, sequences, states, cases, mixed views and shared fault causes.",
-      "project": "demos/views.zip"
+      "project": "demos/views.zip",
+      "publication": "c10ea62a1ed522f350dc982bf4194ab81eebbf81f097213b632ce15e592278a2"
     },
     {
       "id": "flashlight",
       "title": "A flashlight: requirement, assembly and switching",
       "description": "A small model connecting a requirement, the flashlight assembly and switching behavior.",
-      "project": "demos/flashlight.zip"
+      "project": "demos/flashlight.zip",
+      "publication": "3061b5e2180a1ffa17c8b47c7f2e09a00cdf35693766a5238277d6fbbba2d11a"
     }
   ]
 }

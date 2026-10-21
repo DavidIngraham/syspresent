@@ -109,7 +109,9 @@ package GorgeChallenge {
         end #original source ::> transGorgeChallenge;
         end #derive target ::> courseCompletion;
     }
-    dependency futureEnduranceBasis from repeatedOperation to courseCompletion;
+    dependency futureEnduranceBasis from repeatedOperation to courseCompletion {
+        metadata rationale : ModelingMetadata::Rationale { text = "Future repeated operation uses the same ordered course geometry. This design dependency does not impose repeating endurance on the current finite qualification mission."; }
+    }
     #derivation connection challengeRuleUnassistedAttempt {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         metadata rationale : ModelingMetadata::Rationale { text = "This rule is explicitly included in C-000; C-002 retains its objective-only status."; }

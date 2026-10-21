@@ -15,6 +15,22 @@ package BlueDogUseCases {
         actor traffic : OtherVessel;
         objective 'M-001 Gorge mission' :> roundTrip;
     }
+    #systemUseCase use case navigateCourse {
+        doc /* Use current validated navigation to follow the declared course
+         * and operating boundaries. Invalid observations require degradation and
+         * separately confirmed safety; they cannot silently remain control inputs. */
+        subject context : MissionContext;
+        actor operator : Operator;
+        actor traffic : OtherVessel;
+        objective 'E-002 Navigation and control' :> navigationAndControl;
+    }
+    #systemUseCase use case preserveRecoveryReserve {
+        doc /* Observe usable energy and current recovery demand, preserve
+         * required safety loads, and transfer to recovery when reserve is threatened. */
+        subject context : MissionContext;
+        actor operator : Operator;
+        objective 'E-004 Low-energy recovery' :> lowEnergyRecovery;
+    }
     #systemUseCase use case sailOcean {
         metadata applicability : BlueDogMissionScope::Applicability { mission = BlueDogMissionScope::MissionKind::futureOcean; }
         doc /* Future mission: sail to Hawaii under independently allocated constraints. */
@@ -35,6 +51,16 @@ package BlueDogUseCases {
         actor operator : Operator;
         actor traffic : OtherVessel;
         objective 'S-003 Safe recovery' :> safeRecovery;
+    }
+    #systemUseCase use case recoverUpright {
+        doc /* For the passive-righting candidate, retain required safety while inverted, recover upright without
+         * propulsion or outside assistance, and restore control without clearing
+         * gate progress, restrictions or a prior loss of qualification. If safety
+         * is unavailable, transfer to autonomous abort and recovery. */
+        subject context : MissionContext;
+        actor operator : Operator;
+        actor traffic : OtherVessel;
+        objective 'N-051 Self-righting' :> selfRighting;
     }
     #systemUseCase use case maintain {
         doc /* Manufacture and service. */

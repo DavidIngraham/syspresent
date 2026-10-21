@@ -9,7 +9,7 @@ package BlueDogRequirements {
     requirement def <'M-001'> RoundTrip {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall cross the configured Bingen departure, buoy 16 rounding checkpoints and Bingen return gates in order during one qualifying attempt. */
-        comment conditions /* C-003 through C-006 govern attempt qualification. */
+        comment conditions /* C-000 defines the governing finite challenge obligations. Course review, unassisted sail-only operation, safety capability, recovery reserve and the persistent attempt state apply throughout. Safe unassisted righting may preserve qualification; motor propulsion, external intervention or required safety-capability loss ends it. */
     }
     requirement def <'M-002'> MultiDayEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -25,7 +25,7 @@ package BlueDogRequirements {
     requirement def <'E-002'> NavigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall provide autonomous navigation and sail/steering control within the selected operational profile. */
-        comment conditions /* Qualification uses the selected mission profile. Accuracy trials contain 1800 scheduled one-second epochs in 30 minutes; invalid or missing epochs fail. Position and heading criteria use the same set of at least 1710 qualifying epochs, preventing separate selection of different good samples. Fault-injection runs are separate. */
+        comment conditions /* Qualification uses the selected mission profile. Accuracy trials contain 1800 scheduled one-second epochs in 30 minutes; invalid or missing epochs count as failed epochs. Position and heading criteria use the same set of at least 1710 qualifying epochs, preventing separate selection of different good samples. Fault-injection runs are separate. */
     }
     requirement def <'E-003'> ResetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -39,7 +39,7 @@ package BlueDogRequirements {
     }
     requirement def <'E-005'> Communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall support live telemetry through link outages and reconnection. */
+        doc /* The vessel shall retain telemetry through link outages for delivery after reconnection. */
         comment conditions /* Link availability is a delivery-test precondition, not a coverage guarantee. Normal, low-energy and recovery delivery cadence is 30 seconds, as allocated by GorgeChallenge::liveObservation. Outage tests last 24 hours. */
     }
     requirement def <'E-006'> IngressResponse {
@@ -117,6 +117,7 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "The owner requires one-person handling independently of either voyage outcome."; }
     }
 
+    attribute printBuildLimit : LengthValue = 250 [mm];
     requirement def <'P-002'> DesktopManufacture {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Every print job shall fit within positive X, Y and Z extents no greater than 250 mm each. */
@@ -124,13 +125,19 @@ package BlueDogRequirements {
         attribute jobX : LengthValue;
         attribute jobY : LengthValue;
         attribute jobZ : LengthValue;
-        attribute buildLimit : LengthValue = 250 [mm];
-        require constraint jobFits {
-            jobX > 0 [mm] and jobY > 0 [mm] and jobZ > 0 [mm] and
-            jobX <= buildLimit and jobY <= buildLimit and jobZ <= buildLimit
-        }
+        attribute buildLimit : LengthValue = printBuildLimit;
+        require constraint jobFits { PrintJobEnvelopeCriterion(jobX, jobY, jobZ, buildLimit) }
     }
     requirement desktopManufacture : DesktopManufacture;
+    calc def PrintJobEnvelopeCriterion {
+        in jobX : LengthValue;
+        in jobY : LengthValue;
+        in jobZ : LengthValue;
+        in buildLimit : LengthValue;
+        return verdict : Boolean;
+        buildLimit > 0 [mm] and jobX > 0 [mm] and jobY > 0 [mm] and jobZ > 0 [mm] and
+            jobX <= buildLimit and jobY <= buildLimit and jobZ <= buildLimit
+    }
     dependency deriveDesktopManufacture from desktopManufacture to BlueDog::DesignIntent {
         metadata rationale : ModelingMetadata::Rationale { text = "The owner selected a 250 mm cubic desktop-printer build volume independently of mission completion."; }
     }
@@ -214,7 +221,7 @@ package BlueDogRequirements {
     requirement def <'N-001'> EnvironmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall retain the functions required by its selected environmental profile and operating mode. */
-        comment conditions /* Gorge qualification uses N-010; ocean qualification uses N-020. Both include applicable shared exposure requirements. Operational functions are navigation, sail/steering control, recording and available-link telemetry. Survival requires flotation, attached rig/ballast, dry electronics and retained mission state; course progress is not required. */
+        comment conditions /* Gorge qualification uses N-010; ocean qualification uses N-020. Both include applicable shared exposure requirements. Operational functions are navigation, sail/steering control, recording and available-link telemetry. Survival requires flotation, attached rig/ballast, dry electronics and retained mission state; course progress is not required. Required traffic assessment, navigation signals and available-link location reporting remain safety obligations in every mode. Loss of required safety capability invokes C-012 even when the structure survives. */
         comment notes /* Profiles are not interchangeable. Gorge release does not require ocean qualification, and Gorge success does not establish ocean capability. */
     }
     requirement environmentalEnvelope : EnvironmentalEnvelope;
@@ -236,7 +243,7 @@ package BlueDogRequirements {
     requirement def <'N-003'> StabilityAndFouling {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall autonomously tolerate capsize and submerged aquatic vegetation, including milfoil-like stems. */
-        comment conditions /* Righting, control recovery, weed passage, snag shedding and blockage-response criteria apply without operator intervention during a qualifying attempt. */
+        comment conditions /* Capsize and vegetation are separate disturbance cases. Righting and upright control restoration apply to the selected N-051 strategy; C-018 also permits post-abort limp recovery. Weed passage, snag shedding and blockage response apply to the declared Gorge exposure. No disturbance waives required safety capability or motor inhibition. */
         comment notes /* Submerged-weed passage qualification does not cover dense floating mats or fishing-line entanglement. */
     }
     requirement stabilityAndFouling : StabilityAndFouling;
@@ -539,7 +546,7 @@ package BlueDogRequirements {
     requirement def <'N-035'> EnvelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall select survival or sailing operation according to the defined environmental transition conditions. */
-        comment conditions /* The trigger is a detected upper operational wind or wave limit exceedance for the selected profile; calm invokes N-034. Resumption eligibility requires 10 continuous minutes inside the selected wind/wave limits, valid navigation and no low-energy, emergency-recovery or isolation restriction. */
+        comment conditions /* The trigger is a detected upper operational wind or wave limit exceedance for the selected profile; calm invokes N-034. Resumption eligibility requires 10 continuous minutes inside the selected wind/wave limits, valid navigation, upright control, preserved required safety capability and no low-energy, emergency-recovery or isolation restriction. Resuming a control mode never clears a disqualified attempt. */
     }
     requirement envelopeTransition : EnvelopeTransition;
     #derivation connection deriveEnvelopeTransition {
@@ -653,11 +660,8 @@ package BlueDogRequirements {
         comment conditions /* Apply to every N-051 release without operator input. Mode-appropriate control does not mean normal sailing before the N-035 resumption gate permits it. */
     }
     requirement capsizeControlRecovery : CapsizeControlRecovery;
-    #derivation connection deriveCapsizeControlRecovery {
-        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "CapsizeControlRecovery provides a separately verifiable criterion for stabilityAndFouling."; }
-        end #original source ::> stabilityAndFouling;
-        end #derive target ::> capsizeControlRecovery;
+    dependency deriveCapsizeControlRecovery from capsizeControlRecovery to stabilityAndFouling {
+        metadata rationale : ModelingMetadata::Rationale { text = "Upright control restoration is an obligation of the selected passive-righting strategy. Alternative challenge concepts may provide post-abort limp recovery without this strategy."; }
     }
 
     requirement def <'N-053'> SubmergedWeedPassage {
@@ -753,10 +757,10 @@ package BlueDogRequirements {
         end #derive target ::> navigationAvailability;
     }
     dependency auditDerivation2 from launchEnergyAdmission to recoveryEnergy {
-        metadata rationale : ModelingMetadata::Rationale { text = "LaunchEnergyAdmission isolates a separately verifiable consequence of recoveryEnergy. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The selected launch gate consumes the route-dependent reserve calculation. A changed reserve or validity rule requires admission review; the reserve magnitude alone does not define launch behavior."; }
     }
     dependency auditDerivation3 from challengeMotorInhibition to GorgeChallenge::sailingPropulsion {
-        metadata rationale : ModelingMetadata::Rationale { text = "ChallengeMotorInhibition isolates a separately verifiable consequence of GorgeChallenge::sailingPropulsion. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The onboard interlock is the selected enforcement of sail-only qualification. The challenge rule governs the attempt outcome without mandating this particular interlock design."; }
     }
     dependency auditDerivation4 from challengeMotorInhibition to GorgeChallenge::unassistedAttempt {
         metadata rationale : ModelingMetadata::Rationale { text = "No-intervention qualification must survive resets and motor-mode transitions. This is design motivation or an implementation choice, not a satisfaction implication."; }
@@ -929,7 +933,8 @@ package BlueDogRequirements {
 
     requirement def <'E-111'> MissionStateRestoration {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* Within 30 seconds after a watchdog reset under E-003 preconditions, restored mission mode shall equal the last persisted mode. */
+        doc /* Within 30 seconds after a watchdog reset under E-003 preconditions, the restored mission-mode record shall equal the last persisted mode. */
+        comment conditions /* Restoring recorded mission intent does not command that operating mode. Current safety, capsize, energy, recovery and isolation restrictions govern actual operation under E-113 and N-035. */
     }
     requirement missionStateRestoration : MissionStateRestoration;
 
@@ -1492,7 +1497,8 @@ package BlueDogRequirements {
 
     requirement def <'S-101'> TrafficTracking {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall acquire and maintain encounter tracks with the reviewed class- and condition-specific timely acquisition and continuity performance required by S-001. All admitted target classes remain in scope; before reliable classification, the reviewed conservative plausible-class envelope applies.*/
+        doc /* The vessel shall acquire and maintain encounter tracks with the reviewed class- and condition-specific timely acquisition and continuity performance required by S-001.*/
+        comment conditions /* Each admitted target class remains in scope. Before reliable classification, apply the reviewed conservative envelope spanning plausible classes and occupant transitions. */
     }
     requirement trafficTracking : TrafficTracking;
 
@@ -2146,11 +2152,8 @@ package BlueDogRequirements {
     }
     requirement batteryChargeTemperatureInhibition : BatteryChargeTemperatureInhibition;
 
-    #derivation connection decomposeBatteryChargeTemperatureInhibition {
-        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-046; the parent supplies shared verification conditions."; }
-        end #original source ::> solarHeating;
-        end #derive target ::> batteryChargeTemperatureInhibition;
+    dependency decomposeBatteryChargeTemperatureInhibition from batteryChargeTemperatureInhibition to solarHeating {
+        metadata rationale : ModelingMetadata::Rationale { text = "Charge-temperature protection applies beyond the solar-heating campaign. The campaign supplies one relevant verification exposure rather than the source of this universal battery-protection obligation."; }
     }
 
     requirement def <'N-118'> RightingDeadline {
@@ -2651,7 +2654,8 @@ package BlueDogRequirements {
 
     requirement def <'E-201'> SustainedReserveProtection {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* Conservative stored energy shall remain strictly above the R-002 protected reserve throughout the selected sustained-operation profile. */
+        doc /* Conservative stored energy shall remain strictly above the R-002 protected reserve throughout the selected mission-energy profile. */
+        comment conditions /* Apply to the complete finite M-002 history or the future E-200 repeating profile as selected. Route-dependent reserve remains subject to R-002; a fixed reserve input is a declared analysis approximation. */
         comment notes /* Unmodeled intrainterval dips are outside the analysis claim. */
         attribute samples : EnergyValue [1..*] ordered nonunique;
         attribute reserve : EnergyValue;
@@ -2849,7 +2853,7 @@ package BlueDogRequirements {
     requirement def <'L-001'> MissionReliability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall preserve mission-critical functions throughout each declared unassisted voyage. */
-        comment conditions /* Apply L-101 through L-104 to the finite Gorge attempt. Hawaii reliability targets require a separate future allocation. Failure includes loss of required control, mission completion, safety function or required observation service. Recovery that violates the mission rules is not success. */
+        comment conditions /* L-103 evidence and L-104 failure dispositions apply to the finite Gorge attempt. L-101 and L-102 are provisional study objectives, not launch or mission-acceptance thresholds. Hawaii reliability targets require a separate future allocation. Failure includes loss of required control, mission completion, safety function or required observation service. Recovery that violates the mission rules is not success. */
         metadata rationale : ModelingMetadata::Rationale { text = "Longer passages impose tighter reliability budgets; Gorge performance does not qualify an ocean mission."; }
     }
     requirement missionReliability : MissionReliability;
@@ -2912,17 +2916,11 @@ package BlueDogRequirements {
         end #original source ::> cruisePerformance;
         end #derive target ::> cruiseEvidence;
     }
-    #derivation connection cruiseReliabilityDerivation9 {
-        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "missionSuccessProbability supplies an acceptance condition needed to achieve missionReliability."; }
-        end #original source ::> missionReliability;
-        end #derive target ::> missionSuccessProbability;
+    dependency cruiseReliabilityDerivation9 from missionSuccessProbability to missionReliability {
+        metadata rationale : ModelingMetadata::Rationale { text = "The provisional probability/confidence objective supports reliability studies; preserving required functions does not entail this unaccepted numerical target."; }
     }
-    #derivation connection cruiseReliabilityDerivation10 {
-        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "failureRateBudget supplies an acceptance condition needed to achieve missionReliability."; }
-        end #original source ::> missionReliability;
-        end #derive target ::> failureRateBudget;
+    dependency cruiseReliabilityDerivation10 from failureRateBudget to missionReliability {
+        metadata rationale : ModelingMetadata::Rationale { text = "The constant-hazard budget is one provisional study model. Mission capability does not require this failure distribution or establish its evidence."; }
     }
     #derivation connection cruiseReliabilityDerivation11 {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2997,12 +2995,16 @@ package BlueDogRequirements {
     dependency windForAutonomousControl from windObservation to navigationAndControl {
         metadata rationale : ModelingMetadata::Rationale { text = "Apparent-wind feedback is the selected implementation for autonomous sail trim. This is a design-basis dependency, not an assertion that every autonomous sailing architecture must use this sensor."; }
     }
-    dependency windForSailOnlyMission from windObservation to GorgeChallenge::sailingPropulsion;
-    dependency windEnduranceBasis from windSensingEndurance to multiDayEndurance;
+    dependency windForSailOnlyMission from windObservation to GorgeChallenge::sailingPropulsion {
+        metadata rationale : ModelingMetadata::Rationale { text = "Changes to the sail-only operating concept require review of the selected wind-feedback strategy; sailing propulsion alone does not prescribe a sensor technology."; }
+    }
+    dependency windEnduranceBasis from windSensingEndurance to multiDayEndurance {
+        metadata rationale : ModelingMetadata::Rationale { text = "A change to the finite mission exposure changes installed sensing endurance and energy evidence; the mission does not imply a fixed campaign duration."; }
+    }
     requirement def <'E-146'> WindSampleCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall deliver apparent-wind observations to sail control at intervals no greater than 1 second. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windSampleCadence : WindSampleCadence;
     #derivation connection decomposeWindSampleCadence {
@@ -3014,7 +3016,7 @@ package BlueDogRequirements {
     requirement def <'E-147'> WindSpeedAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Installed apparent-wind speed error shall not exceed the greater of 0.5 m/s or 5 percent of reference speed. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windSpeedAccuracy : WindSpeedAccuracy;
     #derivation connection decomposeWindSpeedAccuracy {
@@ -3026,7 +3028,7 @@ package BlueDogRequirements {
     requirement def <'E-148'> WindDirectionAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Installed apparent-wind direction error relative to the vessel heading shall not exceed 5 degrees. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windDirectionAccuracy : WindDirectionAccuracy;
     #derivation connection decomposeWindDirectionAccuracy {
@@ -3038,7 +3040,7 @@ package BlueDogRequirements {
     requirement def <'E-149'> WindStaleInvalidation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall mark wind observations invalid when their age exceeds 2 seconds. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windStaleInvalidation : WindStaleInvalidation;
     #derivation connection decomposeWindStaleInvalidation {
@@ -3050,7 +3052,7 @@ package BlueDogRequirements {
     requirement def <'E-150'> InvalidWindUseInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Sail control shall exclude invalid wind observations from trim calculations. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement invalidWindUseInhibition : InvalidWindUseInhibition;
     #derivation connection decomposeInvalidWindUseInhibition {
@@ -3062,7 +3064,7 @@ package BlueDogRequirements {
     requirement def <'E-151'> WindLossResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall enter its wind-sensing-degraded control state within 1 second after wind observations become invalid. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windLossResponse : WindLossResponse;
     #derivation connection decomposeWindLossResponse {
@@ -3074,7 +3076,7 @@ package BlueDogRequirements {
     requirement def <'E-152'> WindSensingEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The wind-sensing installation shall operate throughout the complete M-002 mission without servicing or external charging. */
-        comment conditions /* E-009 supplies installed measurement and fault-test conditions. E-152 uses the M-002 energy campaign. */
+        comment conditions /* Use the installed configuration through the complete M-002 energy campaign, including its holds and maneuvers. E-009 separately qualifies installed measurement and fault response. */
     }
     requirement windSensingEndurance : WindSensingEndurance;
     #derivation connection decomposeWindSensingEndurance {

@@ -286,6 +286,319 @@ function showLanding(document2, visible2) {
   document2.body.classList.toggle("landing-mode", isLanding);
 }
 
+// src/canvas-prototype/story-content.mjs
+var text = (value, label2) => {
+  if (typeof value !== "string" || !value.trim()) throw Error(label2 + " requires nonempty text");
+  return value;
+};
+var identifier = (value, label2) => {
+  text(value, label2);
+  if (!/^[A-Za-z][A-Za-z0-9_.-]*$/.test(value)) throw Error("Invalid " + label2 + ": " + value);
+};
+var contextKinds = { "challenge-requirement": "Challenge requirement", "owner-constraint": "Owner constraint", assumption: "Assumption", allocation: "Provisional allocation", decision: "Design decision", candidate: "Candidate definition", analysis: "Analysis", evidence: "Evidence" };
+function assetType(path) {
+  const ext = path.split(".").at(-1).toLowerCase();
+  return { svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" }[ext];
+}
+function references(refs2, label2, required = false) {
+  if (refs2 === void 0 && !required) return;
+  if (!Array.isArray(refs2) || required && !refs2.length || !refs2.every((r) => typeof r === "string" && r.trim())) throw Error(label2 + " requires modelRefs");
+}
+function evidence(value, label2) {
+  if (!value) return;
+  if (!["prepared-analysis", "recorded-execution"].includes(value.classification)) throw Error(label2 + ": invalid evidence classification");
+  for (const key2 of ["source", "configuration"]) text(value[key2], label2 + " evidence " + key2);
+  if (!value.inputs || typeof value.inputs !== "object" || Array.isArray(value.inputs)) throw Error(label2 + ": evidence inputs must be an object");
+  let count = 0;
+  const inspect = (v, depth = 0) => {
+    if (++count > 1e3 || depth > 8) throw Error(label2 + ": evidence inputs exceed the supported size");
+    if (typeof v === "number" && !Number.isFinite(v)) throw Error(label2 + ": evidence inputs must contain finite numbers");
+    if (v && typeof v === "object") for (const item of Object.values(v)) inspect(item, depth + 1);
+  };
+  inspect(value.inputs);
+  if (value.classification === "recorded-execution") text(value.runId, label2 + " evidence runId");
+}
+function validateStoryContent(scenes, { files, pathFor, resolve: resolve2 } = {}) {
+  const chapters = /* @__PURE__ */ new Map(), closed = /* @__PURE__ */ new Set();
+  let previous;
+  for (const scene2 of scenes) {
+    const label2 = "Scene " + scene2.id;
+    if (scene2.allowDisconnected !== void 0 && typeof scene2.allowDisconnected !== "boolean") throw Error(label2 + ": allowDisconnected must be boolean");
+    if (scene2.chapter) {
+      identifier(scene2.chapter.id, "chapter id");
+      text(scene2.chapter.title, "chapter title");
+      const old = chapters.get(scene2.chapter.id);
+      if (old && old !== scene2.chapter.title) throw Error("Conflicting chapter title: " + scene2.chapter.id);
+      chapters.set(scene2.chapter.id, scene2.chapter.title);
+    }
+    const chapter = scene2.chapter?.id;
+    if (chapter !== previous) {
+      if (previous) closed.add(previous);
+      if (chapter && closed.has(chapter)) throw Error("Chapter must be contiguous: " + chapter);
+      previous = chapter;
+    }
+    const ids = /* @__PURE__ */ new Set(["primary", "comparison", ...(scene2.regions ?? []).map((r) => r.id)]);
+    if (scene2.figures !== void 0 && (!Array.isArray(scene2.figures) || scene2.figures.length > 3)) throw Error(label2 + ": at most three figures are supported");
+    if ((scene2.figures?.length ?? 0) + (scene2.regions?.length ?? 0) > 3) throw Error(label2 + ": at most three companion regions are supported");
+    for (const f of scene2.figures ?? []) {
+      identifier(f.id, "figure id");
+      if (ids.has(f.id)) throw Error(label2 + ": duplicate region " + f.id);
+      ids.add(f.id);
+      for (const key2 of ["title", "asset", "alt", "caption"]) text(f[key2], label2 + " figure " + key2);
+      if (!assetType(f.asset)) throw Error(label2 + ": unsupported figure asset " + f.asset);
+      pathFor?.(f.asset);
+      if (files && !Object.hasOwn(files, f.asset)) throw Error(label2 + ": missing figure " + f.asset);
+      for (const key2 of ["source", "context"]) text(f.provenance?.[key2], label2 + " figure provenance " + key2);
+      references(f.modelRefs, label2);
+      evidence(f.evidence, label2);
+    }
+    if (scene2.context !== void 0 && !Array.isArray(scene2.context)) throw Error(label2 + ": context must be an array");
+    for (const card of scene2.context ?? []) {
+      if (!Object.hasOwn(contextKinds, card.kind)) throw Error(label2 + ": invalid context kind");
+      for (const key2 of ["title", "text"]) text(card[key2], label2 + " context " + key2);
+      references(card.modelRefs, label2, true);
+      evidence(card.evidence, label2);
+    }
+    const refs2 = [...markdownModelReferences(scene2.markdown ?? ""), ...(scene2.figures ?? []).flatMap((f) => f.modelRefs ?? []), ...(scene2.context ?? []).flatMap((c) => c.modelRefs)];
+    if (resolve2) {
+      for (const ref of refs2) if (!resolve2(ref)) throw Error(label2 + ": model reference does not resolve: " + ref);
+    }
+  }
+}
+function inlineTokens(value) {
+  const tokens = [], pattern = /`([^`]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+  let start2 = 0;
+  for (const m of value.matchAll(pattern)) {
+    if (m.index > start2) tokens.push({ type: "text", text: value.slice(start2, m.index) });
+    tokens.push(m[1] ? { type: "code", text: m[1] } : m[2] ? { type: "link", text: m[2], target: m[3] } : { type: m[4] ? "strong" : "em", text: m[4] ?? m[5] });
+    start2 = m.index + m[0].length;
+  }
+  if (start2 < value.length) tokens.push({ type: "text", text: value.slice(start2) });
+  return tokens;
+}
+function modelRef(target) {
+  try {
+    return decodeURIComponent(target.slice(6));
+  } catch {
+    throw Error("Invalid encoded model link: " + target);
+  }
+}
+function markdownModelReferences(value) {
+  let fenced = false;
+  return value.split("\n").flatMap((line2) => {
+    if (/^\s*```/.test(line2)) {
+      fenced = !fenced;
+      return [];
+    }
+    return fenced ? [] : inlineTokens(line2).filter((t) => t.type === "link" && t.target.startsWith("model:")).map((t) => modelRef(t.target));
+  });
+}
+function renderMarkdown(doc, value, { resolve: resolve2, onSelect } = {}) {
+  const host = doc.createElement("div");
+  let paragraph = [], list, code;
+  const inline = (parent, line2) => {
+    for (const t of inlineTokens(line2)) {
+      if (t.type === "text") {
+        parent.append(doc.createTextNode(t.text));
+        continue;
+      }
+      let node;
+      if (t.type === "link") {
+        if (t.target.startsWith("model:")) {
+          const ref = modelRef(t.target), id = resolve2(ref);
+          if (!id) throw Error("Unresolved model link: " + ref);
+          node = doc.createElement("button");
+          node.type = "button";
+          node.className = "model-link";
+          node.dataset.modelId = id;
+          node.onclick = () => onSelect(id);
+        } else if (/^https?:\/\//i.test(t.target)) {
+          node = doc.createElement("a");
+          node.href = t.target;
+          node.target = "_blank";
+          node.rel = "noopener noreferrer";
+        } else {
+          parent.append(doc.createTextNode(t.text));
+          continue;
+        }
+      } else node = doc.createElement(t.type);
+      node.textContent = t.text;
+      parent.append(node);
+    }
+  };
+  const flush = () => {
+    if (paragraph.length) {
+      const p = doc.createElement("p");
+      inline(p, paragraph.join(" "));
+      host.append(p);
+      paragraph = [];
+    }
+    list = null;
+  };
+  for (const line2 of value.split("\n")) {
+    if (/^\s*```/.test(line2)) {
+      flush();
+      if (code) code = null;
+      else {
+        const pre = doc.createElement("pre");
+        code = doc.createElement("code");
+        pre.append(code);
+        host.append(pre);
+      }
+      continue;
+    }
+    if (code) {
+      code.textContent += line2 + "\n";
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line2), item = /^\s*(?:([-*])|\d+\.)\s+(.+)$/.exec(line2);
+    if (heading) {
+      flush();
+      const h = doc.createElement("h" + Math.min(6, heading[1].length + 1));
+      inline(h, heading[2]);
+      host.append(h);
+    } else if (item) {
+      if (paragraph.length) flush();
+      const tag = item[1] ? "UL" : "OL";
+      if (!list || list.tagName !== tag) {
+        list = doc.createElement(tag);
+        host.append(list);
+      }
+      const li = doc.createElement("li");
+      inline(li, item[2]);
+      list.append(li);
+    } else if (!line2.trim()) flush();
+    else paragraph.push(line2);
+  }
+  flush();
+  return host;
+}
+var el = (doc, tag, value, cls) => {
+  const node = doc.createElement(tag);
+  if (value !== void 0) node.textContent = value;
+  if (cls) node.className = cls;
+  return node;
+};
+function appendModelReferences(host, refs2, { resolve: resolve2, onSelect, labelFor: labelFor2 }) {
+  const doc = host.ownerDocument;
+  for (const ref of refs2 ?? []) {
+    const id = resolve2(ref), b = el(doc, "button", labelFor2?.(id) ?? ref, "model-link");
+    b.type = "button";
+    b.dataset.modelId = id;
+    b.onclick = () => onSelect(id);
+    host.append(b);
+  }
+}
+function renderEvidence(doc, value) {
+  const box = el(doc, "details", void 0, "evidence-details");
+  box.append(el(doc, "summary", value.classification === "recorded-execution" ? "Recorded execution \xB7 source and conditions" : "Prepared analysis \xB7 source and conditions"));
+  const dl = el(doc, "dl");
+  for (const [name, content] of [["Source", value.source], ["Configuration", value.configuration], ["Run", value.runId]]) if (content) {
+    dl.append(el(doc, "dt", name), el(doc, "dd", content));
+  }
+  box.append(dl, el(doc, "pre", JSON.stringify(value.inputs, null, 2)), el(doc, "p", "Classification identifies the supplied record; it does not establish acceptance or a verification verdict.", "evidence-note"));
+  return box;
+}
+function renderContext(doc, cards, options) {
+  const host = el(doc, "div", void 0, "story-context");
+  for (const card of cards ?? []) {
+    const box = el(doc, "details", void 0, "context-card");
+    box.append(el(doc, "summary", contextKinds[card.kind] + " \xB7 " + card.title), el(doc, "p", card.text));
+    const refs2 = el(doc, "div", void 0, "model-references");
+    appendModelReferences(refs2, card.modelRefs, options);
+    box.append(refs2);
+    if (card.evidence) box.append(renderEvidence(doc, card.evidence));
+    host.append(box);
+  }
+  return host;
+}
+function chapterGroups(scenes) {
+  const groups = [];
+  for (const [index, scene2] of scenes.entries()) {
+    const id = scene2.chapter?.id ?? "";
+    let group = groups.at(-1);
+    if (!group || group.id !== id) {
+      group = { id, title: scene2.chapter?.title ?? "Scenes", scenes: [] };
+      groups.push(group);
+    }
+    group.scenes.push({ scene: scene2, index });
+  }
+  return groups;
+}
+function sceneFromURL(url, scenes) {
+  const hash = new URLSearchParams(new URL(url).hash.slice(1)), id = hash.get("scene"), chapter = hash.get("chapter");
+  if (!id && !chapter) return 0;
+  const index = scenes.findIndex((s) => id ? s.id === id : s.chapter?.id === chapter);
+  if (index < 0) throw Error("Shared " + (id ? "scene" : "chapter") + " is unavailable: " + (id ?? chapter));
+  return index;
+}
+function sceneURL(base, { scene: scene2, modelHash, demo, publication }) {
+  const url = new URL(base);
+  if (demo) url.searchParams.set("demo", demo);
+  url.hash = new URLSearchParams({ scene: scene2, ...modelHash ? { model: modelHash } : {}, ...publication ? { publication } : {} }).toString();
+  return url.href;
+}
+function checkSharedModel(url, modelHash, publication) {
+  const hash = new URLSearchParams(new URL(url).hash.slice(1)), expected = hash.get("model"), version = hash.get("publication");
+  if (expected && expected !== modelHash || version && version !== publication) throw Error("This link refers to a different story or model snapshot. Open its original publication or remove the link fragment to read this version.");
+}
+
+// src/canvas-prototype/figure-view.mjs
+function createAssetURLs(files, urlAPI = URL) {
+  const urls = /* @__PURE__ */ new Map();
+  return { get(path) {
+    if (!urls.has(path)) {
+      const data = files[path];
+      if (data === void 0) throw Error("Missing figure: " + path);
+      urls.set(path, urlAPI.createObjectURL(new Blob([data], { type: assetType(path) })));
+    }
+    return urls.get(path);
+  }, destroy() {
+    for (const value of urls.values()) urlAPI.revokeObjectURL(value);
+    urls.clear();
+  } };
+}
+function mountFigure(host, figure, { assetURL, resolve: resolve2, onSelect, labelFor: labelFor2, state: state2 = {}, onStateChange, onEnlarge } = {}) {
+  const doc = host.ownerDocument, el3 = (tag, text3) => {
+    const n = doc.createElement(tag);
+    if (text3 !== void 0) n.textContent = text3;
+    return n;
+  };
+  host.classList.add("figure-region");
+  const body = el3("figure"), image = el3("img");
+  image.src = assetURL(figure.asset);
+  image.alt = figure.alt;
+  image.decoding = "async";
+  const caption = el3("figcaption");
+  caption.append(el3("p", figure.caption));
+  const refs2 = el3("div");
+  refs2.className = "model-references";
+  appendModelReferences(refs2, figure.modelRefs, { resolve: resolve2, onSelect, labelFor: labelFor2 });
+  caption.append(refs2);
+  const source = el3("details");
+  source.append(el3("summary", "Figure source"), el3("p", figure.provenance.source), el3("p", figure.provenance.context));
+  caption.append(source);
+  if (figure.evidence) caption.append(renderEvidence(doc, figure.evidence));
+  if (onEnlarge) {
+    const b = el3("button", "Enlarge figure");
+    b.type = "button";
+    b.onclick = () => onEnlarge(figure);
+    caption.prepend(b);
+  }
+  body.append(image, caption);
+  host.replaceChildren(body);
+  for (const [i, d] of [...host.querySelectorAll("details")].entries()) d.open = state2.open?.[i] ?? false;
+  host.scrollTop = state2.scrollTop ?? 0;
+  const getState = () => ({ scrollTop: host.scrollTop, open: [...host.querySelectorAll("details")].map((d) => d.open) });
+  host.onscroll = () => onStateChange?.(getState());
+  return { getState, destroy() {
+    host.onscroll = null;
+    host.replaceChildren();
+  }, anchors: () => [], selectMany(ids) {
+    for (const b of host.querySelectorAll("[data-model-id]")) b.classList.toggle("selected", ids.includes(b.dataset.modelId));
+  } };
+}
+
 // src/canvas-prototype/reader-settings.mjs
 var key = "syspresent.reader.v1";
 var defaults = Object.freeze({ compartments: "all", routing: "square" });
@@ -459,9 +772,9 @@ function labelCandidates(points, width, height) {
 }
 function routeEdges(edges, nodes, options = {}) {
   const byID = new Map(nodes.map((n) => [n.id, n])), labels = [], ports = /* @__PURE__ */ new Map();
-  const measured = (text2) => {
-    const size = options.measureLabel?.(text2);
-    return { width: Math.max(1, size?.width ?? String(text2).length * 7.2 + 4), height: Math.max(1, size?.height ?? 16) };
+  const measured = (text3) => {
+    const size = options.measureLabel?.(text3);
+    return { width: Math.max(1, size?.width ?? String(text3).length * 7.2 + 4), height: Math.max(1, size?.height ?? 16) };
   };
   const ordered = [...edges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
   for (const edge of ordered) for (const side of ["source", "target"]) {
@@ -647,7 +960,7 @@ var representedIdentities = (view) => [...new Set(representations(view).map((r) 
 
 // src/canvas-prototype/grid-view.mjs
 var copy = (value) => value === void 0 ? void 0 : structuredClone(value);
-var text = (value) => value === null || value === void 0 ? "" : String(value);
+var text2 = (value) => value === null || value === void 0 ? "" : String(value);
 var hasIdentity = (value) => typeof value === "string" && value.length > 0;
 var positionKey = (row, column) => `${row}:${column}`;
 function gridRowOrder(view, sort) {
@@ -655,7 +968,7 @@ function gridRowOrder(view, sort) {
   if (view.kind === "matrix" || !sort || !Number.isInteger(sort.column) || sort.column < 0 || sort.column >= (view.columns ?? []).length) return indices;
   const direction = sort.direction === "descending" ? -1 : 1;
   return indices.sort((a, b) => {
-    const left = text(view.rows[a].cells?.[sort.column]), right = text(view.rows[b].cells?.[sort.column]);
+    const left = text2(view.rows[a].cells?.[sort.column]), right = text2(view.rows[b].cells?.[sort.column]);
     return direction * left.localeCompare(right, void 0, { numeric: true }) || a - b;
   });
 }
@@ -695,15 +1008,15 @@ function mountGrid(host, view, options = {}) {
     target.addEventListener(event, handler, settings2);
     listeners.push(() => target.removeEventListener(event, handler, settings2));
   };
-  const el2 = (tag, className, content) => {
+  const el3 = (tag, className, content) => {
     const node = doc.createElement(tag);
     if (className) node.className = className;
-    if (content !== void 0) node.textContent = text(content);
+    if (content !== void 0) node.textContent = text2(content);
     return node;
   };
-  const labelFor2 = (id) => text(options.labelFor?.(id) || id);
+  const labelFor2 = (id) => text2(options.labelFor?.(id) || id);
   const button2 = (label2, action, className = "") => {
-    const result = el2("button", className, label2);
+    const result = el3("button", className, label2);
     result.type = "button";
     result.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -711,29 +1024,29 @@ function mountGrid(host, view, options = {}) {
     });
     return result;
   };
-  const shell = el2("section", "canvas-grid-view");
+  const shell = el3("section", "canvas-grid-view");
   shell.setAttribute("aria-label", view.title ?? view.id ?? (matrix ? "Relationship matrix" : "Model table"));
-  const toolbar = el2("div", "canvas-grid-toolbar");
-  const settings = el2("details", "canvas-grid-settings");
-  settings.append(el2("summary", null, "Columns"));
-  const widthFields = el2("div", "canvas-grid-widths");
+  const toolbar = el3("div", "canvas-grid-toolbar");
+  const settings = el3("details", "canvas-grid-settings");
+  settings.append(el3("summary", null, "Columns"));
+  const widthFields = el3("div", "canvas-grid-widths");
   settings.append(widthFields);
   toolbar.append(settings);
-  const summary = el2("span", "canvas-grid-summary", `${rows.length} rows \xB7 ${columns.length} columns`);
+  const summary = el3("span", "canvas-grid-summary", `${rows.length} rows \xB7 ${columns.length} columns`);
   toolbar.append(summary);
-  const viewport = el2("div", "canvas-grid-scroll");
+  const viewport = el3("div", "canvas-grid-scroll");
   viewport.tabIndex = 0;
   viewport.setAttribute("role", "region");
   viewport.setAttribute("aria-label", `${matrix ? "Matrix" : "Table"} contents; scroll to read all rows and columns`);
-  const table = el2("table", "canvas-grid-table");
+  const table = el3("table", "canvas-grid-table");
   table.setAttribute("aria-label", view.title ?? view.id ?? "Native model view");
-  const colgroup = el2("colgroup"), thead = el2("thead"), tbody = el2("tbody");
+  const colgroup = el3("colgroup"), thead = el3("thead"), tbody = el3("tbody");
   table.append(colgroup, thead, tbody);
   viewport.append(table);
-  const inspector = el2("div", "canvas-grid-inspector");
+  const inspector = el3("div", "canvas-grid-inspector");
   inspector.setAttribute("role", "status");
   inspector.setAttribute("aria-live", "polite");
-  const disclosure = el2("p", "canvas-grid-disclosure");
+  const disclosure = el3("p", "canvas-grid-disclosure");
   shell.append(toolbar, viewport, inspector, disclosure);
   host.append(shell);
   const bindings = [];
@@ -746,14 +1059,14 @@ function mountGrid(host, view, options = {}) {
     kind: "row",
     row,
     semanticId: rows[row].semanticId,
-    label: text(rows[row].cells?.[0] ?? rows[row].name ?? `Row ${row + 1}`),
+    label: text2(rows[row].cells?.[0] ?? rows[row].name ?? `Row ${row + 1}`),
     identityStatus: rows[row].identityStatus ?? (hasIdentity(rows[row].semanticId) ? "native" : "unknown")
   });
   const columnSelection = (column) => ({
     kind: "column",
     column,
     semanticId: columnElements.get(column)?.semanticId,
-    label: text(columns[column]),
+    label: text2(columns[column]),
     identityStatus: columnElements.get(column)?.identityStatus ?? (hasIdentity(columnElements.get(column)?.semanticId) ? "native" : "unknown")
   });
   const cellSelection = (row, column) => {
@@ -763,7 +1076,7 @@ function mountGrid(host, view, options = {}) {
       row,
       column,
       ...links.length === 1 && hasIdentity(links[0].semanticId) ? { semanticId: links[0].semanticId } : {},
-      label: text(rows[row].cells?.[column]),
+      label: text2(rows[row].cells?.[column]),
       rowSemanticId: rows[row].semanticId,
       columnSemanticId: columnElements.get(column)?.semanticId,
       relationships: links
@@ -782,38 +1095,38 @@ function mountGrid(host, view, options = {}) {
     inspector.replaceChildren();
     const selection = state2.selection;
     if (!selection) {
-      inspector.append(el2("span", null, "Select a row, heading or cell to inspect it. Explore is a separate action."));
+      inspector.append(el3("span", null, "Select a row, heading or cell to inspect it. Explore is a separate action."));
       return;
     }
-    const description = el2("div", "canvas-grid-selection");
+    const description = el3("div", "canvas-grid-selection");
     if (selection.kind === "relationship-cell") {
-      description.append(el2("strong", null, `${text(rows[selection.row]?.cells?.[0])} \xD7 ${text(columns[selection.column])}`));
+      description.append(el3("strong", null, `${text2(rows[selection.row]?.cells?.[0])} \xD7 ${text2(columns[selection.column])}`));
       const links = selection.relationships ?? [];
       if (!links.length) {
-        description.append(el2("p", null, selection.label ? "Relationship provenance is unavailable for this cell. Its displayed value is retained." : "No matching relationship in this view."));
-        if (selection.label) description.append(el2("p", null, selection.label));
+        description.append(el3("p", null, selection.label ? "Relationship provenance is unavailable for this cell. Its displayed value is retained." : "No matching relationship in this view."));
+        if (selection.label) description.append(el3("p", null, selection.label));
       } else {
-        description.append(el2("p", null, `${links.length} native relationship${links.length === 1 ? "" : "s"}. Direction is shown for each relationship.`));
-        const list = el2("ul");
+        description.append(el3("p", null, `${links.length} native relationship${links.length === 1 ? "" : "s"}. Direction is shown for each relationship.`));
+        const list = el3("ul");
         for (const relationship of links) {
-          const item = el2("li");
-          item.append(el2("span", null, `${relationship.kind ?? "Relationship"}: ${hasIdentity(relationship.sourceSemanticId) ? labelFor2(relationship.sourceSemanticId) : "Unknown source identity"} \u2192 ${hasIdentity(relationship.targetSemanticId) ? labelFor2(relationship.targetSemanticId) : "Unknown target identity"}${relationship.label ? ` \xB7 ${relationship.label}` : ""}`));
+          const item = el3("li");
+          item.append(el3("span", null, `${relationship.kind ?? "Relationship"}: ${hasIdentity(relationship.sourceSemanticId) ? labelFor2(relationship.sourceSemanticId) : "Unknown source identity"} \u2192 ${hasIdentity(relationship.targetSemanticId) ? labelFor2(relationship.targetSemanticId) : "Unknown target identity"}${relationship.label ? ` \xB7 ${relationship.label}` : ""}`));
           if (hasIdentity(relationship.semanticId)) {
-            const provenance = el2("details", "canvas-grid-provenance");
-            provenance.append(el2("summary", null, "Native identity"));
-            provenance.append(el2("small", null, `Relationship: ${relationship.semanticId}`));
-            if (relationship.qualifiedName) provenance.append(el2("small", null, `Qualified name: ${relationship.qualifiedName}`));
-            provenance.append(el2("small", null, `Source: ${relationship.sourceSemanticId ?? "unavailable"}`), el2("small", null, `Target: ${relationship.targetSemanticId ?? "unavailable"}`));
+            const provenance = el3("details", "canvas-grid-provenance");
+            provenance.append(el3("summary", null, "Native identity"));
+            provenance.append(el3("small", null, `Relationship: ${relationship.semanticId}`));
+            if (relationship.qualifiedName) provenance.append(el3("small", null, `Qualified name: ${relationship.qualifiedName}`));
+            provenance.append(el3("small", null, `Source: ${relationship.sourceSemanticId ?? "unavailable"}`), el3("small", null, `Target: ${relationship.targetSemanticId ?? "unavailable"}`));
             item.append(provenance);
-          } else item.append(el2("small", null, "Relationship identity unavailable."));
+          } else item.append(el3("small", null, "Relationship identity unavailable."));
           list.append(item);
         }
         description.append(list);
       }
     } else {
-      description.append(el2("strong", null, selection.label || "Empty value"));
-      if (selection.kind === "value-cell") description.append(el2("p", null, "Native displayed value. This cell has no exported property identity."));
-      else if (!hasIdentity(selection.semanticId)) description.append(el2("p", null, "Native semantic identity unavailable; model exploration is unavailable for this representation."));
+      description.append(el3("strong", null, selection.label || "Empty value"));
+      if (selection.kind === "value-cell") description.append(el3("p", null, "Native displayed value. This cell has no exported property identity."));
+      else if (!hasIdentity(selection.semanticId)) description.append(el3("p", null, "Native semantic identity unavailable; model exploration is unavailable for this representation."));
     }
     const canExplore = hasIdentity(selection.semanticId) || (selection.relationships ?? []).some((item) => hasIdentity(item.sourceSemanticId) && hasIdentity(item.targetSemanticId));
     if (canExplore) description.append(button2(selection.kind === "relationship-cell" ? "Explore relationship" : "Explore element", () => options.onExplore?.(copy(state2.selection)), "canvas-grid-explore"));
@@ -855,15 +1168,15 @@ function mountGrid(host, view, options = {}) {
     table.style.width = `${totalWidth}px`;
   };
   for (const [column, label2] of columns.entries()) {
-    colgroup.append(el2("col"));
-    const field = el2("label", null, `${text(label2) || `Column ${column + 1}`} width`);
-    const input = el2("input");
+    colgroup.append(el3("col"));
+    const field = el3("label", null, `${text2(label2) || `Column ${column + 1}`} width`);
+    const input = el3("input");
     input.type = "number";
     input.min = "80";
     input.max = "900";
     input.step = "20";
     input.value = String(state2.widths[column] ?? 200);
-    input.setAttribute("aria-label", `${text(label2) || `Column ${column + 1}`} width in pixels`);
+    input.setAttribute("aria-label", `${text2(label2) || `Column ${column + 1}`} width in pixels`);
     input.addEventListener("change", () => {
       const width = Number(input.value);
       if (!Number.isFinite(width) || width < 80 || width > 900) {
@@ -882,13 +1195,13 @@ function mountGrid(host, view, options = {}) {
     bindings.length = 0;
     thead.replaceChildren();
     tbody.replaceChildren();
-    const heading = el2("tr");
+    const heading = el3("tr");
     for (const [column, label2] of columns.entries()) {
-      const th = el2("th");
+      const th = el3("th");
       th.scope = "col";
       const selection = columnSelection(column);
-      const select2 = bind2(button2(text(label2) || `Column ${column + 1}`, () => selectSelection(selection), "canvas-grid-heading"), selection);
-      select2.setAttribute("aria-label", `Inspect column ${text(label2) || column + 1}`);
+      const select2 = bind2(button2(text2(label2) || `Column ${column + 1}`, () => selectSelection(selection), "canvas-grid-heading"), selection);
+      select2.setAttribute("aria-label", `Inspect column ${text2(label2) || column + 1}`);
       th.append(select2);
       if (!matrix) {
         th.setAttribute("aria-sort", state2.sort?.column === column ? state2.sort.direction : "none");
@@ -898,23 +1211,23 @@ function mountGrid(host, view, options = {}) {
           thead.querySelectorAll(".canvas-grid-sort")[column]?.focus({ preventScroll: true });
           changed();
         }, "canvas-grid-sort");
-        sort.setAttribute("aria-label", `Sort by ${text(label2) || `column ${column + 1}`} ${state2.sort?.column === column && state2.sort.direction === "ascending" ? "descending" : "ascending"}`);
+        sort.setAttribute("aria-label", `Sort by ${text2(label2) || `column ${column + 1}`} ${state2.sort?.column === column && state2.sort.direction === "ascending" ? "descending" : "ascending"}`);
         th.append(sort);
       }
       heading.append(bind2(th, selection));
     }
     thead.append(heading);
     for (const row of gridRowOrder(view, state2.sort)) {
-      const tr = el2("tr");
+      const tr = el3("tr");
       tr.dataset.nativeRow = String(row);
       for (const [column] of columns.entries()) {
-        const cell = el2(column === 0 ? "th" : "td");
+        const cell = el3(column === 0 ? "th" : "td");
         if (column === 0) cell.scope = "row";
         const selection = column === 0 ? rowSelection(row) : cellSelection(row, column);
-        const displayed = text(rows[row].cells?.[column]);
+        const displayed = text2(rows[row].cells?.[column]);
         const label2 = displayed || (matrix && column > 0 ? "\u2014" : "Empty");
         const select2 = bind2(button2(label2, () => selectSelection(selection), "canvas-grid-value"), selection);
-        select2.setAttribute("aria-label", column === 0 ? `Inspect row ${label2}` : `Inspect ${text(columns[column])} for ${text(rows[row].cells?.[0])}: ${displayed || (matrix ? "no matching relationship in this view" : "empty value")}`);
+        select2.setAttribute("aria-label", column === 0 ? `Inspect row ${label2}` : `Inspect ${text2(columns[column])} for ${text2(rows[row].cells?.[0])}: ${displayed || (matrix ? "no matching relationship in this view" : "empty value")}`);
         cell.append(select2);
         tr.append(bind2(cell, selection));
       }
@@ -1269,8 +1582,8 @@ function sequenceLayout(nativeView) {
     const from = byId.get(edge.source), to = byId.get(edge.target), a = from.x + from.width / 2, b = to.x + to.width / 2, self2 = a === b;
     const width = self2 ? Math.max(150, columnWidth - 40) : Math.max(140, Math.abs(b - a) - 24);
     const label2 = edge.label ?? "", detail = [edge.fromLabel ?? edge.from_label, edge.toLabel ?? edge.to_label].filter(Boolean).join(" \u2192 ");
-    const text2 = [label2, detail].filter(Boolean).join("\n");
-    const labelHeight = Math.max(30, text2.split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length * 7 / (width - 12))) * 19, 0) + 8);
+    const text3 = [label2, detail].filter(Boolean).join("\n");
+    const labelHeight = Math.max(30, text3.split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length * 7 / (width - 12))) * 19, 0) + 8);
     const points = self2 ? [{ x: a, y }, { x: a + Math.max(65, columnWidth * 0.37), y }, { x: a + Math.max(65, columnWidth * 0.37), y: y + 30 }, { x: a, y: y + 30 }] : [{ x: a, y }, { x: b, y }];
     const supported = ["flow", "succession", "transition"].includes(edge.kind);
     if (!supported) notices.push(`Unsupported sequence message kind: ${edge.kind}. Its native record remains available; no message arrow is inferred.`);
@@ -1284,7 +1597,7 @@ function sequenceLayout(nativeView) {
       supported,
       self: self2,
       labelBox: { x: self2 ? a + 12 : Math.min(a, b) + 12, y: y - labelHeight - 5, width, height: labelHeight },
-      text: text2
+      text: text3
     };
     y += Math.max(78, labelHeight + 38) + (self2 ? 30 : 0);
     return result;
@@ -1297,9 +1610,9 @@ function mountSequence(host, nativeView, { onSelect = () => {
 }, selectedId = null, selectedIds, state: state2 = {}, onStateChange = () => {
 } } = {}) {
   const document2 = host.ownerDocument, layout = sequenceLayout(nativeView), records = [], selected = { value: null, ids: [] };
-  const make = (tag, text2, cls) => {
+  const make = (tag, text3, cls) => {
     const e = document2.createElement(tag);
-    if (text2 !== void 0) e.textContent = text2;
+    if (text3 !== void 0) e.textContent = text3;
     if (cls) e.className = cls;
     return e;
   };
@@ -1311,14 +1624,14 @@ function mountSequence(host, nativeView, { onSelect = () => {
   const root = make("section", void 0, "sequence-view");
   root.setAttribute("aria-label", "Sequence view");
   const toolbar = make("div", void 0, "sequence-toolbar");
-  const evidence = make("p", "Modeled interaction \xB7 vertical spacing does not represent elapsed time.", "sequence-evidence");
+  const evidence2 = make("p", "Modeled interaction \xB7 vertical spacing does not represent elapsed time.", "sequence-evidence");
   const explore2 = make("button", "Explore selection");
   explore2.type = "button";
   explore2.disabled = true;
   explore2.onclick = () => {
     if (selected.value) onExplore(selected.value);
   };
-  toolbar.append(evidence, explore2);
+  toolbar.append(evidence2, explore2);
   root.append(toolbar);
   const selectionNotice = make("p", "", "sequence-selection-notice");
   selectionNotice.hidden = true;
@@ -1459,9 +1772,9 @@ function behaviorNotation(node) {
 function behaviorFace(document2, node) {
   const notation = behaviorNotation(node);
   if (!notation) return null;
-  const make = (tag, text2, cls) => {
+  const make = (tag, text3, cls) => {
     const e = document2.createElement(tag);
-    if (text2) e.textContent = text2;
+    if (text3) e.textContent = text3;
     if (cls) e.className = cls;
     return e;
   };
@@ -1504,9 +1817,9 @@ function applyBehaviorLayout(view) {
   return { ...view, nodes: view.nodes.map((node) => {
     const notation = behaviorNotation(node);
     if (!notation || notation.family === "control") return node;
-    const text2 = visibleDetail(node), lines = text2.split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length / 28)), 0);
+    const text3 = visibleDetail(node), lines = text3.split("\n").reduce((sum, line2) => sum + Math.max(1, Math.ceil(line2.length / 28)), 0);
     const base = notation.family === "fault-tree" ? 132 : notation.family === "case" ? 110 : 80;
-    return { ...node, width: Math.max(node.width ?? 0, notation.shape === "ellipse" ? 200 : 170), height: Math.max(node.height ?? 0, base + (text2 ? lines * 18 : 0)), behaviorFamily: notation.family };
+    return { ...node, width: Math.max(node.width ?? 0, notation.shape === "ellipse" ? 200 : 170), height: Math.max(node.height ?? 0, base + (text3 ? lines * 18 : 0)), behaviorFamily: notation.family };
   }) };
 }
 
@@ -1732,8 +2045,8 @@ function makeGraph(view, options, profile) {
   for (const native of view.nodes.filter((n) => actualPorts.has(n.id))) {
     const owner = elkNodes.get(native.parentId), incoming = view.edges.find((e) => (e.sourceAttachment ?? e.source) === native.id || (e.targetAttachment ?? e.target) === native.id), specified = String(native.portSide ?? native.side ?? "").toUpperCase();
     const side = ["NORTH", "SOUTH", "EAST", "WEST"].includes(specified) ? specified : (incoming?.sourceAttachment ?? incoming?.source) === native.id ? "SOUTH" : "NORTH";
-    const text2 = native.label ?? native.name, label2 = text2 ? options.measureLabel?.(text2) ?? { width: String(text2).length * 6.5, height: 16 } : null;
-    owner.ports.push({ id: native.id, width: num(native.width, 12), height: num(native.height, 12), ...label2 ? { labels: [{ id: native.id + ":port-label", text: text2, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {}, layoutOptions: { "elk.port.side": side, "elk.port.borderOffset": String(-Math.min(num(native.width, 12), num(native.height, 12)) / 2) } });
+    const text3 = native.label ?? native.name, label2 = text3 ? options.measureLabel?.(text3) ?? { width: String(text3).length * 6.5, height: 16 } : null;
+    owner.ports.push({ id: native.id, width: num(native.width, 12), height: num(native.height, 12), ...label2 ? { labels: [{ id: native.id + ":port-label", text: text3, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {}, layoutOptions: { "elk.port.side": side, "elk.port.borderOffset": String(-Math.min(num(native.width, 12), num(native.height, 12)) / 2) } });
     anchors.set(native.id, { identityStatus: native.semanticId ? "actual-model-port" : "modeled-pin", semanticId: native.semanticId ?? null, representationId: native.id, ownerId: native.parentId, ...native.nativePortId ? { nativePortId: native.nativePortId, nativePort: structuredClone(native.nativePort) } : {} });
   }
   function anchor(id, edgeId, side, preferredSide) {
@@ -2244,10 +2557,10 @@ async function mountGraphRegion(host, view, { onSelect, onExplore, selectedId, s
     const face2 = behaviorFace(doc, n);
     if (face2) node.append(face2);
     else {
-      for (const [cls, text2] of [["kind", `\xAB${n.kind}\xBB`], ["name", n.name], ["detail", n.displayDetail]]) if (text2) {
+      for (const [cls, text3] of [["kind", `\xAB${n.kind}\xBB`], ["name", n.name], ["detail", n.displayDetail]]) if (text3) {
         const span = doc.createElement("span");
         span.className = cls;
-        span.textContent = text2;
+        span.textContent = text3;
         node.append(span);
       }
     }
@@ -3438,6 +3751,7 @@ function validateProject(project) {
   for (const name of [...m.modelSources, ...m.viewSources, m.story, ...m.assets ?? []]) fileText(project, name);
   if ((/* @__PURE__ */ new Set([...m.modelSources, ...m.viewSources])).size !== m.modelSources.length + m.viewSources.length) throw Error("Model and view source files must be separate");
   if (!["complete", "scoped"].includes(m.publication?.scope)) throw Error("Publication scope must be complete or scoped");
+  validateStoryContent(parseStory(fileText(project, m.story)), { files: project.files, pathFor: projectPath });
   return project;
 }
 function projectDescriptor(project) {
@@ -3455,11 +3769,11 @@ function projectDescriptor(project) {
   else delete author.story;
   return author;
 }
-function parseStory(markdown2) {
+function parseStory(markdown) {
   const scenes = [], pattern = /^```syspresent\s*\n([\s\S]*?)\n```[ \t]*$/gm;
   let previous;
-  for (const match of markdown2.matchAll(pattern)) {
-    if (previous) previous.markdown = markdown2.slice(previous.bodyStart, match.index).trim();
+  for (const match of markdown.matchAll(pattern)) {
+    if (previous) previous.markdown = markdown.slice(previous.bodyStart, match.index).trim();
     let config;
     try {
       config = JSON.parse(match[1]);
@@ -3483,11 +3797,13 @@ function parseStory(markdown2) {
     previous = { ...config, bodyStart: match.index + match[0].length, markdown: "" };
     scenes.push(previous);
   }
-  if (previous) previous.markdown = markdown2.slice(previous.bodyStart).trim();
-  return scenes.map(({ bodyStart, ...scene2 }) => scene2);
+  if (previous) previous.markdown = markdown.slice(previous.bodyStart).trim();
+  const result = scenes.map(({ bodyStart, ...scene2 }) => scene2);
+  validateStoryContent(result);
+  return result;
 }
 function writeStory(title, scenes) {
-  return "# " + title + "\n\n" + scenes.map(({ markdown: markdown2, ...config }) => "```syspresent\n" + JSON.stringify({ ...config, type: "scene" }) + "\n```\n\n" + (markdown2 ?? "").trim() + "\n").join("\n");
+  return "# " + title + "\n\n" + scenes.map(({ markdown, ...config }) => "```syspresent\n" + JSON.stringify({ ...config, type: "scene" }) + "\n```\n\n" + (markdown ?? "").trim() + "\n").join("\n");
 }
 function packProject(project) {
   validateProject(project);
@@ -4958,8 +5274,8 @@ function documentationFor(graph, id) {
   const own2 = index.get(id);
   if (own2?.description) return { text: own2.description, source: own2 };
   const types = own2?.native?.type;
-  const references = Array.isArray(types) ? types : types ? [types] : [];
-  for (const reference of references) {
+  const references2 = Array.isArray(types) ? types : types ? [types] : [];
+  for (const reference of references2) {
     const type = index.get(reference?.["@id"]);
     if (type?.description) return { text: type.description, source: type };
   }
@@ -4970,10 +5286,10 @@ function measureCard(document2, node, detail) {
   const card = document2.createElement("div");
   card.className = "node";
   card.style.cssText = `position:fixed;left:-10000px;top:0;visibility:hidden;width:${width}px;height:auto;transform:none;`;
-  for (const [className, text2] of [["kind", `\xAB${node.kind}\xBB${node.displayID ? " " + node.displayID : ""}${node.type ? " : " + node.type : ""}`], ["name", (node.name?.split("::").at(-1) || node.kind).replace(/([a-z0-9])([A-Z])/g, "$1\u200B$2")], ...detail ? [["detail", detail]] : [], ...node.overviewLabel ? [["prominence", node.overviewLabel]] : []]) {
+  for (const [className, text3] of [["kind", `\xAB${node.kind}\xBB${node.displayID ? " " + node.displayID : ""}${node.type ? " : " + node.type : ""}`], ["name", (node.name?.split("::").at(-1) || node.kind).replace(/([a-z0-9])([A-Z])/g, "$1\u200B$2")], ...detail ? [["detail", detail]] : [], ...node.overviewLabel ? [["prominence", node.overviewLabel]] : []]) {
     const part = document2.createElement("span");
     part.className = className;
-    part.textContent = text2;
+    part.textContent = text3;
     card.append(part);
   }
   document2.body.append(card);
@@ -5035,14 +5351,14 @@ function createSemanticEngine({ assetBase, assetVersion, workerURL = new URL("./
 // src/canvas-prototype/app.mjs
 var buildVersion = document.querySelector('meta[name="syspresent-build"]')?.content || "development";
 var $ = (id) => document.getElementById(id);
-var el = (name, text2, cls) => {
+var el2 = (name, text3, cls) => {
   const e = document.createElement(name);
-  if (text2 !== void 0) e.textContent = text2;
+  if (text3 !== void 0) e.textContent = text3;
   if (cls) e.className = cls;
   return e;
 };
-var button = (text2, fn) => {
-  const e = el("button", text2);
+var button = (text3, fn) => {
+  const e = el2("button", text3);
   e.type = "button";
   e.onclick = () => Promise.resolve(fn()).catch(report);
   return e;
@@ -5094,51 +5410,10 @@ function scopeIds() {
   const roots = state.project.manifest.systemOfInterest;
   return state.graph.elements.filter((e) => roots.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id);
 }
-function status(text2) {
-  $("status").textContent = text2;
-  $("loading-phase").textContent = text2;
-  if (!$("landing").hidden) $("landing-status").textContent = text2;
-}
-function inline(parent, text2) {
-  let start2 = 0;
-  for (const m of text2.matchAll(/\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g)) {
-    parent.append(document.createTextNode(text2.slice(start2, m.index)));
-    parent.append(el(m[1] ? "strong" : m[2] ? "code" : "em", m[1] ?? m[2] ?? m[3]));
-    start2 = m.index + m[0].length;
-  }
-  parent.append(document.createTextNode(text2.slice(start2)));
-}
-function markdown(text2) {
-  const host = el("div");
-  let paragraph = [], list;
-  const flush = () => {
-    if (paragraph.length) {
-      const p = el("p");
-      inline(p, paragraph.join(" "));
-      host.append(p);
-      paragraph = [];
-    }
-    list = null;
-  };
-  for (const line2 of text2.split("\n")) {
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line2), item = /^[-*]\s+(.+)$/.exec(line2);
-    if (heading) {
-      flush();
-      host.append(el("h" + Math.min(6, Number(heading[1].length) + 1), heading[2]));
-    } else if (item) {
-      if (paragraph.length) flush();
-      if (!list) {
-        list = el("ul");
-        host.append(list);
-      }
-      const li = el("li");
-      inline(li, item[1]);
-      list.append(li);
-    } else if (!line2.trim()) flush();
-    else paragraph.push(line2);
-  }
-  flush();
-  return host;
+function status(text3) {
+  $("status").textContent = text3;
+  $("loading-phase").textContent = text3;
+  if (!$("landing").hidden) $("landing-status").textContent = text3;
 }
 var engineReady;
 var demoCatalog;
@@ -5174,7 +5449,7 @@ async function demos() {
   demoCatalog = catalog.demos;
   return demoCatalog;
 }
-async function openDemo(id) {
+async function openDemo(id, { readURL = false } = {}) {
   const request = ++state.loadRevision;
   ++state.revision;
   busy(true);
@@ -5186,8 +5461,12 @@ async function openDemo(id) {
     const response = await fetch("./" + demo.project + "?v=" + buildVersion);
     if (!response.ok) throw Error("Demo files are unavailable.");
     const bytes = new Uint8Array(await response.arrayBuffer());
+    if (demo.publication) {
+      const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (digest !== demo.publication) throw Error("Published project bytes do not match the catalog snapshot. Reload the publication.");
+    }
     if (request !== state.loadRevision) return;
-    await loadProject(unpackProject(bytes), { cacheHash: demo.runtimeCacheHash, loadToken: request });
+    await loadProject(unpackProject(bytes), { cacheHash: demo.runtimeCacheHash, loadToken: request, publication: demo.publication, demo: id, readURL });
   } catch (error) {
     if (request === state.loadRevision) throw error;
   } finally {
@@ -5280,9 +5559,10 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
   for (let i = 1; i < scenes.length; i++) {
     const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: scoped, journey: b.journey?.map(byName) });
     if (b.journey?.length && !plan.route.found) throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);
-    if (plan.mode === "cross-kind" && !plan.route.found) throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);
+    if (plan.mode === "cross-kind" && !plan.route.found && !b.allowDisconnected) throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);
   }
   if (m.entryFocus && !byName(m.entryFocus)) throw Error("Starting element does not resolve: " + m.entryFocus);
+  validateStoryContent(scenes, { files: project.files, pathFor: projectPath, resolve: byName });
   return { project, modelHash: parsed.modelHash, exported, graph, views, scenes, coverage, availableViews };
 }
 var rankingScope;
@@ -5297,7 +5577,7 @@ function busy(value) {
   $("loading").hidden = !value;
   for (const id of ["previous", "next", "scenes", "standalone", "return", "system-overview", "fit", "show-neighborhood", "zoom-in", "zoom-out", "find-toggle", "edit"]) $(id).disabled = value;
 }
-async function loadProject(project, { cacheHash = state.trustedCacheHash, loadToken } = {}) {
+async function loadProject(project, { cacheHash = state.trustedCacheHash, loadToken, demo = null, publication = null, readURL = false } = {}) {
   const revision = loadToken ?? ++state.loadRevision;
   if (revision !== state.loadRevision) return;
   ++state.revision;
@@ -5310,8 +5590,8 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
   try {
     await ensureEngine();
     if (revision !== state.loadRevision) return;
-    compiled = await compile(validateProject(project), { cacheHash, progress: (text2) => {
-      if (revision === state.loadRevision) status(text2);
+    compiled = await compile(validateProject(project), { cacheHash, progress: (text3) => {
+      if (revision === state.loadRevision) status(text3);
     } });
   } catch (error) {
     if (revision !== state.loadRevision) return;
@@ -5321,8 +5601,21 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
     throw error;
   }
   if (revision !== state.loadRevision) return;
+  let initialScene = 0;
+  try {
+    if (readURL) {
+      checkSharedModel(location.href, compiled.modelHash, publication);
+      initialScene = sceneFromURL(location.href, compiled.scenes);
+    }
+  } catch (error) {
+    busy(false);
+    throw error;
+  }
   disposeSurfaces();
-  Object.assign(state, compiled, { sceneIndex: 0, selected: null, selectedIds: [], exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map(), neighborhoodBudget: null, surfaceStates: {}, comparison: null, activeRegion: "primary" });
+  state.assetURLs?.destroy();
+  $("narrative").removeAttribute("data-scene-id");
+  Object.assign(state, compiled, { demo, publication, narrativeState: {}, sceneIndex: 0, selected: null, selectedIds: [], exploring: false, expanded: /* @__PURE__ */ new Set(), collapsed: /* @__PURE__ */ new Set(), rects: /* @__PURE__ */ new Map(), view: null, displayed: null, history: [], future: [], traceRequest: null, traceInfo: null, presentation: {}, extraViews: /* @__PURE__ */ new Map(), neighborhoodBudget: null, surfaceStates: {}, comparison: null, activeRegion: "primary" });
+  state.assetURLs = createAssetURLs(project.files);
   state.trustedCacheHash = cacheHash ?? null;
   showLanding(document, false);
   document.title = project.manifest.title + " \xB7 Syspresent";
@@ -5331,7 +5624,7 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
   updateLists();
   $("editor-error").textContent = "";
   $("project-menu").open = false;
-  if (state.scenes.length) await showScene(0, false);
+  if (state.scenes.length) await showScene(initialScene, false, { urlMode: "replace" });
   else if (project.manifest.entryView || project.manifest.entryFocus) {
     state.focus = resolve(project.manifest.entryFocus ?? project.manifest.systemOfInterest[0]);
     const entry = state.views.get(project.manifest.entryView);
@@ -5343,32 +5636,51 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
 }
 function updateLists() {
   $("scenes").replaceChildren();
-  for (const [i, s] of state.scenes.entries()) {
-    const option = el("option", `${i + 1}. ${s.title}`);
-    option.value = i;
-    $("scenes").append(option);
+  for (const group of chapterGroups(state.scenes)) {
+    const host = group.id ? el2("optgroup") : $("scenes");
+    if (group.id) {
+      host.label = group.title;
+      $("scenes").append(host);
+    }
+    for (const { scene: s, index: i } of group.scenes) {
+      const option = el2("option", `${i + 1}. ${s.title}`);
+      option.value = i;
+      host.append(option);
+    }
   }
+  $("contents").disabled = !state.scenes.length;
+  $("share-scene").disabled = !state.scenes.length;
   $("views").replaceChildren();
   for (const name of state.availableViews) {
-    const option = el("option", name);
+    const option = el2("option", name);
     option.value = name;
     $("views").append(option);
   }
   $("view-file").replaceChildren();
   for (const name of state.project.manifest.viewSources) {
-    const option = el("option", name);
+    const option = el2("option", name);
     option.value = name;
     $("view-file").append(option);
   }
 }
 function panelGeometry(view = state.view) {
   const panel = $("narrative"), stage = $("stage");
+  if (panel.dataset.sceneId && !panel.hidden) {
+    state.narrativeState ??= {};
+    state.narrativeState[panel.dataset.sceneId] = { open: [...panel.querySelectorAll("details")].map((d) => d.open), scrollTop: panel.scrollTop };
+  }
   if (state.exploring || !scene()) {
     panel.hidden = true;
     return [];
   }
+  const group = chapterGroups(state.scenes).find((g) => g.scenes.some((s) => s.index === state.sceneIndex)), position = group?.scenes.findIndex((s) => s.index === state.sceneIndex) ?? 0;
+  const progress = scene().chapter ? `${scene().chapter.title} \xB7 ${position + 1} of ${group.scenes.length} \xB7 Scene ${state.sceneIndex + 1} of ${state.scenes.length}` : `Scene ${state.sceneIndex + 1} of ${state.scenes.length}`;
+  const options = { resolve, onSelect: selectNarrative, labelFor: label };
   panel.hidden = false;
-  panel.replaceChildren(el("div", `Scene ${state.sceneIndex + 1} of ${state.scenes.length}`, "scene-count"), el("h2", scene().title), markdown(scene().markdown));
+  panel.replaceChildren(el2("div", progress, "scene-count"), el2("h2", scene().title), renderMarkdown(document, scene().markdown, options), renderContext(document, scene().context, options));
+  panel.dataset.sceneId = scene().id;
+  const savedNarrative = state.narrativeState?.[scene().id];
+  if (savedNarrative) for (const [i, detail] of [...panel.querySelectorAll("details")].entries()) detail.open = savedNarrative.open[i] ?? false;
   const width = stage.clientWidth, height = stage.clientHeight, narrow = width < 700, placement = narrow ? "bottom" : scene().panel?.placement ?? "right";
   panel.style.cssText = "";
   panel.style.width = (narrow ? width - 24 : Math.min(390, Math.max(280, width * 0.3))) + "px";
@@ -5383,6 +5695,8 @@ function panelGeometry(view = state.view) {
     panel.style.maxHeight = Math.max(140, height - 90) + "px";
   }
   const a = panel.getBoundingClientRect(), b = stage.getBoundingClientRect();
+  panel.style.height = a.height + "px";
+  panel.scrollTop = savedNarrative?.scrollTop ?? 0;
   return [{ id: "narrative", x: a.x - b.x, y: a.y - b.y, width: a.width, height: a.height }];
 }
 function sizeView(view, focus, { compact = false } = {}) {
@@ -5414,8 +5728,8 @@ var nodeKey = (node, counts, view) => {
   counts.set(base, count + 1);
   return base + ":" + count;
 };
-function labelSize(text2) {
-  const span = el("span", text2);
+function labelSize(text3) {
+  const span = el2("span", text3);
   span.style.cssText = "position:fixed;visibility:hidden;left:-10000px;white-space:pre;font:12px system-ui,sans-serif";
   document.body.append(span);
   const rect = span.getBoundingClientRect();
@@ -5454,34 +5768,34 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
 function face(n) {
   const behavior = behaviorFace(document, n);
   if (behavior) {
-    if (n.overviewLabel) behavior.append(el("span", n.overviewLabel, "prominence"));
+    if (n.overviewLabel) behavior.append(el2("span", n.overviewLabel, "prominence"));
     return behavior;
   }
-  const host = el("span", void 0, "node-face");
+  const host = el2("span", void 0, "node-face");
   if (n.kind === "port" && !n.overviewLabel) {
-    const text2 = n.label ?? n.name ?? "";
-    if (text2) host.append(el("span", text2, "port-name"));
+    const text3 = n.label ?? n.name ?? "";
+    if (text3) host.append(el2("span", text3, "port-name"));
     return host;
   }
   const short = (n.name?.split("::").at(-1) || n.kind).replace(/([a-z0-9])([A-Z])/g, "$1\u200B$2");
-  host.append(el("span", `\xAB${n.kind}\xBB${n.displayID ? " " + n.displayID : ""}${n.type ? " : " + n.type : ""}`, "kind"), el("span", short, "name"));
-  if (n.displayDetail) host.append(el("span", n.displayDetail, "detail"));
-  if (n.overviewLabel) host.append(el("span", n.overviewLabel, "prominence"));
+  host.append(el2("span", `\xAB${n.kind}\xBB${n.displayID ? " " + n.displayID : ""}${n.type ? " : " + n.type : ""}`, "kind"), el2("span", short, "name"));
+  if (n.displayDetail) host.append(el2("span", n.displayDetail, "detail"));
+  if (n.overviewLabel) host.append(el2("span", n.overviewLabel, "prominence"));
   return host;
 }
 function visualNode(n) {
   if (n.kind === "context-boundary") {
-    const marker = el("span", void 0, "node context-boundary");
+    const marker = el2("span", void 0, "node context-boundary");
     marker.title = "Additional model context: " + (n.name || n.semanticId);
     marker.setAttribute("role", "img");
     marker.setAttribute("aria-label", marker.title);
     marker.dataset.context = "true";
-    const glyph = el("span", "\u203A", "continuation-glyph");
+    const glyph = el2("span", "\u203A", "continuation-glyph");
     glyph.style.transform = `rotate(${{ EAST: 0, SOUTH: 90, WEST: 180, NORTH: 270 }[n.continuationDirection] ?? 0}deg)`;
     marker.append(glyph);
     return marker;
   }
-  const node = el("button", void 0, `node ${n.kind}${n.overviewLabel ? " overview-card" : ""}${n.container ? " container" : ""}${n.context ? " peripheral" : ""}${n.semanticId && n.semanticId === state.selected ? " selected" : ""}`);
+  const node = el2("button", void 0, `node ${n.kind}${n.overviewLabel ? " overview-card" : ""}${n.container ? " container" : ""}${n.context ? " peripheral" : ""}${n.semanticId && n.semanticId === state.selected ? " selected" : ""}`);
   node.type = "button";
   node.dataset.representation = n.id;
   if (n.semanticId) node.dataset.semanticId = n.semanticId;
@@ -5594,11 +5908,11 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
     const title = svgel("title");
     title.textContent = latest.label || latest.kind;
     group.append(title);
-    let text2;
+    let text3;
     if (latest.label && !latest.labelOmitted) {
-      text2 = svgel("text", { "font-size": 12 * (latest.labelScale ?? 1), "font-family": "system-ui, sans-serif", fill: "#355e60", "paint-order": "stroke", stroke: "#f5f7f7", "stroke-width": 4, "text-anchor": "start" });
-      text2.textContent = latest.label;
-      group.append(text2);
+      text3 = svgel("text", { "font-size": 12 * (latest.labelScale ?? 1), "font-family": "system-ui, sans-serif", fill: "#355e60", "paint-order": "stroke", stroke: "#f5f7f7", "stroke-width": 4, "text-anchor": "start" });
+      text3.textContent = latest.label;
+      group.append(text3);
     }
     group.onclick = (event) => {
       event.stopPropagation();
@@ -5619,7 +5933,7 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
       }
       return r;
     });
-    return { key: key2, group, line: line2, oldLine, hit, text: text2, latest, track: numeric };
+    return { key: key2, group, line: line2, oldLine, hit, text: text3, latest, track: numeric };
   });
   const draw = (progress, clock) => {
     const contextFade = duration ? Math.max(0, 1 - clock / 0.16, (clock - 0.84) / 0.16) : 1;
@@ -5655,11 +5969,11 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
     const currentNodes = nodes.map((n) => ({ ...n, id: n.key, parentId: n.parentId ? nodes.find((p) => p.id === n.parentId)?.key : void 0 }));
     const sampledEdges = edgeTracks.map((item) => ({ item, r: sampleTrack(item.track, offsets, progress) })), journeySizes = /* @__PURE__ */ new Map();
     const liveEdges = sampledEdges.filter(({ r }) => clock !== 1 && r.journey > 0.5 && r.opacity > 0.01).map(({ item }) => {
-      const text2 = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text2.length * 7), height: 16 }, old = journeySizes.get(text2);
-      journeySizes.set(text2, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
-      return { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, label: text2 };
+      const text3 = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text3.length * 7), height: 16 }, old = journeySizes.get(text3);
+      journeySizes.set(text3, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
+      return { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey, label: text3 };
     });
-    const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text2) => journeySizes.get(text2) }).map((route2) => [route2.id, route2]));
+    const liveRoutes = new Map(routeEdges(liveEdges, currentNodes, { area: destination.area, measureLabel: (text3) => journeySizes.get(text3) }).map((route2) => [route2.id, route2]));
     const shapeFor = ({ item, r }) => {
       if (r.context > 0.5 && r.journey < 0.5 && contextFade < 0.01) return { points: [], edge: { ...item.latest, id: item.key, source: item.latest.sourceKey, target: item.latest.targetKey }, journeyEdge: false };
       const interpolated = Array.from({ length: 20 }, (_, i) => ({ x: r["x" + i], y: r["y" + i] }));
@@ -5686,13 +6000,13 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
     }).filter((edge) => edge.points.length > 1 && visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
     if (clock > 0 && clock < 1 && contextFade > 0.01) {
       const contextSizes = /* @__PURE__ */ new Map(), movingContext = sampledEdges.filter(({ item, r }) => r.context > 0.5 && r.journey < 0.5 && r.opacity > 0.01).map(({ item }) => {
-        const shape = shapes.get(item.key), text2 = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text2.length * 7), height: 16 }, old = contextSizes.get(text2);
-        contextSizes.set(text2, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
+        const shape = shapes.get(item.key), text3 = item.latest.label ?? "", box = item.latest.labelBox ?? { width: Math.max(16, text3.length * 7), height: 16 }, old = contextSizes.get(text3);
+        contextSizes.set(text3, { width: Math.max(old?.width ?? 0, box.width), height: Math.max(old?.height ?? 0, box.height) });
         return { ...shape.edge, points: shape.points };
       }).filter((edge) => visibleIDs.has(edge.source) && visibleIDs.has(edge.target));
       const before = peripheralRoutingMetrics(movingContext, currentActive);
       if (before.crossings || before.overlapLength || before.blocked) {
-        const optimized = routePeripheralEdges(movingContext, visibleNodes, destination.area, { activeEdges: currentActive, measureLabel: (text2) => contextSizes.get(text2), candidateBudget: 4, reverse: false, visibilitySearches: 0 });
+        const optimized = routePeripheralEdges(movingContext, visibleNodes, destination.area, { activeEdges: currentActive, measureLabel: (text3) => contextSizes.get(text3), candidateBudget: 4, reverse: false, visibilitySearches: 0 });
         if (peripheralRouteScore(optimized.metrics) < peripheralRouteScore(before)) for (const route2 of optimized.edges) {
           const shape = shapes.get(route2.id);
           shape.points = route2.points;
@@ -5808,8 +6122,9 @@ async function frame(view, caption = "", duration = 0, focus = state.focus) {
   return result;
 }
 function sceneRegions(view = state.view) {
-  const regions = [{ id: "primary", view, focus: state.focus, title: view?.title || "Primary view" }];
+  const regions = [{ id: "primary", view, focus: state.focus, title: "Model" }];
   if (!state.exploring) for (const r of scene()?.regions ?? []) regions.push({ ...r, view: state.views.get(r.view), focus: resolve(r.focus ?? scene().focus) });
+  if (!state.exploring) for (const figure of scene()?.figures ?? []) regions.push({ id: figure.id, title: figure.title, figure, view: { id: "figure:" + figure.id, title: figure.title, kind: "figure" } });
   if (state.comparison) regions.push({ ...state.comparison, id: "comparison" });
   return regions.filter((r) => r.view);
 }
@@ -5840,7 +6155,7 @@ function surfaceAnchorSnapshot() {
 function destinationAnchors(view, focus, panels, base) {
   const family = rendererFamily(view);
   if (family === "graph") return null;
-  const area = primaryArea(view, panels), host = el("section", void 0, "view-region"), key2 = "primary:" + view.id;
+  const area = primaryArea(view, panels), host = el2("section", void 0, "view-region"), key2 = "primary:" + view.id;
   host.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:${area.x}px;top:${area.y}px;width:${area.width}px;height:${area.height}px`;
   $("stage").append(host);
   const options = { state: structuredClone(state.surfaceStates[key2] ?? {}), selectedId: state.selected, selectedIds: state.selectedIds, labelFor: label }, controller = family === "grid" ? mountGrid(host, view, options) : mountSequence(host, view, options);
@@ -5881,16 +6196,16 @@ async function renderSurfaces(view, focus, panels, revision) {
   }));
   for (const region of regions) {
     if (!region.visible || region.id === "primary" && rendererFamily(region.view) === "graph") continue;
-    const host = el("section", void 0, "view-region");
+    const host = el2("section", void 0, "view-region");
     host.setAttribute("aria-label", region.title || region.view.title);
     host.dataset.regionId = region.id;
     const r = region.area;
     host.style.cssText = `left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px`;
     $("view-regions").append(host);
-    const key2 = region.id + ":" + region.view.id, family = rendererFamily(region.view), options = { state: structuredClone(state.surfaceStates[key2] ?? {}), selectedId: state.selected, selectedIds: [...state.selectedIds], labelFor: label, onSelect: (selection) => selectSurface(selection, key2), onExplore: (selection) => exploreSurface(selection).catch(report), onStateChange: (value) => {
+    const key2 = region.id + ":" + region.view.id, family = region.figure ? "figure" : rendererFamily(region.view), options = { state: structuredClone(state.surfaceStates[key2] ?? {}), selectedId: state.selected, selectedIds: [...state.selectedIds], labelFor: label, onSelect: (selection) => selectSurface(selection, key2), onExplore: (selection) => exploreSurface(selection).catch(report), onStateChange: (value) => {
       if (revision === state.revision) state.surfaceStates[key2] = structuredClone(value);
     } };
-    const controller = await (family === "grid" ? mountGrid(host, region.view, options) : family === "sequence" ? mountSequence(host, region.view, options) : mountGraphRegion(host, sizeView(region.view, region.focus ?? focus), { ...options, elk: state.layoutEngine, routing: state.reader.routing, measureLabel: labelSize }));
+    const controller = await (family === "figure" ? mountFigure(host, region.figure, { ...options, resolve, onSelect: selectNarrative, assetURL: (path) => state.assetURLs.get(path), onEnlarge: enlargeFigure }) : family === "grid" ? mountGrid(host, region.view, options) : family === "sequence" ? mountSequence(host, region.view, options) : mountGraphRegion(host, sizeView(region.view, region.focus ?? focus), { ...options, elk: state.layoutEngine, routing: state.reader.routing, measureLabel: labelSize }));
     if (revision !== state.revision) {
       controller.destroy();
       host.remove();
@@ -5930,8 +6245,8 @@ function selectSurface(selection, origin) {
   if (selection.relationships?.length) {
     highlightSelection(selection.relationships.map((r) => r.semanticId), origin);
     const menu = $("selection");
-    menu.replaceChildren(el("strong", selection.label || "Relationships"));
-    for (const r of selection.relationships) menu.append(el("p", `${label(r.sourceSemanticId)} \u2192 ${label(r.targetSemanticId)} \xB7 ${r.kind}`));
+    menu.replaceChildren(el2("strong", selection.label || "Relationships"));
+    for (const r of selection.relationships) menu.append(el2("p", `${label(r.sourceSemanticId)} \u2192 ${label(r.targetSemanticId)} \xB7 ${r.kind}`));
     menu.append(button("Explore relationship", () => exploreSurface(selection)), button("Close", () => {
       menu.hidden = true;
     }));
@@ -5940,7 +6255,7 @@ function selectSurface(selection, origin) {
   else {
     highlightSelection([], origin);
     const menu = $("selection");
-    menu.replaceChildren(el("p", selection.kind === "relationship-cell" && !selection.label ? "No matching relationship in this view." : "No native semantic identity is available for this record."), button("Close", () => {
+    menu.replaceChildren(el2("p", selection.kind === "relationship-cell" && !selection.label ? "No matching relationship in this view." : "No native semantic identity is available for this record."), button("Close", () => {
       menu.hidden = true;
     }));
     menu.hidden = false;
@@ -6029,9 +6344,9 @@ async function transitionTo(view, focus, { animate = true, journey, allowDisconn
     }
   }
 }
-async function showScene(index, animate = true, { record = false } = {}) {
+async function showScene(index, animate = true, { record = false, urlMode = "push" } = {}) {
   if (index < 0 || index >= state.scenes.length) return;
-  const saved = snapshot(), savedHistory = [...state.history], savedFuture = [...state.future];
+  const saved = snapshot(), savedHistory = [...state.history], savedFuture = [...state.future], savedURL = location.href;
   if (record) remember();
   state.sceneIndex = index;
   state.exploring = false;
@@ -6049,6 +6364,7 @@ async function showScene(index, animate = true, { record = false } = {}) {
   let navigationRevision;
   try {
     if (!focus || !view) throw Error("Scene focus or native view is unavailable");
+    syncSceneURL(urlMode);
     const pending = transitionTo(view, focus, { animate, journey: s.journey, allowDisconnected: true });
     navigationRevision = state.revision;
     await pending;
@@ -6057,6 +6373,7 @@ async function showScene(index, animate = true, { record = false } = {}) {
     state.history = savedHistory;
     state.future = savedFuture;
     restoreValues(saved);
+    if (urlMode !== "none") history.replaceState(null, "", savedURL);
     if (saved.view) await transitionTo(saved.view, saved.focus, { animate: false, allowDisconnected: true, camera: saved.camera });
     throw error;
   } finally {
@@ -6067,6 +6384,67 @@ async function showScene(index, animate = true, { record = false } = {}) {
     $("return").hidden = !state.exploring || !state.scenes.length;
     $("standalone").hidden = state.exploring;
   }
+}
+function syncSceneURL(mode = "replace") {
+  if (!state.demo || !scene() || mode === "none") return;
+  const url = sceneURL(location.href, { scene: scene().id, modelHash: state.modelHash, demo: state.demo, publication: state.publication });
+  if (url !== location.href) history[mode === "push" ? "pushState" : "replaceState"](null, "", url);
+}
+function selectNarrative(id) {
+  select(id);
+  const represented = sceneRegions().some((r) => !r.figure && representedIdentities(r.view).includes(id));
+  if (!represented) $("selection").append(el2("p", "This element is loaded but outside the displayed views. Choose Focus to explore it.", "projection-note"));
+  else if ($("graph-viewport").hidden && rendererFamily(state.view) === "graph" && representedIdentities(state.view).includes(id)) $("selection").append(button("Show model view", async () => {
+    saveSurfaces();
+    state.activeRegion = "primary";
+    await frame(state.view);
+  }));
+}
+function enlargeFigure(figure) {
+  $("figure-title").textContent = figure.title;
+  mountFigure($("figure-detail"), figure, { assetURL: (path) => state.assetURLs.get(path), resolve, onSelect: (id) => {
+    $("figure-dialog").close();
+    selectNarrative(id);
+  }, labelFor: label });
+  $("figure-dialog").showModal();
+}
+function openContents() {
+  const body = $("contents-list");
+  body.replaceChildren();
+  for (const group of chapterGroups(state.scenes)) {
+    const section = el2("section");
+    section.append(el2("h3", group.title));
+    const list = el2("ol");
+    for (const { scene: s, index } of group.scenes) {
+      const item = el2("li"), link = el2(state.demo ? "a" : "button", s.title);
+      if (state.demo) link.href = sceneURL(location.href, { scene: s.id, modelHash: state.modelHash, demo: state.demo, publication: state.publication });
+      if (index === state.sceneIndex) link.setAttribute("aria-current", "step");
+      link.onclick = (e) => {
+        if (state.demo && (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)) return;
+        e.preventDefault();
+        $("contents-dialog").close();
+        showScene(index).catch(report);
+      };
+      item.append(link);
+      list.append(item);
+    }
+    section.append(list);
+    body.append(section);
+  }
+  $("contents-dialog").showModal();
+}
+function shareScene() {
+  $("share-note").textContent = state.demo ? "This link opens this scene and checks the model version. Keep the original publication URL when sharing a frozen review." : "This local project has no published URL. Export its project ZIP to share the story, model and figures together.";
+  $("share-url").hidden = !state.demo;
+  $("copy-scene-link").hidden = !state.demo;
+  if (state.demo) $("share-url").value = sceneURL(location.href, { scene: scene().id, modelHash: state.modelHash, demo: state.demo, publication: state.publication });
+  $("share-dialog").showModal();
+  if (state.demo) $("share-url").select();
+}
+function editorStoryContent() {
+  const id = $("chapter-id").value.trim(), title = $("chapter-title").value.trim();
+  if (!!id !== !!title) throw Error("Chapter ID and title must be supplied together");
+  return { chapter: id ? { id, title } : void 0, figures: JSON.parse($("scene-figures").value || "[]"), context: JSON.parse($("scene-context").value || "[]") };
 }
 function displayPreferences() {
   return { ...resolvePresentation(state.presentation, { width: $("stage").clientWidth, resolve }), compartments: { all: "expanded", none: "compact", focused: "auto" }[state.reader.compartments] };
@@ -6129,7 +6507,7 @@ async function restoreHistory(direction) {
   }
 }
 async function openExploration(view, id, { request = null, info = null, record = true, resetRegions = false } = {}) {
-  const previous = snapshot(), history = [...state.history], future = [...state.future];
+  const previous = snapshot(), history2 = [...state.history], future = [...state.future];
   if (record) remember();
   if (resetRegions) {
     state.comparison = null;
@@ -6149,7 +6527,7 @@ async function openExploration(view, id, { request = null, info = null, record =
     status(info ? info.summary.message : "Explore this native view \xB7 select an element for contextual actions");
   } catch (error) {
     if (revision !== state.revision) return;
-    state.history = history;
+    state.history = history2;
     state.future = future;
     restoreValues(previous);
     updateExplorationControls();
@@ -6194,10 +6572,10 @@ function select(id, node, origin) {
   clearTrace();
   highlightSelection([id], origin);
   const menu = $("selection");
-  menu.replaceChildren(el("strong", node?.name || label(id)));
+  menu.replaceChildren(el2("strong", node?.name || label(id)));
   menu.hidden = false;
   if (!id) {
-    menu.append(el("p", "This native notation element or embedded port has no independent model-element identity in this projection."), button("Close", () => {
+    menu.append(el2("p", "This native notation element or embedded port has no independent model-element identity in this projection."), button("Close", () => {
       menu.hidden = true;
     }));
     return;
@@ -6211,7 +6589,7 @@ function select(id, node, origin) {
   }));
   const prominence = state.view?.overview?.metrics[id];
   if (prominence) {
-    menu.append(el("p", `${prominence.children} direct children \xB7 ${prominence.connections} distinct connected elements. Structural prominence describes the loaded model, not engineering criticality.`));
+    menu.append(el2("p", `${prominence.children} direct children \xB7 ${prominence.connections} distinct connected elements. Structural prominence describes the loaded model, not engineering criticality.`));
     if (prominence.children > 0 && isStructuralElement(element(id))) menu.append(button("Expand contents", () => followTrace(id, "contents")));
   }
   menu.append(button("Focus", () => explore(id)), button(state.expanded.has(id) || !!node?.displayDetail ? "Collapse compartment" : "Show statement / compartment", async () => {
@@ -6227,7 +6605,7 @@ function select(id, node, origin) {
   }));
   const e = element(id);
   if (isStructuralElement(e)) {
-    const actions = el("div", void 0, "requirement-actions");
+    const actions = el2("div", void 0, "requirement-actions");
     for (const action of structuralActions(state.graph, id)) {
       const control = button(`${action.label} (${action.count})`, () => followTrace(id, action.mode));
       control.disabled = !action.enabled;
@@ -6240,16 +6618,16 @@ function select(id, node, origin) {
   if (["ActionUsage", "ActionDefinition"].includes(e?.kind)) menu.append(button("Activity view", () => explore(id, "action")));
   if (["StateUsage", "StateDefinition"].includes(e?.kind)) menu.append(button("State view", () => explore(id, "state")));
   if (["RequirementUsage", "RequirementDefinition"].includes(e?.kind)) {
-    const actions = el("div", void 0, "requirement-actions");
+    const actions = el2("div", void 0, "requirement-actions");
     for (const action of requirementActions(state.graph, id).filter((a) => a.mode !== "context")) {
       const control = button(`${action.label} (${action.count})`, () => followTrace(id, action.mode));
       control.disabled = action.count === 0 && action.unavailable === 0 && action.filtered === 0;
       control.title = action.summary?.message ?? "";
       actions.append(control);
     }
-    menu.append(actions, el("p", "Counts describe links in this loaded projection. Missing links are not proof that none exist.", "projection-note"));
+    menu.append(actions, el2("p", "Counts describe links in this loaded projection. Missing links are not proof that none exist.", "projection-note"));
   }
-  const advanced = el("details"), summary = el("summary", "Other relationships");
+  const advanced = el2("details"), summary = el2("summary", "Other relationships");
   advanced.append(summary);
   const kinds2 = [...new Set(state.graph.relationships.filter((r) => r.source === id || r.target === id).map((r) => r.kind))].filter((k) => !["typing", "owner", "specialization"].includes(k));
   for (const kind of kinds2) advanced.append(button(`Follow ${kind} relationships`, async () => {
@@ -6284,7 +6662,7 @@ function traceEdge(edge, key2) {
     g.setAttribute("aria-pressed", String(match));
   }
   const menu = $("selection");
-  menu.replaceChildren(el("strong", edge.label || edge.kind), el("p", `${label(edge.sourceSemantic)} \u2192 ${label(edge.targetSemantic)}`));
+  menu.replaceChildren(el2("strong", edge.label || edge.kind), el2("p", `${label(edge.sourceSemantic)} \u2192 ${label(edge.targetSemantic)}`));
   for (const id of [.../* @__PURE__ */ new Set([edge.sourceSemantic, edge.targetSemantic])].filter(Boolean)) menu.append(button("Focus " + label(id), () => explore(id)));
   menu.append(button("Close", () => {
     clearTrace();
@@ -6293,7 +6671,7 @@ function traceEdge(edge, key2) {
   menu.hidden = false;
 }
 function download(name, bytes, type) {
-  const blob = new Blob([bytes], { type }), url = URL.createObjectURL(blob), a = el("a");
+  const blob = new Blob([bytes], { type }), url = URL.createObjectURL(blob), a = el2("a");
   a.href = url;
   a.download = name;
   document.body.append(a);
@@ -6309,6 +6687,10 @@ function editorPresentation() {
 }
 function openEditor() {
   if (!state.project) return;
+  $("chapter-id").value = scene()?.chapter?.id ?? "";
+  $("chapter-title").value = scene()?.chapter?.title ?? "";
+  $("scene-figures").value = JSON.stringify(scene()?.figures ?? [], null, 2);
+  $("scene-context").value = JSON.stringify(scene()?.context ?? [], null, 2);
   $("scene-regions").value = (scene()?.regions ?? []).map((r) => r.view).join("\n");
   $("scene-title").value = scene()?.title || "New scene";
   $("scene-prose").value = scene()?.markdown || "";
@@ -6365,6 +6747,36 @@ function omissionDisclosure(omissions, overview) {
 Showing 100 of ${omissions.length} omitted records. Use Find to locate another named model element.` : "");
 }
 function bind() {
+  $("contents").onclick = openContents;
+  $("share-scene").onclick = shareScene;
+  $("copy-scene-link").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($("share-url").value);
+      $("share-note").textContent = "Scene link copied.";
+    } catch {
+      $("share-url").focus();
+      $("share-url").select();
+      $("share-note").textContent = "Select and copy the scene link below.";
+    }
+  };
+  const navigateURL = () => {
+    if (!state.project || !state.demo) return;
+    const demo = new URLSearchParams(location.search).get("demo");
+    if (demo !== state.demo) {
+      if (demo) openDemo(demo, { readURL: true }).catch(report);
+      else home();
+      return;
+    }
+    try {
+      checkSharedModel(location.href, state.modelHash, state.publication);
+      const index = sceneFromURL(location.href, state.scenes);
+      if (index !== state.sceneIndex || state.exploring) showScene(index, false, { urlMode: "none" }).catch(report);
+    } catch (error) {
+      report(error);
+    }
+  };
+  window.addEventListener("popstate", navigateURL);
+  window.addEventListener("hashchange", navigateURL);
   $("global-compartments").value = state.reader.compartments;
   $("global-routing").value = state.reader.routing;
   for (const [id, key2] of [["global-compartments", "compartments"], ["global-routing", "routing"]]) $(id).onchange = async () => {
@@ -6385,7 +6797,7 @@ function bind() {
   };
   $("open-folder").hidden = !("webkitdirectory" in $("folder-files"));
   for (const kind of PRESENTATION_RELATIONSHIP_KINDS) {
-    const option = el("option", kind);
+    const option = el2("option", kind);
     option.value = kind;
     $("presentation-emphasis").append(option);
   }
@@ -6478,7 +6890,7 @@ function bind() {
     try {
       if (!scene()) throw Error("Capture a first scene before editing it");
       const presentation = editorPresentation(), regions = updateRegionReferences(scene().regions ?? [], $("scene-regions").value.split("\n").map((s) => s.trim()).filter(Boolean)), index = state.sceneIndex, project = structuredClone(state.project), scenes = structuredClone(state.scenes);
-      Object.assign(scenes[index], { presentation, regions, title: $("scene-title").value, markdown: $("scene-prose").value, panel: { placement: $("panel-placement").value } });
+      Object.assign(scenes[index], { ...editorStoryContent(), presentation, regions, title: $("scene-title").value, markdown: $("scene-prose").value, panel: { placement: $("panel-placement").value } });
       project.files[project.manifest.story] = writeStory(project.manifest.title, scenes);
       await loadProject(project);
       $("editor").close();
@@ -6632,7 +7044,7 @@ async function start() {
   busy(false);
   showLanding(document, true);
   const demo = new URLSearchParams(location.search).get("demo");
-  if (demo) await openDemo(demo);
+  if (demo) await openDemo(demo, { readURL: true });
 }
 start().catch(report);
 //# sourceMappingURL=app.js.map

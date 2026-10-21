@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="660" viewBox="0 0 720 660" role="img" aria-labelledby="title desc">
+  <title id="title">IC-01 declared design inputs</title>
+  <desc id="desc">Rounded model inputs: hull length 1.20 metres, beam 0.42 metres, sail area 0.40 square metres, ballast 0.50 kilograms, main battery 1300 watt-hours and proposed recovery battery 60 watt-hours. These are candidate inputs, not measured installed performance.</desc>
+  <rect width="720" height="660" rx="20" fill="#f5f8f7"/>
+  <g font-family="system-ui, sans-serif" fill="#203b45">
+    <text x="40" y="53" font-size="18" letter-spacing="2">BLUE DOG / IC-01</text>
+    <text x="40" y="97" font-size="30" font-weight="700">A consistent candidate</text>
+    <text x="40" y="132" font-size="18">Declared inputs · rounded for reading</text>
+    <g font-size="22">
+      <text x="40" y="198">Hull length</text><text x="470" y="198" font-weight="700">1.20 m</text>
+      <text x="40" y="260">Beam</text><text x="470" y="260" font-weight="700">0.42 m</text>
+      <text x="40" y="322">Sail area</text><text x="470" y="322" font-weight="700">0.40 m²</text>
+      <text x="40" y="384">Ballast</text><text x="470" y="384" font-weight="700">0.50 kg</text>
+      <text x="40" y="446">Main battery</text><text x="470" y="446" font-weight="700">1,300 Wh</text>
+      <text x="40" y="508">Recovery battery</text><text x="470" y="508" font-weight="700">60 Wh</text>
+    </g>
+    <path d="M40 217H680 M40 279H680 M40 341H680 M40 403H680 M40 465H680 M40 527H680" stroke="#ccd9d7"/>
+    <text x="40" y="568" font-size="18">Nameplate capacities do not establish usable energy.</text>
+    <text x="40" y="598" font-size="18">Hull length does not establish overall operating length.</text>
+    <text x="40" y="628" font-size="18" font-weight="600">Physical qualification remains open.</text>
+  </g>
+</svg>
