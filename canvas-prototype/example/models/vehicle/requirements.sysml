@@ -19,7 +19,8 @@ package BlueDogRequirements {
     }
     requirement def <'E-001'> EnergyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall maintain conservative estimates of usable energy and protected recovery reserve. */
+        doc /*
+         *  The vessel shall maintain conservative estimates of usable battery energy and the energy required for protected recovery. */
         comment conditions /* Energy estimation and conservative decision inputs; accuracy uses calibrated energy integration across operating battery temperatures. */
     }
     requirement def <'E-002'> NavigationAndControl {
@@ -159,11 +160,9 @@ package BlueDogRequirements {
         comment conditions /* Use independently recorded head-on, crossing and overtaking AIS and non-AIS targets, day and night in the selected operational profile. Allocations shall include kinematic response distance, uncertainty, consequence-informed clearance and margins, and required timely observation and whole-response reliability with confidence criteria. Unreliably classified targets shall use a reviewed conservative envelope spanning plausible classes and occupant transitions. Collision avoidance and nonimpediment obligations remain unchanged.*/
     }
     requirement trafficSafety : TrafficSafety;
-    #derivation connection challengeTrafficResponse {
+    #refinement dependency challengeTrafficResponse from BlueDogRequirements::trafficSafety to GorgeChallenge::trafficCoexistence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Preventing collisions requires traffic assessment and response; scenario parameters are allocated by Blue Dog analysis."; }
-        end #original source ::> GorgeChallenge::trafficCoexistence;
-        end #derive target ::> trafficSafety;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-001 specifies observation, assessment and response supporting collision-free passage. Its reviewed performance envelopes are selected allocations; C-007 independently supplies navigation duties. No-contact outcome alone does not imply the assessment process."; }
     }
     dependency deriveTrafficSafety from trafficSafety to navigationAndControl {
         metadata rationale : ModelingMetadata::Rationale { text = "TrafficSafety supports navigationAndControl. This is design motivation or an implementation choice, not a satisfaction implication."; }
@@ -182,13 +181,14 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "OperatingBoundary supports roundTrip. This is design motivation or an implementation choice, not a satisfaction implication."; }
     }
 
-    requirement def <'S-003'> SafeRecovery {
+    requirement def <'S-003'> EmergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall support controlled emergency intervention and powered recovery. */
-        comment conditions /* Emergency intervention ends attempt qualification. Exercise active emergency, powered recovery, local isolation and remote-control loss, including coexisting low-energy flags. */
+        doc /*
+         *  The vessel shall preserve controlled emergency intervention through abort, local motor isolation and remote-control loss. */
+        comment conditions /* Emergency intervention ends attempt qualification. Exercise abort, local isolation and remote-control loss with coexisting low-energy flags. S-110 through S-115 define the detailed acceptance criteria; powered shore-recovery capability is independently required by R-001. */
     }
-    requirement safeRecovery : SafeRecovery;
-    dependency deriveSafeRecovery from safeRecovery to GorgeChallenge::emergencyIntervention {
+    requirement emergencyControl : EmergencyControl;
+    dependency deriveSafeRecovery from emergencyControl to GorgeChallenge::emergencyIntervention {
         metadata rationale : ModelingMetadata::Rationale { text = "Permitted emergency intervention requires explicit abort, qualification, isolation and control-loss behavior. This is design motivation or an implementation choice, not a satisfaction implication."; }
     }
 
@@ -198,11 +198,9 @@ package BlueDogRequirements {
         comment conditions /* Use the deployment-specific compliance matrix for sailing, powered-recovery and stationary modes, including its visibility, arcs, colors and sound criteria. The matrix remains a deployment hold point under S-005. */
     }
     requirement navigationConspicuity : NavigationConspicuity;
-    #derivation connection challengeNavigationSignals {
+    #refinement dependency challengeNavigationSignals from BlueDogRequirements::navigationConspicuity to GorgeChallenge::navigationRules {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Applicable navigation-rule compliance includes presenting the required mode-dependent signals."; }
-        end #original source ::> GorgeChallenge::navigationRules;
-        end #derive target ::> navigationConspicuity;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-004 clarifies C-007 signal presentation during an attempt only. Its powered-recovery and stationary-mode coverage has the separate C-027 and deployment-matrix basis; those modes are not derived from attempt-only compliance."; }
     }
     dependency deriveNavigationConspicuity from navigationConspicuity to trafficSafety {
         metadata rationale : ModelingMetadata::Rationale { text = "NavigationConspicuity supports trafficSafety. This is design motivation or an implementation choice, not a satisfaction implication."; }
@@ -240,15 +238,16 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "MarineDurability supports environmentalEnvelope. This is design motivation or an implementation choice, not a satisfaction implication."; }
     }
 
-    requirement def <'N-003'> StabilityAndFouling {
+    requirement def <'N-003'> CapsizeResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall autonomously tolerate capsize and submerged aquatic vegetation, including milfoil-like stems. */
-        comment conditions /* Capsize and vegetation are separate disturbance cases. Righting and upright control restoration apply to the selected N-051 strategy; C-018 also permits post-abort limp recovery. Weed passage, snag shedding and blockage response apply to the declared Gorge exposure. No disturbance waives required safety capability or motor inhibition. */
-        comment notes /* Submerged-weed passage qualification does not cover dense floating mats or fishing-line entanglement. */
+        doc /*
+         *  After the declared capsize disturbances, the vessel shall provide the recovery behavior defined for the selected righting or post-abort recovery strategy. */
+        comment conditions /* Righting and upright control restoration apply to selected N-051/N-052 passive-righting criteria; C-018 independently permits post-abort limp recovery. No capsize waives required safety capability or motor inhibition. N-004 separately governs vegetation encounters. */
+
     }
-    requirement stabilityAndFouling : StabilityAndFouling;
-    dependency deriveStabilityAndFouling from stabilityAndFouling to environmentalEnvelope {
-        metadata rationale : ModelingMetadata::Rationale { text = "StabilityAndFouling supports environmentalEnvelope. This is design motivation or an implementation choice, not a satisfaction implication."; }
+    requirement capsizeResilience : CapsizeResilience;
+    dependency deriveStabilityAndFouling from capsizeResilience to environmentalEnvelope {
+        metadata rationale : ModelingMetadata::Rationale { text = "CapsizeResilience supports environmentalEnvelope. This dependency records design motivation rather than a satisfaction implication."; }
     }
 
     requirement def <'R-001'> RecoveryPropulsion {
@@ -258,8 +257,8 @@ package BlueDogRequirements {
         comment notes /* A sheltered thrust demonstration alone cannot qualify course-wide or capsized recovery. */
     }
     requirement recoveryPropulsion : RecoveryPropulsion;
-    dependency deriveRecoveryPropulsion from recoveryPropulsion to safeRecovery {
-        metadata rationale : ModelingMetadata::Rationale { text = "RecoveryPropulsion supports safeRecovery. This is design motivation or an implementation choice, not a satisfaction implication."; }
+dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::autonomousShoreRecovery {
+        metadata rationale : ModelingMetadata::Rationale { text = "R-001 specifies the installed powered means supporting course-dependent shore recovery. Emergency-control acceptance remains a separate S-003 obligation."; }
     }
 
     calc def RecoveryReserveDemand {
@@ -346,11 +345,9 @@ package BlueDogRequirements {
         comment notes /* Wind tolerance does not guarantee upstream progress. */
     }
     requirement gorgeWind : GorgeWind;
-    #derivation connection deriveGorgeWind {
+    #refinement dependency deriveGorgeWind from BlueDogRequirements::gorgeWind to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "GorgeWind provides a separately verifiable criterion for gorgeEnvironment."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> gorgeWind;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-011 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-012'> GorgeWaves {
@@ -359,11 +356,9 @@ package BlueDogRequirements {
         comment conditions /* N-001 defines operational functions. Wave statistics use 20-minute records. */
     }
     requirement gorgeWaves : GorgeWaves;
-    #derivation connection deriveGorgeWaves {
+    #refinement dependency deriveGorgeWaves from BlueDogRequirements::gorgeWaves to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "GorgeWaves provides a separately verifiable criterion for gorgeEnvironment."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> gorgeWaves;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-012 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-013'> GorgeCurrent {
@@ -373,11 +368,9 @@ package BlueDogRequirements {
         comment notes /* Current tolerance does not guarantee progress or station keeping; positive upstream speed is not required at every wind speed or heading. */
     }
     requirement gorgeCurrent : GorgeCurrent;
-    #derivation connection deriveGorgeCurrent {
+    #refinement dependency deriveGorgeCurrent from BlueDogRequirements::gorgeCurrent to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "GorgeCurrent provides a separately verifiable criterion for gorgeEnvironment."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> gorgeCurrent;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-013 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-014'> GorgeSurvivalWind {
@@ -386,11 +379,9 @@ package BlueDogRequirements {
         comment conditions /* Use N-001 survival outcomes and the operational wind reference convention. Selected-profile wave, current, temperature and humidity limits apply concurrently. BlueDogEnvironmentReview::RecoveryExposureHours includes casualty transit and declared pickup delay. */
     }
     requirement gorgeSurvivalWind : GorgeSurvivalWind;
-    #derivation connection deriveGorgeSurvivalWind {
+    #refinement dependency deriveGorgeSurvivalWind from BlueDogRequirements::gorgeSurvivalWind to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "GorgeSurvivalWind provides a separately verifiable criterion for gorgeEnvironment."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> gorgeSurvivalWind;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-014 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-015'> GorgeSurvivalWaves {
@@ -399,11 +390,9 @@ package BlueDogRequirements {
         comment conditions /* N-001 defines survival outcomes. */
     }
     requirement gorgeSurvivalWaves : GorgeSurvivalWaves;
-    #derivation connection deriveGorgeSurvivalWaves {
+    #refinement dependency deriveGorgeSurvivalWaves from BlueDogRequirements::gorgeSurvivalWaves to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "GorgeSurvivalWaves provides a separately verifiable criterion for gorgeEnvironment."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> gorgeSurvivalWaves;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-015 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-021'> OceanWind {
@@ -414,11 +403,9 @@ package BlueDogRequirements {
         comment notes /* Wind tolerance does not guarantee upstream progress. */
     }
     requirement oceanWind : OceanWind;
-    #derivation connection deriveOceanWind {
+    #refinement dependency deriveOceanWind from BlueDogRequirements::oceanWind to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "OceanWind provides a separately verifiable criterion for oceanEnvironment."; }
-        end #original source ::> oceanEnvironment;
-        end #derive target ::> oceanWind;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-021 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-022'> OceanWaves {
@@ -428,11 +415,9 @@ package BlueDogRequirements {
         comment conditions /* N-001 defines operational functions. Wave statistics use 20-minute records. */
     }
     requirement oceanWaves : OceanWaves;
-    #derivation connection deriveOceanWaves {
+    #refinement dependency deriveOceanWaves from BlueDogRequirements::oceanWaves to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "OceanWaves provides a separately verifiable criterion for oceanEnvironment."; }
-        end #original source ::> oceanEnvironment;
-        end #derive target ::> oceanWaves;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-022 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-023'> OceanCurrent {
@@ -443,11 +428,9 @@ package BlueDogRequirements {
         comment notes /* Current tolerance does not guarantee progress or station keeping; positive upstream speed is not required at every wind speed or heading. */
     }
     requirement oceanCurrent : OceanCurrent;
-    #derivation connection deriveOceanCurrent {
+    #refinement dependency deriveOceanCurrent from BlueDogRequirements::oceanCurrent to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "OceanCurrent provides a separately verifiable criterion for oceanEnvironment."; }
-        end #original source ::> oceanEnvironment;
-        end #derive target ::> oceanCurrent;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-023 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-024'> OceanSurvivalWind {
@@ -457,11 +440,9 @@ package BlueDogRequirements {
         comment conditions /* Use N-001 survival outcomes and the operational wind reference convention. Selected-profile wave, current, temperature and humidity limits apply concurrently. */
     }
     requirement oceanSurvivalWind : OceanSurvivalWind;
-    #derivation connection deriveOceanSurvivalWind {
+    #refinement dependency deriveOceanSurvivalWind from BlueDogRequirements::oceanSurvivalWind to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "OceanSurvivalWind provides a separately verifiable criterion for oceanEnvironment."; }
-        end #original source ::> oceanEnvironment;
-        end #derive target ::> oceanSurvivalWind;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-024 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-025'> OceanSurvivalWaves {
@@ -471,11 +452,9 @@ package BlueDogRequirements {
         comment conditions /* N-001 defines survival outcomes. */
     }
     requirement oceanSurvivalWaves : OceanSurvivalWaves;
-    #derivation connection deriveOceanSurvivalWaves {
+    #refinement dependency deriveOceanSurvivalWaves from BlueDogRequirements::oceanSurvivalWaves to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "OceanSurvivalWaves provides a separately verifiable criterion for oceanEnvironment."; }
-        end #original source ::> oceanEnvironment;
-        end #derive target ::> oceanSurvivalWaves;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-025 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-030'> AirTemperature {
@@ -484,11 +463,9 @@ package BlueDogRequirements {
         comment conditions /* N-001/N-035 define operational and survival functions. */
     }
     requirement airTemperature : AirTemperature;
-    #derivation connection deriveAirTemperature {
+    #refinement dependency deriveAirTemperature from BlueDogRequirements::airTemperature to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "AirTemperature provides a separately verifiable criterion for environmentalEnvelope."; }
-        end #original source ::> environmentalEnvelope;
-        end #derive target ::> airTemperature;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-030 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-031'> WaterTemperature {
@@ -497,11 +474,9 @@ package BlueDogRequirements {
         comment conditions /* N-001/N-035 define operational and survival functions. */
     }
     requirement waterTemperature : WaterTemperature;
-    #derivation connection deriveWaterTemperature {
+    #refinement dependency deriveWaterTemperature from BlueDogRequirements::waterTemperature to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "WaterTemperature provides a separately verifiable criterion for environmentalEnvelope."; }
-        end #original source ::> environmentalEnvelope;
-        end #derive target ::> waterTemperature;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-031 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-032'> Humidity {
@@ -509,11 +484,9 @@ package BlueDogRequirements {
         doc /* Installed equipment shall retain operational functions at 0–100 percent relative humidity, including condensation. */
     }
     requirement humidity : Humidity;
-    #derivation connection deriveHumidity {
+    #refinement dependency deriveHumidity from BlueDogRequirements::humidity to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Humidity provides a separately verifiable criterion for environmentalEnvelope."; }
-        end #original source ::> environmentalEnvelope;
-        end #derive target ::> humidity;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-032 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-033'> Visibility {
@@ -522,11 +495,9 @@ package BlueDogRequirements {
         comment conditions /* Exercise daylight and darkness at meteorological visibility of at least 1 km, and detected visibility below 1 km. Apply current BlueDogClassDetection class-specific or conservative plausible-class envelopes and the S-001 reviewed observation and response criteria.*/
     }
     requirement visibility : Visibility;
-    #derivation connection deriveVisibility {
+    #refinement dependency deriveVisibility from BlueDogRequirements::visibility to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Visibility provides a separately verifiable criterion for environmentalEnvelope."; }
-        end #original source ::> environmentalEnvelope;
-        end #derive target ::> visibility;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-033 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-034'> CalmOperation {
@@ -536,11 +507,9 @@ package BlueDogRequirements {
         comment notes /* Neither progress nor station keeping is required. */
     }
     requirement calmOperation : CalmOperation;
-    #derivation connection deriveCalmOperation {
+    #refinement dependency deriveCalmOperation from BlueDogRequirements::calmOperation to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "CalmOperation provides a separately verifiable criterion for environmentalEnvelope."; }
-        end #original source ::> environmentalEnvelope;
-        end #derive target ::> calmOperation;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-034 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-035'> EnvelopeTransition {
@@ -549,11 +518,9 @@ package BlueDogRequirements {
         comment conditions /* The trigger is a detected upper operational wind or wave limit exceedance for the selected profile; calm invokes N-034. Resumption eligibility requires 10 continuous minutes inside the selected wind/wave limits, valid navigation, upright control, preserved required safety capability and no low-energy, emergency-recovery or isolation restriction. Resuming a control mode never clears a disqualified attempt. */
     }
     requirement envelopeTransition : EnvelopeTransition;
-    #derivation connection deriveEnvelopeTransition {
+    #refinement dependency deriveEnvelopeTransition from BlueDogRequirements::envelopeTransition to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "EnvelopeTransition provides a separately verifiable criterion for environmentalEnvelope."; }
-        end #original source ::> environmentalEnvelope;
-        end #derive target ::> envelopeTransition;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-035 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-041'> FreshwaterExposure {
@@ -561,11 +528,9 @@ package BlueDogRequirements {
         doc /* For Gorge qualification, following continuous freshwater exposure for the full declared mission history, with submerged parts continuously wet and complete topside spray wetting at least once per hour, the vessel shall pass its Gorge functional checks without repair or servicing. */
     }
     requirement freshwaterExposure : FreshwaterExposure;
-    #derivation connection deriveFreshwaterExposure {
+    #refinement dependency deriveFreshwaterExposure from BlueDogRequirements::freshwaterExposure to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "FreshwaterExposure provides a separately verifiable criterion for marineDurability."; }
-        end #original source ::> marineDurability;
-        end #derive target ::> freshwaterExposure;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-041 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-042'> SaltwaterExposure {
@@ -581,11 +546,9 @@ package BlueDogRequirements {
         doc /* Before and after each wet-exposure campaign, installed electronics enclosures, connectors and penetrations shall show no detectable liquid ingress on dry internal water-sensitive indicators after 30 minutes immersion with their highest point 1 m below the water surface. */
     }
     requirement enclosureSealing : EnclosureSealing;
-    #derivation connection deriveEnclosureSealing {
+    #refinement dependency deriveEnclosureSealing from BlueDogRequirements::enclosureSealing to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "EnclosureSealing provides a separately verifiable criterion for marineDurability."; }
-        end #original source ::> marineDurability;
-        end #derive target ::> enclosureSealing;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-043 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-044'> WetMechanicalIntegrity {
@@ -594,11 +557,9 @@ package BlueDogRequirements {
         comment conditions /* Evaluate after each selected profile wet-exposure campaign under N-002. */
     }
     requirement wetMechanicalIntegrity : WetMechanicalIntegrity;
-    #derivation connection deriveWetMechanicalIntegrity {
+    #refinement dependency deriveWetMechanicalIntegrity from BlueDogRequirements::wetMechanicalIntegrity to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "WetMechanicalIntegrity provides a separately verifiable criterion for marineDurability."; }
-        end #original source ::> marineDurability;
-        end #derive target ::> wetMechanicalIntegrity;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-044 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-045'> WetElectricalIntegrity {
@@ -607,11 +568,9 @@ package BlueDogRequirements {
         comment conditions /* Evaluate disconnected cable assemblies after each selected profile wet-exposure campaign under N-002; disconnect electronics for insulation measurement. */
     }
     requirement wetElectricalIntegrity : WetElectricalIntegrity;
-    #derivation connection deriveWetElectricalIntegrity {
+    #refinement dependency deriveWetElectricalIntegrity from BlueDogRequirements::wetElectricalIntegrity to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "WetElectricalIntegrity provides a separately verifiable criterion for marineDurability."; }
-        end #original source ::> marineDurability;
-        end #derive target ::> wetElectricalIntegrity;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-045 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-046'> SolarHeating {
@@ -620,11 +579,9 @@ package BlueDogRequirements {
         comment conditions /* Expose the powered vessel to 40 degC ambient air and 1000 W/m2 incident solar irradiance for 8 hours; use the installed battery manufacturer temperature limits. */
     }
     requirement solarHeating : SolarHeating;
-    #derivation connection deriveSolarHeating {
+    #refinement dependency deriveSolarHeating from BlueDogRequirements::solarHeating to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "SolarHeating provides a separately verifiable criterion for marineDurability."; }
-        end #original source ::> marineDurability;
-        end #derive target ::> solarHeating;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-046 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-047'> PrintedMaterialAging {
@@ -637,20 +594,18 @@ package BlueDogRequirements {
         require constraint acceptance { exposureEvidenceAccepted and creditedLoadCapacityN > 0 and qualifiedAgedCapacityN >= creditedLoadCapacityN }
     }
     requirement printedMaterialAging : PrintedMaterialAging;
-    #derivation connection derivePrintedMaterialAging {
+    #refinement dependency derivePrintedMaterialAging from BlueDogRequirements::printedMaterialAging to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "PrintedMaterialAging provides a separately verifiable criterion for marineDurability."; }
-        end #original source ::> marineDurability;
-        end #derive target ::> printedMaterialAging;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-047 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-051'> SelfRighting {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall recover from the specified capsize releases without external assistance or motor thrust. */
-        comment conditions /* Apply to the selected passive-righting concept, not every challenge-compliant vessel. Use minimum and maximum mission loading, five releases at each angle of 90 and 180 degrees toward each side, without external action or motor thrust. Use freshwater for Gorge or 35 g/kg saltwater for ocean; dual qualification requires both media. All leaves apply to every release. */
+        comment conditions /* Apply to the selected passive-righting concept, not every challenge-compliant vessel. Use minimum and maximum mission loading, five releases at each angle of 90 and 180 degrees toward each side, without external action or motor thrust. Use freshwater for Gorge or 35 g/kg saltwater for ocean; dual qualification requires both media. N-118 RightingDeadline, N-119 CapsizeRigRetention, N-120 CapsizeBallastRetention and N-121 CapsizeElectronicsSealing apply to every release. */
     }
     requirement selfRighting : SelfRighting;
-    dependency selectedRightingStrategy from selfRighting to stabilityAndFouling {
+    dependency selectedRightingStrategy from selfRighting to capsizeResilience {
         metadata rationale : ModelingMetadata::Rationale { text = "Passive self-righting is the current monohull design strategy, not entailed by the challenge. C-018 also permits demonstrated limp recovery after abort; an alternative concept may meet that obligation without self-righting."; }
     }
 
@@ -660,7 +615,7 @@ package BlueDogRequirements {
         comment conditions /* Apply to every N-051 release without operator input. Mode-appropriate control does not mean normal sailing before the N-035 resumption gate permits it. */
     }
     requirement capsizeControlRecovery : CapsizeControlRecovery;
-    dependency deriveCapsizeControlRecovery from capsizeControlRecovery to stabilityAndFouling {
+    dependency deriveCapsizeControlRecovery from capsizeControlRecovery to capsizeResilience {
         metadata rationale : ModelingMetadata::Rationale { text = "Upright control restoration is an obligation of the selected passive-righting strategy. Alternative challenge concepts may provide post-abort limp recovery without this strategy."; }
     }
 
@@ -671,24 +626,20 @@ package BlueDogRequirements {
         metadata issue : ModelingMetadata::Issue { text = "Equivalence of the vegetation surrogate to local milfoil requires physical-test validation."; }
     }
     requirement submergedWeedPassage : SubmergedWeedPassage;
-    #derivation connection deriveSubmergedWeedPassage {
+    #refinement dependency deriveSubmergedWeedPassage from BlueDogRequirements::submergedWeedPassage to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "SubmergedWeedPassage provides a separately verifiable criterion for stabilityAndFouling."; }
-        end #original source ::> stabilityAndFouling;
-        end #derive target ::> submergedWeedPassage;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-053 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-054'> WeedSnagShedding {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall recover sailing performance after the specified appendage weed snags without assistance or motor use. */
-        comment conditions /* Gorge campaign: drape one wet 1 m branched stem over one appendage leading edge at a time, five repetitions per appendage, with N-053 surrogate characteristics, 5 m/s mean wind and the unobstructed reference heading. No manual assistance or motor use. Both leaf criteria apply to every repetition; visible stem removal alone is insufficient. */
+        comment conditions /* Gorge campaign: drape one wet 1 m branched stem over one appendage leading edge at a time, five repetitions per appendage, with N-053 surrogate characteristics, 5 m/s mean wind and the unobstructed reference heading. No manual assistance or motor use. N-128 WeedSnagSpeedRecovery and N-129 WeedSnagSteeringRecovery apply to every repetition; visible stem removal alone is insufficient. */
     }
     requirement weedSnagShedding : WeedSnagShedding;
-    #derivation connection deriveWeedSnagShedding {
+    #refinement dependency deriveWeedSnagShedding from BlueDogRequirements::weedSnagShedding to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "WeedSnagShedding provides a separately verifiable criterion for stabilityAndFouling."; }
-        end #original source ::> stabilityAndFouling;
-        end #derive target ::> weedSnagShedding;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-054 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-055'> WeedBlockageResponse {
@@ -697,11 +648,9 @@ package BlueDogRequirements {
         comment conditions /* Gorge trigger: vegetation prevents completion of commanded rudder motion for 5 seconds, or keeps water-relative speed below 25 percent of the preceding weed-free 60-second mean for 60 seconds with mean wind at least 3 m/s. Dense mats are a blockage/avoidance case, not a pass-through claim. */
     }
     requirement weedBlockageResponse : WeedBlockageResponse;
-    #derivation connection deriveWeedBlockageResponse {
+    #refinement dependency deriveWeedBlockageResponse from BlueDogRequirements::weedBlockageResponse to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "WeedBlockageResponse provides a separately verifiable criterion for stabilityAndFouling."; }
-        end #original source ::> stabilityAndFouling;
-        end #derive target ::> weedBlockageResponse;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-055 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-056'> RecoveryPropulsorWeeds {
@@ -710,11 +659,9 @@ package BlueDogRequirements {
         comment conditions /* Use a separately designated Gorge powered-recovery test with five passes through the N-053 patch without manual propulsor clearing, on the weed-free powered reference heading. Exercise locked propulsor separately. */
     }
     requirement recoveryPropulsorWeeds : RecoveryPropulsorWeeds;
-    #derivation connection deriveRecoveryPropulsorWeeds {
+    #refinement dependency deriveRecoveryPropulsorWeeds from BlueDogRequirements::recoveryPropulsorWeeds to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "RecoveryPropulsorWeeds provides a separately verifiable criterion for stabilityAndFouling."; }
-        end #original source ::> stabilityAndFouling;
-        end #derive target ::> recoveryPropulsorWeeds;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-056 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     dependency motorWeedTolerance from recoveryPropulsorWeeds to recoveryPropulsion {
         metadata rationale : ModelingMetadata::Rationale { text = "The recovery propulsor must remain usable in the vegetation encountered by the sailing vessel. This is design motivation or an implementation choice, not a satisfaction implication."; }
@@ -727,7 +674,8 @@ package BlueDogRequirements {
     requirement navigationAvailability : NavigationAvailability;
     requirement def <'R-003'> LaunchEnergyAdmission {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* Mission start shall remain inhibited unless a valid usable-energy estimate no older than 1 second strictly exceeds a valid R-002 protected reserve. */
+        doc /*
+         *  The vessel shall inhibit mission start unless a valid usable-energy estimate no older than 1 second strictly exceeds a valid R-002 protected reserve. */
         comment conditions /* Missing, stale or invalid estimates or reserve configuration inhibit start. */
         attribute conservativeStartEnergy : EnergyValue;
         attribute protectedReserve : EnergyValue;
@@ -746,15 +694,14 @@ package BlueDogRequirements {
     requirement launchEnergyAdmission : LaunchEnergyAdmission;
     requirement def <'R-004'> ChallengeMotorInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall prevent motor propulsion from qualifying as unassisted sailing. */
+        doc /*
+         *  The vessel shall inhibit motor thrust until it has durably recorded a known nonqualifying status for the attempt. */
         comment conditions /* Exercise qualifying, nonqualifying and unknown qualification states, restart, link loss, power loss during transitions and conflicting/stale commands. Shared qualification persistence applies before enabling intervention. */
     }
     requirement challengeMotorInhibition : ChallengeMotorInhibition;
-    #derivation connection auditDerivation1 {
+    #refinement dependency auditDerivation1 from BlueDogRequirements::navigationAvailability to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "NavigationAvailability isolates a separately verifiable consequence of navigationAndControl."; }
-        end #original source ::> navigationAndControl;
-        end #derive target ::> navigationAvailability;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-008 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     dependency auditDerivation2 from launchEnergyAdmission to recoveryEnergy {
         metadata rationale : ModelingMetadata::Rationale { text = "The selected launch gate consumes the route-dependent reserve calculation. A changed reserve or validity rule requires admission review; the reserve magnitude alone does not define launch behavior."; }
@@ -771,147 +718,140 @@ package BlueDogRequirements {
     dependency auditDerivation6 from commandIntegrity to GorgeChallenge::emergencyIntervention {
         metadata rationale : ModelingMetadata::Rationale { text = "The emergency control channel needs authenticated, fresh commands and persistent qualification changes. This is design motivation or an implementation choice, not a satisfaction implication."; }
     }
-    #derivation connection auditDerivation10 {
+    #refinement dependency auditDerivation10 from BlueDogRequirements::freshwaterExposure to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "The river profile supplies the freshwater exposure medium."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> freshwaterExposure;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-041 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
-    #derivation connection auditDerivation11 {
+    #refinement dependency auditDerivation11 from BlueDogRequirements::saltwaterExposure to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "The ocean profile supplies the saltwater exposure medium."; }
-        end #original source ::> oceanEnvironment;
-        end #derive target ::> saltwaterExposure;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-042 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
-    #derivation connection auditDerivation12 {
+    #refinement dependency auditDerivation12 from BlueDogRequirements::submergedWeedPassage to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "David identified Columbia River milfoil as a Gorge design condition."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> submergedWeedPassage;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-053 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
-    #derivation connection auditDerivation13 {
+    #refinement dependency auditDerivation13 from BlueDogRequirements::weedSnagShedding to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Appendage snags are a consequence of the Gorge submerged-vegetation exposure."; }
-        end #original source ::> gorgeEnvironment;
-        end #derive target ::> weedSnagShedding;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-054 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     // Independently verifiable acceptance leaves.
     requirement def <'E-101'> EnergyEstimateCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall refresh usable battery-energy estimates at least once per second. */
+        comment conditions /*
+         *  Apply the E-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-101 continue to govern. */
     }
     requirement energyEstimateCadence : EnergyEstimateCadence;
-
-    #derivation connection decomposeEnergyEstimateCadence {
+    #refinement dependency decomposeEnergyEstimateCadence from BlueDogRequirements::energyEstimateCadence to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-001; the parent supplies shared verification conditions."; }
-        end #original source ::> energyAwareness;
-        end #derive target ::> energyEstimateCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-101 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-102'> ReserveEstimateCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall refresh protected recovery-reserve estimates at least once per second. */
+        comment conditions /*
+         *  Apply the E-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-102 continue to govern. */
     }
     requirement reserveEstimateCadence : ReserveEstimateCadence;
-
-    #derivation connection decomposeReserveEstimateCadence {
+    #refinement dependency decomposeReserveEstimateCadence from BlueDogRequirements::reserveEstimateCadence to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-001; the parent supplies shared verification conditions."; }
-        end #original source ::> energyAwareness;
-        end #derive target ::> reserveEstimateCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-102 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-103'> EnergyEstimateAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* Usable-energy estimation error shall not exceed 10 percent of measured usable full-charge energy relative to calibrated charge/discharge integration across operating battery temperatures. */
+        doc /*
+         *  Across the operating battery-temperature range, the absolute difference between estimated usable energy and calibrated charge/discharge integration shall not exceed 10 percent of measured usable full-charge energy. */
+        comment conditions /*
+         *  Apply the E-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-103 continue to govern. */
     }
     requirement energyEstimateAccuracy : EnergyEstimateAccuracy;
-
-    #derivation connection decomposeEnergyEstimateAccuracy {
+    #refinement dependency decomposeEnergyEstimateAccuracy from BlueDogRequirements::energyEstimateAccuracy to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-001; the parent supplies shared verification conditions."; }
-        end #original source ::> energyAwareness;
-        end #derive target ::> energyEstimateAccuracy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-103 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-104'> ConservativeEnergyEstimate {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The usable-energy input to admission and low-energy decisions shall equal estimated usable energy minus the EnergyEstimateAccuracy error allowance. */
+        comment conditions /*
+         *  Apply the E-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-104 continue to govern. */
     }
     requirement conservativeEnergyEstimate : ConservativeEnergyEstimate;
-
-    #derivation connection decomposeConservativeEnergyEstimate {
+    #refinement dependency decomposeConservativeEnergyEstimate from BlueDogRequirements::conservativeEnergyEstimate to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-001; the parent supplies shared verification conditions."; }
-        end #original source ::> energyAwareness;
-        end #derive target ::> conservativeEnergyEstimate;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-104 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-105'> GuidanceUpdateCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* During operational qualification, mission guidance shall update at least once per second. */
+        doc /*
+         *  During operational qualification, mission guidance shall refresh its guidance output at intervals no greater than 1 second. */
+        comment observationBoundary /*
+         *  Observe refresh at the guidance output consumed by control, or at the actuator command input, respectively. Repeated values count as a refresh; changed values and achieved physical motion are not required by this cadence criterion. */
+        comment conditions /*
+         *  Apply the E-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-105 continue to govern. */
     }
     requirement guidanceUpdateCadence : GuidanceUpdateCadence;
-
-    #derivation connection decomposeGuidanceUpdateCadence {
+    #refinement dependency decomposeGuidanceUpdateCadence from BlueDogRequirements::guidanceUpdateCadence to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-002; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAndControl;
-        end #derive target ::> guidanceUpdateCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-105 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-106'> SailCommandCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* During operational qualification, commanded sail position shall update at least once per second. */
+        doc /*
+         *  During operational qualification, sail control shall refresh the commanded sail position at intervals no greater than 1 second. */
+        comment observationBoundary /*
+         *  Observe refresh at the guidance output consumed by control, or at the actuator command input, respectively. Repeated values count as a refresh; changed values and achieved physical motion are not required by this cadence criterion. */
+        comment conditions /*
+         *  Apply the E-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-106 continue to govern. */
     }
     requirement sailCommandCadence : SailCommandCadence;
-
-    #derivation connection decomposeSailCommandCadence {
+    #refinement dependency decomposeSailCommandCadence from BlueDogRequirements::sailCommandCadence to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-002; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAndControl;
-        end #derive target ::> sailCommandCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-106 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-107'> SteeringCommandCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* During operational qualification, commanded steering position shall update at least once per second. */
+        doc /*
+         *  During operational qualification, steering control shall refresh the commanded steering position at intervals no greater than 1 second. */
+        comment observationBoundary /*
+         *  Observe refresh at the guidance output consumed by control, or at the actuator command input, respectively. Repeated values count as a refresh; changed values and achieved physical motion are not required by this cadence criterion. */
+        comment conditions /*
+         *  Apply the E-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-107 continue to govern. */
     }
     requirement steeringCommandCadence : SteeringCommandCadence;
-
-    #derivation connection decomposeSteeringCommandCadence {
+    #refinement dependency decomposeSteeringCommandCadence from BlueDogRequirements::steeringCommandCadence to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-002; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAndControl;
-        end #derive target ::> steeringCommandCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-107 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-108'> PositionAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* At every epoch in the common E-002 acceptance set, valid position error shall be at most 10 m against an independent reference. */
+        comment conditions /*
+         *  Apply the E-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-108 continue to govern. */
     }
     requirement positionAccuracy : PositionAccuracy;
-
-    #derivation connection decomposePositionAccuracy {
+    #refinement dependency decomposePositionAccuracy from BlueDogRequirements::positionAccuracy to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-002; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAndControl;
-        end #derive target ::> positionAccuracy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-108 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-109'> HeadingAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* At every epoch in the common E-002 acceptance set, valid heading error shall be at most 10 degrees against an independent reference. */
+        comment conditions /*
+         *  Apply the E-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-109 continue to govern. */
     }
     requirement headingAccuracy : HeadingAccuracy;
-
-    #derivation connection decomposeHeadingAccuracy {
+    #refinement dependency decomposeHeadingAccuracy from BlueDogRequirements::headingAccuracy to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-002; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAndControl;
-        end #derive target ::> headingAccuracy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-109 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-110'> RestartDeadline {
@@ -921,14 +861,13 @@ package BlueDogRequirements {
         require constraint restartDeadline {
             measuredRestartTime >= 0 [s] and measuredRestartTime <= 30 [s]
         }
+        comment conditions /*
+         *  Apply the E-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-110 continue to govern. */
     }
     requirement restartDeadline : RestartDeadline;
-
-    #derivation connection decomposeRestartDeadline {
+    #refinement dependency decomposeRestartDeadline from BlueDogRequirements::restartDeadline to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-003; the parent supplies shared verification conditions."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> restartDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-110 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-111'> MissionStateRestoration {
@@ -937,30 +876,28 @@ package BlueDogRequirements {
         comment conditions /* Restoring recorded mission intent does not command that operating mode. Current safety, capsize, energy, recovery and isolation restrictions govern actual operation under E-113 and N-035. */
     }
     requirement missionStateRestoration : MissionStateRestoration;
-
-    #derivation connection decomposeMissionStateRestoration {
+    #refinement dependency decomposeMissionStateRestoration from BlueDogRequirements::missionStateRestoration to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-003; the parent supplies shared verification conditions."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> missionStateRestoration;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-111 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-112'> GateProgressRestoration {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Within 30 seconds after a watchdog reset under E-003 preconditions, restored gate progress shall equal the last persisted gate progress. */
+        comment conditions /*
+         *  Apply the E-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-112 continue to govern. */
     }
     requirement gateProgressRestoration : GateProgressRestoration;
-
-    #derivation connection decomposeGateProgressRestoration {
+    #refinement dependency decomposeGateProgressRestoration from BlueDogRequirements::gateProgressRestoration to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-003; the parent supplies shared verification conditions."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> gateProgressRestoration;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-112 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-113'> ResetRestrictionPreservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After watchdog reset, each active survival, low-energy, recovery and isolation restriction shall remain effective until its own release condition is met. */
+        comment conditions /*
+         *  Apply the E-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-113 continue to govern. */
     }
     requirement resetRestrictionPreservation : ResetRestrictionPreservation;
 
@@ -974,84 +911,80 @@ package BlueDogRequirements {
     requirement def <'E-114'> LowEnergyEntry {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* When conservative usable energy reaches or falls below protected reserve, the vessel shall set the low-energy flag within 5 seconds. */
+        comment conditions /*
+         *  Apply the E-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-114 continue to govern. */
     }
     requirement lowEnergyEntry : LowEnergyEntry;
-
-    #derivation connection decomposeLowEnergyEntry {
+    #refinement dependency decomposeLowEnergyEntry from BlueDogRequirements::lowEnergyEntry to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-004; the parent supplies shared verification conditions."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> lowEnergyEntry;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-114 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-115'> LowEnergyPayloadInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* While the low-energy flag is set, the optional observation payload shall be disabled. */
+        comment conditions /*
+         *  Apply the E-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-115 continue to govern. */
     }
     requirement lowEnergyPayloadInhibition : LowEnergyPayloadInhibition;
-
-    #derivation connection decomposeLowEnergyPayloadInhibition {
+    #refinement dependency decomposeLowEnergyPayloadInhibition from BlueDogRequirements::lowEnergyPayloadInhibition to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-004; the parent supplies shared verification conditions."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> lowEnergyPayloadInhibition;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-115 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-116'> LowEnergyNavigationContinuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* While the low-energy flag is set, autonomous navigation shall remain active. */
+        comment conditions /*
+         *  Apply the E-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-116 continue to govern. */
     }
     requirement lowEnergyNavigationContinuity : LowEnergyNavigationContinuity;
-
-    #derivation connection decomposeLowEnergyNavigationContinuity {
+    #refinement dependency decomposeLowEnergyNavigationContinuity from BlueDogRequirements::lowEnergyNavigationContinuity to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-004; the parent supplies shared verification conditions."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> lowEnergyNavigationContinuity;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-116 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-117'> LowEnergyCollisionContinuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* While the low-energy flag is set, collision-response behavior shall remain active. */
+        comment conditions /*
+         *  Apply the E-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-117 continue to govern. */
     }
     requirement lowEnergyCollisionContinuity : LowEnergyCollisionContinuity;
-
-    #derivation connection decomposeLowEnergyCollisionContinuity {
+    #refinement dependency decomposeLowEnergyCollisionContinuity from BlueDogRequirements::lowEnergyCollisionContinuity to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-004; the parent supplies shared verification conditions."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> lowEnergyCollisionContinuity;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-117 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-118'> LowEnergyExit {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After conservative usable energy exceeds 1.2 times protected reserve for 10 continuous minutes, the vessel shall clear the low-energy flag independently of survival/recovery flags. */
+        comment conditions /*
+         *  Apply the E-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-118 continue to govern. */
     }
     requirement lowEnergyExit : LowEnergyExit;
-
-    #derivation connection decomposeLowEnergyExit {
+    #refinement dependency decomposeLowEnergyExit from BlueDogRequirements::lowEnergyExit to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-004; the parent supplies shared verification conditions."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> lowEnergyExit;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-118 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-119'> PayloadRestartPermission {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Payload operation shall remain inhibited whenever a low-energy, survival or recovery restriction is active. */
+        comment conditions /*
+         *  Apply the E-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-119 continue to govern. */
     }
     requirement payloadRestartPermission : PayloadRestartPermission;
-
-    #derivation connection decomposePayloadRestartPermission {
+    #refinement dependency decomposePayloadRestartPermission from BlueDogRequirements::payloadRestartPermission to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-004; the parent supplies shared verification conditions."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> payloadRestartPermission;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-119 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-120'> TelemetryDeliveryCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* With a functioning link, current position, operating mode and health telemetry delivery intervals shall not exceed 30 seconds. */
+        comment conditions /*
+         *  Apply the E-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-120 continue to govern. */
     }
     requirement telemetryDeliveryCadence : TelemetryDeliveryCadence;
 
@@ -1065,45 +998,44 @@ package BlueDogRequirements {
     requirement def <'E-121'> OutageAutonomy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Through a 24-hour telemetry-link outage, autonomous mission control shall continue without operator intervention. */
+        comment conditions /*
+         *  Apply the E-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-121 continue to govern. */
     }
     requirement outageAutonomy : OutageAutonomy;
-
-    #derivation connection decomposeOutageAutonomy {
+    #refinement dependency decomposeOutageAutonomy from BlueDogRequirements::outageAutonomy to BlueDogRequirements::communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-005; the parent supplies shared verification conditions."; }
-        end #original source ::> communications;
-        end #derive target ::> outageAutonomy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-121 specifies a detailed acceptance condition for E-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-122'> ReconnectCurrentRecord {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After link restoration, a current telemetry record shall arrive within the active TelemetryDeliveryCadence interval. */
+        comment conditions /*
+         *  Apply the E-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-122 continue to govern. */
     }
     requirement reconnectCurrentRecord : ReconnectCurrentRecord;
-
-    #derivation connection decomposeReconnectCurrentRecord {
+    #refinement dependency decomposeReconnectCurrentRecord from BlueDogRequirements::reconnectCurrentRecord to BlueDogRequirements::communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-005; the parent supplies shared verification conditions."; }
-        end #original source ::> communications;
-        end #derive target ::> reconnectCurrentRecord;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-122 specifies a detailed acceptance condition for E-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-123'> BacklogOrdering {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After reconnection, retained backlog records shall be transmitted in ascending acquisition sequence order. */
+        comment conditions /*
+         *  Apply the E-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-123 continue to govern. */
     }
     requirement backlogOrdering : BacklogOrdering;
-
-    #derivation connection decomposeBacklogOrdering {
+    #refinement dependency decomposeBacklogOrdering from BlueDogRequirements::backlogOrdering to BlueDogRequirements::communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-005; the parent supplies shared verification conditions."; }
-        end #original source ::> communications;
-        end #derive target ::> backlogOrdering;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-123 specifies a detailed acceptance condition for E-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-124'> BacklogCurrentPriority {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* During backlog transfer, current telemetry shall continue to meet TelemetryDeliveryCadence. */
+        comment conditions /*
+         *  Apply the E-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-124 continue to govern. */
     }
     requirement backlogCurrentPriority : BacklogCurrentPriority;
 
@@ -1117,196 +1049,181 @@ package BlueDogRequirements {
     requirement def <'E-125'> IngressDetection {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* In the E-006 injection test, ingress detection shall occur within 60 seconds of injection starting. */
+        comment conditions /*
+         *  Apply the E-006 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-125 continue to govern. */
     }
     requirement ingressDetection : IngressDetection;
-
-    #derivation connection decomposeIngressDetection {
+    #refinement dependency decomposeIngressDetection from BlueDogRequirements::ingressDetection to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-006; the parent supplies shared verification conditions."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> ingressDetection;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-125 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-126'> IngressRecoveryRequest {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* In the E-006 test, ingress detection shall set the recovery-request state. */
+        comment conditions /*
+         *  Apply the E-006 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-126 continue to govern. */
     }
     requirement ingressRecoveryRequest : IngressRecoveryRequest;
-
-    #derivation connection decomposeIngressRecoveryRequest {
+    #refinement dependency decomposeIngressRecoveryRequest from BlueDogRequirements::ingressRecoveryRequest to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-006; the parent supplies shared verification conditions."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> ingressRecoveryRequest;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-126 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-127'> IngressFlotation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* In the E-006 test, the vessel shall remain afloat for the full 30 minutes. */
+        comment conditions /*
+         *  Apply the E-006 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-127 continue to govern. */
     }
     requirement ingressFlotation : IngressFlotation;
-
-    #derivation connection decomposeIngressFlotation {
+    #refinement dependency decomposeIngressFlotation from BlueDogRequirements::ingressFlotation to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-006; the parent supplies shared verification conditions."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> ingressFlotation;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-127 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-128'> IngressElectronicsProtection {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After the E-006 test, enclosed-electronics water-sensitive indicators shall show no liquid ingress. */
+        comment conditions /*
+         *  Apply the E-006 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-128 continue to govern. */
     }
     requirement ingressElectronicsProtection : IngressElectronicsProtection;
-
-    #derivation connection decomposeIngressElectronicsProtection {
+    #refinement dependency decomposeIngressElectronicsProtection from BlueDogRequirements::ingressElectronicsProtection to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-006; the parent supplies shared verification conditions."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> ingressElectronicsProtection;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-128 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-129'> IngressPositionContinuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Throughout the E-006 test with a functioning link, position reporting shall meet the active TelemetryDeliveryCadence. */
+        comment conditions /*
+         *  Apply the E-006 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-129 continue to govern. */
     }
     requirement ingressPositionContinuity : IngressPositionContinuity;
-
-    #derivation connection decomposeIngressPositionContinuity {
+    #refinement dependency decomposeIngressPositionContinuity from BlueDogRequirements::ingressPositionContinuity to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-006; the parent supplies shared verification conditions."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> ingressPositionContinuity;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-129 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-130'> PeriodicLogCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Periodic mission records shall be acquired at least once per second normally and once per minute in low-energy or survival operation. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-130 continue to govern. */
     }
     requirement periodicLogCadence : PeriodicLogCadence;
-
-    #derivation connection decomposePeriodicLogCadence {
+    #refinement dependency decomposePeriodicLogCadence from BlueDogRequirements::periodicLogCadence to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> periodicLogCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-130 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-131'> LogRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Acquired mission records shall remain retrievable onboard for at least 30 days. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-131 continue to govern. */
     }
     requirement logRetention : LogRetention;
-
-    #derivation connection decomposeLogRetention {
+    #refinement dependency decomposeLogRetention from BlueDogRequirements::logRetention to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> logRetention;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-131 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-132'> CriticalEventRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Every external-command disposition, reset, motor-enable transition, ingress detection, recovery request, navigation-degraded transition, low-energy flag transition and qualification change shall have an event record regardless of periodic cadence. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-132 continue to govern. */
     }
     requirement criticalEventRecording : CriticalEventRecording;
-
-    #derivation connection decomposeCriticalEventRecording {
+    #refinement dependency decomposeCriticalEventRecording from BlueDogRequirements::criticalEventRecording to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> criticalEventRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-132 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-133'> LogTimestampAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* With valid GNSS time, mission-record timestamps shall differ from reference UTC by at most 1 second. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-133 continue to govern. */
     }
     requirement logTimestampAccuracy : LogTimestampAccuracy;
-
-    #derivation connection decomposeLogTimestampAccuracy {
+    #refinement dependency decomposeLogTimestampAccuracy from BlueDogRequirements::logTimestampAccuracy to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> logTimestampAccuracy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-133 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-134'> InvalidTimestampMarking {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each record acquired without valid time shall carry an invalid-time indication. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-134 continue to govern. */
     }
     requirement invalidTimestampMarking : InvalidTimestampMarking;
-
-    #derivation connection decomposeInvalidTimestampMarking {
+    #refinement dependency decomposeInvalidTimestampMarking from BlueDogRequirements::invalidTimestampMarking to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> invalidTimestampMarking;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-134 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-135'> LogGapIndication {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each detected missing sequence of scheduled records shall have a gap indication in retrieved data. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-135 continue to govern. */
     }
     requirement logGapIndication : LogGapIndication;
-
-    #derivation connection decomposeLogGapIndication {
+    #refinement dependency decomposeLogGapIndication from BlueDogRequirements::logGapIndication to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> logGapIndication;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-135 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-136'> LogInterruptionDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After watchdog reset or abrupt power removal, every record older than 5 seconds before interruption shall remain readable. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-136 continue to govern. */
     }
     requirement logInterruptionDurability : LogInterruptionDurability;
-
-    #derivation connection decomposeLogInterruptionDurability {
+    #refinement dependency decomposeLogInterruptionDurability from BlueDogRequirements::logInterruptionDurability to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> logInterruptionDurability;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-136 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-137'> ReconnectLogPreservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Communication reconnection shall not delete retained mission records. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-137 continue to govern. */
     }
     requirement reconnectLogPreservation : ReconnectLogPreservation;
-
-    #derivation connection decomposeReconnectLogPreservation {
+    #refinement dependency decomposeReconnectLogPreservation from BlueDogRequirements::reconnectLogPreservation to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> reconnectLogPreservation;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-137 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-138'> QualificationPersistence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each disqualifying transition shall be durably stored before its associated commanded intervention or motor enable. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-138 continue to govern. */
     }
     requirement qualificationPersistence : QualificationPersistence;
-
-    #derivation connection decomposeQualificationPersistence {
+    #refinement dependency decomposeQualificationPersistence from BlueDogRequirements::qualificationPersistence to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> qualificationPersistence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-138 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-139'> UnknownQualificationFallback {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* On restart with absent or inconsistent persisted qualification state, the vessel shall adopt nonqualifying status. */
+        comment conditions /*
+         *  Apply the E-007 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-139 continue to govern. */
     }
     requirement unknownQualificationFallback : UnknownQualificationFallback;
-
-    #derivation connection decomposeUnknownQualificationFallback {
+    #refinement dependency decomposeUnknownQualificationFallback from BlueDogRequirements::unknownQualificationFallback to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-007; the parent supplies shared verification conditions."; }
-        end #original source ::> missionEvidence;
-        end #derive target ::> unknownQualificationFallback;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-139 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-140'> NavigationValidEpochs {
@@ -1316,110 +1233,108 @@ package BlueDogRequirements {
         require constraint availabilityFraction {
             validEpochs >= 1710 and validEpochs <= 1800
         }
+        comment conditions /*
+         *  Apply the E-008 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-140 continue to govern. */
     }
     requirement navigationValidEpochs : NavigationValidEpochs;
-
-    #derivation connection decomposeNavigationValidEpochs {
+    #refinement dependency decomposeNavigationValidEpochs from BlueDogRequirements::navigationValidEpochs to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-008; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAvailability;
-        end #derive target ::> navigationValidEpochs;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-140 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-141'> StaleNavigationInvalidation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Navigation observations older than 5 seconds shall be marked invalid. */
+        comment conditions /*
+         *  Apply the E-008 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-141 continue to govern. */
     }
     requirement staleNavigationInvalidation : StaleNavigationInvalidation;
-
-    #derivation connection decomposeStaleNavigationInvalidation {
+    #refinement dependency decomposeStaleNavigationInvalidation from BlueDogRequirements::staleNavigationInvalidation to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-008; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAvailability;
-        end #derive target ::> staleNavigationInvalidation;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-141 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-142'> NavigationDegradedTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* When position or heading becomes invalid due to age, the vessel shall enter navigation-degraded state within 1 second. */
+        comment conditions /*
+         *  Apply the E-008 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-142 continue to govern. */
     }
     requirement navigationDegradedTransition : NavigationDegradedTransition;
-
-    #derivation connection decomposeNavigationDegradedTransition {
+    #refinement dependency decomposeNavigationDegradedTransition from BlueDogRequirements::navigationDegradedTransition to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-008; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAvailability;
-        end #derive target ::> navigationDegradedTransition;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-142 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-143'> StaleNavigationUseInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The controller shall not use observations marked invalid as current navigation inputs. */
+        comment conditions /*
+         *  Apply the E-008 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-143 continue to govern. */
     }
     requirement staleNavigationUseInhibition : StaleNavigationUseInhibition;
-
-    #derivation connection decomposeStaleNavigationUseInhibition {
+    #refinement dependency decomposeStaleNavigationUseInhibition from BlueDogRequirements::staleNavigationUseInhibition to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-008; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationAvailability;
-        end #derive target ::> staleNavigationUseInhibition;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-143 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-101'> SoloTransport {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* One adult shall move all mission equipment 100 m without assistance. */
+        doc /*
+         *  The vessel and its mission equipment shall be transportable for 100 m by one adult without assistance under the P-001 handling conditions. */
+        comment conditions /*
+         *  Apply the P-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-101 continue to govern. */
     }
     requirement soloTransport : SoloTransport;
-
-    #derivation connection decomposeSoloTransport {
+    #refinement dependency decomposeSoloTransport from BlueDogRequirements::soloTransport to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-001; the parent supplies shared verification conditions."; }
-        end #original source ::> transportability;
-        end #derive target ::> soloTransport;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-101 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-102'> LiftMass {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each separately lifted assembly shall have a mass no greater than 15 kg. */
+        comment conditions /*
+         *  Apply the P-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-102 continue to govern. */
     }
     requirement liftMass : LiftMass;
-
-    #derivation connection decomposeLiftMass {
+    #refinement dependency decomposeLiftMass from BlueDogRequirements::liftMass to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-001; the parent supplies shared verification conditions."; }
-        end #original source ::> transportability;
-        end #derive target ::> liftMass;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-102 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-103'> SetupDuration {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* One adult shall assemble the vessel from its transport configuration within 30 minutes. */
+        doc /*
+         *  The vessel shall be capable of assembly from its transport configuration by one adult within 30 minutes under the P-001 handling conditions. */
+        comment conditions /*
+         *  Apply the P-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-103 continue to govern. */
     }
     requirement setupDuration : SetupDuration;
-
-    #derivation connection decomposeSetupDuration {
+    #refinement dependency decomposeSetupDuration from BlueDogRequirements::setupDuration to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-001; the parent supplies shared verification conditions."; }
-        end #original source ::> transportability;
-        end #derive target ::> setupDuration;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-103 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-104'> PackDuration {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* One adult shall pack the vessel into its transport configuration within 30 minutes. */
+        doc /*
+         *  The vessel shall be capable of packing into its transport configuration by one adult within 30 minutes under the P-001 handling conditions. */
+        comment conditions /*
+         *  Apply the P-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-104 continue to govern. */
     }
     requirement packDuration : PackDuration;
-
-    #derivation connection decomposePackDuration {
+    #refinement dependency decomposePackDuration from BlueDogRequirements::packDuration to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-001; the parent supplies shared verification conditions."; }
-        end #original source ::> transportability;
-        end #derive target ::> packDuration;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-104 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-105'> SoloLaunch {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* One adult shall launch the assembled vessel without assistance. */
+        doc /*
+         *  The assembled vessel shall be launchable by one adult without assistance under the P-001 handling conditions. */
+        comment conditions /*
+         *  Apply the P-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-105 continue to govern. */
     }
     requirement soloLaunch : SoloLaunch;
 
@@ -1432,7 +1347,10 @@ package BlueDogRequirements {
 
     requirement def <'P-106'> SoloRetrieval {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* One adult shall retrieve the vessel from the water without assistance. */
+        doc /*
+         *  The vessel shall be retrievable from the water by one adult without assistance under the P-001 handling conditions. */
+        comment conditions /*
+         *  Apply the P-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-106 continue to govern. */
     }
     requirement soloRetrieval : SoloRetrieval;
 
@@ -1446,19 +1364,20 @@ package BlueDogRequirements {
     requirement def <'P-107'> ReplacementDuration {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each P-003 replacement shall take no more than 30 minutes. */
+        comment conditions /*
+         *  Apply the P-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-107 continue to govern. */
     }
     requirement replacementDuration : ReplacementDuration;
-
-    #derivation connection decomposeReplacementDuration {
+    #refinement dependency decomposeReplacementDuration from BlueDogRequirements::replacementDuration to BlueDogRequirements::serviceability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-003; the parent supplies shared verification conditions."; }
-        end #original source ::> serviceability;
-        end #derive target ::> replacementDuration;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-107 specifies a detailed acceptance condition for P-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-108'> NondestructiveService {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each P-003 replacement shall leave bonded structural joints and adjacent parts intact. */
+        comment conditions /*
+         *  Apply the P-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-108 continue to govern. */
     }
     requirement nondestructiveService : NondestructiveService;
 
@@ -1472,27 +1391,25 @@ package BlueDogRequirements {
     requirement def <'P-109'> PostServiceSealing {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each P-003 replacement, the assembly shall meet the N-043 immersion criterion. */
+        comment conditions /*
+         *  Apply the P-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-109 continue to govern. */
     }
     requirement postServiceSealing : PostServiceSealing;
-
-    #derivation connection decomposePostServiceSealing {
+    #refinement dependency decomposePostServiceSealing from BlueDogRequirements::postServiceSealing to BlueDogRequirements::serviceability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-003; the parent supplies shared verification conditions."; }
-        end #original source ::> serviceability;
-        end #derive target ::> postServiceSealing;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-109 specifies a detailed acceptance condition for P-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'P-110'> PostServiceActuation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each P-003 replacement, affected actuators shall complete their full commanded travel. */
+        comment conditions /*
+         *  Apply the P-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in P-110 continue to govern. */
     }
     requirement postServiceActuation : PostServiceActuation;
-
-    #derivation connection decomposePostServiceActuation {
+    #refinement dependency decomposePostServiceActuation from BlueDogRequirements::postServiceActuation to BlueDogRequirements::serviceability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of P-003; the parent supplies shared verification conditions."; }
-        end #original source ::> serviceability;
-        end #derive target ::> postServiceActuation;
+        metadata rationale : ModelingMetadata::Rationale { text = "P-110 specifies a detailed acceptance condition for P-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-101'> TrafficTracking {
@@ -1501,199 +1418,184 @@ package BlueDogRequirements {
         comment conditions /* Each admitted target class remains in scope. Before reliable classification, apply the reviewed conservative envelope spanning plausible classes and occupant transitions. */
     }
     requirement trafficTracking : TrafficTracking;
-
-    #derivation connection decomposeTrafficTracking {
+    #refinement dependency decomposeTrafficTracking from BlueDogRequirements::trafficTracking to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-001; the parent supplies shared verification conditions."; }
-        end #original source ::> trafficSafety;
-        end #derive target ::> trafficTracking;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-101 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-102'> CollisionAssessmentCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall update collision-risk estimates at least once per second. */
+        comment conditions /*
+         *  Apply the S-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-102 continue to govern. */
     }
     requirement collisionAssessmentCadence : CollisionAssessmentCadence;
-
-    #derivation connection decomposeCollisionAssessmentCadence {
+    #refinement dependency decomposeCollisionAssessmentCadence from BlueDogRequirements::collisionAssessmentCadence to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-001; the parent supplies shared verification conditions."; }
-        end #original source ::> trafficSafety;
-        end #derive target ::> collisionAssessmentCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-102 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-103'> AvoidanceCommandDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall issue the prescribed avoiding-action command within 2 seconds of each S-001 collision-risk trigger. */
+        comment conditions /*
+         *  Apply the S-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-103 continue to govern. */
     }
     requirement avoidanceCommandDeadline : AvoidanceCommandDeadline;
-
-    #derivation connection decomposeAvoidanceCommandDeadline {
+    #refinement dependency decomposeAvoidanceCommandDeadline from BlueDogRequirements::avoidanceCommandDeadline to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-001; the parent supplies shared verification conditions."; }
-        end #original source ::> trafficSafety;
-        end #derive target ::> avoidanceCommandDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-103 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-104'> TrafficAwarenessFault {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After traffic assessment has been invalid for more than 5 seconds, the vessel shall log a traffic-awareness fault within 1 second. */
+        comment conditions /*
+         *  Apply the S-001 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-104 continue to govern. */
     }
     requirement trafficAwarenessFault : TrafficAwarenessFault;
-
-    #derivation connection decomposeTrafficAwarenessFault {
+    #refinement dependency decomposeTrafficAwarenessFault from BlueDogRequirements::trafficAwarenessFault to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-001; the parent supplies shared verification conditions."; }
-        end #original source ::> trafficSafety;
-        end #derive target ::> trafficAwarenessFault;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-104 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-105'> BoundaryEvaluationCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall evaluate its current position and predicted trajectory against the S-002 polygons at least once per second. */
+        comment conditions /*
+         *  Apply the S-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-105 continue to govern. */
     }
     requirement boundaryEvaluationCadence : BoundaryEvaluationCadence;
-
-    #derivation connection decomposeBoundaryEvaluationCadence {
+    #refinement dependency decomposeBoundaryEvaluationCadence from BlueDogRequirements::boundaryEvaluationCadence to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-002; the parent supplies shared verification conditions."; }
-        end #original source ::> operatingBoundary;
-        end #derive target ::> boundaryEvaluationCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-105 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-106'> BoundaryAvoidanceDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall issue an avoidance command within 2 seconds of predicting a boundary crossing. */
+        comment conditions /*
+         *  Apply the S-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-106 continue to govern. */
     }
     requirement boundaryAvoidanceDeadline : BoundaryAvoidanceDeadline;
-
-    #derivation connection decomposeBoundaryAvoidanceDeadline {
+    #refinement dependency decomposeBoundaryAvoidanceDeadline from BlueDogRequirements::boundaryAvoidanceDeadline to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-002; the parent supplies shared verification conditions."; }
-        end #original source ::> operatingBoundary;
-        end #derive target ::> boundaryAvoidanceDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-106 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-107'> BoundaryAvoidanceRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Every boundary-avoidance command shall have a corresponding event record. */
+        comment conditions /*
+         *  Apply the S-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-107 continue to govern. */
     }
     requirement boundaryAvoidanceRecording : BoundaryAvoidanceRecording;
-
-    #derivation connection decomposeBoundaryAvoidanceRecording {
+    #refinement dependency decomposeBoundaryAvoidanceRecording from BlueDogRequirements::boundaryAvoidanceRecording to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-002; the parent supplies shared verification conditions."; }
-        end #original source ::> operatingBoundary;
-        end #derive target ::> boundaryAvoidanceRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-107 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-108'> BoundaryStartInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Missing or geometrically invalid boundaries shall inhibit mission start. */
+        comment conditions /*
+         *  Apply the S-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-108 continue to govern. */
     }
     requirement boundaryStartInhibition : BoundaryStartInhibition;
-
-    #derivation connection decomposeBoundaryStartInhibition {
+    #refinement dependency decomposeBoundaryStartInhibition from BlueDogRequirements::boundaryStartInhibition to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-002; the parent supplies shared verification conditions."; }
-        end #original source ::> operatingBoundary;
-        end #derive target ::> boundaryStartInhibition;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-108 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-109'> BoundaryDegradedEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Navigation loss or absence of a feasible maneuver shall produce an explicit degraded-route verdict instead of a safe-route verdict. */
+        comment conditions /*
+         *  Apply the S-002 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-109 continue to govern. */
     }
     requirement boundaryDegradedEvidence : BoundaryDegradedEvidence;
-
-    #derivation connection decomposeBoundaryDegradedEvidence {
+    #refinement dependency decomposeBoundaryDegradedEvidence from BlueDogRequirements::boundaryDegradedEvidence to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-002; the parent supplies shared verification conditions."; }
-        end #original source ::> operatingBoundary;
-        end #derive target ::> boundaryDegradedEvidence;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-109 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-110'> AbortLatchDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After accepting emergency abort, the vessel shall latch the attempt as disqualified within 1 second. */
+        comment conditions /*
+         *  Apply the S-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-110 continue to govern. */
     }
     requirement abortLatchDeadline : AbortLatchDeadline;
-
-    #derivation connection decomposeAbortLatchDeadline {
+    #refinement dependency decomposeAbortLatchDeadline from BlueDogRequirements::abortLatchDeadline to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-003; the parent supplies shared verification conditions."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> abortLatchDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-110 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-111'> RecoveryTelemetryCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* During active emergency or powered recovery with a functioning link, the vessel shall deliver position telemetry at least once per 30 seconds, including low-energy operation. */
+        comment conditions /*
+         *  Apply the S-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-111 continue to govern. */
     }
     requirement recoveryTelemetryCadence : RecoveryTelemetryCadence;
-
-    #derivation connection decomposeRecoveryTelemetryCadence {
+    #refinement dependency decomposeRecoveryTelemetryCadence from BlueDogRequirements::recoveryTelemetryCadence to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-003; the parent supplies shared verification conditions."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> recoveryTelemetryCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-111 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-112'> MotorIsolationDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* A physically accessible local isolation control shall remove motor power within 1 second of activation. */
+        comment conditions /*
+         *  Apply the S-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-112 continue to govern. */
     }
     requirement motorIsolationDeadline : MotorIsolationDeadline;
-
-    #derivation connection decomposeMotorIsolationDeadline {
+    #refinement dependency decomposeMotorIsolationDeadline from BlueDogRequirements::motorIsolationDeadline to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-003; the parent supplies shared verification conditions."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> motorIsolationDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-112 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-113'> IsolationRestartInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Motor restart shall remain inhibited after local isolation until deliberate local reset. */
+        comment conditions /*
+         *  Apply the S-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-113 continue to govern. */
     }
     requirement isolationRestartInhibition : IsolationRestartInhibition;
-
-    #derivation connection decomposeIsolationRestartInhibition {
+    #refinement dependency decomposeIsolationRestartInhibition from BlueDogRequirements::isolationRestartInhibition to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-003; the parent supplies shared verification conditions."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> isolationRestartInhibition;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-113 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-114'> ManualControlLossShutdown {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After remote control has been lost for 5 seconds during manual powered recovery, the vessel shall command zero thrust within a further 1 second. */
+        comment conditions /*
+         *  Apply the S-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-114 continue to govern. */
     }
     requirement manualControlLossShutdown : ManualControlLossShutdown;
-
-    #derivation connection decomposeManualControlLossShutdown {
+    #refinement dependency decomposeManualControlLossShutdown from BlueDogRequirements::manualControlLossShutdown to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-003; the parent supplies shared verification conditions."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> manualControlLossShutdown;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-114 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-115'> ControlLossLocationContinuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Location reporting shall continue at the active telemetry cadence after remote-control loss whenever a telemetry link is available. */
+        comment conditions /*
+         *  Apply the S-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-115 continue to govern. */
     }
     requirement controlLossLocationContinuity : ControlLossLocationContinuity;
-
-    #derivation connection decomposeControlLossLocationContinuity {
+    #refinement dependency decomposeControlLossLocationContinuity from BlueDogRequirements::controlLossLocationContinuity to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-003; the parent supplies shared verification conditions."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> controlLossLocationContinuity;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-115 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-116'> NavigationLightPresentation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall present the lights prescribed for its current mode by the S-004 compliance matrix without a person aboard. */
+        comment conditions /*
+         *  Apply the S-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-116 continue to govern. */
     }
     requirement navigationLightPresentation : NavigationLightPresentation;
 
@@ -1707,6 +1609,8 @@ package BlueDogRequirements {
     requirement def <'S-117'> NavigationShapePresentation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall present the shapes prescribed for its current mode by the S-004 compliance matrix without a person aboard. */
+        comment conditions /*
+         *  Apply the S-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-117 continue to govern. */
     }
     requirement navigationShapePresentation : NavigationShapePresentation;
 
@@ -1720,6 +1624,8 @@ package BlueDogRequirements {
     requirement def <'S-118'> NavigationSoundPresentation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall present the sound signals prescribed for its current mode by the S-004 compliance matrix without a person aboard. */
+        comment conditions /*
+         *  Apply the S-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-118 continue to govern. */
     }
     requirement navigationSoundPresentation : NavigationSoundPresentation;
 
@@ -1733,58 +1639,56 @@ package BlueDogRequirements {
     requirement def <'S-119'> SignalingModeDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* A commanded mode change shall select the corresponding signaling configuration within 1 second. */
+        comment conditions /*
+         *  Apply the S-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-119 continue to govern. */
     }
     requirement signalingModeDeadline : SignalingModeDeadline;
-
-    #derivation connection decomposeSignalingModeDeadline {
+    #refinement dependency decomposeSignalingModeDeadline from BlueDogRequirements::signalingModeDeadline to BlueDogRequirements::navigationConspicuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-004; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationConspicuity;
-        end #derive target ::> signalingModeDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-119 specifies a detailed acceptance condition for S-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-120'> SignalingFaultRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each detectable signaling failure shall be logged within 5 seconds of detection. */
+        comment conditions /*
+         *  Apply the S-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-120 continue to govern. */
     }
     requirement signalingFaultRecording : SignalingFaultRecording;
-
-    #derivation connection decomposeSignalingFaultRecording {
+    #refinement dependency decomposeSignalingFaultRecording from BlueDogRequirements::signalingFaultRecording to BlueDogRequirements::navigationConspicuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-004; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationConspicuity;
-        end #derive target ::> signalingFaultRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-120 specifies a detailed acceptance condition for S-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-121'> SignalingFaultReporting {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* With a functioning link, each detected signaling failure shall be reported to shore within 5 seconds. */
+        comment conditions /*
+         *  Apply the S-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-121 continue to govern. */
     }
     requirement signalingFaultReporting : SignalingFaultReporting;
-
-    #derivation connection decomposeSignalingFaultReporting {
+    #refinement dependency decomposeSignalingFaultReporting from BlueDogRequirements::signalingFaultReporting to BlueDogRequirements::navigationConspicuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-004; the parent supplies shared verification conditions."; }
-        end #original source ::> navigationConspicuity;
-        end #derive target ::> signalingFaultReporting;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-121 specifies a detailed acceptance condition for S-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-122'> DeploymentComplianceRecord {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Each deployment shall have a dated compliance record identifying the craft, dimensions, waters, operating modes, applicable navigation and radio obligations, and permission evidence. */
+        comment conditions /*
+         *  Apply the S-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-122 continue to govern. */
     }
     requirement deploymentComplianceRecord : DeploymentComplianceRecord;
-
-    #derivation connection decomposeDeploymentComplianceRecord {
+    #refinement dependency decomposeDeploymentComplianceRecord from BlueDogRequirements::deploymentComplianceRecord to BlueDogRequirements::regulatoryClassification {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of S-005; the parent supplies shared verification conditions."; }
-        end #original source ::> regulatoryClassification;
-        end #derive target ::> deploymentComplianceRecord;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-122 specifies a detailed acceptance condition for S-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'S-123'> DeploymentReleaseGate {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Deployment release shall be withheld while any mandatory authorization is absent, expired or unresolved. */
+        comment conditions /*
+         *  Apply the S-005 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in S-123 continue to govern. */
     }
     requirement deploymentReleaseGate : DeploymentReleaseGate;
 
@@ -1798,149 +1702,140 @@ package BlueDogRequirements {
     requirement def <'C-201'> TelemetryDisplayContent {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The shore endpoint shall display UTC sample time, position, mode, conservative usable energy, reserve, faults and age from each current telemetry record. */
+        comment conditions /*
+         *  Apply the C-101 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-201 continue to govern. */
     }
     requirement telemetryDisplayContent : TelemetryDisplayContent;
-
-    #derivation connection decomposeTelemetryDisplayContent {
+    #refinement dependency decomposeTelemetryDisplayContent from BlueDogRequirements::telemetryDisplayContent to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-101; the parent supplies shared verification conditions."; }
-        end #original source ::> telemetryEquipment;
-        end #derive target ::> telemetryDisplayContent;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-201 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-202'> TelemetryStaleIndication {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The shore endpoint shall indicate stale data when record age exceeds its C-101 mode threshold until receipt of a record within its applicable threshold. */
+        comment conditions /*
+         *  Apply the C-101 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-202 continue to govern. */
     }
     requirement telemetryStaleIndication : TelemetryStaleIndication;
-
-    #derivation connection decomposeTelemetryStaleIndication {
+    #refinement dependency decomposeTelemetryStaleIndication from BlueDogRequirements::telemetryStaleIndication to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-101; the parent supplies shared verification conditions."; }
-        end #original source ::> telemetryEquipment;
-        end #derive target ::> telemetryStaleIndication;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-202 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-203'> TelemetryIdentityPreservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The shore endpoint shall preserve received record identity and sequence numbers across the C-101 outage/reconnection test. */
+        comment conditions /*
+         *  Apply the C-101 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-203 continue to govern. */
     }
     requirement telemetryIdentityPreservation : TelemetryIdentityPreservation;
-
-    #derivation connection decomposeTelemetryIdentityPreservation {
+    #refinement dependency decomposeTelemetryIdentityPreservation from BlueDogRequirements::telemetryIdentityPreservation to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-101; the parent supplies shared verification conditions."; }
-        end #original source ::> telemetryEquipment;
-        end #derive target ::> telemetryIdentityPreservation;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-203 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-204'> TelemetryDuplicateSuppression {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The shore endpoint shall not present a duplicate telemetry record as a new observation. */
+        comment conditions /*
+         *  Apply the C-101 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-204 continue to govern. */
     }
     requirement telemetryDuplicateSuppression : TelemetryDuplicateSuppression;
-
-    #derivation connection decomposeTelemetryDuplicateSuppression {
+    #refinement dependency decomposeTelemetryDuplicateSuppression from BlueDogRequirements::telemetryDuplicateSuppression to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-101; the parent supplies shared verification conditions."; }
-        end #original source ::> telemetryEquipment;
-        end #derive target ::> telemetryDuplicateSuppression;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-204 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-205'> UnauthenticatedCommandRejection {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Commands failing authentication shall cause zero accepted actuator or mission-state changes. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-205 continue to govern. */
     }
     requirement unauthenticatedCommandRejection : UnauthenticatedCommandRejection;
-
-    #derivation connection decomposeUnauthenticatedCommandRejection {
+    #refinement dependency decomposeUnauthenticatedCommandRejection from BlueDogRequirements::unauthenticatedCommandRejection to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> unauthenticatedCommandRejection;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-205 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-206'> ReplayCommandRejection {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Commands with previously used sequence numbers shall cause zero accepted actuator or mission-state changes. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-206 continue to govern. */
     }
     requirement replayCommandRejection : ReplayCommandRejection;
-
-    #derivation connection decomposeReplayCommandRejection {
+    #refinement dependency decomposeReplayCommandRejection from BlueDogRequirements::replayCommandRejection to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> replayCommandRejection;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-206 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-207'> ExpiredCommandRejection {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Commands older than 30 seconds shall cause zero accepted actuator or mission-state changes. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-207 continue to govern. */
     }
     requirement expiredCommandRejection : ExpiredCommandRejection;
-
-    #derivation connection decomposeExpiredCommandRejection {
+    #refinement dependency decomposeExpiredCommandRejection from BlueDogRequirements::expiredCommandRejection to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> expiredCommandRejection;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-207 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-208'> AcceptedCommandDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* An accepted abort or mode-change command shall be applied within 1 second of complete receipt. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-208 continue to govern. */
     }
     requirement acceptedCommandDeadline : AcceptedCommandDeadline;
-
-    #derivation connection decomposeAcceptedCommandDeadline {
+    #refinement dependency decomposeAcceptedCommandDeadline from BlueDogRequirements::acceptedCommandDeadline to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> acceptedCommandDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-208 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-209'> OnboardAcknowledgmentDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* An accepted abort or mode-change command shall be acknowledged onboard within 1 second of complete receipt. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-209 continue to govern. */
     }
     requirement onboardAcknowledgmentDeadline : OnboardAcknowledgmentDeadline;
-
-    #derivation connection decomposeOnboardAcknowledgmentDeadline {
+    #refinement dependency decomposeOnboardAcknowledgmentDeadline from BlueDogRequirements::onboardAcknowledgmentDeadline to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> onboardAcknowledgmentDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-209 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-210'> AcknowledgmentQueueing {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* An accepted command acknowledgment shall enter the transmit queue in the same command-processing cycle when a link is available. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-210 continue to govern. */
     }
     requirement acknowledgmentQueueing : AcknowledgmentQueueing;
-
-    #derivation connection decomposeAcknowledgmentQueueing {
+    #refinement dependency decomposeAcknowledgmentQueueing from BlueDogRequirements::acknowledgmentQueueing to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> acknowledgmentQueueing;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-210 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'C-211'> ExternalControlDisqualification {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Acceptance of external mission or steering control during a qualifying attempt shall permanently disqualify that attempt. */
+        comment conditions /*
+         *  Apply the C-102 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in C-211 continue to govern. */
     }
     requirement externalControlDisqualification : ExternalControlDisqualification;
-
-    #derivation connection decomposeExternalControlDisqualification {
+    #refinement dependency decomposeExternalControlDisqualification from BlueDogRequirements::externalControlDisqualification to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of C-102; the parent supplies shared verification conditions."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> externalControlDisqualification;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-211 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-101'> VisibilityNavigationCapability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Navigation shall meet E-002 and E-008 acceptance criteria at visibility of at least 1 km in daylight and darkness. */
+        comment conditions /*
+         *  Apply the N-033 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-101 continue to govern. */
     }
     requirement visibilityNavigationCapability : VisibilityNavigationCapability;
 
@@ -1954,6 +1849,8 @@ package BlueDogRequirements {
     requirement def <'N-102'> VisibilityTrafficCapability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Traffic assessment shall meet the reviewed class-specific S-001 criteria at visibility of at least 1 km in daylight and darkness.*/
+        comment conditions /*
+         *  Apply the N-033 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-102 continue to govern. */
     }
     requirement visibilityTrafficCapability : VisibilityTrafficCapability;
 
@@ -1967,32 +1864,32 @@ package BlueDogRequirements {
     requirement def <'N-103'> RestrictedVisibilityEntry {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* On detecting visibility below 1 km, the vessel shall enter restricted-visibility state within 60 seconds. */
+        comment conditions /*
+         *  Apply the N-033 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-103 continue to govern. */
     }
     requirement restrictedVisibilityEntry : RestrictedVisibilityEntry;
-
-    #derivation connection decomposeRestrictedVisibilityEntry {
+    #refinement dependency decomposeRestrictedVisibilityEntry from BlueDogRequirements::restrictedVisibilityEntry to BlueDogRequirements::visibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-033; the parent supplies shared verification conditions."; }
-        end #original source ::> visibility;
-        end #derive target ::> restrictedVisibilityEntry;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-103 specifies a detailed acceptance condition for N-033 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-104'> RestrictedVisibilityEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Restricted-visibility operation shall be recorded as outside the normal operational envelope. */
+        comment conditions /*
+         *  Apply the N-033 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-104 continue to govern. */
     }
     requirement restrictedVisibilityEvidence : RestrictedVisibilityEvidence;
-
-    #derivation connection decomposeRestrictedVisibilityEvidence {
+    #refinement dependency decomposeRestrictedVisibilityEvidence from BlueDogRequirements::restrictedVisibilityEvidence to BlueDogRequirements::visibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-033; the parent supplies shared verification conditions."; }
-        end #original source ::> visibility;
-        end #derive target ::> restrictedVisibilityEvidence;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-104 specifies a detailed acceptance condition for N-033 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-105'> RestrictedVisibilityCollisionAssessment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Collision assessment shall remain active during restricted-visibility operation. */
+        comment conditions /*
+         *  Apply the N-033 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-105 continue to govern. */
     }
     requirement restrictedVisibilityCollisionAssessment : RestrictedVisibilityCollisionAssessment;
 
@@ -2006,45 +1903,44 @@ package BlueDogRequirements {
     requirement def <'N-106'> SurvivalEntryDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall enter survival mode within 60 seconds of the N-035 upper-limit trigger. */
+        comment conditions /*
+         *  Apply the N-035 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-106 continue to govern. */
     }
     requirement survivalEntryDeadline : SurvivalEntryDeadline;
-
-    #derivation connection decomposeSurvivalEntryDeadline {
+    #refinement dependency decomposeSurvivalEntryDeadline from BlueDogRequirements::survivalEntryDeadline to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-035; the parent supplies shared verification conditions."; }
-        end #original source ::> envelopeTransition;
-        end #derive target ::> survivalEntryDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-106 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-107'> SurvivalTransitionRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Every survival-mode entry shall have a corresponding event record. */
+        comment conditions /*
+         *  Apply the N-035 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-107 continue to govern. */
     }
     requirement survivalTransitionRecording : SurvivalTransitionRecording;
-
-    #derivation connection decomposeSurvivalTransitionRecording {
+    #refinement dependency decomposeSurvivalTransitionRecording from BlueDogRequirements::survivalTransitionRecording to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-035; the parent supplies shared verification conditions."; }
-        end #original source ::> envelopeTransition;
-        end #derive target ::> survivalTransitionRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-107 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-108'> SailingResumptionDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Full autonomous sailing shall resume within 5 minutes of N-035 resumption eligibility becoming continuously true. */
+        comment conditions /*
+         *  Apply the N-035 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-108 continue to govern. */
     }
     requirement sailingResumptionDeadline : SailingResumptionDeadline;
-
-    #derivation connection decomposeSailingResumptionDeadline {
+    #refinement dependency decomposeSailingResumptionDeadline from BlueDogRequirements::sailingResumptionDeadline to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-035; the parent supplies shared verification conditions."; }
-        end #original source ::> envelopeTransition;
-        end #derive target ::> sailingResumptionDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-108 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-109'> SailingResumptionInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Full autonomous sailing shall remain inhibited while N-035 resumption eligibility is false. */
+        comment conditions /*
+         *  Apply the N-035 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-109 continue to govern. */
     }
     requirement sailingResumptionInhibition : SailingResumptionInhibition;
 
@@ -2058,71 +1954,68 @@ package BlueDogRequirements {
     requirement def <'N-110'> ResumptionBlockEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Every blocked sailing-resumption attempt shall record the blocking condition. */
+        comment conditions /*
+         *  Apply the N-035 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-110 continue to govern. */
     }
     requirement resumptionBlockEvidence : ResumptionBlockEvidence;
-
-    #derivation connection decomposeResumptionBlockEvidence {
+    #refinement dependency decomposeResumptionBlockEvidence from BlueDogRequirements::resumptionBlockEvidence to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-035; the parent supplies shared verification conditions."; }
-        end #original source ::> envelopeTransition;
-        end #derive target ::> resumptionBlockEvidence;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-110 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-111'> WetMechanismTravel {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each N-044 exposure, external mechanisms shall complete their full commanded travel without seizure. */
+        comment conditions /*
+         *  Apply the N-044 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-111 continue to govern. */
     }
     requirement wetMechanismTravel : WetMechanismTravel;
-
-    #derivation connection decomposeWetMechanismTravel {
+    #refinement dependency decomposeWetMechanismTravel from BlueDogRequirements::wetMechanismTravel to BlueDogRequirements::wetMechanicalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-044; the parent supplies shared verification conditions."; }
-        end #original source ::> wetMechanicalIntegrity;
-        end #derive target ::> wetMechanismTravel;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-111 specifies a detailed acceptance condition for N-044 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-112'> WetJointIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each N-044 exposure, structural joints shall show no separation or through-cracks on visual inspection at 5 times magnification. */
+        comment conditions /*
+         *  Apply the N-044 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-112 continue to govern. */
     }
     requirement wetJointIntegrity : WetJointIntegrity;
-
-    #derivation connection decomposeWetJointIntegrity {
+    #refinement dependency decomposeWetJointIntegrity from BlueDogRequirements::wetJointIntegrity to BlueDogRequirements::wetMechanicalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-044; the parent supplies shared verification conditions."; }
-        end #original source ::> wetMechanicalIntegrity;
-        end #derive target ::> wetJointIntegrity;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-112 specifies a detailed acceptance condition for N-044 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-113'> WetConductorResistance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each N-045 exposure, end-to-end conductor resistance shall be no more than 10 percent above its pre-test value. */
+        comment conditions /*
+         *  Apply the N-045 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-113 continue to govern. */
     }
     requirement wetConductorResistance : WetConductorResistance;
-
-    #derivation connection decomposeWetConductorResistance {
+    #refinement dependency decomposeWetConductorResistance from BlueDogRequirements::wetConductorResistance to BlueDogRequirements::wetElectricalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-045; the parent supplies shared verification conditions."; }
-        end #original source ::> wetElectricalIntegrity;
-        end #derive target ::> wetConductorResistance;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-113 specifies a detailed acceptance condition for N-045 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-114'> WetInsulationResistance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each N-045 exposure, conductor-to-conductor and conductor-to-case insulation resistance shall be at least 1 megohm at 50 V DC. */
+        comment conditions /*
+         *  Apply the N-045 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-114 continue to govern. */
     }
     requirement wetInsulationResistance : WetInsulationResistance;
-
-    #derivation connection decomposeWetInsulationResistance {
+    #refinement dependency decomposeWetInsulationResistance from BlueDogRequirements::wetInsulationResistance to BlueDogRequirements::wetElectricalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-045; the parent supplies shared verification conditions."; }
-        end #original source ::> wetElectricalIntegrity;
-        end #derive target ::> wetInsulationResistance;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-114 specifies a detailed acceptance condition for N-045 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-115'> HotSunElectronicsOperation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Powered electronics shall retain operational functions throughout the N-046 exposure. */
+        comment conditions /*
+         *  Apply the N-046 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-115 continue to govern. */
     }
     requirement hotSunElectronicsOperation : HotSunElectronicsOperation;
 
@@ -2136,6 +2029,8 @@ package BlueDogRequirements {
     requirement def <'N-116'> HotSunBatteryTemperature {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Battery temperatures shall remain within manufacturer operating limits throughout the N-046 exposure. */
+        comment conditions /*
+         *  Apply the N-046 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-116 continue to govern. */
     }
     requirement hotSunBatteryTemperature : HotSunBatteryTemperature;
 
@@ -2149,6 +2044,8 @@ package BlueDogRequirements {
     requirement def <'N-117'> BatteryChargeTemperatureInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Battery charging shall remain inhibited whenever measured battery temperature is outside the manufacturer permitted charge range. */
+        comment conditions /*
+         *  Apply the N-046 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-117 continue to govern. */
     }
     requirement batteryChargeTemperatureInhibition : BatteryChargeTemperatureInhibition;
 
@@ -2163,6 +2060,8 @@ package BlueDogRequirements {
         require constraint rightingDeadline {
             measuredRightingTime >= 0 [s] and measuredRightingTime <= 60 [s]
         }
+        comment conditions /*
+         *  Apply the N-051 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-118 continue to govern. */
     }
     requirement rightingDeadline : RightingDeadline;
 
@@ -2176,6 +2075,8 @@ package BlueDogRequirements {
     requirement def <'N-119'> CapsizeRigRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall retain its rig through every N-051 release. */
+        comment conditions /*
+         *  Apply the N-051 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-119 continue to govern. */
     }
     requirement capsizeRigRetention : CapsizeRigRetention;
 
@@ -2189,6 +2090,8 @@ package BlueDogRequirements {
     requirement def <'N-120'> CapsizeBallastRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall retain its ballast through every N-051 release. */
+        comment conditions /*
+         *  Apply the N-051 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-120 continue to govern. */
     }
     requirement capsizeBallastRetention : CapsizeBallastRetention;
 
@@ -2202,6 +2105,8 @@ package BlueDogRequirements {
     requirement def <'N-121'> CapsizeElectronicsSealing {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* No water shall reach electronics during any N-051 release. */
+        comment conditions /*
+         *  Apply the N-051 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-121 continue to govern. */
     }
     requirement capsizeElectronicsSealing : CapsizeElectronicsSealing;
 
@@ -2219,84 +2124,80 @@ package BlueDogRequirements {
         require constraint controlRecoveryDeadline {
             measuredControlRecoveryTime >= 0 [s] and measuredControlRecoveryTime <= 120 [s]
         }
+        comment conditions /*
+         *  Apply the N-052 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-122 continue to govern. */
     }
     requirement controlRecoveryDeadline : ControlRecoveryDeadline;
-
-    #derivation connection decomposeControlRecoveryDeadline {
+    #refinement dependency decomposeControlRecoveryDeadline from BlueDogRequirements::controlRecoveryDeadline to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-052; the parent supplies shared verification conditions."; }
-        end #original source ::> capsizeControlRecovery;
-        end #derive target ::> controlRecoveryDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-122 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-123'> CapsizeGateProgressRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Gate progress shall be preserved through every N-051 release. */
+        comment conditions /*
+         *  Apply the N-052 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-123 continue to govern. */
     }
     requirement capsizeGateProgressRetention : CapsizeGateProgressRetention;
-
-    #derivation connection decomposeCapsizeGateProgressRetention {
+    #refinement dependency decomposeCapsizeGateProgressRetention from BlueDogRequirements::capsizeGateProgressRetention to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-052; the parent supplies shared verification conditions."; }
-        end #original source ::> capsizeControlRecovery;
-        end #derive target ::> capsizeGateProgressRetention;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-123 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-124'> CapsizeQualificationRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Qualification status shall be preserved through every N-051 release absent an independently disqualifying event. */
+        comment conditions /*
+         *  Apply the N-052 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-124 continue to govern. */
     }
     requirement capsizeQualificationRetention : CapsizeQualificationRetention;
-
-    #derivation connection decomposeCapsizeQualificationRetention {
+    #refinement dependency decomposeCapsizeQualificationRetention from BlueDogRequirements::capsizeQualificationRetention to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-052; the parent supplies shared verification conditions."; }
-        end #original source ::> capsizeControlRecovery;
-        end #derive target ::> capsizeQualificationRetention;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-124 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-125'> CapsizeRestrictionRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Control restoration after each N-051 release shall preserve every active survival, low-energy, recovery and motor-inhibition restriction. */
+        comment conditions /*
+         *  Apply the N-052 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-125 continue to govern. */
     }
     requirement capsizeRestrictionRetention : CapsizeRestrictionRetention;
-
-    #derivation connection decomposeCapsizeRestrictionRetention {
+    #refinement dependency decomposeCapsizeRestrictionRetention from BlueDogRequirements::capsizeRestrictionRetention to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-052; the parent supplies shared verification conditions."; }
-        end #original source ::> capsizeControlRecovery;
-        end #derive target ::> capsizeRestrictionRetention;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-125 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-126'> WeedPassageSpeed {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* During each N-053 patch passage, mean water-relative sailing speed shall be at least 50 percent of the weed-free reference speed. */
+        comment conditions /*
+         *  Apply the N-053 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-126 continue to govern. */
     }
     requirement weedPassageSpeed : WeedPassageSpeed;
-
-    #derivation connection decomposeWeedPassageSpeed {
+    #refinement dependency decomposeWeedPassageSpeed from BlueDogRequirements::weedPassageSpeed to BlueDogRequirements::submergedWeedPassage {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-053; the parent supplies shared verification conditions."; }
-        end #original source ::> submergedWeedPassage;
-        end #derive target ::> weedPassageSpeed;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-126 specifies a detailed acceptance condition for N-053 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-127'> WeedPassageSteering {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After each N-053 patch passage, full commanded rudder travel shall be regained within 5 minutes. */
+        comment conditions /*
+         *  Apply the N-053 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-127 continue to govern. */
     }
     requirement weedPassageSteering : WeedPassageSteering;
-
-    #derivation connection decomposeWeedPassageSteering {
+    #refinement dependency decomposeWeedPassageSteering from BlueDogRequirements::weedPassageSteering to BlueDogRequirements::submergedWeedPassage {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-053; the parent supplies shared verification conditions."; }
-        end #original source ::> submergedWeedPassage;
-        end #derive target ::> weedPassageSteering;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-127 specifies a detailed acceptance condition for N-053 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-128'> WeedSnagSpeedRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Within 5 minutes of each N-054 snag, water-relative sailing speed shall recover to at least 50 percent of unobstructed reference speed. */
+        comment conditions /*
+         *  Apply the N-054 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-128 continue to govern. */
     }
     requirement weedSnagSpeedRecovery : WeedSnagSpeedRecovery;
 
@@ -2310,6 +2211,8 @@ package BlueDogRequirements {
     requirement def <'N-129'> WeedSnagSteeringRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Within 5 minutes of each N-054 snag, full commanded rudder travel shall be regained. */
+        comment conditions /*
+         *  Apply the N-054 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-129 continue to govern. */
     }
     requirement weedSnagSteeringRecovery : WeedSnagSteeringRecovery;
 
@@ -2323,58 +2226,56 @@ package BlueDogRequirements {
     requirement def <'N-130'> WeedBlockageFault {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* A suspected-fouling fault shall be logged within 10 seconds after the N-055 trigger. */
+        comment conditions /*
+         *  Apply the N-055 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-130 continue to govern. */
     }
     requirement weedBlockageFault : WeedBlockageFault;
-
-    #derivation connection decomposeWeedBlockageFault {
+    #refinement dependency decomposeWeedBlockageFault from BlueDogRequirements::weedBlockageFault to BlueDogRequirements::weedBlockageResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-055; the parent supplies shared verification conditions."; }
-        end #original source ::> weedBlockageResponse;
-        end #derive target ::> weedBlockageFault;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-130 specifies a detailed acceptance condition for N-055 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-131'> WeedBlockageContingency {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall enter fouling-contingency state within 10 seconds after the N-055 trigger. */
+        comment conditions /*
+         *  Apply the N-055 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-131 continue to govern. */
     }
     requirement weedBlockageContingency : WeedBlockageContingency;
-
-    #derivation connection decomposeWeedBlockageContingency {
+    #refinement dependency decomposeWeedBlockageContingency from BlueDogRequirements::weedBlockageContingency to BlueDogRequirements::weedBlockageResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-055; the parent supplies shared verification conditions."; }
-        end #original source ::> weedBlockageResponse;
-        end #derive target ::> weedBlockageContingency;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-131 specifies a detailed acceptance condition for N-055 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-132'> WeedBlockageLocation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Location reporting shall continue at the active telemetry cadence during fouling contingency whenever a link is available. */
+        comment conditions /*
+         *  Apply the N-055 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-132 continue to govern. */
     }
     requirement weedBlockageLocation : WeedBlockageLocation;
-
-    #derivation connection decomposeWeedBlockageLocation {
+    #refinement dependency decomposeWeedBlockageLocation from BlueDogRequirements::weedBlockageLocation to BlueDogRequirements::weedBlockageResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-055; the parent supplies shared verification conditions."; }
-        end #original source ::> weedBlockageResponse;
-        end #derive target ::> weedBlockageLocation;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-132 specifies a detailed acceptance condition for N-055 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-133'> PoweredWeedSpeed {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Mean water-relative powered speed through each N-056 patch passage shall be at least 50 percent of weed-free reference speed. */
+        comment conditions /*
+         *  Apply the N-056 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-133 continue to govern. */
     }
     requirement poweredWeedSpeed : PoweredWeedSpeed;
-
-    #derivation connection decomposePoweredWeedSpeed {
+    #refinement dependency decomposePoweredWeedSpeed from BlueDogRequirements::poweredWeedSpeed to BlueDogRequirements::recoveryPropulsorWeeds {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-056; the parent supplies shared verification conditions."; }
-        end #original source ::> recoveryPropulsorWeeds;
-        end #derive target ::> poweredWeedSpeed;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-133 specifies a detailed acceptance condition for N-056 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'N-134'> PoweredWeedCurrent {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Motor and controller currents shall remain within their respective rated limits during each N-056 patch passage. */
+        comment conditions /*
+         *  Apply the N-056 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-134 continue to govern. */
     }
     requirement poweredWeedCurrent : PoweredWeedCurrent;
 
@@ -2388,6 +2289,8 @@ package BlueDogRequirements {
     requirement def <'N-135'> PoweredWeedTemperature {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Motor and controller temperatures shall remain within their respective rated limits during each N-056 patch passage. */
+        comment conditions /*
+         *  Apply the N-056 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-135 continue to govern. */
     }
     requirement poweredWeedTemperature : PoweredWeedTemperature;
 
@@ -2401,14 +2304,13 @@ package BlueDogRequirements {
     requirement def <'N-136'> LockedPropulsorShutdown {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* A locked propulsor shall cause motor shutdown within 2 seconds. */
+        comment conditions /*
+         *  Apply the N-056 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in N-136 continue to govern. */
     }
     requirement lockedPropulsorShutdown : LockedPropulsorShutdown;
-
-    #derivation connection decomposeLockedPropulsorShutdown {
+    #refinement dependency decomposeLockedPropulsorShutdown from BlueDogRequirements::lockedPropulsorShutdown to BlueDogRequirements::recoveryPropulsorWeeds {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of N-056; the parent supplies shared verification conditions."; }
-        end #original source ::> recoveryPropulsorWeeds;
-        end #derive target ::> lockedPropulsorShutdown;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-136 specifies a detailed acceptance condition for N-056 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'R-101'> MotorQualificationInvariant {
@@ -2420,228 +2322,149 @@ package BlueDogRequirements {
         require constraint motorQualificationInvariant {
             not motorEnabled or (qualificationStateKnown and not qualifying)
         }
+        comment conditions /*
+         *  Apply the R-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in R-101 continue to govern. */
     }
     requirement motorQualificationInvariant : MotorQualificationInvariant;
-
-    #derivation connection decomposeMotorQualificationInvariant {
+    #refinement dependency decomposeMotorQualificationInvariant from BlueDogRequirements::motorQualificationInvariant to BlueDogRequirements::challengeMotorInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of R-004; the parent supplies shared verification conditions."; }
-        end #original source ::> challengeMotorInhibition;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "R-101 specifies a detailed acceptance condition for R-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'R-102'> FreshRecoveryCommand {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* After restart, motor enable shall remain inhibited until recovery is authorized by the onboard safety function or a fresh authenticated operator command. */
+        comment conditions /*
+         *  Apply the R-004 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in R-102 continue to govern. */
     }
     requirement freshRecoveryCommand : FreshRecoveryCommand;
-
-    #derivation connection decomposeFreshRecoveryCommand {
+    #refinement dependency decomposeFreshRecoveryCommand from BlueDogRequirements::freshRecoveryCommand to BlueDogRequirements::challengeMotorInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of R-004; the parent supplies shared verification conditions."; }
-        end #original source ::> challengeMotorInhibition;
-        end #derive target ::> freshRecoveryCommand;
+        metadata rationale : ModelingMetadata::Rationale { text = "R-102 specifies a detailed acceptance condition for R-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-144'> IngressEventDeadline {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* In the E-006 injection test, an ingress event record shall exist within 60 seconds of injection starting. */
+        comment conditions /*
+         *  Apply the E-006 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-144 continue to govern. */
     }
     requirement ingressEventDeadline : IngressEventDeadline;
-
-    #derivation connection decomposeIngressEventDeadline {
+    #refinement dependency decomposeIngressEventDeadline from BlueDogRequirements::ingressEventDeadline to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-006; the parent supplies shared verification conditions."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> ingressEventDeadline;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-144 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
 
     requirement def <'E-145'> QualificationRestoration {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* Within 30 seconds after a watchdog reset under E-003 preconditions, qualification status shall equal the valid persisted status, or be nonqualifying when persisted status is absent or inconsistent. */
+        comment conditions /*
+         *  Apply the E-003 qualification conditions for this criterion. Explicit mode coverage and independent shared obligations stated in E-145 continue to govern. */
     }
     requirement qualificationRestoration : QualificationRestoration;
-
-    #derivation connection decomposeQualificationRestoration {
+    #refinement dependency decomposeQualificationRestoration from BlueDogRequirements::qualificationRestoration to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of E-003; the parent supplies shared verification conditions."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> qualificationRestoration;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-145 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
-
-    #derivation connection sharedAcceptance1 {
+    dependency sharedAcceptance1 from BlueDogRequirements::resetRecovery to BlueDogRequirements::logInterruptionDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "resetRecovery also requires the shared logInterruptionDurability outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> logInterruptionDurability;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-003 relies on the E-136 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance2 {
+    dependency sharedAcceptance2 from BlueDogRequirements::resetRecovery to BlueDogRequirements::unknownQualificationFallback {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "resetRecovery also requires the shared unknownQualificationFallback outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> unknownQualificationFallback;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-003 relies on the E-139 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance3 {
+    dependency sharedAcceptance3 from BlueDogRequirements::resetRecovery to BlueDogRequirements::qualificationPersistence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "resetRecovery also requires the shared qualificationPersistence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> qualificationPersistence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-003 relies on the E-138 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance4 {
+    dependency sharedAcceptance4 from BlueDogRequirements::resetRecovery to BlueDogRequirements::freshRecoveryCommand {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "resetRecovery also requires the shared freshRecoveryCommand outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> freshRecoveryCommand;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-003 relies on the R-102 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance5 {
+    dependency sharedAcceptance5 from BlueDogRequirements::resetRecovery to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "resetRecovery also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> resetRecovery;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-003 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance6 {
+    dependency sharedAcceptance6 from BlueDogRequirements::commandIntegrity to BlueDogRequirements::criticalEventRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "commandIntegrity also requires the shared criticalEventRecording outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> criticalEventRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-102 relies on the E-132 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance7 {
+    dependency sharedAcceptance7 from BlueDogRequirements::commandIntegrity to BlueDogRequirements::qualificationPersistence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "commandIntegrity also requires the shared qualificationPersistence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> commandIntegrity;
-        end #derive target ::> qualificationPersistence;
+        metadata rationale : ModelingMetadata::Rationale { text = "C-102 relies on the E-138 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance8 {
+    dependency sharedAcceptance8 from BlueDogRequirements::emergencyControl to BlueDogRequirements::qualificationPersistence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "safeRecovery also requires the shared qualificationPersistence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> qualificationPersistence;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-003 relies on the E-138 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance9 {
+    dependency sharedAcceptance9 from BlueDogRequirements::emergencyControl to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "safeRecovery also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-003 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance10 {
+    dependency sharedAcceptance10 from BlueDogRequirements::emergencyControl to BlueDogRequirements::periodicLogCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "safeRecovery also requires the shared periodicLogCadence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> safeRecovery;
-        end #derive target ::> periodicLogCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "S-003 relies on the E-130 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance11 {
+    dependency sharedAcceptance11 from BlueDogRequirements::challengeMotorInhibition to BlueDogRequirements::qualificationPersistence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "challengeMotorInhibition also requires the shared qualificationPersistence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> challengeMotorInhibition;
-        end #derive target ::> qualificationPersistence;
+        metadata rationale : ModelingMetadata::Rationale { text = "R-004 relies on the E-138 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance12 {
+    dependency sharedAcceptance12 from BlueDogRequirements::challengeMotorInhibition to BlueDogRequirements::criticalEventRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "challengeMotorInhibition also requires the shared criticalEventRecording outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> challengeMotorInhibition;
-        end #derive target ::> criticalEventRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "R-004 relies on the E-132 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance13 {
+    dependency sharedAcceptance13 from BlueDogRequirements::lowEnergyRecovery to BlueDogRequirements::periodicLogCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "lowEnergyRecovery also requires the shared periodicLogCadence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> periodicLogCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-004 relies on the E-130 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance14 {
+    dependency sharedAcceptance14 from BlueDogRequirements::lowEnergyRecovery to BlueDogRequirements::telemetryDeliveryCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "lowEnergyRecovery also requires the shared telemetryDeliveryCadence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> telemetryDeliveryCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-004 relies on the E-120 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance15 {
+    dependency sharedAcceptance15 from BlueDogRequirements::lowEnergyRecovery to BlueDogRequirements::criticalEventRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "lowEnergyRecovery also requires the shared criticalEventRecording outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> criticalEventRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-004 relies on the E-132 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance16 {
+    dependency sharedAcceptance16 from BlueDogRequirements::lowEnergyRecovery to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "lowEnergyRecovery also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> lowEnergyRecovery;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-004 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance17 {
+    dependency sharedAcceptance17 from BlueDogRequirements::ingressResponse to BlueDogRequirements::criticalEventRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "ingressResponse also requires the shared criticalEventRecording outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> criticalEventRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-006 relies on the E-132 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance18 {
+    dependency sharedAcceptance18 from BlueDogRequirements::ingressResponse to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "ingressResponse also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> ingressResponse;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-006 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance19 {
+    dependency sharedAcceptance19 from BlueDogRequirements::communications to BlueDogRequirements::logRetention {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "communications also requires the shared logRetention outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> communications;
-        end #derive target ::> logRetention;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-005 relies on the E-131 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance20 {
+    dependency sharedAcceptance20 from BlueDogRequirements::communications to BlueDogRequirements::reconnectLogPreservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "communications also requires the shared reconnectLogPreservation outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> communications;
-        end #derive target ::> reconnectLogPreservation;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-005 relies on the E-137 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance21 {
+    dependency sharedAcceptance21 from BlueDogRequirements::navigationAvailability to BlueDogRequirements::criticalEventRecording {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "navigationAvailability also requires the shared criticalEventRecording outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> navigationAvailability;
-        end #derive target ::> criticalEventRecording;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-008 relies on the E-132 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance22 {
+    dependency sharedAcceptance22 from BlueDogRequirements::envelopeTransition to BlueDogRequirements::periodicLogCadence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "envelopeTransition also requires the shared periodicLogCadence outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> envelopeTransition;
-        end #derive target ::> periodicLogCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-035 relies on the E-130 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance23 {
+    dependency sharedAcceptance23 from BlueDogRequirements::envelopeTransition to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "envelopeTransition also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> envelopeTransition;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-035 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance24 {
+    dependency sharedAcceptance24 from BlueDogRequirements::weedBlockageResponse to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "weedBlockageResponse also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> weedBlockageResponse;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-055 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
-
-    #derivation connection sharedAcceptance25 {
+    dependency sharedAcceptance25 from BlueDogRequirements::recoveryPropulsorWeeds to BlueDogRequirements::motorQualificationInvariant {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "recoveryPropulsorWeeds also requires the shared motorQualificationInvariant outcome; one normative leaf avoids duplicate obligations."; }
-        end #original source ::> recoveryPropulsorWeeds;
-        end #derive target ::> motorQualificationInvariant;
+        metadata rationale : ModelingMetadata::Rationale { text = "N-056 relies on the R-101 rule only for events and modes within its own qualification context. The full shared rule remains independently applicable and directly verified; this dependency does not derive its other contexts."; }
     }
 
     requirement def <'E-200'> SustainedEnergyFeasibility {
@@ -2703,7 +2526,8 @@ package BlueDogRequirements {
 
     requirement def <'E-205'> EnergyEvidenceReadiness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* An energy case shall be accepted only after its installed-load coverage, resource bounds, battery derating and interval-resolution evidence have been accepted. */
+        doc /*
+         *  The energy-case acceptance record shall identify accepted evidence for installed-load coverage, resource bounds, battery derating and interval resolution before the case is accepted. */
         attribute accepted : Boolean;
         attribute verdict : Boolean = EnergyEvidenceReadinessCriterion(accepted);
         require constraint { verdict }
@@ -2738,12 +2562,9 @@ package BlueDogRequirements {
         end #original source ::> sustainedEnergyFeasibility;
         end #derive target ::> peakSupplyCapability;
     }
-
-    #derivation connection energyDerivation6 {
+    dependency energyDerivation6 from BlueDogRequirements::energyEvidenceReadiness to BlueDogRequirements::sustainedEnergyFeasibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "This leaf isolates one acceptance outcome of sustained energy feasibility."; }
-        end #original source ::> sustainedEnergyFeasibility;
-        end #derive target ::> energyEvidenceReadiness;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-205 is an evidence-acceptance work product supporting E-200; a product capability does not logically entail the assurance record."; }
     }
 
     #derivation connection energyDerivation7 {
@@ -2752,26 +2573,17 @@ package BlueDogRequirements {
         end #original source ::> multiDayEndurance;
         end #derive target ::> sustainedReserveProtection;
     }
-
-    #derivation connection energyDerivation8 {
+    #refinement dependency energyDerivation8 from BlueDogRequirements::peakSupplyCapability to BlueDogRequirements::multiDayEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "The M-002 campaign requires this separately evaluated energy outcome."; }
-        end #original source ::> multiDayEndurance;
-        end #derive target ::> peakSupplyCapability;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-203 specifies a detailed acceptance condition for M-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
-
-    #derivation connection energyDerivation9 {
+    #refinement dependency energyDerivation9 from BlueDogRequirements::harvestCampaignCoverage to BlueDogRequirements::sustainedEnergyFeasibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "A repeated-day qualification profile belongs to the future sustained-operation study, not finite Gorge completion."; }
-        end #original source ::> sustainedEnergyFeasibility;
-        end #derive target ::> harvestCampaignCoverage;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-204 specifies a detailed acceptance condition for E-200 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
-
-    #derivation connection energyDerivation10 {
+    dependency energyDerivation10 from BlueDogRequirements::energyEvidenceReadiness to BlueDogRequirements::multiDayEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "The M-002 campaign requires this separately evaluated energy outcome."; }
-        end #original source ::> multiDayEndurance;
-        end #derive target ::> energyEvidenceReadiness;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-205 is an evidence-acceptance work product supporting M-002; a product capability does not logically entail the assurance record."; }
     }
 
     dependency energyDerivation11 from sustainedReserveProtection to recoveryEnergy {
@@ -2825,7 +2637,8 @@ package BlueDogRequirements {
     requirement cruisePerformance : CruisePerformance;
     requirement def <'Q-101'> LegProgress {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The mission analysis shall evaluate whole-route progress over the declared reproducible scenario ensemble. */
+        doc /*
+         *  The mission-performance assessment shall evaluate complete-route progress over the declared reproducible scenario ensemble, including sailing legs, holds and maneuvers. */
         comment conditions /* Evaluate sailing-only, loaded configuration under the declared wind, wave, current and fouling profile. Include tacking in water-relative velocity made good. Holds are separate exposure intervals, not discarded samples. */
         metadata rationale : ModelingMetadata::Rationale { text = "Owner decision: no fixed minimum sailing speed. Compare complete passage, waiting, aborts, recovery reserve and model coverage using the same versioned scenario set across designs."; }
         metadata issue : ModelingMetadata::Issue { text = "Proposed target pending design review and mission-profile selection."; }
@@ -3007,11 +2820,9 @@ package BlueDogRequirements {
         comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windSampleCadence : WindSampleCadence;
-    #derivation connection decomposeWindSampleCadence {
+    #refinement dependency decomposeWindSampleCadence from BlueDogRequirements::windSampleCadence to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> windSampleCadence;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-146 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     requirement def <'E-147'> WindSpeedAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -3019,11 +2830,9 @@ package BlueDogRequirements {
         comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windSpeedAccuracy : WindSpeedAccuracy;
-    #derivation connection decomposeWindSpeedAccuracy {
+    #refinement dependency decomposeWindSpeedAccuracy from BlueDogRequirements::windSpeedAccuracy to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> windSpeedAccuracy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-147 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     requirement def <'E-148'> WindDirectionAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -3031,11 +2840,9 @@ package BlueDogRequirements {
         comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windDirectionAccuracy : WindDirectionAccuracy;
-    #derivation connection decomposeWindDirectionAccuracy {
+    #refinement dependency decomposeWindDirectionAccuracy from BlueDogRequirements::windDirectionAccuracy to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> windDirectionAccuracy;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-148 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     requirement def <'E-149'> WindStaleInvalidation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -3043,11 +2850,9 @@ package BlueDogRequirements {
         comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windStaleInvalidation : WindStaleInvalidation;
-    #derivation connection decomposeWindStaleInvalidation {
+    #refinement dependency decomposeWindStaleInvalidation from BlueDogRequirements::windStaleInvalidation to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> windStaleInvalidation;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-149 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     requirement def <'E-150'> InvalidWindUseInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -3055,11 +2860,9 @@ package BlueDogRequirements {
         comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement invalidWindUseInhibition : InvalidWindUseInhibition;
-    #derivation connection decomposeInvalidWindUseInhibition {
+    #refinement dependency decomposeInvalidWindUseInhibition from BlueDogRequirements::invalidWindUseInhibition to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> invalidWindUseInhibition;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-150 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     requirement def <'E-151'> WindLossResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -3067,11 +2870,9 @@ package BlueDogRequirements {
         comment conditions /* E-009 supplies installed measurement and fault-test conditions. */
     }
     requirement windLossResponse : WindLossResponse;
-    #derivation connection decomposeWindLossResponse {
+    #refinement dependency decomposeWindLossResponse from BlueDogRequirements::windLossResponse to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> windLossResponse;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-151 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
     requirement def <'E-152'> WindSensingEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -3079,10 +2880,20 @@ package BlueDogRequirements {
         comment conditions /* Use the installed configuration through the complete M-002 energy campaign, including its holds and maneuvers. E-009 separately qualifies installed measurement and fault response. */
     }
     requirement windSensingEndurance : WindSensingEndurance;
-    #derivation connection decomposeWindSensingEndurance {
+    #refinement dependency decomposeWindSensingEndurance from BlueDogRequirements::windSensingEndurance to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "Separately verifiable acceptance criterion for onboard wind observation."; }
-        end #original source ::> windObservation;
-        end #derive target ::> windSensingEndurance;
+        metadata rationale : ModelingMetadata::Rationale { text = "E-152 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
     }
+    requirement def <'N-004'> VegetationResilience {
+        doc /* The vessel shall preserve or autonomously recover the sailing and recovery functions specified for the declared submerged-vegetation encounters. */
+        comment conditions /* N-053 through N-056 define distinct passage, snag, blockage and powered-recovery cases under the declared Gorge exposure. Submerged-weed qualification excludes dense floating mats and fishing-line entanglement. No disturbance waives required safety capability or motor inhibition. */
+        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+    }
+    requirement vegetationResilience : VegetationResilience;
+    dependency vegetationEnvironmentBasis from vegetationResilience to environmentalEnvelope;
+
+    dependency navigationDutyBasis from trafficSafety to GorgeChallenge::navigationRules;
+    dependency recoverySignalBasis from navigationConspicuity to GorgeChallenge::recoveryConspicuity;
+    dependency signalMatrixBasis from navigationConspicuity to regulatoryClassification;
+
 }

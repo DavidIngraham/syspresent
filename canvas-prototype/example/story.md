@@ -8,7 +8,7 @@ Blue Dog is a small autonomous sailboat project: a boat intended to navigate, tr
 
 The [course definition](model:TransGorgeCourse::policy) specifies directed departure, rounding and finish gates. Passing them in order provides an observable definition of completion. There is no elapsed-time deadline, and the complete operating boat must meet the [1.2 m overall-length limit](model:GorgeChallenge::overallLength).
 
-This story follows how those obligations lead to a boat: requirements, operating scenarios, onboard responsibilities, competing sail concepts, the IC-01 candidate and the evidence still needed before launch. The diagrams and linked terms refer to the bundled SysML model; a requirement states an obligation, while a candidate describes a proposed solution.
+This story follows how those obligations lead to a boat: requirements, operating scenarios, onboard responsibilities, competing sail concepts, the IC-01 candidate and the evidence still needed before launch. The diagrams and linked terms refer to the bundled SysML model; a requirement states an obligation, while a candidate describes a proposed solution. The bundled model is the 24 October working-tree snapshot, including the requirement, architecture and decision-record cleanups. Its source.json records exact file hashes and the base commit; the base commit alone does not identify these updated bytes. Prepared figures retain their original source context.
 
 ```syspresent
 {"type": "scene", "id": "qualifying-attempt", "title": "What keeps a circuit qualifying", "view": "BlueDogCanvasViews::story_qualifying_attempt", "focus": "GorgeChallenge::unassistedAttempt", "chapter": {"id": "gorge", "title": "The Gorge challenge"}, "presentation": {"compartments": "compact"}, "allowDisconnected": true, "context": [{"kind": "challenge-requirement", "title": "Recovery remains mandatory after abort", "text": "A safety abort initiates autonomous recovery toward a suitable shore retrieval location without waiting for communications. An alert is sent or queued.", "modelRefs": ["GorgeChallenge::autonomousShoreRecovery", "GorgeChallenge::abortAlert"]}]}
@@ -26,7 +26,7 @@ Safety has priority. [Loss of a required safety capability](model:GorgeChallenge
 
 The river brings opposing wind and current, short chop, traffic and submerged vegetation. Blue Dog's proposed [Gorge operating profile](model:BlueDogRequirements::gorgeEnvironment) calls for functions to remain available in mean wind from 0 to 15 m/s with 20 m/s three-second gusts, significant waves up to 1.5 m, and current up to 1.5 m/s.
 
-These are qualification targets, not demonstrated capabilities or a claim that the boat makes upstream progress in every combination. [Whole-route progress](model:BlueDogRequirements::legProgress) depends on the weather history, tacking, current, delays and available energy. Launch therefore requires an assessed [forecast window](model:GorgeChallenge::forecastAdmission) covering passage and recovery.
+These are qualification targets, not demonstrated capabilities or a claim that the boat makes upstream progress in every combination. [Whole-route duration](model:BlueDogRequirements::passageDuration) depends on the weather history, tacking, current, delays and available energy. Launch therefore requires an assessed [forecast window](model:GorgeChallenge::forecastAdmission) covering passage and recovery.
 
 Survival has a different purpose: retain safety and recoverability when full sailing operation is unavailable. Its exposure duration follows the recovery case. The separate [ocean profile](model:BlueDogRequirements::oceanEnvironment) belongs to a future mission toward Hawaii.
 
@@ -46,7 +46,7 @@ These choices make joints, removable assemblies, seals and access space part of 
 
 The challenge becomes a set of onboard obligations: navigate the course, control sail and steering, assess traffic, respect boundaries, preserve energy, endure wet exposure and retain a trustworthy [mission record](model:BlueDogRequirements::missionEvidence). Finishing the route is only one part of acceptance.
 
-The model distinguishes an obligation from its implementation and its evidence. A derivation identifies an upstream requirement; a dependency can record supporting rationale; an allocation assigns a responsibility to a proposed component. A satisfaction assertion is a design claim. A verification case specifies how that claim will be checked.
+The model distinguishes an obligation from its implementation and its evidence. A derivation records an obligation implied by an upstream requirement under its conditions. A refinement supplies detail without that implication; a dependency can record supporting rationale. An allocation assigns responsibility for realizing some or all of an intent to a logical or implementation element. A satisfaction assertion is a design claim. A verification case specifies how that claim will be checked.
 
 Numerical timing and accuracy targets are [retained performance allocations](model:BlueDogRequirementBasis::retainedAllocations). Their values still need justification against control and encounter conditions. This prevents a convenient study assumption from quietly becoming proof that the boat meets the mission.
 
@@ -111,7 +111,7 @@ The [encounter scenario](model:BlueDogMethod::Scenarios::TrafficEncounter) obser
 A command sent on time does not prove adequate clearance. The [traffic verification case](model:BlueDogRequirementVerification::TrafficSafetyVerification) still needs configuration-specific sensing and maneuver evidence. The design therefore couples sensor choice with hull, rudder, sail authority and operating restrictions.
 
 ```syspresent
-{"type": "scene", "id": "powered-recovery", "title": "Powered recovery needs protected energy", "view": "BlueDogCanvasViews::recoveryBasis", "focus": "BlueDogRequirements::safeRecovery", "panel": {"placement": "right"}, "presentation": {"compartments": "compact", "emphasis": ["derive"]}, "chapter": {"id": "recovery", "title": "Recovery, capsize and qualification"}, "allowDisconnected": true}
+{"type": "scene", "id": "powered-recovery", "title": "Powered recovery needs protected energy", "view": "BlueDogCanvasViews::recoveryBasis", "focus": "BlueDogRequirements::recoveryPropulsion", "panel": {"placement": "right"}, "presentation": {"compartments": "compact", "emphasis": ["derive"]}, "chapter": {"id": "recovery", "title": "Recovery, capsize and qualification"}, "allowDisconnected": true}
 ```
 
 An aborted attempt still has a destination: a suitable shore-accessible retrieval location. [Powered recovery](model:BlueDogRequirements::recoveryPropulsion) must be evaluated at mission load, with remaining capabilities and adverse current. A place that is geometrically nearby may not be reachable or suitable for retrieval.
@@ -148,7 +148,7 @@ The mission needs useful progress, manageable power demand and recoverable behav
 
 Soft sail brings cloth, sheet and chafe questions. Tail control offers aerodynamic trim but adds a boom, tail, tab and their failure states. Direct mast rotation avoids those parts but puts trim torque, movement energy and failed-angle behavior onto the drive. None has established superiority across the declared evidence gates.
 
-The [numerical baseline decision](model:BlueDogDesignDecisions::sizingBaseline) uses the fixed-camber wing because existing CAD provides a starting section. This enables coupled calculations; it is not a final downselect. Control architecture and camber are independent choices—a cambered wing could also use tail control.
+The [numerical baseline decision](model:BlueDogDesignDecisions::sizingBaseline) uses the fixed-camber wing because existing CAD provides a starting section. This enables coupled calculations; it is not a final downselect. Control architecture and camber are independent choices—a cambered wing could also use tail control. Six declared mandatory evidence groups organize the comparison; the provisional reliability study remains separate. Unknown evidence retains the contenders and does not select a rig.
 
 ```syspresent
 {"type": "scene", "id": "drive-and-aerodynamics", "title": "Holding the sail angle changes power and failure behavior", "view": "BlueDogCanvasViews::story_drive_and_aerodynamics", "focus": "BlueDogDesignDecisions::holdingDrive", "chapter": {"id": "rig", "title": "The sail and actuator trades"}, "presentation": {"compartments": "compact"}, "allowDisconnected": true, "context": [{"kind": "decision", "title": "Evidence that can decide the rig", "text": "Compare both-tack progress, installed mass and center of gravity, daily drive energy, wet-cycle durability and dynamic recovery using the same mission conditions.", "modelRefs": ["BlueDogDesignDecisions::sizingBaseline"]}]}
@@ -226,7 +226,7 @@ Average daily generation cannot reveal every low-energy interval. Peak demand is
 
 The [physical IC-01 candidate](model:BlueDogPhysicalArchitecture::ic01) proposes equipment to realize the logical responsibilities: a main battery, navigation and wind sensing, traffic observation, a primary controller and sailing actuators. Hull and rig provide the mechanical platform.
 
-Native allocations connect responsibilities to candidate elements. The model also declares power, observation, permission and command interfaces. This is where the earlier story becomes a proposed assembly: autonomous sailing requires these functions to work together on the same boat.
+Native [architecture allocations](model:BlueDogArchitectureCorrespondence) connect scenario responsibilities, logical elements and the IC-01 candidate. Each implementation mapping identifies its contribution and primary, recovery or shared path. Logical exchanges map to candidate transfers or explicit internal controller interactions. The model also declares power, observation, permission and command interfaces. Autonomous sailing requires these functions to work together on the same boat; an allocation does not execute their behavior.
 
 Catalog products, processor partitions, connectors, buses, voltage and throughput are still open. The diagram defines proposed equipment roles and interfaces, not a released bill of materials.
 
@@ -265,6 +265,8 @@ The [communications-outage scenario](model:BlueDogMethod::Scenarios::Communicati
 ```
 
 The model contains several kinds of support. Requirements state obligations. Scenarios describe interactions. Executable decisions check supplied observations. Numerical analyses test conditional feasibility. Recorded evidence preserves the source, configuration and assumptions of an actual run.
+
+Engineering choices and open questions use the shared [DecisionRecord item definition](model:EngineeringDecisions::DecisionRecord). The 20 records preserve working dispositions and unresolved questions; their structure does not assert a new approval. The 80 requirement-allocation and procedure reviews remain metadata attached to their subjects. These information records are distinct from runtime decision nodes. Candidate requirement satisfaction claims live in satisfaction.sysml, while architectural allocations assign implementation responsibility.
 
 [Virtual closure](model:BlueDogIntegratedCandidate::VirtualClosure) requires sizing, nominal passage, encounters, recovery, energy, timing and recorded assumptions to agree for a candidate. The integration study uses a bounded synthetic reach; it does not establish a complete Gorge passage or installed performance.
 

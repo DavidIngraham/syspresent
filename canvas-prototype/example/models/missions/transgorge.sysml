@@ -45,7 +45,7 @@ package GorgeChallenge {
     requirement def <'C-005'> LiveObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall deliver position, operating mode and health updates at intervals no greater than 30 seconds while the monitoring link is available. */
-        comment conditions /* Monitoring-link loss shall not interrupt autonomous mission execution. Retained telemetry shall be transmitted after contact returns. */
+        comment conditions /* C-020 governs autonomous continuation, retention and telemetry replay during monitoring-link outages. */
         metadata issue : ModelingMetadata::Issue { text = "LTE-M-class throughput is a provisional vehicle design assumption, not a mandated challenge technology. End-to-end delivery qualification and stale-data presentation are allocated to the vehicle."; }
     }
     requirement def <'C-006'> EmergencyIntervention {
@@ -65,9 +65,7 @@ package GorgeChallenge {
         doc /* The vessel shall comply with the U.S. Inland Navigation Rules (33 CFR parts 83 through 90) and applicable local navigation provisions throughout the attempt on the approved Gorge course.*/
         comment conditions /* Evaluate the actual encounter and visibility conditions, including lookout, collision-risk assessment, avoidance action, safe speed, overtaking, sailing encounters and narrow-channel obligations. A safety action takes precedence over preserving attempt qualification. */
         metadata rationale : ModelingMetadata::Rationale { text = "USCG Navigation Rules: https://www.navcen.uscg.gov/navigation-rules-amalgamated . Detailed encounter cases and quantitative acceptance allocations belong to the vehicle analysis, not the independent challenge. Small size and sail propulsion do not exempt the vessel from collision avoidance or channel non-impediment."; }
-        comment governingBaseline /* Before entry approval, the entrant shall submit a rule-applicability assessment for the identified vessel, propulsion modes, course and operating conditions. Identify the governing provisions and current local restrictions, required lights/shapes/sound signals, applicable exceptions and supporting authority. The organizer shall record the reviewed rule and notice baseline; later effective changes shall be reviewed before launch.*/
-        comment entryEvidence /* Entry approval shall require organizer acceptance of configuration-specific evidence covering relevant sailing, overtaking, crossing and constrained-water encounters, uncertain classification, restricted visibility, degraded sensing and safety intervention. Record assumptions, observation and maneuver limits, pass/fail criteria, physical demonstrations, simulation coverage and remaining exclusions. Unsupported conditions shall be excluded from admission; unresolved capability within admitted conditions prevents entry approval. Entrants shall justify detection distances, margins and maneuver capability. Passing a limited software rule subset does not establish compliance with C-007.*/
-        comment adjudication /* A collision, established navigation-rule breach or unsafe conduct requiring safety intervention disqualifies the attempt. Safety action shall not be delayed to preserve qualification, and the operator shall intervene when necessary if autonomous action is insufficient and intervention is available. Operator intervention or motor propulsion ends qualification under C-003/C-004 even when it prevents a violation. A compliant autonomous avoidance maneuver does not by itself end qualification. The organizer shall adjudicate using retained observations, commands, motion history and independent evidence where available, with a recorded reason. Insufficient evidence leaves qualification unconfirmed; absence of collision alone is not proof of compliance. Entry approval does not waive ongoing obligations.*/
+        comment processResponsibilities /* C-028 identifies entrant applicability review; C-029 controls the organizer rule and notice baseline; C-030 governs entry evidence; C-031 identifies operator safety intervention; C-032 governs adjudication. These preserve the C-007 entry and qualification policy. */
         comment complianceSources /* Governing source: https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E . Applicability: https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E/part-83/subpart-A/section-83.01 . Source-linked verification cases in GorgeChallengeVerification cover applicability, lookout/avoidance, encounter conduct, channel/visibility and signals. Their verdicts remain inconclusive pending accepted evidence; traceability is not a compliance finding.*/
     }
     requirement def <'C-008'> RestrictedWaters {
@@ -343,4 +341,40 @@ package GorgeChallenge {
         end #derive target ::> recoveryConspicuity;
     }
     comment trafficCourtesyGuidance /* Entrants are encouraged to choose routes and operating windows that reduce encounters with other waterway users. This is nonbinding guidance, not an entry or adjudication criterion. Another vessel changing course or speed is not by itself a breach. Navigation-rule compliance, applicable nonimpediment duties and collision avoidance remain governed by C-007 and C-009.*/
+    requirement def <'C-028'> NavigationRuleApplicability {
+        doc /* Before entry approval, the entrant shall submit a configuration-specific navigation-rule applicability assessment. */
+        comment conditions /* Before entry approval, the entrant shall submit a rule-applicability assessment for the identified vessel, propulsion modes, course and operating conditions. Identify the governing provisions and current local restrictions, required lights/shapes/sound signals, applicable exceptions and supporting authority. */
+        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+    }
+    requirement navigationRuleApplicability : NavigationRuleApplicability;
+    dependency navigationRuleApplicabilityBasis from navigationRuleApplicability to navigationRules;
+    requirement def <'C-029'> NavigationRuleBaseline {
+        doc /* The organizer shall record and maintain the reviewed rule and notice baseline for the attempt. */
+        comment conditions /* The organizer shall record the reviewed rule and notice baseline; later effective changes shall be reviewed before launch. */
+        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+    }
+    requirement navigationRuleBaseline : NavigationRuleBaseline;
+    dependency navigationRuleBaselineBasis from navigationRuleBaseline to navigationRules;
+    requirement def <'C-030'> NavigationEntryEvidence {
+        doc /* The organizer shall approve entry only when the configuration-specific navigation evidence satisfies the entry-evidence conditions. */
+        comment conditions /* Entry approval shall require organizer acceptance of configuration-specific evidence covering relevant sailing, overtaking, crossing and constrained-water encounters, uncertain classification, restricted visibility, degraded sensing and safety intervention. Record assumptions, observation and maneuver limits, pass/fail criteria, physical demonstrations, simulation coverage and remaining exclusions. Unsupported conditions shall be excluded from admission; unresolved capability within admitted conditions prevents entry approval. Entrants shall justify detection distances, margins and maneuver capability. Passing a limited software rule subset does not establish compliance with C-007. */
+        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+    }
+    requirement navigationEntryEvidence : NavigationEntryEvidence;
+    dependency navigationEntryEvidenceBasis from navigationEntryEvidence to navigationRules;
+    requirement def <'C-031'> OperatorSafetyIntervention {
+        doc /* The operator shall intervene when necessary if autonomous safety action is insufficient and intervention is available. */
+        comment conditions /* Safety action shall not be delayed to preserve qualification. Operator intervention or motor propulsion ends qualification under C-003/C-004 even when it prevents a violation. */
+        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+    }
+    requirement operatorSafetyIntervention : OperatorSafetyIntervention;
+    dependency operatorSafetyInterventionBasis from operatorSafetyIntervention to navigationRules;
+    requirement def <'C-032'> NavigationAdjudication {
+        doc /* The organizer shall record the attempt qualification decision and its supporting reason against the navigation adjudication conditions. */
+        comment conditions /* A collision, established navigation-rule breach or unsafe conduct requiring safety intervention disqualifies the attempt. Safety action shall not be delayed to preserve qualification, and the operator shall intervene when necessary if autonomous action is insufficient and intervention is available. Operator intervention or motor propulsion ends qualification under C-003/C-004 even when it prevents a violation. A compliant autonomous avoidance maneuver does not by itself end qualification. The organizer shall adjudicate using retained observations, commands, motion history and independent evidence where available, with a recorded reason. Insufficient evidence leaves qualification unconfirmed; absence of collision alone is not proof of compliance. Entry approval does not waive ongoing obligations. */
+        metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+    }
+    requirement navigationAdjudication : NavigationAdjudication;
+    dependency navigationAdjudicationBasis from navigationAdjudication to navigationRules;
+
 }

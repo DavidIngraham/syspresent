@@ -134,6 +134,12 @@ package BlueDogMissionLogic {
     dependency recoveryScenario from SupervisoryCycle to BlueDogMethod::Scenarios::AbortAndRecover;
     action supervisor : SupervisoryCycle;
     action capsizeDisposition : CapsizeDisposition;
+    action recoveryAuthority : RecoveryAuthority;
+    action fallback : FallbackPolicy;
+    allocate recoveryAuthority to BlueDogLogicalArchitecture::vessel.recovery;
+    allocate fallback to BlueDogLogicalArchitecture::vessel.recovery;
+    dependency recoveryAuthorityScenario from RecoveryAuthority to BlueDogMethod::Scenarios::AbortAndRecover;
+    dependency fallbackScenario from FallbackPolicy to BlueDogMethod::Scenarios::AbortAndRecover;
     allocate supervisor to BlueDogLogicalArchitecture::vessel.supervision;
     allocate capsizeDisposition to BlueDogLogicalArchitecture::vessel.supervision;
 }

@@ -32,6 +32,8 @@ package BlueDogMethod {
     }
 
     #ioEntity item def WindEstimate {
+        attribute frameIdentity : ScalarValues::String;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute speed : ISQ::SpeedValue;
         attribute direction : ISQ::AngularMeasureValue;
         attribute observedAt : ISQ::TimeValue;
@@ -41,10 +43,15 @@ package BlueDogMethod {
          */
     }
     #ioEntity item def SailingCommand {
+        item context : BlueDogInterfaceContracts::CommandContext;
+        attribute headingReference : ScalarValues::String;
+        attribute sailTrimReference : ScalarValues::String;
         attribute heading : ISQ::AngularMeasureValue;
         attribute sailTrim : ISQ::AngularMeasureValue;
     }
     #ioEntity item def LinkObservation {
+        attribute valid : ScalarValues::Boolean;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute available : ScalarValues::Boolean;
         attribute observedAt : ISQ::TimeValue;
     }
@@ -93,14 +100,19 @@ package BlueDogMethod {
         action def ObserveWind { out wind : WindEstimate; }
         action def SelectSailingCommand {
             in wind : WindEstimate;
+            in navigation : BlueDogLogicalArchitecture::NavigationEstimate;
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             out command : SailingCommand;
         }
         action def ApplySailingCommand {
-            in command : SailingCommand;
+            in command : SailingCommand [1];
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             doc /* Apply only with current supervisor permission at the actuation
              * interface. This sequence does not bypass the independent inhibit. */
         }
         #logicalScenario action def NormalSailing {
+            in navigation : BlueDogLogicalArchitecture::NavigationEstimate;
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             doc /* One cycle with valid navigation, wind and safety capabilities.
              * Invalid observations transfer responsibility to degraded-operation logic.
              */
@@ -108,6 +120,9 @@ package BlueDogMethod {
             then action select : SelectSailingCommand;
             then action actuate : ApplySailingCommand;
             flow observe.wind to select.wind;
+            bind select.navigation = navigation;
+            bind select.permission = permission;
+            bind actuate.permission = permission;
             flow select.command to actuate.command;
         }
         action def ObserveTraffic { out observation : BlueDogLogicalArchitecture::TrafficObservation; }
@@ -119,13 +134,17 @@ package BlueDogMethod {
         }
         action def SelectAvoidanceManeuver {
             in assessment : BlueDogLogicalArchitecture::TrafficAssessment;
+            in navigation : BlueDogLogicalArchitecture::NavigationEstimate;
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             out command : SailingCommand;
         }
         action def ExecuteAndReassess {
-            in command : SailingCommand;
+            in command : SailingCommand [1];
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             out assessment : BlueDogLogicalArchitecture::TrafficAssessment;
         }
         #logicalScenario action def TrafficEncounter {
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             doc /* Repeated encounter assessment includes AIS and non-AIS traffic.
              * Detection failure invokes abort/recovery; this sequence alone does not
              * establish collision avoidance or navigation-rule compliance.
@@ -138,6 +157,9 @@ package BlueDogMethod {
             flow observe.observation to assess.observation;
             flow navigate.navigation to assess.navigation;
             flow assess.assessment to select.assessment;
+            flow navigate.navigation to select.navigation;
+            bind select.permission = permission;
+            bind execute.permission = permission;
             flow select.command to execute.command;
         }
         action def LatchAbort {
@@ -150,14 +172,42 @@ package BlueDogMethod {
              * communications link or acknowledgment before proceeding to recovery.
              */
         }
+        action def AssessRecoveryBoundary {
+            in navigation : BlueDogLogicalArchitecture::NavigationEstimate;
+            out boundary : BlueDogLogicalArchitecture::BoundaryAssessment;
+        }
         action def SelectReachableShore {
-            in permission : BlueDogLogicalArchitecture::OperationPermission;
+            in navigation : BlueDogLogicalArchitecture::NavigationEstimate;
+            in observation : BlueDogLogicalArchitecture::TrafficObservation;
+            in boundary : BlueDogLogicalArchitecture::BoundaryAssessment;
+            in reserve : BlueDogLogicalArchitecture::ReserveAssessment;
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             out plan : RecoveryPlan;
         }
         action def RecoverAndReassess {
             in plan : RecoveryPlan;
-            in permission : BlueDogLogicalArchitecture::OperationPermission;
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
+            out command : BlueDogLogicalArchitecture::RecoveryCommand;
             out record : BlueDogLogicalArchitecture::MissionRecord;
+        }
+        action def PersistRecoveryAuthorization {
+            in record : BlueDogLogicalArchitecture::MissionRecord;
+            out authorizationStored : ScalarValues::Boolean [1];
+            doc /* Confirm durable disqualification storage before motor enable.
+             * Failure or unknown acknowledgment cannot authorize propulsion.
+             * This descriptive step does not implement storage hardware. */
+        }
+        action def ApplyRecoveryCommand {
+            in command : BlueDogLogicalArchitecture::RecoveryCommand [1];
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
+            in authorizationStored : ScalarValues::Boolean [1];
+            out record : BlueDogLogicalArchitecture::MissionRecord;
+            doc /* Check current authority, command applicability, qualification,
+             * durable state and interlocks before enable. Record the observed
+             * execution disposition; acceptance does not establish shore arrival. */
+        }
+        action def RecordRecoveryOutcome {
+            in record : BlueDogLogicalArchitecture::MissionRecord;
         }
         #logicalScenario action def AbortAndRecover {
             doc /* A safety-capability loss, reserve trigger or other declared abort
@@ -167,8 +217,25 @@ package BlueDogMethod {
              */
             action abort : LatchAbort;
             then action signal : RecordAndSignalAbort;
+            then action navigate : ObserveNavigation;
+            then action observe : ObserveTraffic;
+            then action boundary : AssessRecoveryBoundary;
+            then action reserve : ObserveReserve;
             then action plan : SelectReachableShore;
             then action recover : RecoverAndReassess;
+            then action persist : PersistRecoveryAuthorization;
+            then action actuate : ApplyRecoveryCommand;
+            then action record : RecordRecoveryOutcome;
+            flow navigate.navigation to boundary.navigation;
+            flow navigate.navigation to plan.navigation;
+            flow observe.observation to plan.observation;
+            flow boundary.boundary to plan.boundary;
+            flow reserve.assessment to plan.reserve;
+            flow recover.command to actuate.command;
+            flow recover.record to persist.record;
+            flow persist.authorizationStored to actuate.authorizationStored;
+            flow abort.permission to actuate.permission;
+            flow actuate.record to record.record;
             flow abort.record to signal.record;
             flow abort.permission to plan.permission;
             flow abort.permission to recover.permission;
@@ -187,7 +254,7 @@ package BlueDogMethod {
              * control observation is required before sailing can resume. */
         }
         action def ApplyCapsizePermission {
-            in permission : BlueDogLogicalArchitecture::OperationPermission;
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
         }
         action def RetainCapsizeRecord {
             in record : BlueDogLogicalArchitecture::MissionRecord;
@@ -210,16 +277,21 @@ package BlueDogMethod {
         action def ValidateNavigation {
             in observation : BlueDogLogicalArchitecture::NavigationEstimate;
             out current : BlueDogLogicalArchitecture::NavigationEstimate;
-            doc /* Mark stale or invalid observations unusable. Backup safety
+            out usable : ScalarValues::Boolean [1];
+            doc /* Preserve the producer assertion and report consumer usability
+             * separately using the allocated age/context criteria. Backup safety
              * confirmation is a separate observation, not inferred from this flag. */
         }
         action def SelectNavigationGuidance {
             in navigation : BlueDogLogicalArchitecture::NavigationEstimate;
+            in navigationUsable : ScalarValues::Boolean [1];
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             out command : SailingCommand;
             doc /* Invalid navigation cannot authorize a sailing command; the
              * separate supervisor permission interface inhibits actuation. */
         }
         #logicalScenario action def NavigationUpdate {
+            in permission : BlueDogLogicalArchitecture::OperationPermission [1];
             doc /* Observe, validate, guide and actuate. Invalid primary navigation
              * enters degraded operation; continuation requires separately confirmed
              * safety and cannot credit gate progress from invalid observations. */
@@ -229,6 +301,9 @@ package BlueDogMethod {
             then action actuate : ApplySailingCommand;
             flow observe.navigation to validate.observation;
             flow validate.current to guide.navigation;
+            flow validate.usable to guide.navigationUsable;
+            bind guide.permission = permission;
+            bind actuate.permission = permission;
             flow guide.command to actuate.command;
         }
         action def ObserveLink { out link : LinkObservation; }
@@ -258,8 +333,8 @@ package BlueDogMethod {
             out permission : BlueDogLogicalArchitecture::OperationPermission;
             out recovery : BlueDogLogicalArchitecture::RecoveryCommand;
         }
-        action def PreserveSafetyLoads { in permission : BlueDogLogicalArchitecture::OperationPermission; }
-        action def RequestRecovery { in command : BlueDogLogicalArchitecture::RecoveryCommand; }
+        action def PreserveSafetyLoads { in permission : BlueDogLogicalArchitecture::OperationPermission [1]; }
+        action def RequestRecovery { in command : BlueDogLogicalArchitecture::RecoveryCommand [1]; }
         #logicalScenario action def LowEnergyResponse {
             doc /* Compare conservative usable energy with current recovery demand,
              * protect required safety loads, and abort when the protected reserve
@@ -334,6 +409,13 @@ package BlueDogMethod {
         allocate abortAndRecover.signal to BlueDogLogicalArchitecture::vessel.recording;
         allocate abortAndRecover.plan to BlueDogLogicalArchitecture::vessel.recovery;
         allocate abortAndRecover.recover to BlueDogLogicalArchitecture::vessel.recovery;
+        allocate abortAndRecover.navigate to BlueDogLogicalArchitecture::vessel.navigation;
+        allocate abortAndRecover.observe to BlueDogLogicalArchitecture::vessel.trafficObservation;
+        allocate abortAndRecover.boundary to BlueDogLogicalArchitecture::vessel.boundary;
+        allocate abortAndRecover.reserve to BlueDogLogicalArchitecture::vessel.energy;
+        allocate abortAndRecover.persist to BlueDogLogicalArchitecture::vessel.recording;
+        allocate abortAndRecover.actuate to BlueDogLogicalArchitecture::vessel.recoveryActuation;
+        allocate abortAndRecover.record to BlueDogLogicalArchitecture::vessel.recording;
         allocate capsizeAndResume.observe to BlueDogLogicalArchitecture::vessel.safety;
         allocate capsizeAndResume.assess to BlueDogLogicalArchitecture::vessel.supervision;
         allocate capsizeAndResume.apply to BlueDogLogicalArchitecture::vessel.actuation;
@@ -368,7 +450,14 @@ package BlueDogMethod {
         #refinement dependency serviceScenario from MaintainAndRelease to BlueDogUseCases::maintain;
         dependency normalEvidence from BlueDogRequirementVerification::NavigationAndControlVerification to NormalSailing;
         dependency trafficEvidence from BlueDogRequirementVerification::TrafficSafetyVerification to TrafficEncounter;
-        dependency recoveryEvidence from BlueDogRequirementVerification::SafeRecoveryVerification to AbortAndRecover;
+        dependency recoveryEvidence from BlueDogRequirementVerification::EmergencyControlVerification to AbortAndRecover;
+        dependency recoveryPropulsionEvidence from BlueDogRequirementVerification::RecoveryPropulsionVerification to AbortAndRecover;
+        dependency recoveryReserveEvidence from BlueDogRequirementVerification::RecoveryEnergyVerification to AbortAndRecover;
+        dependency capsizeEvidence from BlueDogRequirementVerification::CapsizeControlRecoveryVerification to CapsizeAndResume;
+        dependency navigationEvidence from BlueDogRequirementVerification::NavigationAvailabilityVerification to NavigationUpdate;
+        dependency outageEvidence from BlueDogRequirementVerification::CommunicationsVerification to CommunicationsOutage;
+        dependency reserveEvidence from BlueDogRequirementVerification::LowEnergyRecoveryVerification to LowEnergyResponse;
+        dependency serviceEvidence from BlueDogRequirementVerification::ServiceabilityVerification to MaintainAndRelease;
         dependency simulationScope from BlueDogMissionSimulation::Inputs to NormalSailing;
         dependency encounterSimulationScope from BlueDogMissionSimulation::Inputs to TrafficEncounter;
         dependency recoverySimulationScope from BlueDogMissionSimulation::Inputs to AbortAndRecover;

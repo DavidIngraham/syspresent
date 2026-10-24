@@ -4,6 +4,8 @@ package BlueDogRequirementVerification {
      * Named requirement conditions are normative qualification definitions;
      * rationale and notes are explanatory. */
     verification def <'V-M-001'> RoundTripVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the complete M-001 qualification conditions and GorgeChallengeVerification::PassageQualificationVerification acceptance strategy. Correlate the observed trajectory with safety-capability, energy-reserve, external-command, propulsion and qualification histories. Test safe unassisted righting separately from capsize with safety loss, motor use or external assistance. Missing gate crossings, missing evidence or disqualifying events prevent a completion verdict. */
         objective acceptance {
             verify BlueDogRequirements::roundTrip;
@@ -11,6 +13,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-M-002'> MultiDayEnduranceVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the M-002 qualification conditions. Record initial battery state, harvester configuration, resource profile, harvested energy and loads. Limit input to installed-harvester output measured under a frozen, recorded resource profile; any test supply replay must not exceed measured power or accumulated energy. Absent profile evidence invalidates the test. */
         objective acceptance {
             verify BlueDogRequirements::multiDayEndurance;
@@ -18,6 +22,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-001'> EnergyAwarenessVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the E-001 qualification conditions. Assess every applicable acceptance outcome separately: E-101, E-102, E-103, E-104. */
         objective acceptance {
             verify BlueDogRequirements::energyAwareness;
@@ -29,6 +35,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-002'> NavigationAndControlVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the E-002 qualification conditions. Assess every applicable acceptance outcome separately: E-105, E-106, E-107, E-108, E-109. */
         objective acceptance {
             verify BlueDogRequirements::navigationAndControl;
@@ -41,6 +49,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-003'> ResetRecoveryVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the E-003 qualification conditions. Assess every applicable acceptance outcome separately: E-110, E-111, E-112, E-113, E-145, E-136, E-139, E-138, R-102, R-101. */
         objective acceptance {
             verify BlueDogRequirements::resetRecovery;
@@ -58,6 +67,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-004'> LowEnergyRecoveryVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the E-004 qualification conditions. Assess every applicable acceptance outcome separately: E-114, E-115, E-116, E-117, E-118, E-119, E-130, E-120, E-132, R-101. */
         objective acceptance {
             verify BlueDogRequirements::lowEnergyRecovery;
@@ -75,6 +86,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-005'> CommunicationsVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the E-005 qualification conditions. Assess every applicable acceptance outcome separately: E-120, E-121, E-122, E-123, E-124, E-131, E-137. */
         objective acceptance {
             verify BlueDogRequirements::communications;
@@ -89,6 +101,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-006'> IngressResponseVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the E-006 qualification conditions. Assess every applicable acceptance outcome separately: E-125, E-126, E-127, E-128, E-129, E-144, E-132, R-101. */
         objective acceptance {
             verify BlueDogRequirements::ingressResponse;
@@ -104,6 +117,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-007'> MissionEvidenceVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
         doc /* Apply the E-007 qualification conditions. Assess every applicable acceptance outcome separately: E-130, E-131, E-132, E-133, E-134, E-135, E-136, E-137, E-138, E-139. */
         objective acceptance {
             verify BlueDogRequirements::missionEvidence;
@@ -121,6 +136,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-P-001'> TransportabilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
         doc /* Apply the P-001 qualification conditions. Assess every applicable acceptance outcome separately: P-101, P-102, P-103, P-104, P-105, P-106. */
         objective acceptance {
             verify BlueDogRequirements::transportability;
@@ -134,6 +151,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-P-002'> DesktopManufactureVerification {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the P-002 qualification conditions. Compare slicer/job-envelope measurements for every job with the 250 × 250 × 250 mm usable Cartesian travel; raw part volume is insufficient. */
         objective acceptance {
             verify BlueDogRequirements::desktopManufacture;
@@ -141,6 +160,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-P-003'> ServiceabilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
         doc /* Apply the P-003 qualification conditions. Assess every applicable acceptance outcome separately: P-107, P-108, P-109, P-110. */
         objective acceptance {
             verify BlueDogRequirements::serviceability;
@@ -152,6 +173,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-S-001'> TrafficSafetyVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Verify S-001 and its decomposed timing and tracking requirements using reviewed class-specific and conservative unclassified envelopes from BlueDogClassDetection. Record class/condition-specific timely track and whole-response probability lower bounds, confidence, applicable method and consequence/exposure reviews, classification transitions, clearance and risk disposition. Independently observe collision and nonimpediment obligations; source-model gates and synthetic truth do not demonstrate physical compliance. Current allocations and installed evidence remain open.*/
         objective acceptance {
             verify BlueDogRequirements::trafficSafety;
@@ -163,6 +186,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-S-002'> OperatingBoundaryVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the S-002 qualification conditions. Assess every applicable acceptance outcome separately: S-105, S-106, S-107, S-108, S-109. */
         objective acceptance {
             verify BlueDogRequirements::operatingBoundary;
@@ -174,10 +199,11 @@ package BlueDogRequirementVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
-    verification def <'V-S-003'> SafeRecoveryVerification {
+    verification def <'V-S-003'> EmergencyControlVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the S-003 qualification conditions. Assess every applicable acceptance outcome separately: S-110, S-111, S-112, S-113, S-114, S-115, E-138, R-101, E-130. */
         objective acceptance {
-            verify BlueDogRequirements::safeRecovery;
+            verify BlueDogRequirements::emergencyControl;
             verify BlueDogRequirements::abortLatchDeadline;
             verify BlueDogRequirements::recoveryTelemetryCadence;
             verify BlueDogRequirements::motorIsolationDeadline;
@@ -191,6 +217,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-S-004'> NavigationConspicuityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
         doc /* Apply the S-004 qualification conditions. Assess every applicable acceptance outcome separately: S-116, S-117, S-118, S-119, S-120, S-121. */
         objective acceptance {
             verify BlueDogRequirements::navigationConspicuity;
@@ -204,6 +232,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-S-005'> RegulatoryClassificationVerification {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
         doc /* Apply the S-005 qualification conditions. Assess every applicable acceptance outcome separately: S-122, S-123. */
         objective acceptance {
             verify BlueDogRequirements::regulatoryClassification;
@@ -213,6 +242,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-001'> EnvironmentalEnvelopeVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Select the current Gorge profile and record configuration, load state, exposure duration, instrumentation and acceptance criteria before testing. Exercise required functions concurrently in physically realizable operating and recovery wind/wave/current combinations. Include N-014 course-derived recovery exposure, the complete N-041 freshwater/spray history and N-043 enclosure immersion checks before and after exposure. Inspect retained safety capability and distinguish structural survival from safe autonomous continuation. Shared equipment tests support the installed-vessel argument only with justified applicability. Ocean profiles require their own future plan and are not accepted by this case. */
         objective acceptance {
             verify BlueDogRequirements::environmentalEnvelope;
@@ -224,6 +255,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-002'> MarineDurabilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-002 qualification conditions. Perform post-exposure functional checks for the selected profile. */
         objective acceptance {
             verify BlueDogRequirements::marineDurability;
@@ -231,6 +263,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-R-001'> RecoveryPropulsionVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the R-001 qualification conditions. Measure track, current and electrical power. */
         objective acceptance {
             verify BlueDogRequirements::recoveryPropulsion;
@@ -238,6 +272,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-R-002'> RecoveryEnergyVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the R-002 qualification conditions. Evaluate recovery routes along the course under declared adverse current and casualty conditions. Measure motor and essential powers, bound transit and retrieval exposure, and characterize available battery energy at the lowest operating temperature and end-of-service capacity. Infeasible routes or missing route evidence cannot pass. */
         objective acceptance {
             verify BlueDogRequirements::recoveryEnergy;
@@ -245,6 +281,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-C-101'> TelemetryEquipmentVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the C-101 qualification conditions. Assess every applicable acceptance outcome separately: C-201, C-202, C-203, C-204. */
         objective acceptance {
             verify BlueDogRequirements::telemetryEquipment;
@@ -256,6 +293,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-C-102'> CommandIntegrityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the C-102 qualification conditions. Assess every applicable acceptance outcome separately: C-205, C-206, C-207, C-208, C-209, C-210, C-211, E-132, E-138. */
         objective acceptance {
             verify BlueDogRequirements::commandIntegrity;
@@ -272,6 +310,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-011'> GorgeWindVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-011 qualification conditions. Include upwind, crosswind and downwind headings. */
         objective acceptance {
             verify BlueDogRequirements::gorgeWind;
@@ -279,6 +318,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-012'> GorgeWavesVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-012 qualification conditions. Include head, beam and following seas and physically realizable wind-wave-current combinations within the selected profile. */
         objective acceptance {
             verify BlueDogRequirements::gorgeWaves;
@@ -286,6 +326,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-013'> GorgeCurrentVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-013 qualification conditions. Include opposing current. */
         objective acceptance {
             verify BlueDogRequirements::gorgeCurrent;
@@ -293,6 +334,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-015'> GorgeSurvivalWavesVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-015 qualification conditions. Include adverse relative directions and physically realizable combinations with profile survival wind and current. */
         objective acceptance {
             verify BlueDogRequirements::gorgeSurvivalWaves;
@@ -300,6 +342,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-021'> OceanWindVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-021 qualification conditions. Include upwind, crosswind and downwind headings. */
         objective acceptance {
             verify BlueDogRequirements::oceanWind;
@@ -307,6 +350,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-022'> OceanWavesVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-022 qualification conditions. Include head, beam and following seas and physically realizable wind-wave-current combinations within the selected profile. */
         objective acceptance {
             verify BlueDogRequirements::oceanWaves;
@@ -314,6 +358,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-023'> OceanCurrentVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-023 qualification conditions. Include opposing current. */
         objective acceptance {
             verify BlueDogRequirements::oceanCurrent;
@@ -321,6 +366,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-025'> OceanSurvivalWavesVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-025 qualification conditions. Include adverse relative directions and physically realizable combinations with profile survival wind and current. */
         objective acceptance {
             verify BlueDogRequirements::oceanSurvivalWaves;
@@ -328,6 +374,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-030'> AirTemperatureVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-030 qualification conditions. Test powered cold and hot endpoints after internal temperatures stabilize to less than 1 degC change per hour; operate for 2 hours at each endpoint. */
         objective acceptance {
             verify BlueDogRequirements::airTemperature;
@@ -335,6 +382,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-031'> WaterTemperatureVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-031 qualification conditions. Operate for 2 hours at each endpoint after thermal stabilization. */
         objective acceptance {
             verify BlueDogRequirements::waterTemperature;
@@ -342,6 +390,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-032'> HumidityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-032 qualification conditions. Apply three powered 24-hour cycles between 10 and 40 degC at at least 95 percent relative humidity. Produce visible external condensation during cooling; no liquid water may reach enclosed electronics. */
         objective acceptance {
             verify BlueDogRequirements::humidity;
@@ -349,6 +398,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-033'> VisibilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the N-033 qualification conditions. Assess every applicable acceptance outcome separately: N-101, N-102, N-103, N-104, N-105. */
         objective acceptance {
             verify BlueDogRequirements::visibility;
@@ -361,6 +412,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-034'> CalmOperationVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-034 qualification conditions. Record initial energy, the load measurement and the full energy history. */
         objective acceptance {
             verify BlueDogRequirements::calmOperation;
@@ -368,6 +420,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-035'> EnvelopeTransitionVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-035 qualification conditions. Assess every applicable acceptance outcome separately: N-106, N-107, N-108, N-109, N-110, E-130, R-101. */
         objective acceptance {
             verify BlueDogRequirements::envelopeTransition;
@@ -382,6 +435,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-044'> WetMechanicalIntegrityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-044 qualification conditions. Assess every applicable acceptance outcome separately: N-111, N-112. */
         objective acceptance {
             verify BlueDogRequirements::wetMechanicalIntegrity;
@@ -391,6 +445,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-045'> WetElectricalIntegrityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-045 qualification conditions. Assess every applicable acceptance outcome separately: N-113, N-114. */
         objective acceptance {
             verify BlueDogRequirements::wetElectricalIntegrity;
@@ -400,6 +455,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-046'> SolarHeatingVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-046 qualification conditions. Assess every applicable acceptance outcome separately: N-115, N-116, N-117. */
         objective acceptance {
             verify BlueDogRequirements::solarHeating;
@@ -410,6 +466,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-047'> PrintedMaterialAgingVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the N-047 qualification conditions. Establish aged load-capacity bounds for the production geometry, orientation, material and process under representative exposure. Compare with the capacity credited to each component and verify its demanded loads. Unaged controls characterize degradation; neither an 80-percent ratio nor a fixed coupon count alone establishes qualification. */
         objective acceptance {
             verify BlueDogRequirements::printedMaterialAging;
@@ -417,6 +475,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-051'> SelfRightingVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-051 qualification conditions. Assess every applicable acceptance outcome separately: N-118, N-119, N-120, N-121. */
         objective acceptance {
             verify BlueDogRequirements::selfRighting;
@@ -428,6 +487,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-052'> CapsizeControlRecoveryVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-052 qualification conditions. Assess every applicable acceptance outcome separately: N-122, N-123, N-124, N-125. */
         objective acceptance {
             verify BlueDogRequirements::capsizeControlRecovery;
@@ -439,6 +499,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-053'> SubmergedWeedPassageVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-053 qualification conditions. Assess every applicable acceptance outcome separately: N-126, N-127. */
         objective acceptance {
             verify BlueDogRequirements::submergedWeedPassage;
@@ -448,6 +509,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-054'> WeedSnagSheddingVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-054 qualification conditions. Assess every applicable acceptance outcome separately: N-128, N-129. */
         objective acceptance {
             verify BlueDogRequirements::weedSnagShedding;
@@ -457,6 +519,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-055'> WeedBlockageResponseVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-055 qualification conditions. Assess every applicable acceptance outcome separately: N-130, N-131, N-132, R-101. */
         objective acceptance {
             verify BlueDogRequirements::weedBlockageResponse;
@@ -468,6 +531,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-N-056'> RecoveryPropulsorWeedsVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the N-056 qualification conditions. Assess every applicable acceptance outcome separately: N-133, N-134, N-135, N-136, R-101. */
         objective acceptance {
             verify BlueDogRequirements::recoveryPropulsorWeeds;
@@ -480,6 +544,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-008'> NavigationAvailabilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the E-008 qualification conditions. Assess every applicable acceptance outcome separately: E-140, E-141, E-142, E-143, E-132. */
         objective acceptance {
             verify BlueDogRequirements::navigationAvailability;
@@ -492,6 +557,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-R-003'> LaunchEnergyAdmissionVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the R-003 qualification conditions. Inject below-reserve, equal-reserve, above-reserve and missing, invalid or stale inputs. */
         objective acceptance {
             verify BlueDogRequirements::launchEnergyAdmission;
@@ -499,6 +565,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-R-004'> ChallengeMotorInhibitionVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
         doc /* Apply the R-004 qualification conditions. Assess every applicable acceptance outcome separately: R-101, R-102, E-138, E-132. */
         objective acceptance {
             verify BlueDogRequirements::challengeMotorInhibition;
@@ -510,6 +577,7 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-201'> SustainedReserveProtectionVerification {
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the E-201 qualification conditions. For piecewise-constant net power, check the initial state and every interval endpoint. */
         objective acceptance {
             verify BlueDogRequirements::sustainedReserveProtection;
@@ -517,6 +585,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-205'> EnergyEvidenceReadinessVerification {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Apply the E-205 qualification conditions to the selected finite or repeating profile. Review configuration-specific installed loads, resources, battery limits, initial energy, reserve route, time resolution, uncertainty, provenance and acceptance disposition. A supplied acceptance Boolean is an input to the predicate, not an automated review of those records. */
         objective acceptance {
             verify BlueDogRequirements::energyEvidenceReadiness;
@@ -524,11 +594,15 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-L-104'> FailureDispositionVerification {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Review the architecture DFMEA, coverage, accepted mitigations, residual-risk approvals and evidence before launch. The starter list is not complete hazard coverage. */
         objective disposition { verify BlueDogRequirements::criticalFailureDisposition; }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-009'> WindObservationVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Run the E-009 installed-flow matrix and fault injections. Record time-correlated reference measurements, delivered observations, validity and control state. Demonstrate E-152 through the M-002 campaign with the same sensor and interface installation. A manufacturer specification alone cannot close installed-error criteria. */
         objective acceptance {
             verify BlueDogRequirements::windObservation;
@@ -543,6 +617,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-107'> StructuralMaterialEvidence {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Establish wet-conditioned, directional production material bounds with documented variability and reductions. Compare every property credited by the released structural analysis with its supported bound. Re-run sizing and load checks after any material/process change. */
         objective acceptance {
             verify BlueDogStructure::wetCouponStrength;
@@ -551,6 +627,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-102'> FunctionalDeformationEvidence {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Validate member-specific deformation limits against sailing/control, alignment, sealing and clearance functions, then evaluate measured or correlated responses under applicable loads. Provisional numerical percentages cannot set evidence acceptance. */
         objective acceptance {
             verify BlueDogStructure::appendageDeflection;
@@ -560,6 +638,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-101'> StructuralLoadEvidence {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Derive applicable operational, handling and casualty loads from the selected configuration and mission cases. Correlate structural predictions with member, panel, attachment and bond tests. A fixed pressure or tip-force screening probe alone is insufficient. */
         objective acceptance {
             verify BlueDogStructure::structuralIntegrity;
@@ -571,6 +651,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-110'> FlotationEvidence {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Assess actual downflooding openings and casualty buoyancy across loading, heel/pitch, wave and ingress cases. Demonstrate flotation through the declared recovery exposure; intact freeboard or volume ratios alone cannot close the case. */
         objective acceptance {
             verify BlueDogStructure::loadedFreeboard;
@@ -579,6 +661,8 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-112'> LaunchSiteEvidence {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Record surveyed launch/retrieval paths, depth/stage uncertainty, motion and installed appendage configuration. Check the site-qualified clearance throughout each path. */
         objective acceptance {
             verify BlueDogStructure::launchClearance;
@@ -586,18 +670,25 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-113'> StructuralPrintEnvelope {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Use actual sliced structural jobs including support and printer clearances; test all three positive extents against the owner 250 mm envelope. The study seam/tile dimension is not an acceptance limit. */
         objective acceptance {
             verify BlueDogStructure::printTileEnvelope;
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
-    verification def <'V-N-003'> StabilityAndFoulingVerification {
-        doc /* Integrate the declared capsize and vegetation campaigns for the same installed configuration. Use N-051/N-052 only when the passive-righting strategy is selected; retain the independent C-018 post-capsize shore-recovery obligation. Review separate weed passage, appendage snag, blockage and powered-recovery outcomes against N-053 through N-056, including subsequent control and safety capability. Check that damage, fouling or energy consumed by one exposure does not invalidate the claimed next operating state. Separate campaign results require a justified combination argument; no automatic capsize disqualification or motor-assisted qualification is permitted. */
-        objective acceptance { verify BlueDogRequirements::stabilityAndFouling; }
+    verification def <'V-N-003'> CapsizeResilienceVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
+        doc /*
+         *  Assess capsize recovery for the declared installed configuration and casualty profile. Use N-051/N-052 only for the selected passive-righting strategy; retain independent C-018 post-capsize shore recovery. Establish required safety capability, restrictions and qualification persistence during inversion and after recovery. A righting result alone cannot close N-003. */
+        objective acceptance { verify BlueDogRequirements::capsizeResilience; }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-Q-001'> MissionCapabilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* For the declared loaded configuration and reproducible route/weather ensemble, establish whole-route sailing capability from accepted sailing, maneuver, energy and recovery evidence. Retain failed routes and holds in exposure accounting. Independently assess preservation of mission-critical functions across the same exposure, including interacting faults and recoveries. Review Q-101 through Q-103 and L-103/L-104 evidence; the provisional L-101/L-102 study target cannot substitute for functional coverage or safety disposition. Numerical screens, a successful isolated course and uncalibrated simulation completion fractions do not close the installed-vessel capability claim. */
         objective acceptance {
             verify BlueDogRequirements::cruisePerformance;
@@ -606,13 +697,41 @@ package BlueDogRequirementVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-E-203'> PeakSupplyCapabilityVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Measure coincident installed withdrawal demand for each admitted mode and transition, including sensing, signaling, actuation and recovery. Disable harvesting and exercise conservative battery temperature, state of charge, end-of-service capacity, conversion losses and declared uncertainty. Compare each demand with demonstrated supply capability using E-203, and observe voltage-dependent loss of required function and protective trips. A component nameplate or summed nominal power does not establish installed peak delivery. */
         objective acceptance { verify BlueDogRequirements::peakSupplyCapability; }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'V-T-001'> ConstructionArchitectureVerification {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
         doc /* Inspect the as-built primary shell, bill of materials, manufacturing records and representative sections to establish the owner-selected FDM substrate and wet-layup glass/epoxy construction. Identify configuration, process and departures explicitly. This inspection establishes construction identity only; material, joint, load, durability and flotation acceptance remain separate objectives. */
         objective acceptance { verify BlueDogStructure::hybridConstruction; }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def <'V-N-004'> VegetationResilienceVerification {
+        metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
+        doc /* Apply N-053 through N-056 to the same installed configuration. Assess sailing passage, appendage snag shedding, blockage response and powered recovery separately. Review subsequent control, safety capability and energy use; separate campaign results need a justified combination argument, including compatibility with capsize exposure. */
+        objective acceptance { verify BlueDogRequirements::vegetationResilience; }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
+    verification def MissionPerformanceAssessmentVerification {
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
+        doc /* Review the declared reproducible whole-route ensemble and performance evidence for the identified configuration. Include sailing legs, holds, maneuvers and failed routes. Establish input provenance, coverage and limits independently of the provisional reliability targets; a favorable isolated passage is insufficient. */
+        objective acceptance {
+            verify BlueDogRequirements::legProgress;
+            verify BlueDogRequirements::cruiseEvidence;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+    verification def ReliabilityEvidenceVerification {
+        metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
+        doc /* Review the configuration-specific mission exposure, critical-function failure-rate bound, confidence method, censoring and observed failures. Assess dependence, common causes and constant-hazard applicability. Accepted rates and a study result do not establish whole-vessel reliability without this argument. */
+        objective acceptance { verify BlueDogRequirements::reliabilityEvidence; }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }

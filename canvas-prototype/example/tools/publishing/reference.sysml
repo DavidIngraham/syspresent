@@ -56,13 +56,13 @@ package BlueDogDocuments {
     }
     part def Traceability :> Document {
         attribute redefines title = "Use-case and architecture traceability";
-        part caution : Paragraph { attribute redefines text = "Use-case objectives subset the referenced requirements. Satisfy relationships express intended design allocations, not verified compliance; criteria and evidence remain open."; }
+        part caution : Paragraph { attribute redefines text = "Use-case objectives subset the referenced requirements. Satisfy relationships express candidate engineering assertions, not responsibility allocations or verified compliance; their criteria and evidence remain open."; }
         part useCases : Section {
             attribute redefines title = "Use-case objectives";
             part entries : Table { calc rows : UseCaseLinks; }
         }
         part satisfaction : Section {
-            attribute redefines title = "Architecture satisfaction allocations";
+            attribute redefines title = "Candidate architecture satisfaction assertions";
             part entries : Table { calc rows : SatisfactionLinks; }
         }
     }
@@ -72,7 +72,7 @@ package BlueDogDocuments {
             part link : Link { attribute redefines text = "Qualification conditions, rationale, open issues and verification specifications"; attribute redefines target = "methods/modeling.md"; }
         }
         part intro : Paragraph {
-            attribute redefines text = "Generated natively by OpenSysML from the project models. Status describes work on the model element, not verification. Derivations express required acceptance outcomes under their stated conditions, not evidence that a vessel satisfies them. Design-basis dependencies and refinements are reported separately.";
+            attribute redefines text = "Generated natively by OpenSysML from the project models. Status describes model work, not verification. Original satisfaction implies its derived obligations under their stated conditions; passing children alone does not prove a parent. Refinements add precision, including selected allocations with independent justification. Supporting dependencies and evidence claims remain distinct.";
         }
         part requirements : Section {
             attribute redefines title = "Requirements";
@@ -131,7 +131,7 @@ package BlueDogDocuments {
             columns = (Column(name = "ID", path = "shortName"), Column(name = "Requirement", path = "name"), Column(name = "Text", path = "issue.text")))
     }
     calc def VerificationSpecifications :> Query {
-        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = ("BlueDogRequirementVerification", "BlueDogReliability"))), type = "VerificationCaseDefinition"),
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = ("BlueDogRequirementVerification", "BlueDogReliability", "GorgeChallengeVerification"))), type = "VerificationCaseDefinition"),
             properties = ("shortName", "name", "documentation"),
             columns = (Column(name = "Verifies", cell = { in row : SysML::VerificationCaseDefinition;
             RelatedElements(source = row, relationshipKind = "verification", direction = "outgoing", maxDepth = 1) })))
@@ -194,6 +194,12 @@ package BlueDogDocuments {
         part refinements : Section { attribute redefines title = "Refinement"; part entries : Table { calc rows : RefinementLinks; } }
         part designBasis : Section { attribute redefines title = "Plain dependency"; part entries : Table { calc rows : DesignBasisLinks; } }
     }
+    calc def RequirementLabels :> Query {
+        Project(source = WhereType(source = ModelElements(), type = "RequirementUsage"), columns = (
+            Column(name = "ID", cell = { in row : SysML::RequirementUsage;
+                RelatedElements(source = row, relationshipKind = "typing", direction = "outgoing", maxDepth = 1)->ControlFunctions::collect { in t : KerML::Root::Element; t.declaredShortName } })))
+    }
+
 }
 
 package BlueDogEvidenceDocuments {
@@ -296,11 +302,11 @@ package BlueDogSailTradeDocuments {
     calc def Durability :> Query { Project(source = Candidates(), columns = (Column(name = "Candidate", path = "label"), Column(name = "Durability and reliability", path = "durability"), Column(name = "Energy", path = "energy"))) }
     calc def Recovery :> Query { Project(source = Candidates(), columns = (Column(name = "Candidate", path = "label"), Column(name = "Sailing performance", path = "sailing"), Column(name = "Recovery geometry", path = "recovery"))) }
     calc def Manufacturing :> Query { Project(source = Candidates(), columns = (Column(name = "Candidate", path = "label"), Column(name = "Construction", path = "manufacturing"), Column(name = "Next evidence", path = "nextEvidence"))) }
-    calc def Results :> Query { Project(source = Named(qualifiedName = ("BlueDogSailTrade::tailAssessment", "BlueDogSailTrade::camberAssessment", "BlueDogSailTrade::softAssessment")), columns = (Column(name = "Candidate", path = "candidateName"), Column(name = "Development decision", path = "developmentDecision"), Column(name = "Requirement verdict", path = "requirementVerdict"))) }
+    calc def Results :> Query { Project(source = Named(qualifiedName = ("BlueDogSailTrade::tailAssessment", "BlueDogSailTrade::camberAssessment", "BlueDogSailTrade::softAssessment")), columns = (Column(name = "Candidate", path = "candidateName"), Column(name = "Development decision", path = "developmentDecision"), Column(name = "Declared mandatory evidence", path = "requirementVerdict"), Column(name = "Provisional reliability study", path = "reliabilityStudyDisposition"))) }
     calc def Traces :> Query { Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogSailTrade")), type = "Dependency"), columns = (Column(name = "Analysis element", cell = { in row : KerML::Root::Dependency; row.client }), Column(name = "Requirement / architecture", cell = { in row : KerML::Root::Dependency; row.supplier }))) }
     part def Report :> Document {
         attribute redefines title = "Sail architecture trade study";
-        part scope : Paragraph { attribute redefines text = "Equal comparison of three rig concepts for the finite Gorge mission. All physical requirement gates remain unknown. No numeric reliability rates or arbitrary weighted scores are assigned. No rig is selected or mission-qualified. Sources and decision rationale are linked in BlueDogSourceEvidence and BlueDogDesignDecisions."; }
+        part scope : Paragraph { attribute redefines text = "Equal comparison of three rig concepts for the finite Gorge mission. All candidate evidence remains unknown. Six declared mandatory groups and a separate provisional reliability study organize this comparison; they are not a complete system acceptance argument. No numeric reliability rates or arbitrary weighted scores are assigned. No rig is selected or mission-qualified. Sources and decision rationale are linked in BlueDogSourceEvidence and BlueDogDesignDecisions."; }
         part decision : Section { attribute redefines title = "Native analysis conclusion"; part rows : Table { calc rows : Results; } }
         part concepts : Section { attribute redefines title = "Candidate definitions"; part rows : Table { calc rows : Concepts; } }
         part durability : Section { attribute redefines title = "Durability and energy"; part rows : Table { calc rows : Durability; } }
@@ -550,6 +556,39 @@ package BlueDogRequirementBasisDocuments {
         attribute redefines title = "Requirements and provisional design basis";
         part decisions : Table { calc rows : Decisions; }
     }
+    calc def AllocationClosureRows :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogRequirementBasis")), type = "MetadataUsage"), type = "BlueDogRequirementBasis::AllocationDecision"), columns = (
+            Column(name = "Record", path = "name"), Column(name = "Source", path = "source"),
+            Column(name = "Applicability", path = "applicability"), Column(name = "Value justification", path = "valueJustification"),
+            Column(name = "Margin basis", path = "marginBasis"), Column(name = "Evidence needed", path = "evidenceNeeded"),
+            Column(name = "Owner", path = "owner"), Column(name = "Closure action", path = "closureAction"), Column(name = "Accepted", path = "accepted")))
+    }
+    calc def ProcessRows :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogRequirementBasis")), type = "MetadataUsage"), type = "BlueDogRequirementBasis::ProcessObligation"), columns = (
+            Column(name = "Record", path = "name"), Column(name = "Responsible role", path = "responsibleRole"),
+            Column(name = "Output", path = "output"), Column(name = "Acceptance", path = "acceptance")))
+    }
+    calc def EngineeringDecisionRows :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogRequirementDecisions")), type = "EngineeringDecisions::DecisionRecord"), columns = (
+            Column(name = "ID", path = "shortName"), Column(name = "Question", path = "question"),
+            Column(name = "Evidence needed", path = "evidenceNeeded"), Column(name = "Owner", path = "owner"), Column(name = "Accepted", path = "accepted")))
+    }
+    part def ClosurePlans :> Document {
+        attribute redefines title = "Allocation justification and assessment responsibilities";
+        part allocations : Section {
+            attribute redefines title = "Allocation and procedure justification";
+            part records : Table { calc rows : AllocationClosureRows; }
+        }
+        part processes : Section {
+            attribute redefines title = "Process responsibilities and outputs";
+            part records : Table { calc rows : ProcessRows; }
+        }
+        part decisions : Section {
+            attribute redefines title = "Open engineering decisions";
+            part records : Table { calc rows : EngineeringDecisionRows; }
+        }
+    }
+
 }
 
 package BlueDogRiskDocuments {
@@ -750,4 +789,296 @@ package BlueDogFailureViews { private import FailureAnalysisViews::*; private im
         expose BlueDogAvoidanceFailures::OR_scannerObservationUnavailable_4;
     }
     part def ScannerTree :> Document { attribute redefines title = ""; part diagram : Diagram { attribute redefines direction = "BT"; attribute redefines show = "keywords"; ref redefines source = ScannerTreeView; } }
+}
+
+package BlueDogArchitectureAudit {
+    private import DocumentQueries::*;
+    calc def Responsibilities :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogLogicalArchitecture::LogicalVessel")), type = "PartUsage"), columns = (
+            Column(name = "Logical responsibility", path = "name"),
+            Column(name = "Implementation", cell = { in row : KerML::Root::Element;
+                RelatedElements(source = row, relationshipKind = "allocation", direction = "outgoing", maxDepth = 1) })))
+    }
+    calc def LogicalExchanges :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogLogicalArchitecture::LogicalVessel")), type = "FlowUsage"), columns = (
+            Column(name = "Logical exchange", path = "name"),
+            Column(name = "Implementation", cell = { in row : KerML::Root::Element;
+                RelatedElements(source = row, relationshipKind = "allocation", direction = "outgoing", maxDepth = 1) })))
+    }
+    calc def ScenarioActions :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogMethod::Scenarios")), type = "ActionUsage"), columns = (
+            Column(name = "Responsible element", cell = { in row : KerML::Root::Element;
+                RelatedElements(source = row, relationshipKind = "allocation", direction = "outgoing", maxDepth = 1) }),
+            Column(name = "Definition", cell = { in row : KerML::Root::Element;
+                RelatedElements(source = row, relationshipKind = "typing", direction = "outgoing", maxDepth = 1) })))
+    }
+    calc def Mappings :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogArchitectureCorrespondence")), type = "AllocationUsage"), columns = (
+            Column(name = "Scope", path = "scope"),
+            Column(name = "Configuration", path = "configuration"),
+            Column(name = "Path", path = "path"),
+            Column(name = "Mapping definition", cell = { in row : KerML::Root::Element;
+                RelatedElements(source = row, relationshipKind = "typing", direction = "outgoing", maxDepth = 1) })))
+    }
+    calc def Candidate :> Query {
+        Project(source = Named(qualifiedName = "BlueDogPhysicalArchitecture::ic01"), columns = (
+            Column(name = "Configuration", path = "configuration"),
+            Column(name = "Integration assumptions", path = "integration")))
+    }
+    calc def OpenDecisions :> Query {
+        Project(source = Named(qualifiedName = "BlueDogArchitectureCorrespondence"), columns = (
+            Column(name = "Interface decisions", path = "interfaceDecisions.text"),
+            Column(name = "Context limits", path = "contextLimits.text")))
+    }
+}
+
+package BlueDogArchitectureDocuments {
+    private import DocumentQueries::*;
+    part def ResponsibilityRegister :> Document {
+        attribute redefines title = "Logical responsibilities and IC-01 implementation contributions";
+        part responsibilities : Table { calc rows : BlueDogArchitectureAudit::Responsibilities; }
+    }
+    part def ExchangeRegister :> Document {
+        attribute redefines title = "Logical exchanges and candidate implementation paths";
+        part exchanges : Table { calc rows : BlueDogArchitectureAudit::LogicalExchanges; }
+    }
+}
+
+package BlueDogVerificationDocuments {
+    private import DocumentQueries::*;
+    calc def Plans :> Query {
+        in roots : ScalarValues::String [1..*] ordered default = (
+            "BlueDogRequirementVerification", "GorgeChallengeVerification", "BlueDogVerificationPlanning", "BlueDogEnergy", "BlueDogReliability");
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = roots)),
+            type = "VerificationCaseDefinition"), columns = (
+            Column(name = "Case", path = "name"),
+            Column(name = "Planned methods", path = "VerificationCases::VerificationMethod::kind"),
+            Column(name = "Objectives", cell = { in row : SysML::VerificationCaseDefinition;
+                RelatedElements(source = row, relationshipKind = "verification", direction = "outgoing", maxDepth = 1) })))
+    }
+    calc def PlannedVerdicts :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = (
+            "BlueDogRequirementVerification", "GorgeChallengeVerification", "BlueDogVerificationPlanning"))),
+            type = "VerificationCaseDefinition"), columns = (
+            Column(name = "Case", path = "name"), Column(name = "Declared plan result", path = "verdict")))
+    }
+    calc def IntegrationConfigurations :> Query {
+        Project(source = Named(qualifiedName = ("BlueDogVerificationPlanning::interfaceBench",
+            "BlueDogVerificationPlanning::recoveryUseTrial")), columns = (
+            Column(name = "Plan", path = "name"), Column(name = "Planned design", path = "plannedDesign"),
+            Column(name = "Planned assembly", path = "plannedAssembly"), Column(name = "Purpose", path = "purpose"),
+            Column(name = "Actual article", path = "articleIdentity"), Column(name = "Released procedure", path = "procedureIdentity"),
+            Column(name = "Instruments", path = "instrumentConfiguration")))
+    }
+    part def MethodRegister :> Document {
+        attribute redefines title = "Planned verification methods and objectives";
+        part context : Paragraph { attribute redefines text = "Methods identify planned assessment work. This register executes no verification and accepts no evidence. Numerical verification definitions require an identified subject and inputs before producing results."; }
+        part plans : Table { calc rows : Plans; }
+    }
+    part def IntegrationRegister :> Document {
+        attribute redefines title = "Planned IC-01 integration and recovery-use configurations";
+        part configurations : Table { calc rows : IntegrationConfigurations; }
+    }
+}
+
+package BlueDogSafetyDocuments {
+    private import DocumentQueries::*;
+    calc def Hazards :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogSafety::gorge")),
+            type = "BlueDogSafety::HazardRecord"), columns = (
+            Column(name = "ID", path = "identifier"), Column(name = "Condition", path = "condition"),
+            Column(name = "Potential mishap", path = "potentialMishap"), Column(name = "Modes", path = "modes"),
+            Column(name = "Owner role", path = "ownerRole"), Column(name = "Configuration", path = "configuration"),
+            Column(name = "Control intent", path = "controlIntent")))
+    }
+    calc def Basis :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogSafety")),
+            type = "Dependency"), columns = (
+            Column(name = "Link", path = "name"),
+            Column(name = "Client", cell = { in row : KerML::Root::Dependency; row.client }),
+            Column(name = "Supporting element", cell = { in row : KerML::Root::Dependency; row.supplier }),
+            Column(name = "Rationale", path = "rationale.text")))
+    }
+    calc def Dispositions :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogSafety::gorge")),
+            type = "BlueDogSafety::HazardRecord"), columns = (
+            Column(name = "ID", path = "identifier"),
+            Column(name = "Implementation evidence", path = "implementationEvidenceAccepted"),
+            Column(name = "Effectiveness evidence", path = "effectivenessEvidenceAccepted"),
+            Column(name = "Residual-risk assessment", path = "residualRiskAssessmentAccepted"),
+            Column(name = "Risk disposition", path = "riskDispositionAccepted"),
+            Column(name = "Control evidence record", path = "controlEvidenceRecord"),
+            Column(name = "Acceptance record", path = "acceptanceRecord"),
+            Column(name = "Acceptance authority", path = "acceptanceAuthority"),
+            Column(name = "Closed preconditions", path = "closed")))
+    }
+    calc def FailureModes :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogDFMEA::starter")),
+            type = "FailureAnalysis::ReviewRow"), columns = (
+            Column(name = "ID", path = "identifier"), Column(name = "Safety critical", path = "safetyCritical"),
+            Column(name = "Owner role", path = "ownerRole"), Column(name = "Disposition accepted", path = "dispositionAccepted"),
+            Column(name = "Action evidence accepted", path = "actionEvidenceAccepted")))
+    }
+    part def HazardRegister :> Document {
+        attribute redefines title = "Initial Gorge hazard and control basis";
+        part hazards : Table { calc rows : Hazards; }
+        part links : Table { calc rows : Basis; }
+    }
+    part def DispositionRegister :> Document {
+        attribute redefines title = "Hazard evidence and disposition status";
+        part dispositions : Table { calc rows : Dispositions; }
+    }
+}
+
+package BlueDogConfigurationDocuments {
+    private import DocumentQueries::*;
+    calc def Contexts :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogConfigurationManagement")),
+            type = "PartUsage"), type = "BlueDogConfigurationManagement::ContextRecord"), columns = (
+            Column(name = "ID", path = "identifier"), Column(name = "Role", path = "role"),
+            Column(name = "Represented subject", path = "representedSubject"),
+            Column(name = "Intended use", path = "intendedUse"), Column(name = "Revision basis", path = "revisionBasis")))
+    }
+    calc def Installation :> Query {
+        Project(source = Named(qualifiedName = "BlueDogConfigurationManagement::ic01Installation"), columns = (
+            Column(name = "Planned design", path = "design"), Column(name = "Planned assembly", path = "assembly"),
+            Column(name = "Actual article", path = "articleId"), Column(name = "Hardware revision", path = "hardwareRevision"),
+            Column(name = "Software/data revision", path = "softwareDataRevision"), Column(name = "Procedure revision", path = "procedureRevision"),
+            Column(name = "Reconciliation record", path = "reconciliationRecord"),
+            Column(name = "Reconciled", path = "configurationReconciled")))
+    }
+    calc def Scopes :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogConfigurationManagement::ic01")),
+            type = "BlueDogConfigurationManagement::ResourceScope"), columns = (
+            Column(name = "Scope", path = "label"), Column(name = "Quantity kind", path = "quantityKind"),
+            Column(name = "Configuration", path = "configuration"), Column(name = "Boundary", path = "boundary"),
+            Column(name = "Mode", path = "mode"), Column(name = "Owner role", path = "ownerRole"),
+            Column(name = "Basis", path = "basis"), Column(name = "Closure evidence", path = "closureEvidenceNeeded"),
+            Column(name = "Ready preconditions", path = "ready")))
+    }
+    calc def Allocations :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogConfigurationManagement::ic01")),
+            type = "BlueDogConfigurationManagement::ResourceScope"), columns = (
+            Column(name = "Scope", path = "label"), Column(name = "Mass allowance", path = "massAllocation"),
+            Column(name = "Average/active power allowance", path = "averagePowerAllocation"), Column(name = "Peak bound", path = "peakPowerBound"),
+            Column(name = "Nameplate energy", path = "nameplateEnergy"), Column(name = "Departure energy", path = "departureEnergy"),
+            Column(name = "Acquisition latency", path = "acquisitionLatency"), Column(name = "Assessment latency", path = "assessmentLatency"),
+            Column(name = "Command latency", path = "commandLatency"), Column(name = "Maneuver duration", path = "maneuverDuration"),
+            Column(name = "Whole-vessel mass estimate", path = "massEstimate")))
+    }
+    part def ConfigurationRegister :> Document {
+        attribute redefines title = "Configuration contexts and planned installation";
+        part contexts : Table { calc rows : Contexts; }
+        part installation : Table { calc rows : Installation; }
+    }
+    part def BudgetRegister :> Document {
+        attribute redefines title = "IC-01 accounting scopes and allocated quantities";
+        part scopes : Table { calc rows : Scopes; }
+        part values : Table { calc rows : Allocations; }
+    }
+}
+
+package BlueDogAnalysisDocuments {
+    private import DocumentQueries::*;
+    calc def Uses :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = ("BlueDogAcousticEquipment", "BlueDogAerodynamicPolicy", "BlueDogAvoidanceFailures", "BlueDogCandidateEnergy", "BlueDogClassDetection", "BlueDogConceptCredibility", "BlueDogConfigurationManagement", "BlueDogCoupledOperation", "BlueDogCoupledSizing", "BlueDogCoupledUncertainty", "BlueDogCurrentSizing", "BlueDogEncounterEnvelope", "BlueDogEncounterFeasibility", "BlueDogEncounterReview", "BlueDogEnergy", "BlueDogEnvironmentReview", "BlueDogHydrostatics", "BlueDogIntegratedCandidate", "BlueDogLocationTraffic", "BlueDogManeuverDynamics", "BlueDogMissionSimulation", "BlueDogNavigationController", "BlueDogOperatingEnvironment", "BlueDogPassageExposure", "BlueDogRecordedSizing", "BlueDogRecoveryRisk", "BlueDogReliability", "BlueDogReliabilityExamples", "BlueDogSafety", "BlueDogSailing", "BlueDogSailingExamples", "BlueDogSailTrade", "BlueDogSizingEvidence", "BlueDogStructuralBasis", "BlueDogStructure", "BlueDogSurfaceEnvironment", "BlueDogWavePerformance", "BlueDogWeather", "BlueDogWindEquipment", "BlueDogWingActuator", "BlueDogWingHeel", "InlandExtended", "InlandNavigationExperiment", "MarineEnergy", "RecoveryPropulsionTrade", "TransGorgeCourse"))),
+            type = ("AnalysisCaseDefinition", "AnalysisCaseUsage")), columns = (
+            Column(name = "Analysis", path = "qualifiedName"),
+            Column(name = "Category", path = "BlueDogAnalysisCredibility::UseIntent::category"),
+            Column(name = "Intended use", path = "BlueDogAnalysisCredibility::UseIntent::intendedUse"),
+            Column(name = "Domain", path = "BlueDogAnalysisCredibility::UseIntent::domain"),
+            Column(name = "Excluded interpretations", path = "BlueDogAnalysisCredibility::UseIntent::excludedUses"),
+            Column(name = "Needed evidence", path = "BlueDogAnalysisCredibility::UseIntent::evidenceNeeded")))
+    }
+    part def UseRegister :> Document {
+        attribute redefines title = "Analysis purposes, domains and limitations";
+        part uses : Table { calc rows : Uses; }
+    }
+}
+
+package BlueDogDecisionDocuments {
+    private import DocumentQueries::*;
+    calc def BasisRecords :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogRequirementBasis")),
+            type = "ItemUsage"), type = "EngineeringDecisions::DecisionRecord"), columns = (
+            Column(name = "Record", path = "qualifiedName"),
+            Column(name = "Recorded disposition", path = "disposition"),
+            Column(name = "Needed evidence", path = "evidenceNeeded")))
+    }
+    calc def RecordStates :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName =
+            ("BlueDogDesignDecisions", "BlueDogRequirementDecisions", "BlueDogRequirementBasis"))),
+            type = "EngineeringDecisions::DecisionRecord"), columns = (
+            Column(name = "Record", path = "qualifiedName"), Column(name = "Record state", path = "recordState"),
+            Column(name = "Recorded disposition", path = "disposition"), Column(name = "Question", path = "question"),
+            Column(name = "Needed evidence", path = "evidenceNeeded")))
+    }
+    calc def WorkingRecords :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogDesignDecisions")), type = "ItemUsage"), type = "EngineeringDecisions::DecisionRecord"), columns = (
+            Column(name = "Record", path = "qualifiedName"),
+            Column(name = "Kind", path = "BlueDogDecisionContext::Context::kind"),
+            Column(name = "Question", path = "BlueDogDecisionContext::Context::decisionQuestion"),
+            Column(name = "Scope", path = "BlueDogDecisionContext::Context::scope"),
+            Column(name = "Responsible role", path = "BlueDogDecisionContext::Context::ownerRole"),
+            Column(name = "Mandatory basis", path = "BlueDogDecisionContext::Context::criteriaBasis"),
+            Column(name = "Comparison basis", path = "BlueDogDecisionContext::Context::comparisonBasis"),
+            Column(name = "Reopening trigger", path = "BlueDogDecisionContext::Context::reopenTrigger"),
+            Column(name = "Recorded disposition", path = "disposition"),
+            Column(name = "Needed evidence", path = "evidenceNeeded"),
+            Column(name = "Actual disposition record", path = "BlueDogDecisionContext::Context::dispositionRecord"),
+            Column(name = "Actual authority", path = "BlueDogDecisionContext::Context::authorityIdentity"),
+            Column(name = "Actual decision date", path = "BlueDogDecisionContext::Context::decisionDate"),
+            Column(name = "Implementation evidence", path = "BlueDogDecisionContext::Context::implementationEvidence")))
+    }
+    calc def OpenRecords :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogRequirementDecisions")), type = "ItemUsage"), type = "EngineeringDecisions::DecisionRecord"), columns = (
+            Column(name = "Record", path = "qualifiedName"),
+            Column(name = "Kind", path = "BlueDogDecisionContext::Context::kind"),
+            Column(name = "Question", path = "question"),
+            Column(name = "Scope", path = "BlueDogDecisionContext::Context::scope"),
+            Column(name = "Responsible role", path = "owner"),
+            Column(name = "Mandatory basis", path = "BlueDogDecisionContext::Context::criteriaBasis"),
+            Column(name = "Comparison basis", path = "BlueDogDecisionContext::Context::comparisonBasis"),
+            Column(name = "Reopening trigger", path = "BlueDogDecisionContext::Context::reopenTrigger"),
+            Column(name = "Needed evidence", path = "evidenceNeeded"),
+            Column(name = "Actual disposition record", path = "BlueDogDecisionContext::Context::dispositionRecord"),
+            Column(name = "Actual authority", path = "BlueDogDecisionContext::Context::authorityIdentity"),
+            Column(name = "Actual decision date", path = "BlueDogDecisionContext::Context::decisionDate"),
+            Column(name = "Implementation evidence", path = "BlueDogDecisionContext::Context::implementationEvidence"),
+            Column(name = "Open-question acceptance", path = "accepted")))
+    }
+    calc def Criteria :> Query {
+        Project(source = WhereType(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogTradeCriteria")),
+            type = "PartUsage"), type = "BlueDogTradeCriteria::Criterion"), columns = (
+            Column(name = "Evidence-vector position", path = "position"), Column(name = "Criterion", path = "label"),
+            Column(name = "Class", path = "kind"), Column(name = "Applicability", path = "scope"),
+            Column(name = "Evidence needed", path = "evidenceNeeded")))
+    }
+    calc def Basis :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogTradeCriteria")), type = "Dependency"), columns = (
+            Column(name = "Criterion", cell = { in row : KerML::Root::Dependency; row.client }),
+            Column(name = "Supporting requirement", cell = { in row : KerML::Root::Dependency; row.supplier })))
+    }
+
+
+    calc def DesignBasis :> Query {
+        Project(source = WhereType(source = Descendants(source = Named(qualifiedName = "BlueDogDesignDecisions")), type = "Dependency"), columns = (
+            Column(name = "Decision", cell = { in row : KerML::Root::Dependency; row.client }),
+            Column(name = "Supporting element", cell = { in row : KerML::Root::Dependency; row.supplier })))
+    }
+    part def DecisionRegister :> Document {
+        attribute redefines title = "Decision questions, dispositions and reopening conditions";
+        part interpretation : Paragraph {
+            attribute redefines text = "Engineering information records use a shared item definition. Working disposition records preserve existing baselines, policies, preferences and mixed design-basis statements; they do not establish formal approval, hardware selection or accepted evidence. Open questions remain unresolved. Requirement/procedure allocation reviews remain metadata attached to their subjects. Mixed assumptions and constraints are retained pending a separate content review.";
+        }
+        part states : Table { calc rows : RecordStates; }
+        part working : Table { calc rows : WorkingRecords; }
+        part open : Table { calc rows : OpenRecords; }
+        part designBasis : Table { calc rows : BasisRecords; }
+    }
+    part def CriterionRegister :> Document {
+        attribute redefines title = "Declared rig evidence groups and requirement basis";
+        part criteria : Table { calc rows : Criteria; }
+        part basis : Table { calc rows : Basis; }
+    }
 }

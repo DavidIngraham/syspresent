@@ -33,6 +33,14 @@ package BlueDogReliability {
         attribute profileEvidenceAccepted : Boolean;
         attribute rateEvidenceAccepted : Boolean;
         attribute constantHazardAccepted : Boolean;
+        attribute criticalFunctionPartitionAccepted : Boolean default = false;
+        attribute dependenceTreatmentAccepted : Boolean default = false;
+        attribute commonCauseCoverageAccepted : Boolean default = false;
+        comment rateBasis /* Review assertions, not measured rates or proof of independence.
+         * Establish non-overlapping critical-function loss terms, dependence treatment
+         * and common-cause coverage for this configuration/profile before crediting
+         * the study evidence. A primary component fault need not be function loss.
+         * NIST Handbook 8.1.8 and defense R&M BoK 2025 section 3.2.4 inform this basis. */
         attribute totalRatePerHour : Real = NumericalFunctions::sum(criticalRatesPerHour) + commonCauseRatePerHour;
         attribute voyageDuration : TimeValue = NumericalFunctions::sum(legs.travelTime) + holdTime;
         attribute valid : Boolean = SequenceFunctions::size(legs) > 0 and
@@ -58,22 +66,22 @@ package BlueDogReliability {
         out attribute zeroFailureUpperRate : Real = if demonstrationApplicable ? -OpenSysMLMathFunctions::ln(0.05) / profile.zeroFailureTestHours else 0;
         out attribute demonstratedReliabilityLowerBound : Real = if demonstrationApplicable ? OpenSysMLMathFunctions::exp(-zeroFailureUpperRate * voyageHours) else 0;
         out attribute demonstrationMet : Boolean = demonstrationApplicable and BlueDogRequirements::MissionReliabilityCriterion(demonstratedReliabilityLowerBound, 0.95);
-        out attribute evidenceReady : Boolean = profile.profileEvidenceAccepted and profile.rateEvidenceAccepted and profile.constantHazardAccepted;
+        out attribute evidenceReady : Boolean = profile.profileEvidenceAccepted and profile.rateEvidenceAccepted and profile.constantHazardAccepted
+            and profile.criticalFunctionPartitionAccepted and profile.dependenceTreatmentAccepted and profile.commonCauseCoverageAccepted;
         comment provisionalScreens /* minimumProgressMet is a legacy comparison and rateBudgetMet evaluates a provisional objective; neither constrains mission feasibility. */
         return modeledFeasible : Boolean = inputsValid and durationMet;
         out attribute reliabilitySupported : Boolean = modeledFeasible and rateBudgetMet and demonstrationMet and evidenceReady;
         objective feasibility { require constraint { modeledFeasible } }
     }
     verification def VoyageReliabilityVerification {
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
+        doc /*
+         *  Study assessment of provisional L-101 and L-102 only. A failed numerical study target does not fail a binding product or evidence-process requirement. L-103, Q-101 and Q-103 retain their independent planned review objectives. */
         subject profile : VoyageProfile;
         analysis calculation : CruiseReliability { subject = profile; }
         objective reliabilityAcceptance {
             verify BlueDogRequirements::missionSuccessProbability;
             verify BlueDogRequirements::failureRateBudget;
-            verify BlueDogRequirements::reliabilityEvidence;
-            verify BlueDogRequirements::legProgress;
-            verify BlueDogRequirements::passageDuration;
-            verify BlueDogRequirements::cruiseEvidence;
             require constraint { calculation.reliabilitySupported }
         }
         return verdict : VerificationCases::VerdictKind =
@@ -89,4 +97,21 @@ package BlueDogReliability {
     dependency durationEnergyCoupling from CruiseReliability to BlueDogEnergy::SustainedOperation;
     dependency currentContext from CruiseReliability to BlueDogRequirements::gorgeCurrent;
     dependency weedContext from CruiseReliability to BlueDogRequirements::submergedWeedPassage;
+    verification def PassageDurationVerification {
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
+        doc /* Evaluate Q-102 independently of the provisional reliability target and demonstration duration. This checks the supplied profile only; whole-route ensemble completeness and installed qualification evidence remain separate review objectives. */
+        subject profile : VoyageProfile;
+        attribute profileValid : Boolean = SequenceFunctions::size(profile.legs) > 0 and
+            profile.legs->ControlFunctions::forAll { in leg : SailingLeg; leg.valid } and
+            profile.holdTime >= 0 [s] and profile.qualifiedDuration > 0 [s];
+        attribute durationMet : Boolean = BlueDogRequirements::PassageDurationCriterion(profile.voyageDuration, profile.qualifiedDuration);
+        objective durationAcceptance {
+            verify BlueDogRequirements::passageDuration;
+            require constraint { profileValid and durationMet }
+        }
+        return verdict : VerificationCases::VerdictKind =
+            if not profile.profileEvidenceAccepted ? VerificationCases::VerdictKind::inconclusive
+            else VerificationCases::PassIf(profileValid and durationMet);
+    }
+
 }

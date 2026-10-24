@@ -10,7 +10,7 @@ package BlueDogCanvasViews {
         expose GorgeChallenge::sailingPropulsion;
     }
     view rigAlternatives : GeneralView {
-        filter @SysML::PartUsage or @SysML::Dependency;
+        filter @SysML::PartUsage or @SysML::ItemUsage or @SysML::Dependency;
         expose BlueDogDesignDecisions::sizingBaseline;
         expose BlueDogSailTrade::softSail;
         expose BlueDogSailTrade::tailWing;
@@ -44,7 +44,6 @@ package BlueDogCanvasViews {
     view recoveryBasis : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose BlueDogRequirements::safeRecovery;
         expose BlueDogRequirements::recoveryPropulsion;
         expose BlueDogRequirements::recoveryEnergy;
     }
