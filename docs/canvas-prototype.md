@@ -299,6 +299,14 @@ IC-01 input figures. The earlier source and feature counts above describe
 historical milestones. The flashlight example demonstrates prepared analysis
 provenance, without claiming a physical measurement.
 
+## Package workspace and native view navigation
+
+Choose **Explore model**, then **Explore package…** and select a native package such as `GorgeChallenge`. The workspace keeps that package as the reader scope while the focused element changes. **Overview** returns to its bounded overview; **Up** opens the native containing package when one exists; **Whole project** clears the reader scope. Selecting a package tile also offers **Explore package on its own**. Search, contents paging, relationship actions and surrounding context use native ownership membership, including nested declarations. Crossing links remain disclosed in Context. Back/Forward restore scope, viewpoint and camera; Return to scene restores the story.
+
+The persistent **View** chooser opens declared native views or applicable views of the focused element. Packages offer a bounded overview and contents plus complete native tree/general renderings; parts offer internal views, actions offer activity/sequence views and states offer state views. Declared requirement, case, fault, table and matrix views remain available directly. The pinned engine has no `#requirement` shortcut. Complete native renderings can be large. Empty or unsupported results retain the current viewpoint and report their limit.
+
+Native views that cross package scope require explicitly choosing Whole project. The explorer checks represented native identities and relationship endpoints before replacing the view; it does not trim behavior, grids or relationships to manufacture a scoped rendering. **Compare views…** opens the secondary native catalog. **Display** contains compartment, routing and camera settings. Package scope is currently session history state; published links still restore authored scenes.
+
 ## Complete Blue Dog introduction
 
 The authored sequence covers the Gorge challenge; requirements and owner

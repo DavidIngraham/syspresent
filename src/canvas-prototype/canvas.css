@@ -45,6 +45,16 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #exploration-controls{flex-basis:100%;display:flex;align-items:center;gap:.35rem;min-width:0;padding-top:.2rem;border-top:1px solid #dce5e2}
 #exploration-controls button{font-size:.8rem;flex-shrink:0}
 #exploration-label{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:#526e70}
+#workspace-controls{flex:1 1 40rem;display:flex;align-items:center;gap:.4rem;min-width:0;flex-wrap:wrap}
+#workspace-controls button,#workspace-controls select{font-size:.8rem}
+#workspace-controls label{font-size:.8rem;margin:0}
+#scope-label{max-width:30%;min-width:4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:#526e70}
+#view-navigation{flex:1;min-width:10rem;max-width:36rem;width:0}
+#package-list{display:grid;gap:.35rem;max-height:50dvh;overflow:auto}
+#package-list button{text-align:left;overflow-wrap:anywhere}
+#package-count,#search-scope{font-size:.8rem;color:#526e70}
+#exploration-controls{flex-wrap:wrap}
+#exploration-label{max-width:12rem}
 .requirement-actions{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin:.5rem 0}
 #selection .requirement-actions button{margin:0;text-align:left;min-height:40px}
 #selection details{border-top:1px solid #dce5e2;margin-top:.5rem;padding-top:.3rem}

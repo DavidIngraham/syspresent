@@ -11,6 +11,7 @@ import {regionAreas,mountGraphRegion,updateRegionReferences} from './scene-regio
 import {projectFromSelection} from './browser-project.mjs';
 import {discoverNativeIndex} from './native-project.mjs';
 import {buildSystemOverview,nativeScopeIds} from './prominence.mjs';
+import {isPackage,packageMembers,packageCatalog,containingPackage,outsidePackage,focusViewKinds} from './package-explorer.mjs';
 import {planDepartures} from './departures.mjs';
 import {requirementActions,structuralActions,isStructuralElement,traceContext} from './exploration.mjs';
 import {resolvePresentation,validatePresentation,PRESENTATION_RELATIONSHIP_KINDS} from './preferences.mjs';
@@ -43,6 +44,11 @@ const resolve=value=>resolveInGraph(state.graph,value);
 const qname=id=>element(id)?.qualifiedName;
 const scene=()=>state.scenes[state.sceneIndex];
 function scopeIds(){const roots=state.project.manifest.systemOfInterest;return state.graph.elements.filter(e=>roots.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);}
+function explorationScope(){return state.exploring&&state.packageScope?packageMembers(state.graph,state.packageScope):undefined;}
+function assertInScope(view,scopeId=state.packageScope){
+ const outside=outsidePackage(view,scopeId?packageMembers(state.graph,scopeId):undefined);
+ if(outside.length)throw Error(`This native view includes ${outside.length} elements outside ${label(scopeId)}. Choose Whole project to open the complete view. The native view has not been trimmed.`);
+}
 function status(text){$('status').textContent=text;$('loading-phase').textContent=text;if(!$('landing').hidden)$('landing-status').textContent=text;}
 let engineReady, demoCatalog;
 async function ensureEngine(){
@@ -108,16 +114,17 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=status
 }
 let rankingScope;
 function prominenceScope(){
+ if(explorationScope())return explorationScope();
  const roots=state.project.manifest.systemOfInterest.map(resolve).filter(Boolean),key=JSON.stringify(roots);
  if(rankingScope?.graph!==state.graph||rankingScope.key!==key)rankingScope={graph:state.graph,key,ids:nativeScopeIds(state.graph,roots)};
  return rankingScope.ids;
 }
-function busy(value){$('landing').setAttribute('aria-busy',String(value));for(const control of $('landing').querySelectorAll('button:not(#resume-model)'))control.disabled=value;$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','system-overview','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
+function busy(value){$('landing').setAttribute('aria-busy',String(value));for(const control of $('landing').querySelectorAll('button:not(#resume-model)'))control.disabled=value;$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','system-overview','choose-package','workspace-overview','scope-up','scope-clear','view-navigation','view-catalog','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
 async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,demo=null,publication=null,readURL=false}={}){
  const revision=loadToken??++state.loadRevision;if(revision!==state.loadRevision)return;++state.revision;$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
  let compiled;try{await ensureEngine();if(revision!==state.loadRevision)return;compiled=await compile(validateProject(project),{cacheHash,progress:text=>{if(revision===state.loadRevision)status(text);}});}catch(error){if(revision!==state.loadRevision)return;busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision)return;
  let initialScene=0;try{if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){busy(false);throw error;}
- disposeSurfaces();state.assetURLs?.destroy();$('narrative').removeAttribute('data-scene-id');Object.assign(state,compiled,{demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.assetURLs=createAssetURLs(project.files);
+ disposeSurfaces();state.assetURLs?.destroy();$('narrative').removeAttribute('data-scene-id');Object.assign(state,compiled,{demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],packageScope:null,traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.assetURLs=createAssetURLs(project.files);
  state.trustedCacheHash=cacheHash??null;showLanding(document,false);document.title=project.manifest.title+' · Syspresent';$('resume-model').hidden=false;busy(false);updateLists();$('editor-error').textContent='';$('project-menu').open=false;
  if(state.scenes.length)await showScene(initialScene,false,{urlMode:'replace'});else if(project.manifest.entryView||project.manifest.entryFocus){state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}else await openSystemOverview({record:false});
  status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
@@ -164,7 +171,7 @@ async function prepareFrame(view,focus,panels,{journey=false}={}){
  const routed=fitted.edges;
  const labelObstacles=[...routed.filter(e=>e.labelBox).map((e,i)=>({...e.labelBox,id:'label-obstacle:'+i})),...active.flatMap(n=>n.portLabelBox?[{...n.portLabelBox,id:'port-label:'+n.id}]:[])];
  const routeObstacles=routed.flatMap(e=>e.points.slice(1).map((p,i)=>({id:'route:'+e.id+':'+i,x:Math.min(p.x,e.points[i].x)-3,y:Math.min(p.y,e.points[i].y)-3,width:Math.max(6,Math.abs(p.x-e.points[i].x)+6),height:Math.max(6,Math.abs(p.y-e.points[i].y)+6)})));
- const budget=state.neighborhoodBudget??displayPreferences().contextBudget,context=view.overview&&!journey?{view:{nodes:[],edges:[]},elements:[],omissions:[]}:surroundingContext(state.graph,layout,{budget:journey?Math.min(8,budget):budget,focus,prominenceScopeIds:prominenceScope()});
+ const budget=state.neighborhoodBudget??displayPreferences().contextBudget,context=view.overview&&!journey?{view:{nodes:[],edges:[]},elements:[],omissions:[]}:surroundingContext(state.graph,layout,{budget:journey?Math.min(8,budget):budget,focus,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()});
  context.view.nodes=context.view.nodes.map(node=>({...node,...measureCard(document,node,'')}));
  const fringe=prepareNeighborhood(context,active,area,{width:160,height:80,gap:72,activeEdges:routed,labelObstacles,obstacles:[...labelObstacles,...routeObstacles],measureLabel:labelSize});
  const ghosts=fringe.nodes.map(n=>({...n,scale:1,opacity:.3,context:true,displayDetail:'',displayID:''}));
@@ -367,7 +374,7 @@ async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=f
  const revision=++state.revision,previous=state.view,cameraRevision=state.cameraRevision;
  // Validate the route before committing focus or starting an animation.
  const savedJourney=journey?.length>1&&resolve(journey[0])===state.previousFocus&&resolve(journey.at(-1))===focus?journey.map(resolve):undefined;
- const plan=previous?planTransition({view:previous,focus:state.previousFocus},{view,focus},{graph:state.graph,scopeIds:state.exploring?undefined:scopeIds(),reducedMotion:state.reduce,journey:savedJourney}):null;
+ const plan=previous?planTransition({view:previous,focus:state.previousFocus},{view,focus},{graph:state.graph,scopeIds:state.exploring?explorationScope():scopeIds(),reducedMotion:state.reduce,journey:savedJourney}):null;
  if(savedJourney&&!plan?.route?.found)throw Error('Saved journey no longer resolves within the presentation boundary');
  const disconnected=plan?.journeyRequired&&plan.route?.found===false;
  if(disconnected&&!state.exploring&&!allowDisconnected)throw Error('No engineering route connects these viewpoints within the presentation system. Explore the model to open a disconnected viewpoint explicitly.');
@@ -382,13 +389,13 @@ async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=f
  if(result.cancelled||revision!==state.revision)return;state.view=view;state.focus=focus;state.previousFocus=focus;
  await renderSurfaces(view,focus,panels,revision);if(revision!==state.revision)return;updateExplorationControls();
  if(!state.exploring)status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);else status(state.traceInfo?.summary.message??'Explore this native view · select an element for contextual actions');
- $('boundary').textContent=!scopeIds().includes(focus)?'Outside presentation boundary · loaded model context':state.project.manifest.publication.scope==='scoped'?'Scoped publication · supplied model context only':'Complete project · standalone exploration available';
+ $('boundary').textContent=state.exploring&&state.packageScope?`Package scope · ${qname(state.packageScope)} · external links disclosed in Context`:!scopeIds().includes(focus)?'Outside presentation boundary · loaded model context':state.project.manifest.publication.scope==='scoped'?'Scoped publication · supplied model context only':'Complete project · standalone exploration available';
  }finally{oldPanel?.remove();if(revision===state.revision){state.transitioning=false;$('stage').setAttribute('aria-busy','false');state.pendingDestination=null;}}
 }
 async function showScene(index,animate=true,{record=false,urlMode='push'}={}){
  if(index<0||index>=state.scenes.length)return;
  const saved=snapshot(),savedHistory=[...state.history],savedFuture=[...state.future],savedURL=location.href;
- if(record)remember();state.sceneIndex=index;state.exploring=false;state.neighborhoodBudget=null;state.traceRequest=null;state.traceInfo=null;state.comparison=null;state.activeRegion='primary';state.presentation=structuredClone(state.scenes[index].presentation??{});state.expanded=new Set();state.collapsed=new Set();updateExplorationControls();const s=scene();const focus=resolve(s.focus),view=state.views.get(s.view);
+ if(record)remember();state.sceneIndex=index;state.exploring=false;state.packageScope=null;state.neighborhoodBudget=null;state.traceRequest=null;state.traceInfo=null;state.comparison=null;state.activeRegion='primary';state.presentation=structuredClone(state.scenes[index].presentation??{});state.expanded=new Set();state.collapsed=new Set();updateExplorationControls();const s=scene();const focus=resolve(s.focus),view=state.views.get(s.view);
  let navigationRevision;try{if(!focus||!view)throw Error('Scene focus or native view is unavailable');syncSceneURL(urlMode);const pending=transitionTo(view,focus,{animate,journey:s.journey,allowDisconnected:true});navigationRevision=state.revision;await pending;}
  catch(error){if(navigationRevision!==undefined&&navigationRevision!==state.revision)return;state.history=savedHistory;state.future=savedFuture;restoreValues(saved);if(urlMode!=='none')history.replaceState(null,'',savedURL);if(saved.view)await transitionTo(saved.view,saved.focus,{animate:false,allowDisconnected:true,camera:saved.camera});throw error;}
  finally{updateExplorationControls();$('scenes').value=state.sceneIndex;$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;$('return').hidden=!state.exploring||!state.scenes.length;$('standalone').hidden=state.exploring;}
@@ -426,13 +433,60 @@ function editorStoryContent(){
  return {chapter:id?{id,title}:undefined,figures:JSON.parse($('scene-figures').value||'[]'),context:JSON.parse($('scene-context').value||'[]')};
 }
 function displayPreferences(){return {...resolvePresentation(state.presentation,{width:$('stage').clientWidth,resolve}),compartments:({all:'expanded',none:'compact',focused:'auto'})[state.reader.compartments]};}
-function snapshot(){saveSurfaces();return {view:state.pendingDestination?.view??state.view,focus:state.pendingDestination?.focus??state.focus,sceneIndex:state.sceneIndex,exploring:state.exploring,selected:state.selected,selectedIds:[...state.selectedIds],expanded:[...state.expanded],collapsed:[...state.collapsed],presentation:structuredClone(state.presentation),traceRequest:structuredClone(state.traceRequest),traceInfo:structuredClone(state.traceInfo??null),camera:{...state.camera},neighborhoodBudget:state.neighborhoodBudget,surfaceStates:structuredClone(state.surfaceStates),comparison:state.comparison,activeRegion:state.activeRegion};}
-function restoreValues(target){disposeSurfaces();Object.assign(state,{sceneIndex:target.sceneIndex,exploring:target.exploring,selected:target.selected,selectedIds:[...(target.selectedIds??[target.selected].filter(Boolean))],expanded:new Set(target.expanded),collapsed:new Set(target.collapsed),presentation:structuredClone(target.presentation),traceRequest:structuredClone(target.traceRequest),neighborhoodBudget:target.neighborhoodBudget??null,surfaceStates:structuredClone(target.surfaceStates??{}),comparison:target.comparison??null,activeRegion:target.activeRegion??'primary'});state.traceInfo=structuredClone(target.traceInfo??null);}
+function snapshot(){saveSurfaces();return {view:state.pendingDestination?.view??state.view,focus:state.pendingDestination?.focus??state.focus,sceneIndex:state.sceneIndex,exploring:state.exploring,packageScope:state.packageScope??null,selected:state.selected,selectedIds:[...state.selectedIds],expanded:[...state.expanded],collapsed:[...state.collapsed],presentation:structuredClone(state.presentation),traceRequest:structuredClone(state.traceRequest),traceInfo:structuredClone(state.traceInfo??null),camera:{...state.camera},neighborhoodBudget:state.neighborhoodBudget,surfaceStates:structuredClone(state.surfaceStates),comparison:state.comparison,activeRegion:state.activeRegion};}
+function restoreValues(target){disposeSurfaces();Object.assign(state,{sceneIndex:target.sceneIndex,exploring:target.exploring,packageScope:target.packageScope??null,selected:target.selected,selectedIds:[...(target.selectedIds??[target.selected].filter(Boolean))],expanded:new Set(target.expanded),collapsed:new Set(target.collapsed),presentation:structuredClone(target.presentation),traceRequest:structuredClone(target.traceRequest),neighborhoodBudget:target.neighborhoodBudget??null,surfaceStates:structuredClone(target.surfaceStates??{}),comparison:target.comparison??null,activeRegion:target.activeRegion??'primary'});state.traceInfo=structuredClone(target.traceInfo??null);}
 function remember(){if(!state.view)return;state.history.push(snapshot());if(state.history.length>40)state.history.shift();state.future=[];updateExplorationControls();}
+function updateWorkspaceControls(){
+ $('workspace-controls').hidden=!state.exploring;
+ if(!state.project||!state.graph)return;
+ const scope=state.packageScope,scopeName=scope?qname(scope):'Whole project';
+ $('scope-label').textContent=scopeName;$('scope-label').title=scopeName;
+ $('scope-clear').hidden=!scope;$('scope-up').hidden=!scope||!containingPackage(state.graph,scope);
+ $('search-scope').textContent=scope?'Search within '+scopeName:'Search the loaded project';
+ const select=$('view-navigation');select.replaceChildren();
+ const add=(host,value,text)=>{const option=el('option',text);option.value=value;host.append(option);return option;};
+ add(select,'overview',scope?'Package overview':'Project overview');
+ const focusGroup=el('optgroup');focusGroup.label='Focused element · '+label(state.focus);
+ for(const item of focusViewKinds(element(state.focus)))add(focusGroup,item.id,item.label);select.append(focusGroup);
+ const views=el('optgroup');views.label='Declared native views';
+ const catalog=state.availableViews.map(name=>({name,short:element(resolve(name))?.native.declaredName||name,kind:state.views.get(name)?.kind})),counts=new Map();
+ for(const item of catalog)counts.set(item.short,(counts.get(item.short)??0)+1);
+ for(const {name,short,kind}of catalog){const option=add(views,'authored:'+name,(counts.get(short)>1?name:short)+(kind?' · '+kind:''));option.title=name;}if(views.children.length)select.append(views);select.title=state.view?.id||'Native view';
+ const current=state.view?.overview?'overview':state.availableViews.includes(state.view?.id)?'authored:'+state.view.id:state.view?.id?.startsWith('#')?'native:'+state.view.id.slice(1,state.view.id.indexOf(':')):state.traceRequest?.mode;
+ if(current&&[...select.options].some(option=>option.value===current))select.value=current;
+ else{const option=add(select,'current',state.view?.title||'Current view');option.disabled=true;select.value='current';}
+ if($('search').value.trim())$('search').dispatchEvent(new Event('input'));
+}
+function renderPackageChoices(){
+ const choices=packageCatalog(state.graph,$('package-search').value),list=$('package-list');list.replaceChildren();
+ $('package-count').textContent=choices.length?`Showing ${Math.min(60,choices.length)} of ${choices.length} packages${choices.length>60?' · narrow your search':''}.`:'No matching loaded project packages.';
+ for(const item of choices.slice(0,60))list.append(button(item.qualifiedName,async()=>{await openSystemOverview({scopeId:item.id});$('package-dialog').close();}));
+}
+function openPackagePicker(){renderPackageChoices();$('package-dialog').showModal();$('package-search').focus();}
+async function switchWorkspaceView(value){
+ if(value==='overview')await openSystemOverview();
+ else if(value.startsWith('authored:'))await openNativeView(value.slice(9));
+ else if(value.startsWith('native:'))await explore(state.focus,value.slice(7));
+ else if(['context','contents'].includes(value))await followTrace(state.focus,value);
+}
+async function openNativeView(name,{compare=false}={}){
+ const revision=++state.revision,modelHash=state.modelHash;let view=state.views.get(name);
+ if(!view){
+  const raw=await state.engine.call('RenderView',{modelHash,view:name,includeSemanticIdentity:true});if(revision!==state.revision||modelHash!==state.modelHash)return;
+  view=requireNativeIdentity(adaptNativeView(raw,name));if(!supportsView(view))throw Error('Unsupported native notation: '+view.kind);
+ }
+ assertInScope(view);
+ const identities=representedIdentities(view);if(!identities.length)throw Error('This native view contains no represented model elements.');
+ if(!state.views.has(name)){state.views.set(name,view);state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);}
+ const target=identities.includes(state.focus)?state.focus:identities.find(id=>element(id))??state.focus;
+ if(compare){remember();state.comparison={view,focus:target,title:name};state.activeRegion='comparison';await frame(state.view);updateWorkspaceControls();}
+ else await openExploration(view,target,{resetRegions:true});
+ $('native-views-dialog').close();$('find').hidden=true;
+}
 function updateExplorationControls(){
  const exploring=state.exploring;document.querySelector('header nav').hidden=exploring;$('exploration-controls').hidden=!exploring&&!state.history.length&&!state.future.length;$('explore-back').disabled=!state.history.length;$('explore-forward').disabled=!state.future.length;
- $('return').hidden=!exploring||!state.scenes.length;$('standalone').hidden=exploring;
- const request=state.traceRequest,info=state.traceInfo;$('exploration-label').textContent=exploring?(state.view?.overview?'System overview · '+label(state.focus):request&&info?`${info.mode==='context'?'Context':({origins:'Origins',derived:'Derived requirements',impact:'Design impact',verification:'Verification',contents:'Parts / contents',container:'Containing element'})[info.mode]} · ${label(request.focus)} · ${info.shown} of ${info.total}`:label(state.focus)):'Guided scene';$('exploration-label').title=$('exploration-label').textContent;
+ $('return').hidden=!exploring||!state.scenes.length;$('standalone').hidden=exploring;updateWorkspaceControls();
+ const request=state.traceRequest,info=state.traceInfo;$('exploration-label').textContent=exploring?(state.view?.overview?`${state.packageScope?'Package':'System'} overview · ${state.view.overview.summary.shown} of ${state.view.overview.summary.total}`:request&&info?`${info.mode==='context'?'Context':({origins:'Origins',derived:'Derived requirements',impact:'Design impact',verification:'Verification',contents:'Parts / contents',container:'Containing element'})[info.mode]} · ${label(request.focus)} · ${info.shown} of ${info.total}`:label(state.focus)):'Guided scene';$('exploration-label').title=$('exploration-label').textContent;
  $('trace-previous').hidden=!request||!info||info.pages<2;$('trace-next').hidden=!request||!info||info.pages<2;$('trace-previous').disabled=!info||info.page===0;$('trace-next').disabled=!info||info.page>=info.pages-1;
  if(info?.pages>1)$('trace-next').textContent=`More (${info.page+1}/${info.pages})`;
 }
@@ -441,28 +495,42 @@ async function restoreHistory(direction){
  const target=from.pop(),current=snapshot();to.push(current);restoreValues(target);updateExplorationControls();const revision=state.revision+1;
  try{await transitionTo(target.view,target.focus,{allowDisconnected:true,camera:target.camera});if(revision!==state.revision)return;$('scenes').value=state.sceneIndex;updateExplorationControls();if(state.traceInfo)status(state.traceInfo.summary.message);}catch(error){if(revision!==state.revision)return;to.pop();from.push(target);restoreValues(current);updateExplorationControls();await transitionTo(current.view,current.focus,{animate:false,allowDisconnected:true,camera:current.camera});throw error;}
 }
-async function openExploration(view,id,{request=null,info=null,record=true,resetRegions=false}={}){
- const previous=snapshot(),history=[...state.history],future=[...state.future];if(record)remember();if(resetRegions){state.comparison=null;state.activeRegion='primary';}state.neighborhoodBudget=null;state.exploring=true;state.traceRequest=request;state.traceInfo=info;if(request)state.presentation={...state.presentation,emphasis:[]};updateExplorationControls();const revision=state.revision+1;
- try{await transitionTo(view,id,{allowDisconnected:true});if(revision!==state.revision)return;updateExplorationControls();status(info?info.summary.message:'Explore this native view · select an element for contextual actions');}
+async function openExploration(view,id,{request=null,info=null,record=true,resetRegions=false,scopeId=state.packageScope}={}){
+ assertInScope(view,scopeId);
+ const previous=snapshot(),history=[...state.history],future=[...state.future];if(record)remember();if(resetRegions){state.comparison=null;state.activeRegion='primary';}state.packageScope=scopeId??null;state.neighborhoodBudget=null;state.exploring=true;state.traceRequest=request;state.traceInfo=info;if(request)state.presentation={...state.presentation,emphasis:[]};updateExplorationControls();const revision=state.revision+1;
+ try{await transitionTo(view,id,{allowDisconnected:true});if(revision!==state.revision)return;updateExplorationControls();status(info?.summary.message??view.overview?.summary.message??'Explore this native view · select an element for contextual actions');}
  catch(error){if(revision!==state.revision)return;state.history=history;state.future=future;restoreValues(previous);updateExplorationControls();if(previous.view)await transitionTo(previous.view,previous.focus,{animate:false,allowDisconnected:true,camera:previous.camera});throw error;}
 }
-async function openSystemOverview({record=true}={}){
- const rootIds=state.project.manifest.systemOfInterest.map(resolve).filter(Boolean),budget=$('stage').clientWidth<700?6:9;
+async function openSystemOverview({record=true,scopeId=state.packageScope}={}){
+ const rootIds=scopeId?[scopeId]:state.project.manifest.systemOfInterest.map(resolve).filter(Boolean),budget=$('stage').clientWidth<700?6:9;
  const context=buildSystemOverview(state.graph,{rootIds,budget});
  if(!context.elements.length)throw Error('No named project declarations are available for a system overview.');
- const view=graphView(state.graph,context,'System overview');
+ const view=graphView(state.graph,context,scopeId?'Package overview':'System overview');
  view.id='overview:'+JSON.stringify([rootIds,budget,context.elements.map(e=>e.id)]);
  view.overview={rootIds,budget,metrics:Object.fromEntries(context.elements.map(e=>[e.id,context.metrics.get(e.id)])),summary:context.summary};
  view.nodes=view.nodes.map(node=>{const m=context.metrics.get(node.semanticId);return {...node,overviewLabel:m?`${m.children} children · ${m.connections} neighbors`:undefined};});
- await openExploration(view,context.focus,{record,resetRegions:true});
+ await openExploration(view,context.focus,{record,resetRegions:true,scopeId});
 }
 async function explore(id,kind){
- if(!id||!element(id))throw Error('Model target unavailable');const revision=++state.revision,modelHash=state.modelHash;
- if(kind){const q=qname(id);if(!q)throw Error('Native view requires a qualified model identity');const raw=await state.engine.call('RenderView',{modelHash,view:`#${kind}:${q}`,includeSemanticIdentity:true});if(revision!==state.revision||modelHash!==state.modelHash)return;const view={...requireNativeIdentity(adaptNativeView(raw,`#${kind}:${q}`)),capture:{definition:({action:'ActionFlowView',state:'StateTransitionView',sequence:'SequenceView',interconnection:'InterconnectionView'})[kind],root:q}};state.extraViews??=new Map();state.extraViews.set(view.id,view);state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);await openExploration(view,id);}
- else await followTrace(id,'context');
+ if(!id||!element(id))throw Error('Model target unavailable');
+ if(!kind){await followTrace(id,'context');return;}
+ const revision=++state.revision,modelHash=state.modelHash,q=qname(id);
+ if(!q)throw Error('Native view requires a qualified model identity');
+ status('Preparing native '+kind+' view…');
+ const name=`#${kind}:${q}`,raw=await state.engine.call('RenderView',{modelHash,view:name,includeSemanticIdentity:true});
+ if(revision!==state.revision||modelHash!==state.modelHash)return;
+ const view=requireNativeIdentity(adaptNativeView(raw,name));
+ if(!supportsView(view))throw Error('Unsupported native notation: '+view.kind);
+ if(!representedIdentities(view).length)throw Error('No native '+kind+' content is available for '+label(id)+'.');
+ assertInScope(view);
+ const definition=({action:'ActionFlowView',state:'StateTransitionView',sequence:'SequenceView',interconnection:'InterconnectionView'})[kind];
+ if(definition)view.capture={definition,root:q};
+ state.extraViews??=new Map();state.extraViews.set(view.id,view);
+ state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);
+ await openExploration(view,id);
 }
 async function followTrace(id,mode,page=0){
- const request={focus:id,mode,budget:$('stage').clientWidth<700?5:7,page},context=traceContext(state.graph,{...request,prominenceScopeIds:prominenceScope()}),view=graphView(state.graph,context,mode+' of '+label(id));view.traceRequest=request;
+ const request={focus:id,mode,budget:$('stage').clientWidth<700?5:7,page},context=traceContext(state.graph,{...request,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()}),view=graphView(state.graph,context,mode+' of '+label(id));view.traceRequest=request;
  await openExploration(view,id,{request,info:context});
 }
 function select(id,node,origin){clearTrace();highlightSelection([id],origin);const menu=$('selection');menu.replaceChildren(el('strong',node?.name||label(id)));menu.hidden=false;
@@ -470,17 +538,17 @@ function select(id,node,origin){clearTrace();highlightSelection([id],origin);con
  const documentation=documentationFor(state.graph,id);if(documentation.text)menu.append(button('Read full statement',()=>{$('information').classList.add('statement');$('information-title').textContent='Full statement';$('information-text').textContent=(documentation.source?.qualifiedName||label(id))+'\n\n'+documentation.text;$('information').showModal();}));
  const prominence=state.view?.overview?.metrics[id];if(prominence){menu.append(el('p',`${prominence.children} direct children · ${prominence.connections} distinct connected elements. Structural prominence describes the loaded model, not engineering criticality.`));if(prominence.children>0&&isStructuralElement(element(id)))menu.append(button('Expand contents',()=>followTrace(id,'contents')));}
  menu.append(button('Focus',()=>explore(id)),button(state.expanded.has(id)||!!node?.displayDetail?'Collapse compartment':'Show statement / compartment',async()=>{if(state.expanded.has(id)||!!node?.displayDetail){state.expanded.delete(id);state.collapsed.add(id);}else{state.collapsed.delete(id);state.expanded.add(id);}await frame(state.view);select(id,node);}));
- const e=element(id);if(isStructuralElement(e)){const actions=el('div',undefined,'requirement-actions');for(const action of structuralActions(state.graph,id)){const control=button(`${action.label} (${action.count})`,()=>followTrace(id,action.mode));control.disabled=!action.enabled;control.title=action.summary.message;actions.append(control);}menu.append(actions);}
- if(['PartUsage','PartDefinition','Package'].includes(e?.kind))menu.append(button('Internal view',()=>explore(id,'interconnection')));if(['ActionUsage','ActionDefinition'].includes(e?.kind))menu.append(button('Activity view',()=>explore(id,'action')));
+ const e=element(id);if(isPackage(e))menu.append(button('Explore package on its own',()=>openSystemOverview({scopeId:id})));if(isStructuralElement(e)){const actions=el('div',undefined,'requirement-actions');for(const action of structuralActions(state.graph,id,{scopeIds:explorationScope()})){const control=button(`${action.label} (${action.count})`,()=>followTrace(id,action.mode));control.disabled=!action.enabled;control.title=action.summary.message;actions.append(control);}menu.append(actions);}
+ if(['PartUsage','PartDefinition'].includes(e?.kind))menu.append(button('Internal view',()=>explore(id,'interconnection')));if(['ActionUsage','ActionDefinition'].includes(e?.kind))menu.append(button('Activity view',()=>explore(id,'action')));
  if(['StateUsage','StateDefinition'].includes(e?.kind))menu.append(button('State view',()=>explore(id,'state')));
  if(['RequirementUsage','RequirementDefinition'].includes(e?.kind)){
-  const actions=el('div',undefined,'requirement-actions');for(const action of requirementActions(state.graph,id).filter(a=>a.mode!=='context')){const control=button(`${action.label} (${action.count})`,()=>followTrace(id,action.mode));control.disabled=action.count===0&&action.unavailable===0&&action.filtered===0;control.title=action.summary?.message??'';actions.append(control);}menu.append(actions,el('p','Counts describe links in this loaded projection. Missing links are not proof that none exist.','projection-note'));
+  const actions=el('div',undefined,'requirement-actions');for(const action of requirementActions(state.graph,id,{scopeIds:explorationScope()}).filter(a=>a.mode!=='context')){const control=button(`${action.label} (${action.count})`,()=>followTrace(id,action.mode));control.disabled=action.count===0&&action.unavailable===0&&action.filtered===0;control.title=action.summary?.message??'';actions.append(control);}menu.append(actions,el('p','Counts describe links in this loaded projection. Missing links are not proof that none exist.','projection-note'));
  }
  const advanced=el('details'),summary=el('summary','Other relationships');advanced.append(summary);
  const kinds=[...new Set(state.graph.relationships.filter(r=>r.source===id||r.target===id).map(r=>r.kind))].filter(k=>!['typing','owner','specialization'].includes(k));
- for(const kind of kinds)advanced.append(button(`Follow ${kind} relationships`,async()=>{const context=engineeringContext(state.graph,{focus:id,relationshipKinds:[kind],depth:1,budget:7});await openExploration(graphView(state.graph,context),id);}));
+ for(const kind of kinds)advanced.append(button(`Follow ${kind} relationships`,async()=>{const context=engineeringContext(state.graph,{focus:id,scopeIds:explorationScope(),relationshipKinds:[kind],depth:1,budget:7});await openExploration(graphView(state.graph,context),id);}));
  menu.append(advanced);
- const typing=directTypingContext(state.graph,id);if(typing.elements.length>1)menu.append(button('Show direct type context',async()=>{await openExploration(graphView(state.graph,typing,'Explicit typing context'),id);}));
+ const typing=directTypingContext(state.graph,id);if(typing.elements.length>1&&!outsidePackage(graphView(state.graph,typing),explorationScope()).length)menu.append(button('Show direct type context',async()=>{await openExploration(graphView(state.graph,typing,'Explicit typing context'),id);}));
  menu.append(button('Close',()=>{menu.hidden=true;}));
 }
 function clearTrace(){ $('stage').classList.remove('tracing');for(const n of $('nodes').children)n.classList.remove('trace-endpoint');for(const e of $('connections').querySelectorAll('g[data-relationship]')){e.classList.remove('traced');e.removeAttribute('aria-pressed');} }
@@ -528,12 +596,13 @@ function bind(){
  for(const kind of PRESENTATION_RELATIONSHIP_KINDS){const option=el('option',kind);option.value=kind;$('presentation-emphasis').append(option);}
  $('explore-back').onclick=()=>restoreHistory('back').catch(report);$('explore-forward').onclick=()=>restoreHistory('forward').catch(report);$('trace-next').onclick=()=>followTrace(state.traceRequest.focus,state.traceRequest.mode,state.traceInfo.page+1).catch(report);$('trace-previous').onclick=()=>followTrace(state.traceRequest.focus,state.traceRequest.mode,state.traceInfo.page-1).catch(report);
  $('previous').onclick=()=>showScene(state.sceneIndex-1).catch(report);$('next').onclick=()=>showScene(state.sceneIndex+1).catch(report);$('scenes').onchange=()=>showScene(Number($('scenes').value)).catch(report);$('standalone').onclick=async()=>{try{await openExploration(state.view,state.focus);}catch(error){report(error);}};$('return').onclick=()=>showScene(state.sceneIndex,true,{record:true}).catch(report);
- $('system-overview').onclick=()=>{$('camera-menu').open=false;openSystemOverview().catch(report);};
+ $('system-overview').onclick=()=>{$('camera-menu').open=false;openSystemOverview({scopeId:null}).catch(report);};
+ $('choose-package').onclick=openPackagePicker;$('package-search').oninput=renderPackageChoices;$('workspace-overview').onclick=()=>openSystemOverview().catch(report);$('scope-clear').onclick=()=>openSystemOverview({scopeId:null}).catch(report);$('scope-up').onclick=()=>openSystemOverview({scopeId:containingPackage(state.graph,state.packageScope)}).catch(report);$('view-catalog').onclick=()=>$('native-views-dialog').showModal();
+ $('view-navigation').onchange=()=>switchWorkspaceView($('view-navigation').value).catch(error=>{updateWorkspaceControls();report(error);});
  $('fit').onclick=()=>resetCamera().catch(report);$('show-neighborhood').onclick=fitNeighborhood;$('zoom-in').onclick=()=>zoomBy(1.25);$('zoom-out').onclick=()=>zoomBy(.8);$('more-neighbors').onclick=()=>moreNeighbors().catch(report);
  bindCameraControls({element:$('stage'),getViewportArea:()=>state.visualSnapshot?.area,getCamera:()=>state.camera,setCamera:applyCamera,onGestureStart:takeCameraControl,shouldHandleTarget:target=>target===$('stage')||!!target?.closest?.('#graph-viewport')});$('reduce').setAttribute('aria-pressed',state.reduce);$('reduce').onclick=()=>{state.reduce=!state.reduce;$('reduce').setAttribute('aria-pressed',state.reduce);if(state.reduce)state.motion?.finish();};$('find-toggle').onclick=()=>{$('find').hidden=!$('find').hidden;if(!$('find').hidden)$('search').focus();};
- $('search').oninput=()=>{const q=$('search').value.trim().toLowerCase();$('search-results').replaceChildren();if(!q)return;const hits=state.graph.elements.filter(e=>e.qualifiedName&&e.layer==='project'&&e.native.declaredName&&(e.name+' '+e.qualifiedName).toLowerCase().includes(q));for(const e of hits.slice(0,30))$('search-results').append(button(e.qualifiedName,async()=>{$('find').hidden=true;await explore(e.id);}));};
- const openNative=async compare=>{const revision=++state.revision,modelHash=state.modelHash,name=$('views').value;let view=state.views.get(name);if(!view){const raw=await state.engine.call('RenderView',{modelHash,view:name,includeSemanticIdentity:true});if(revision!==state.revision||modelHash!==state.modelHash)return;view=requireNativeIdentity(adaptNativeView(raw,name));if(!supportsView(view))throw Error('Unsupported native notation: '+view.kind);state.views.set(name,view);state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);}const target=representedIdentities(view).find(id=>element(id))??state.focus;$('find').hidden=true;if(compare){remember();state.comparison={view,focus:target,title:name};state.activeRegion='comparison';await frame(state.view);}else {state.comparison=null;state.activeRegion='primary';await openExploration(view,target);}};
- $('open-view').onclick=()=>openNative(false).catch(report);$('compare-view').onclick=()=>openNative(true).catch(report);
+ $('search').oninput=()=>{const q=$('search').value.trim().toLowerCase();$('search-results').replaceChildren();if(!q)return;const hits=state.graph.elements.filter(e=>e.qualifiedName&&e.layer==='project'&&e.native.declaredName&&(!explorationScope()||explorationScope().includes(e.id))&&(e.name+' '+e.qualifiedName).toLowerCase().includes(q));for(const e of hits.slice(0,30))$('search-results').append(button(e.qualifiedName,async()=>{$('find').hidden=true;await explore(e.id);}));};
+ $('open-view').onclick=()=>openNativeView($('views').value).catch(report);$('compare-view').onclick=()=>openNativeView($('views').value,{compare:true}).catch(report);
  $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent=state.view?.overview?'Overview selection':'Prepared neighborhood';const omissions=state.displayOmissions??state.displayed?.omissions??[],n=state.visualSnapshot?.neighborhood;const summary=state.view?.overview?(state.view.overview.summary.message+'\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n'):n?`${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.\n\n`:'';$('information-text').textContent=summary+omissionDisclosure(omissions,!!state.view?.overview)+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
  $('edit').onclick=openEditor;$('view-file').onchange=()=>{$('view-source').value=fileText(state.project,$('view-file').value);};
  $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{...editorStoryContent(),presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project);$('editor').close();await showScene(index,false);}catch(e){report(e);}};

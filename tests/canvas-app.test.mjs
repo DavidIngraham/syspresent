@@ -14,12 +14,14 @@ const coverage={kind:'requirement',nodes:native.nodes,edges:native.edges};
 const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfInterest:['Model'],modelSources:['model.sysml'],viewSources:['views.sysml'],story:'story.md',assets:[],publication:{scope:'complete'}};
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
-async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,size={width:1000,height:700}}={}){
- let workerCount=0,resizeCallback;const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
+async function pickPackage(h,name){const d=h.document;d.getElementById('choose-package').click();const search=d.getElementById('package-search');search.value=name;search.dispatchEvent(new h.window.Event('input'));const choice=[...d.querySelectorAll('#package-list button')].find(b=>b.textContent===name);assert.ok(choice,'native package is offered');choice.click();await until(()=>!d.getElementById('package-dialog').open&&sceneSettled(d));}
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,size={width:1000,height:700}}={}){
+ let workerCount=0,resizeCallback;const nativeRequests=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
  if(storyContent){const block=JSON.parse(fixtureFiles['story.md'].split('```syspresent\n')[1].split('\n```')[0]);Object.assign(block,{chapter:{id:'challenge',title:'Challenge'},figures:[{id:'course',title:'Course map',asset:'assets/course.svg',alt:'Course map',caption:'Illustrative course.',provenance:{source:'Model',context:'Fixture'},modelRefs:['Model::req']}],context:[{kind:'candidate',title:'Candidate',text:'Proposed boat.',modelRefs:['Model::part']}]});fixtureFiles['story.md']='```syspresent\n'+JSON.stringify(block)+'\n```\n\nRead [the requirement](model:Model::req) and [hidden context](model:Model::orphan).';fixtureFiles['assets/course.svg']='<svg xmlns="http://www.w3.org/2000/svg"/>';}
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
- const fixtureRaw=raw.map(e=>structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
+ if(packageFixture)structuralRaw.push({'@id':'run','@type':'ActionDefinition',qualifiedName:'Model::Nested::Run',declaredName:'Run',owner:{'@id':'nested'},'sysx:sourceLine':16});
+ const fixtureRaw=raw.map(e=>packageFixture&&e['@id']==='req'?{...e,owner:{'@id':'nested'}}:structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
  const fixtureManifest={...manifest,...(entryView?{entryView}:{}),...(entryFocus?{entryFocus}:{})};
  if(noStory)fixtureFiles['story.md']='# Explore the supplied model\n\nNo authored scenes.';
  if(overviewFixture)structuralRaw.push({'@id':'outside','@type':'PartDefinition',qualifiedName:'Foreign::outside',declaredName:'outside','sysx:sourceLine':14},{'@id':'outside-dependency','@type':'Dependency',client:[{'@id':'definition'}],supplier:[{'@id':'outside'}]});
@@ -37,12 +39,85 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
   else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
   else if(method==='ExportModel')respond({elements:structuredClone([...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...((secondScene||secondView)?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
   else if(method==='RenderView'&&params.view==='Views::other')respond(structuredClone(secondView??{kind:'requirement',nodes:[{id:'o',semanticId:'orphan',identityStatus:'mapped',name:'orphan',kind:'part'}],edges:[]}));
-  else if(method==='RenderView'&&params.view.startsWith('#'))pendingRender=()=>respond({kind:'interconnection',nodes:[native.nodes[1]],edges:[]});
+  else if(method==='RenderView'&&params.view.startsWith('#')){nativeRequests.push(params.view);pendingRender=()=>respond(emptyNative?{kind:'action',nodes:[],edges:[]}:packageFixture&&params.view.startsWith('#action:')?{kind:'action',nodes:[{id:'run-native',semanticId:'run',name:'Native run activity',kind:'action',identityStatus:'mapped'}],edges:[]}:{kind:'interconnection',nodes:[native.nodes[1]],edges:[]});}
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(fixtureNative));
  }terminate(){}};
  window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===2)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ return {window,nativeRequests,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
+test('package workspace scopes search and traversal, offers native view switching and restores scene handoff',async()=>{
+ const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
+ try{
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&!d.getElementById('workspace-controls').hidden);
+  await pickPackage(h,'Model::Nested');
+  assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+  assert.deepEqual(activeIDs(d),['nested','req','run']);assert.equal(d.querySelector('[data-semantic-id="outside"]'),null);
+  const positions=[...d.querySelectorAll('.node')].map(n=>n.style.transform);d.querySelector('[data-semantic-id="req"]').click();assert.deepEqual([...d.querySelectorAll('.node')].map(n=>n.style.transform),positions);
+  d.getElementById('find-toggle').click();const search=d.getElementById('search');search.value='Model';search.dispatchEvent(new h.window.Event('input'));
+  assert.ok(d.querySelectorAll('#search-results button').length);assert.ok([...d.querySelectorAll('#search-results button')].every(b=>['Model::Nested','Model::req','Model::Nested::Run'].includes(b.textContent)));
+  d.getElementById('find-toggle').click();d.querySelector('[data-semantic-id="req"]').click();action(d,'Focus').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.includes('req'));
+  assert.deepEqual(activeIDs(d),['req']);assert.equal(d.querySelector('[data-semantic-id="part"]'),null);
+  d.getElementById('context-details').click();assert.match(d.getElementById('information-text').textContent,/outside-scope/);d.getElementById('information').close();
+  d.getElementById('view-navigation').value='authored:Views::requirements';d.getElementById('view-navigation').dispatchEvent(new h.window.Event('change'));
+  await until(()=>d.getElementById('status').textContent.includes('outside Nested'));
+  assert.deepEqual(activeIDs(d),['req']);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+  d.getElementById('workspace-overview').click();await until(()=>sceneSettled(d)&&activeIDs(d).includes('run'));
+  d.querySelector('[data-semantic-id="run"]').click();action(d,'Focus').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.includes('Run'));
+  const chooser=d.getElementById('view-navigation');chooser.value='native:action';chooser.dispatchEvent(new h.window.Event('change'));await until(h.pending);h.release();
+  await until(()=>sceneSettled(d)&&chooser.value==='native:action'&&d.querySelector('[data-semantic-id="run"] .name')?.textContent==='Native run activity');assert.equal(h.nativeRequests.at(-1),'#action:Model::Nested::Run');assert.deepEqual(activeIDs(d),['run']);
+  assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&chooser.value==='context').catch(error=>{throw Error(error.message+': '+chooser.value+' / '+d.getElementById('exploration-label').textContent+' / '+d.getElementById('status').textContent);});assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.deepEqual(activeIDs(d),['run']);
+  d.getElementById('return').click();await until(()=>sceneSettled(d)&&!d.getElementById('narrative').hidden);assert.equal(d.getElementById('workspace-controls').hidden,true);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+ }finally{h.window.close();}
+});
+
+test('package Up, Whole project, empty contents and history preserve native scope and view',async()=>{
+ const h=await harness({noStory:true,structuralFixture:true}),d=h.document;
+ try{
+  await pickPackage(h,'Model::Nested');assert.deepEqual(activeIDs(d),['nested']);
+  assert.equal(d.getElementById('return').hidden,true);
+  d.getElementById('zoom-in').click();const camera=d.getElementById('graph-world').style.transform;
+  d.getElementById('scope-up').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Model');
+  d.getElementById('scope-clear').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Whole project');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Model');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Model::Nested');assert.deepEqual(activeIDs(d),['nested']);assert.equal(d.getElementById('graph-world').style.transform,camera);
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Model');
+ }finally{h.window.close();}
+});
+
+test('a delayed native request cannot replace a newly selected package scope',async()=>{
+ const h=await harness({noStory:true,structuralFixture:true,packageFixture:true}),d=h.document;
+ try{
+  await pickPackage(h,'Model::Nested');d.querySelector('[data-semantic-id="run"]').click();action(d,'Activity view').click();await until(h.pending);
+  d.getElementById('scope-clear').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Whole project');const before=activeIDs(d);
+  h.release();await new Promise(resolve=>setTimeout(resolve,25));
+  assert.equal(d.getElementById('scope-label').textContent,'Whole project');assert.deepEqual(activeIDs(d),before);
+  assert.ok(![...d.querySelectorAll('.node .name')].some(n=>n.textContent==='Native run activity'));
+ }finally{h.window.close();}
+});
+
+test('an empty native rendering reports its limit without replacing the package viewpoint',async()=>{
+ const h=await harness({noStory:true,structuralFixture:true,packageFixture:true,emptyNative:true}),d=h.document;
+ try{
+  await pickPackage(h,'Model::Nested');const before=activeIDs(d);d.querySelector('[data-semantic-id="run"]').click();action(d,'Activity view').click();await until(h.pending);h.release();
+  await until(()=>d.getElementById('status').textContent.includes('No native action content'));
+  assert.deepEqual(activeIDs(d),before);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.equal(d.getElementById('view-navigation').value,'overview');
+ }finally{h.window.close();}
+});
+
+test('a declared matrix opens from standalone navigation and a scoped comparison is rejected intact',async()=>{
+ const h=await harness({noStory:true,structuralFixture:true,packageFixture:true,secondView:gridFixture}),d=h.document;
+ try{
+  const choose=d.getElementById('view-navigation');choose.value='authored:Views::other';choose.dispatchEvent(new h.window.Event('change'));
+  await until(()=>sceneSettled(d)&&d.querySelector('.canvas-grid-view'));assert.equal(d.getElementById('return').hidden,true);
+  await pickPackage(h,'Model::Nested');assert.equal(d.querySelector('.canvas-grid-view'),null);const before=activeIDs(d);
+  d.getElementById('view-catalog').click();d.getElementById('views').value='Views::other';d.getElementById('compare-view').click();
+  await until(()=>d.getElementById('status').textContent.includes('outside Nested'));
+  assert.deepEqual(activeIDs(d),before);assert.equal(d.querySelector('.canvas-grid-view'),null);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+ }finally{h.window.close();}
+});
+
 test('story links select without moving, disclose hidden context and permit explicit exploration',async()=>{
  const h=await harness({storyContent:true}),d=h.document;
  const positions=[...d.querySelectorAll('#nodes .node')].map(n=>n.style.transform);

@@ -123,6 +123,16 @@ Packages and namespaces expose direct source declarations from the separate nati
 Parts / contents and Containing element actions select the corresponding direction. They share the existing five/seven-element paging budget, history and omission disclosure. Native connections between selected contents are retained without expanding the page. Whole-to-parts and package-to-contents placement reads top down; typed definitions remain above their usages. These display projections do not add typing shortcuts to the common-ancestor journey planner.
 
 
+## Package workspace and standalone view navigation
+
+Standalone exploration has an explicit reader scope independent of the focused element and authored presentation roots. Explore package opens a searchable native package catalog. Package membership follows the native owner index through nested declarations; names, typing and engineering composition do not establish ownership. The scope label retains the full qualified name as its accessible title. Overview, Up and Whole project provide explicit scope navigation. Package scope is session navigation state, preserved in Back/Forward alongside the native viewpoint and camera; it does not modify the project descriptor or source model.
+
+Search, directional traces, action counts, route proposals and peripheral neighborhoods respect the same scope. Context reports external native targets as outside-scope, rather than absent or unavailable. The complete project stays loaded. Returning to a story clears the reader scope; exploration history can restore it. Empty packages remain inspectable without inventing children.
+
+The persistent View chooser offers bounded graph projections, applicable native target renderings and declared views without opening the presentation editor. Native activity and sequence actions target actions; native states target states; packages and parts offer structural views. Declared views provide the other native notations, including grids. Compare views opens a secondary catalog. Every complete native view is checked using represented element identities and relationship endpoints before it replaces a scoped viewpoint or comparison. A crossing view requires Whole project; native behavior and grids are never trimmed to simulate a package-local rendering. Empty and unsupported native results retain the prior viewpoint and report the limitation. Reusable authored selection remains native SysML; this adds no query language or parser.
+
+Shared URLs still restore published scenes. Package reader scope is currently local navigation state and is not claimed as a portable exploration URL.
+
 ## Prepared neighborhoods and graph camera
 
 Neighbor inclusion is no longer constrained by the display rectangle. The default is 48 neighbors on all screen sizes; authors may choose 0 through 256. The selection policy uses direct native links, relationship priorities appropriate to each active element, stable names/identities and balanced allocation between anchors with the focus first. Package ownership enters structural context and retains containment notation; it does not enter default requirement context. Native declaration categories include metadata, views, enumerations and concerns. A one-hop limit prevents recursive expansion; budget, filter, scope and availability exclusions remain distinct.

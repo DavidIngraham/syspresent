@@ -125,10 +125,10 @@ function summaryFor(data,mode,shown,total){
 /** Contextual actions count unique available neighbors, not parallel edges.
  * A disabled action can still disclose unavailable or policy-filtered references.
  */
-export function requirementActions(graph,focus){
+export function requirementActions(graph,focus,options={}){
  const prepared=prepare(graph);
  return Object.entries(modes).filter(([mode])=>!structuralModes.has(mode)).map(([mode,definition])=>{
-  const data=projection(graph,focus,mode,{},prepared),count=data.candidates.size;
+  const data=projection(graph,focus,mode,options,prepared),count=data.candidates.size;
   return {mode,label:definition.label,count,total:count+data.unavailable.size+data.filtered.size,unavailable:data.unavailable.size,filtered:data.filtered.size,enabled:count>0,summary:summaryFor(data,mode,count,count)};
  });
 }
@@ -182,7 +182,7 @@ export function traceContext(graph,options={}){
 }
 
 /** Structural actions share exactly the same bounded projection as Focus. */
-export function structuralActions(graph,focus){
+export function structuralActions(graph,focus,options={}){
  const prepared=prepare(graph);
- return [...structuralModes].map(mode=>{const data=projection(graph,focus,mode,{},prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
+ return [...structuralModes].map(mode=>{const data=projection(graph,focus,mode,options,prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
 }

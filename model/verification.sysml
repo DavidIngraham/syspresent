@@ -179,6 +179,14 @@ package SyspresentVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def <'SV-019'> packageWorkspace {
+        doc /* Use an unrelated native-owner fixture and the Gorge challenge package. Check nested and empty packages, ownership cycles, misleading qualified-name prefixes, external typing and dependencies. Select without moving, search within scope, inspect excluded-link disclosure and switch native view types without a story. Confirm crossing native views are rejected atomically without trimming, stale responses cannot replace newer navigation, and Up, Whole project, Back, Forward and scene return restore the correct package, native view and camera. Inspect desktop and narrow layouts separately from reader acceptance. */
+        objective acceptance {
+            verify SyspresentRequirements::PackageExploration::packageWorkspace;
+            verify SyspresentRequirements::PackageExploration::standaloneViewNavigation;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
     verification def <'SV-018'> storyPublishing {
         doc /* Round-trip chapters, figure bytes, evidence metadata and native links through Markdown/ZIP. Reject missing assets, unsafe paths, unresolved/ambiguous model targets, conflicting chapters and incomplete run context. Exercise direct links, publication mismatch, contents, browser history and edited-project sharing. Confirm stationary semantic selection, hidden-target disclosure, explicit exploration/return, figure enlargement and narrow-screen tabs. Inspect desktop/mobile layout and assess representative-reader comprehension separately. */
         objective acceptance {

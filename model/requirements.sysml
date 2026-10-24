@@ -300,4 +300,12 @@ package SyspresentRequirements {
             doc /* Scenes shall support compact authored explanations of challenge requirements, owner constraints, assumptions, provisional allocations, decisions, candidates, analyses and evidence, each linked to native records. Prepared analysis and recorded execution shall retain explicit source, configuration and input context; recorded execution shall require a run identity. Authored classification shall not imply a native verdict, accepted evidence or engineering approval. */
         }
     }
+    package PackageExploration {
+        requirement <'SP-098'> packageWorkspace {
+            doc /* Readers shall be able to choose a loaded project package as an explicit exploration scope independent of the focused element or a presentation. Scope membership shall follow native ownership, including nested packages, without inference from qualified-name prefixes, composition references or typing. The scope shall remain visible while searching, traversing links and inspecting bounded neighborhoods. Links crossing the reader scope shall be disclosed as hidden by scope, distinct from unavailable model content. Readers shall be able to open the package overview, move to its native containing package and clear scope. Back and Forward shall restore package scope, viewpoint and camera; returning to a scene shall restore the authored context. */
+        }
+        requirement <'SP-099'> standaloneViewNavigation {
+            doc /* Standalone exploration shall provide a persistent native view chooser outside the presentation editor and element action menus. The chooser shall offer declared native views and applicable focused structural or behavioral views using native identities and element categories. Switching views shall preserve package scope. A native view whose represented elements or relationship endpoints cross that scope shall be reported before replacing the current viewpoint; the reader may explicitly clear scope to open the complete view. Native behavioral or grid payloads shall not be silently trimmed or reconstructed to fit a reader scope. Unsupported or empty native results shall be reported without substituting a misleading notation. */
+        }
+    }
 }
