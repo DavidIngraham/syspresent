@@ -121,7 +121,7 @@ package BlueDogStructure {
         require constraint acceptance { caseCoverageAccepted and minimumOpeningClearanceM > 0 }
     }
     requirement loadedFreeboard : LoadedFreeboard;
-    dependency basisLoadedFreeboard from loadedFreeboard to BlueDogRequirements::stabilityAndFouling { metadata rationale : ModelingMetadata::Rationale { text = "The selected intact operating cases determine downflooding clearances; a sealed deck edge is not an opening."; } }
+    dependency basisLoadedFreeboard from loadedFreeboard to BlueDogRequirements::capsizeResilience { metadata rationale : ModelingMetadata::Rationale { text = "The selected intact operating cases determine downflooding clearances; a sealed deck edge is not an opening."; } }
     requirement def <'T-111'> ReserveBuoyancy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The vessel shall retain sufficient buoyancy to support its loaded weight throughout the applicable casualty-flotation cases. */
@@ -133,7 +133,7 @@ package BlueDogStructure {
     }
     requirement reserveBuoyancy : ReserveBuoyancy;
     dependency flotationPurpose from reserveBuoyancy to GorgeChallenge::casualtyFlotation { metadata rationale : ModelingMetadata::Rationale { text = "Buoyancy assessment supports casualty flotation but does not establish damage stability, retained components or safe retrieval. Changes to casualty cases require a new assessment."; } }
-    dependency basisReserveBuoyancy from reserveBuoyancy to BlueDogRequirements::stabilityAndFouling { metadata rationale : ModelingMetadata::Rationale { text = "Capsize and flooding cases drive the required buoyancy assessment; intact reserve-volume screens do not establish casualty flotation."; } }
+    dependency basisReserveBuoyancy from reserveBuoyancy to BlueDogRequirements::capsizeResilience { metadata rationale : ModelingMetadata::Rationale { text = "Capsize and flooding cases drive the required buoyancy assessment; intact reserve-volume screens do not establish casualty flotation."; } }
     requirement def <'T-112'> LaunchClearance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
         doc /* The loaded vessel shall retain the site-qualified bottom clearance throughout the selected launch and retrieval paths. */

@@ -108,6 +108,7 @@ package BlueDogEnergy {
     dependency energyEvidenceReadinessTrace from SustainedOperation to BlueDogRequirements::energyEvidenceReadiness;
 
     verification def SustainedEnergyVerification {
+        metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
         doc /* Energy-case verification only. Synthetic or unaccepted evidence is
          * inconclusive even when the numerical analysis passes. This does not verify
          * navigation, sailing performance, weather availability or indefinite life.

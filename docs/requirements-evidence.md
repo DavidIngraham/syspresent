@@ -150,3 +150,30 @@ these checks. This is responsive inspection, not physical-device acceptance.
 This validates the publication software and content bindings. No boat analysis
 was rerun and no physical verification, residual-risk acceptance or representative
 reader study is claimed by this publication.
+
+## Updated Blue Dog model snapshot (24 October 2026)
+
+The canvas example captures all 96 current model sources, the publication queries
+and model README from the authorized Blue Dog working tree. `source.json` records
+98 individual file hashes, their aggregate digest, the ancestry commit and an
+explicit working-tree status. The copied content includes the requirement and
+architecture cleanups, twenty decision-record items, eighty subject-attached
+allocation/procedure reviews and the renamed satisfaction source. No new
+engineering decision or acceptance disposition was introduced by this refresh.
+
+The existing native/WASM engine pair (`761d37ebd01ce37b69a46e0b9fc71671f46ac310`)
+parses the updated sources and resolves all 31 guided views. The removed
+safeRecovery grouping is replaced in the presentation by the concrete recovery
+propulsion requirement; the rig view includes item usages. The story distinguishes
+refinement from derivation and updates its architecture and decision-record
+explanations. Prepared figures retain their original source provenance.
+
+All 359 canvas/worker tests pass with the CI-pinned Node 22.14.0 runtime. The
+source/view inventory assertion covers the complete copied source set and ZIP
+round trip. Two existing WebCrypto test fixtures now preserve and restore the
+global property descriptor, supporting Node's getter-backed crypto property.
+Local browser inspection confirmed the current working-tree introduction,
+sizingBaseline displayed as an item, the separate provisional reliability study,
+and the twenty-record/eighty-review explanation. No browser console errors were
+reported in those checks. These results establish publication compatibility, not
+physical boat qualification or representative-reader acceptance.

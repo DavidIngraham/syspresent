@@ -1,2 +1,5 @@
 # Unified patch context and mail trailers intentionally retain whitespace.
 scripts/wasm-prototype/*.patch -whitespace
+# Captured model inputs retain exact bytes, including original line endings.
+examples/canvas-blue-dog/models/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+examples/canvas-blue-dog/tools/publishing/reference.sysml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

@@ -236,6 +236,63 @@ package BlueDogDFMEA {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
             metadata risk : RiskMetadata::Risk;
         }
+        part recoveryCaptureFault : ReviewRow subsets modes {
+            ref part :>> affected = BlueDog::Architecture::missionContext.boat.hullAndRig.handling;
+            attribute :>> identifier = "FM-013";
+            attribute :>> intendedFunction = "Retain and retrieve the vessel safely";
+            occurrence failureModeEvent : FailureAnalysis::Event { attribute :>> description = "Recovery approach cannot be captured or retained"; }
+            ref occurrence :>> failureMode = failureModeEvent;
+            occurrence causeEvent : FailureAnalysis::Event { attribute :>> description = "Unsuitable shore geometry, waves or incompatible handling interface"; }
+            ref occurrence :>> cause = causeEvent;
+            occurrence localEffectEvent : FailureAnalysis::Event { attribute :>> description = "Vessel escapes or requires an unsafe manual reach"; }
+            ref occurrence :>> localEffect = localEffectEvent;
+            occurrence missionEffectEvent : FailureAnalysis::Event { attribute :>> description = "Operator exposure and loss of recoverable vessel"; }
+            ref occurrence :>> missionEffect = missionEffectEvent;
+            attribute :>> proposedDetection = "Surveyed approach and independent capture/retention observation; unverified";
+            attribute :>> recommendedAction = "Test approach, capture, retention and one-person pickup under admitted conditions";
+            attribute :>> ownerRole = "Owner/handling";
+            attribute :>> safetyCritical = true;
+            metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+            metadata risk : RiskMetadata::Risk;
+        }
+        part commandContextFault : ReviewRow subsets modes {
+            ref part :>> affected = BlueDog::Architecture::missionContext.boat.control.missionManager;
+            attribute :>> identifier = "FM-014";
+            attribute :>> intendedFunction = "Apply only current authorized actuation";
+            occurrence failureModeEvent : FailureAnalysis::Event { attribute :>> description = "Stale, replayed or mismatched permission/command is accepted"; }
+            ref occurrence :>> failureMode = failureModeEvent;
+            occurrence causeEvent : FailureAnalysis::Event { attribute :>> description = "Clock, restart, configuration or authority disagreement"; }
+            ref occurrence :>> cause = causeEvent;
+            occurrence localEffectEvent : FailureAnalysis::Event { attribute :>> description = "Actuation bypasses current restrictions"; }
+            ref occurrence :>> localEffect = localEffectEvent;
+            occurrence missionEffectEvent : FailureAnalysis::Event { attribute :>> description = "Unintended motion, contact hazard or disqualification"; }
+            ref occurrence :>> missionEffect = missionEffectEvent;
+            attribute :>> proposedDetection = "Consumer context/ordering/inhibit checks; implementation unverified";
+            attribute :>> recommendedAction = "Fault inject expiry, replay, restart and missing durable acknowledgment at physical enable boundary";
+            attribute :>> ownerRole = "Autonomy/recovery";
+            attribute :>> safetyCritical = true;
+            metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+            metadata risk : RiskMetadata::Risk;
+        }
+        part commonSensingFault : ReviewRow subsets modes {
+            ref part :>> affected = BlueDog::Architecture::missionContext.boat.navigation.traffic;
+            attribute :>> identifier = "FM-015";
+            attribute :>> intendedFunction = "Preserve required observation across primary failure";
+            occurrence failureModeEvent : FailureAnalysis::Event { attribute :>> description = "Primary and recovery observations share an undetected failure"; }
+            ref occurrence :>> failureMode = failureModeEvent;
+            occurrence causeEvent : FailureAnalysis::Event { attribute :>> description = "Common visibility, clock, configuration, software or installation dependence"; }
+            ref occurrence :>> cause = causeEvent;
+            occurrence localEffectEvent : FailureAnalysis::Event { attribute :>> description = "Both paths supply absent or plausible incorrect observations"; }
+            ref occurrence :>> localEffect = localEffectEvent;
+            occurrence missionEffectEvent : FailureAnalysis::Event { attribute :>> description = "Required lookout/navigation unavailable during sailing or recovery"; }
+            ref occurrence :>> missionEffect = missionEffectEvent;
+            attribute :>> proposedDetection = "Independent references and mode-specific coverage evidence; unresolved";
+            attribute :>> recommendedAction = "Assess shared dependencies and inject correlated sensing/context failures in upright and inverted modes";
+            attribute :>> ownerRole = "Sensing/system safety";
+            attribute :>> safetyCritical = true;
+            metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
+            metadata risk : RiskMetadata::Risk;
+        }
     }
     dependency hullLeakDesign from starter::hullLeak to BlueDog::Architecture::missionContext::boat::hullAndRig::printedHull;
     dependency hullLeakCriterion from starter::hullLeak to BlueDogRequirements::enclosureSealing;
@@ -300,4 +357,17 @@ package BlueDogDFMEA {
     connection motorUncommanded_cause_failureMode : CauseAndEffect::Causation connect starter.motorUncommanded.cause to starter.motorUncommanded.failureMode;
     connection motorUncommanded_failureMode_localEffect : CauseAndEffect::Causation connect starter.motorUncommanded.failureMode to starter.motorUncommanded.localEffect;
     connection motorUncommanded_localEffect_missionEffect : CauseAndEffect::Causation connect starter.motorUncommanded.localEffect to starter.motorUncommanded.missionEffect;
+
+    dependency recoveryCaptureFaultCriterion from starter::recoveryCaptureFault to BlueDogRequirements::soloRetrieval;
+    connection recoveryCaptureFault_cause_failureMode : CauseAndEffect::Causation connect starter.recoveryCaptureFault.cause to starter.recoveryCaptureFault.failureMode;
+    connection recoveryCaptureFault_failureMode_localEffect : CauseAndEffect::Causation connect starter.recoveryCaptureFault.failureMode to starter.recoveryCaptureFault.localEffect;
+    connection recoveryCaptureFault_localEffect_missionEffect : CauseAndEffect::Causation connect starter.recoveryCaptureFault.localEffect to starter.recoveryCaptureFault.missionEffect;
+    dependency commandContextFaultCriterion from starter::commandContextFault to BlueDogRequirements::commandIntegrity;
+    connection commandContextFault_cause_failureMode : CauseAndEffect::Causation connect starter.commandContextFault.cause to starter.commandContextFault.failureMode;
+    connection commandContextFault_failureMode_localEffect : CauseAndEffect::Causation connect starter.commandContextFault.failureMode to starter.commandContextFault.localEffect;
+    connection commandContextFault_localEffect_missionEffect : CauseAndEffect::Causation connect starter.commandContextFault.localEffect to starter.commandContextFault.missionEffect;
+    dependency commonSensingFaultCriterion from starter::commonSensingFault to BlueDogRequirements::trafficSafety;
+    connection commonSensingFault_cause_failureMode : CauseAndEffect::Causation connect starter.commonSensingFault.cause to starter.commonSensingFault.failureMode;
+    connection commonSensingFault_failureMode_localEffect : CauseAndEffect::Causation connect starter.commonSensingFault.failureMode to starter.commonSensingFault.localEffect;
+    connection commonSensingFault_localEffect_missionEffect : CauseAndEffect::Causation connect starter.commonSensingFault.localEffect to starter.commonSensingFault.missionEffect;
 }

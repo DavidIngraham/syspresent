@@ -78,6 +78,10 @@ package BlueDog {
     }
 
     package Architecture {
+        doc /* System responsibility and external-context description. Boat is
+         * not an installed assembly. BlueDogArchitectureCorrespondence maps its
+         * responsibilities to LogicalVessel; IC01Candidate owns the provisional
+         * equipment composition. HullAndRig remains a shared hardware concept. */
         #user part def Operator;
         part def MonitoringStation;
         #externalSystem part def ShoreSupport {
@@ -187,6 +191,9 @@ package BlueDogLogicalArchitecture {
      * Candidate realization is separate in BlueDogPhysicalArchitecture. */
 
     #ioEntity item def NavigationEstimate {
+        attribute coordinateReference : String;
+        attribute headingReference : String;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute valid : Boolean;
         attribute observedAt : ISQ::TimeValue;
         attribute latitude : ISQ::AngularMeasureValue;
@@ -194,6 +201,8 @@ package BlueDogLogicalArchitecture {
         attribute heading : ISQ::AngularMeasureValue;
     }
     #ioEntity item def SafetyObservation {
+        attribute valid : ScalarValues::Boolean;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute capsized : Boolean;
         attribute uprightControlRestored : Boolean;
         attribute requiredSafetyConfirmed : Boolean;
@@ -205,17 +214,22 @@ package BlueDogLogicalArchitecture {
          * evidence; absence of that observation cannot establish safe continuation. */
     }
     #ioEntity item def ReserveAssessment {
+        attribute observedAt : ISQ::TimeValue;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute usableEnergy : ISQ::EnergyValue;
         attribute protectedReserve : ISQ::EnergyValue;
         attribute threatened : Boolean;
         attribute valid : Boolean;
     }
     #ioEntity item def TrafficAssessment {
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute conflict : Boolean;
         attribute valid : Boolean;
         attribute observedAt : ISQ::TimeValue;
     }
     #ioEntity item def BoundaryAssessment {
+        attribute observedAt : ISQ::TimeValue;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute insidePermittedArea : Boolean;
         attribute avoidanceRequired : Boolean;
         attribute valid : Boolean;
@@ -223,6 +237,10 @@ package BlueDogLogicalArchitecture {
          * current navigation observation; this is not a surveyed-site approval. */
     }
     #ioEntity item def TrafficTrack {
+        attribute bearingReference : String;
+        attribute rangeReference : String;
+        attribute headingReference : String;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute identity : String;
         attribute observedAt : ISQ::TimeValue;
         attribute bearing : ISQ::AngularMeasureValue;
@@ -234,10 +252,14 @@ package BlueDogLogicalArchitecture {
          * Declared observation validity does not establish detection coverage. */
     }
     #ioEntity item def TrafficObservation {
+        attribute valid : ScalarValues::Boolean;
+        attribute observedAt : ISQ::TimeValue;
+        item context : BlueDogInterfaceContracts::ObservationContext;
         item tracks : TrafficTrack [0..*];
         attribute coverageConfirmed : Boolean;
     }
     #ioEntity item def OperationPermission {
+        item context : BlueDogInterfaceContracts::CommandContext;
         attribute sailingPermitted : Boolean;
         attribute gateScoringPermitted : Boolean;
         attribute harvestPermitted : Boolean;
@@ -245,12 +267,14 @@ package BlueDogLogicalArchitecture {
         attribute qualificationLost : Boolean;
     }
     #ioEntity item def RecoveryCommand {
+        item context : BlueDogInterfaceContracts::CommandContext;
         attribute recoveryRequested : Boolean;
         attribute propulsionPermitted : Boolean;
         doc /* Powered recovery follows qualification loss. This command does
          * not assert shore reachability or available independent hardware. */
     }
     #ioEntity item def MissionRecord {
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute eventKind : String;
         attribute observedAt : ISQ::TimeValue;
         attribute qualificationLost : Boolean;
@@ -318,14 +342,31 @@ package BlueDogLogicalArchitecture {
         port permissions : PermissionInput;
     }
     #logical part def RecoveryManagement {
+        doc /* Select and reassess a reachable shore plan and command recovery.
+         * Navigation, traffic, boundary and reserve assessments are explicit
+         * inputs. Thrust execution belongs to RecoveryActuation; shore capture
+         * and operator pickup remain separate physical/procedural obligations. */
+        port navigation : NavigationInput;
+        port tracks : TracksInput;
+        port boundary : BoundaryInput;
+        port events : RecordOutput;
         port safety : SafetyInput;
         port reserve : ReserveInput;
         port permissions : PermissionInput;
         port commands : RecoveryOutput;
     }
-    #logical part def Recording { port events : RecordInput; }
+    #logical part def RecoveryActuation {
+        port commands : RecoveryInput;
+        doc /* Execute permitted recovery propulsion. A command is not evidence
+         * of achieved thrust, inverted operation, shore arrival or retention. */
+    }
+    #logical part def Recording {
+        port events : RecordInput;
+        port retained : RecordOutput;
+    }
     #logical part def Communications {
         port events : RecordInput;
+        port retained : RecordInput;
         port status : LinkOutput;
     }
     part def LogicalVessel {
@@ -340,29 +381,37 @@ package BlueDogLogicalArchitecture {
         part guidance : Guidance;
         part actuation : SailingActuation;
         part recovery : RecoveryManagement;
+        part recoveryActuation : RecoveryActuation;
         part recording : Recording;
         part communications : Communications;
-        flow navigation.navigation.estimate to supervision.navigation.estimate;
-        flow navigation.navigation.estimate to guidance.navigation.estimate;
-        flow wind.wind.estimate to guidance.wind.estimate;
-        flow wind.wind.estimate to supervision.wind.estimate;
-        flow communications.status.observation to supervision.link.observation;
-        flow safety.safety.observation to supervision.safety.observation;
-        flow safety.safety.observation to recovery.safety.observation;
-        flow energy.reserve.assessment to supervision.reserve.assessment;
-        flow energy.reserve.assessment to recovery.reserve.assessment;
-        flow collision.traffic.assessment to supervision.traffic.assessment;
-        flow trafficObservation.tracks.observation to collision.tracks.observation;
-        flow navigation.navigation.estimate to collision.navigation.estimate;
-        flow navigation.navigation.estimate to boundary.navigation.estimate;
-        flow boundary.boundary.assessment to supervision.boundary.assessment;
-        flow boundary.boundary.assessment to guidance.boundary.assessment;
-        flow supervision.permissions.permission to guidance.permissions.permission;
-        flow supervision.permissions.permission to actuation.permissions.permission;
-        flow supervision.permissions.permission to recovery.permissions.permission;
-        flow guidance.commands.command to actuation.commands.command;
-        flow supervision.events.record to recording.events.record;
-        flow supervision.events.record to communications.events.record;
+        flow navigationToSupervisor from navigation.navigation.estimate to supervision.navigation.estimate;
+        flow navigationToGuidance from navigation.navigation.estimate to guidance.navigation.estimate;
+        flow windToGuidance from wind.wind.estimate to guidance.wind.estimate;
+        flow windToSupervisor from wind.wind.estimate to supervision.wind.estimate;
+        flow linkToSupervisor from communications.status.observation to supervision.link.observation;
+        flow safetyToSupervisor from safety.safety.observation to supervision.safety.observation;
+        flow safetyToRecovery from safety.safety.observation to recovery.safety.observation;
+        flow reserveToSupervisor from energy.reserve.assessment to supervision.reserve.assessment;
+        flow reserveToRecovery from energy.reserve.assessment to recovery.reserve.assessment;
+        flow trafficToSupervisor from collision.traffic.assessment to supervision.traffic.assessment;
+        flow tracksToCollision from trafficObservation.tracks.observation to collision.tracks.observation;
+        flow navigationToCollision from navigation.navigation.estimate to collision.navigation.estimate;
+        flow navigationToBoundary from navigation.navigation.estimate to boundary.navigation.estimate;
+        flow boundaryToSupervisor from boundary.boundary.assessment to supervision.boundary.assessment;
+        flow boundaryToGuidance from boundary.boundary.assessment to guidance.boundary.assessment;
+        flow permissionsToGuidance from supervision.permissions.permission to guidance.permissions.permission;
+        flow permissionsToActuation from supervision.permissions.permission to actuation.permissions.permission;
+        flow permissionsToRecovery from supervision.permissions.permission to recovery.permissions.permission;
+        flow sailingCommands from guidance.commands.command to actuation.commands.command;
+        flow supervisorRecords from supervision.events.record to recording.events.record;
+        flow supervisorTelemetry from supervision.events.record to communications.events.record;
+        flow navigationToRecovery from navigation.navigation.estimate to recovery.navigation.estimate;
+        flow tracksToRecovery from trafficObservation.tracks.observation to recovery.tracks.observation;
+        flow boundaryToRecovery from boundary.boundary.assessment to recovery.boundary.assessment;
+        flow recoveryCommands from recovery.commands.command to recoveryActuation.commands.command;
+        flow recoveryRecords from recovery.events.record to recording.events.record;
+        flow recoveryTelemetry from recovery.events.record to communications.events.record;
+        flow retainedRecordsToCommunications from recording.retained.record to communications.retained.record;
     }
     part vessel : LogicalVessel;
 }
@@ -382,6 +431,7 @@ package BlueDogPhysicalArchitecture {
         attribute available : Boolean;
     }
     #ioEntity item def MonitoredBankState {
+        item context : BlueDogInterfaceContracts::ObservationContext;
         attribute usableEnergy : ISQ::EnergyValue;
         attribute valid : Boolean;
         attribute observedAt : ISQ::TimeValue;
@@ -426,6 +476,7 @@ package BlueDogPhysicalArchitecture {
         port recovery : RecoveryOutput;
         port permissions : PermissionOutput;
         port peerPermissions : PermissionInput;
+        port retained : RecordInput;
         port events : RecordOutput;
         doc /* SafetyAssessment is allocated here; its output aggregates current
          * sensing, actuation, energy and health evidence, not navigation alone.
@@ -441,7 +492,14 @@ package BlueDogPhysicalArchitecture {
         port power : SupplyInput;
         port recovery : RecoveryInput;
     }
-    #hardware part def RecordStorage { port power : SupplyInput; port events : RecordInput; }
+    #hardware part def RecordStorage {
+        port power : SupplyInput;
+        port events : RecordInput;
+        port retained : RecordOutput;
+        doc /* Readback supports queued telemetry. Retention, arbitration and
+         * availability after a primary fault require an installed interface and
+         * supply decision; this interface does not establish survivability. */
+    }
     #hardware part def TelemetryEquipment {
         port power : SupplyInput;
         port events : RecordInput;
@@ -466,55 +524,44 @@ package BlueDogPhysicalArchitecture {
         part recordStorage : RecordStorage;
         part telemetry : TelemetryEquipment;
         part hullAndRig : BlueDog::Architecture::HullAndRig;
-        flow mainBattery.output.electrical to primaryNavigation.power.electrical;
-        flow mainBattery.output.electrical to windSensor.power.electrical;
-        flow mainBattery.output.electrical to primaryObservation.power.electrical;
-        flow mainBattery.output.electrical to primaryController.power.electrical;
-        flow mainBattery.output.electrical to sailingActuators.power.electrical;
-        flow recoveryBattery.output.electrical to recoveryNavigation.power.electrical;
-        flow recoveryBattery.output.electrical to recoveryObservation.power.electrical;
-        flow recoveryBattery.output.electrical to recoveryController.power.electrical;
-        flow recoveryBattery.output.electrical to recoveryPropulsor.power.electrical;
-        flow mainBattery.monitor.observation to primaryController.mainBank.observation;
-        flow recoveryBattery.monitor.observation to primaryController.recoveryBank.observation;
-        flow recoveryBattery.monitor.observation to recoveryController.recoveryBank.observation;
-        flow mainBattery.monitor.observation to recoveryController.mainBank.observation;
-        flow primaryNavigation.navigation.estimate to primaryController.navigation.estimate;
-        flow windSensor.wind.estimate to primaryController.wind.estimate;
-        flow primaryObservation.tracks.observation to primaryController.tracks.observation;
-        flow primaryController.assessedSafety.observation to recoveryController.safety.observation;
-        flow recoveryController.assessedSafety.observation to primaryController.safety.observation;
-        flow primaryController.permissions.permission to sailingActuators.permissions.permission;
-        flow primaryController.permissions.permission to recoveryController.peerPermissions.permission;
-        flow recoveryController.permissions.permission to primaryController.peerPermissions.permission;
-        flow primaryController.commands.command to sailingActuators.commands.command;
-        flow recoveryNavigation.navigation.estimate to recoveryController.navigation.estimate;
-        flow recoveryObservation.tracks.observation to recoveryController.tracks.observation;
-        flow recoveryController.recovery.command to recoveryPropulsor.recovery.command;
-        flow primaryController.events.record to recordStorage.events.record;
-        flow recoveryController.events.record to recordStorage.events.record;
-        flow primaryController.events.record to telemetry.events.record;
-        flow recoveryController.events.record to telemetry.events.record;
-        flow telemetry.status.observation to primaryController.link.observation;
-        flow telemetry.status.observation to recoveryController.link.observation;
+        flow mainNavigationPower from mainBattery.output.electrical to primaryNavigation.power.electrical;
+        flow windPower from mainBattery.output.electrical to windSensor.power.electrical;
+        flow mainObservationPower from mainBattery.output.electrical to primaryObservation.power.electrical;
+        flow mainControllerPower from mainBattery.output.electrical to primaryController.power.electrical;
+        flow sailingPower from mainBattery.output.electrical to sailingActuators.power.electrical;
+        flow recoveryNavigationPower from recoveryBattery.output.electrical to recoveryNavigation.power.electrical;
+        flow recoveryObservationPower from recoveryBattery.output.electrical to recoveryObservation.power.electrical;
+        flow recoveryControllerPower from recoveryBattery.output.electrical to recoveryController.power.electrical;
+        flow recoveryPropulsionPower from recoveryBattery.output.electrical to recoveryPropulsor.power.electrical;
+        flow mainBankToPrimary from mainBattery.monitor.observation to primaryController.mainBank.observation;
+        flow recoveryBankToPrimary from recoveryBattery.monitor.observation to primaryController.recoveryBank.observation;
+        flow recoveryBankToRecovery from recoveryBattery.monitor.observation to recoveryController.recoveryBank.observation;
+        flow mainBankToRecovery from mainBattery.monitor.observation to recoveryController.mainBank.observation;
+        flow primaryNavigationData from primaryNavigation.navigation.estimate to primaryController.navigation.estimate;
+        flow windData from windSensor.wind.estimate to primaryController.wind.estimate;
+        flow primaryTrafficData from primaryObservation.tracks.observation to primaryController.tracks.observation;
+        flow primarySafetyToRecovery from primaryController.assessedSafety.observation to recoveryController.safety.observation;
+        flow recoverySafetyToPrimary from recoveryController.assessedSafety.observation to primaryController.safety.observation;
+        flow sailingPermissions from primaryController.permissions.permission to sailingActuators.permissions.permission;
+        flow primaryPermissionsToRecovery from primaryController.permissions.permission to recoveryController.peerPermissions.permission;
+        flow recoveryPermissionsToPrimary from recoveryController.permissions.permission to primaryController.peerPermissions.permission;
+        flow sailingCommandData from primaryController.commands.command to sailingActuators.commands.command;
+        flow recoveryNavigationData from recoveryNavigation.navigation.estimate to recoveryController.navigation.estimate;
+        flow recoveryTrafficData from recoveryObservation.tracks.observation to recoveryController.tracks.observation;
+        flow recoveryCommandData from recoveryController.recovery.command to recoveryPropulsor.recovery.command;
+        flow primaryRecords from primaryController.events.record to recordStorage.events.record;
+        flow recoveryRecords from recoveryController.events.record to recordStorage.events.record;
+        flow primaryTelemetry from primaryController.events.record to telemetry.events.record;
+        flow recoveryTelemetry from recoveryController.events.record to telemetry.events.record;
+        flow primaryLinkStatus from telemetry.status.observation to primaryController.link.observation;
+        flow recoveryLinkStatus from telemetry.status.observation to recoveryController.link.observation;
+        flow primaryRecordReadback from recordStorage.retained.record to primaryController.retained.record;
+        flow recoveryRecordReadback from recordStorage.retained.record to recoveryController.retained.record;
     }
-    part ic01 : IC01Candidate;
-    allocate vessel.navigation to ic01.primaryNavigation;
-    allocate vessel.navigation to ic01.recoveryNavigation;
-    allocate vessel.wind to ic01.windSensor;
-    allocate vessel.safety to ic01.primaryController;
-    allocate vessel.safety to ic01.recoveryController;
-    allocate vessel.energy to ic01.primaryController;
-    allocate vessel.collision to ic01.primaryController;
-    allocate vessel.collision to ic01.recoveryController;
-    allocate vessel.boundary to ic01.primaryController;
-    allocate vessel.boundary to ic01.recoveryController;
-    allocate vessel.trafficObservation to ic01.primaryObservation;
-    allocate vessel.trafficObservation to ic01.recoveryObservation;
-    allocate vessel.supervision to ic01.primaryController;
-    allocate vessel.guidance to ic01.primaryController;
-    allocate vessel.actuation to ic01.sailingActuators;
-    allocate vessel.recovery to ic01.recoveryController;
-    allocate vessel.recording to ic01.recordStorage;
-    allocate vessel.communications to ic01.telemetry;
+    part ic01 : IC01Candidate {
+        ref part configuration : MarineDesign::Design = BlueDogIC01::design;
+        ref part integration = BlueDogIC01::integration;
+        doc /* Candidate assembly for this named geometry and capability hypothesis.
+         * Configuration references do not qualify installed hardware. */
+    }
 }

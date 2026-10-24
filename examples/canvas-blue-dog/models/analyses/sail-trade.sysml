@@ -16,7 +16,9 @@ package BlueDogSailTrade {
         attribute manufacturing : String;
         attribute nextEvidence : String;
         // Ordered: wet/survival durability, energy, polar/progress, capsize/control,
-        // manufacturing, lifting, voyage reliability. Unknown is never a failure.
+        // manufacturing compatibility, lifting, provisional voyage-reliability study.
+        // The first six are declared mandatory evidence gates; the seventh is a
+        // comparative study objective, not a challenge acceptance veto.
         attribute gates : Evidence [7] ordered nonunique default =
             (Evidence::unknown, Evidence::unknown, Evidence::unknown, Evidence::unknown,
              Evidence::unknown, Evidence::unknown, Evidence::unknown);
@@ -64,13 +66,20 @@ package BlueDogSailTrade {
         subject candidate : Candidate;
         out attribute candidateName : String = candidate.label;
         out attribute gateCount : Integer = SequenceFunctions::size(candidate.gates);
-        out attribute knownFailure : Boolean = candidate.gates->ControlFunctions::exists { in gate : Evidence; gate == Evidence::failed };
+        attribute mandatoryGates : Evidence [6] ordered nonunique =
+            (candidate.gates#(1),candidate.gates#(2),candidate.gates#(3),candidate.gates#(4),candidate.gates#(5),candidate.gates#(6));
+        out attribute knownFailure : Boolean = mandatoryGates->ControlFunctions::exists { in gate : Evidence; gate == Evidence::failed };
         out attribute evidenceComplete : Boolean = candidate.gates->ControlFunctions::forAll { in gate : Evidence; gate != Evidence::unknown };
-        out attribute qualified : Boolean = gateCount == 7 and candidate.gates->ControlFunctions::forAll { in gate : Evidence; gate == Evidence::passed };
-        out attribute requirementVerdict : String = if knownFailure ? "Failed gate" else if qualified ? "Passed declared gates" else "Inconclusive: evidence missing";
+        out attribute mandatoryEvidenceComplete : Boolean = mandatoryGates->ControlFunctions::forAll { in gate : Evidence; gate != Evidence::unknown };
+        out attribute declaredMandatoryGatesMet : Boolean = gateCount == 7 and mandatoryGates->ControlFunctions::forAll { in gate : Evidence; gate == Evidence::passed };
+        // Compatibility name: this is declared gate evidence, not physical qualification.
+        out attribute qualified : Boolean = declaredMandatoryGatesMet;
+        out attribute reliabilityStudyDisposition : String = if candidate.gates#(7) == Evidence::failed ? "Provisional study concern; assess uncertainty and evidence" else
+            if candidate.gates#(7) == Evidence::passed ? "Supplied study objective met; not accepted mission reliability" else "Study evidence missing";
+        out attribute requirementVerdict : String = if knownFailure ? "Failed mandatory gate" else if declaredMandatoryGatesMet ? "Passed declared mandatory gates" else "Inconclusive: mandatory evidence missing";
         // Explicit development policy, not an inferred failure probability or weighted score.
         return developmentDecision : String = if knownFailure ? "Resolve verified failure before selection" else
-            if qualified ? "Eligible for selection; compare validated margins" else
+            if declaredMandatoryGatesMet ? "Eligible for selection review; compare adequate evidence and uncertainty; no hardware decision" else
             "Equal development contender for the finite Gorge mission";
         objective assess { require constraint { gateCount == 7 } }
     }
@@ -79,11 +88,17 @@ package BlueDogSailTrade {
     analysis softAssessment : TradeAssessment { subject :>> candidate = softSail; }
     dependency durabilityCriterion from TradeAssessment to BlueDogRequirements::wetMechanicalIntegrity;
     dependency stormWindCriterion from TradeAssessment to BlueDogRequirements::gorgeSurvivalWind;
-    dependency progressCriterion from TradeAssessment to BlueDogRequirements::legProgress;
+    dependency progressCriterion from TradeAssessment to BlueDogRequirements::passageDuration;
+    dependency progressEvidence from TradeAssessment to BlueDogRequirements::cruiseEvidence;
+    dependency progressStudyComparison from TradeAssessment to BlueDogRequirements::legProgress {
+        metadata rationale : ModelingMetadata::Rationale { text = "Retain the legacy progress study comparison separately; current mandatory performance uses passage duration and representative evidence."; }
+    }
     dependency capsizeCriterion from TradeAssessment to BlueDogRequirements::selfRighting;
     dependency controlCriterion from TradeAssessment to BlueDogRequirements::capsizeControlRecovery;
     dependency liftCriterion from TradeAssessment to BlueDogRequirements::liftMass;
-    dependency reliabilityCriterion from TradeAssessment to BlueDogRequirements::missionSuccessProbability;
+    dependency reliabilityCriterion from TradeAssessment to BlueDogRequirements::missionSuccessProbability {
+        metadata rationale : ModelingMetadata::Rationale { text = "Provisional comparative study objective only; its supplied seventh evidence value does not veto otherwise met mandatory criteria or establish physical reliability."; }
+    }
     dependency reliabilityEvidence from TradeAssessment to BlueDogRequirements::reliabilityEvidence;
     dependency architectureScope from Candidate to BlueDog::Architecture::HullAndRig;
     dependency failureReview from TradeAssessment to BlueDogDFMEA::starter::sailJam;

@@ -61,7 +61,7 @@ test('archive path validation occurs before common-folder stripping',()=>{
  for(const name of ['folder/../outside.sysml','/folder/model.sysml','folder//model.sysml','folder/./model.sysml','C:/model.sysml','folder\\model.sysml'])assert.throws(()=>unpackProject(archive({[name]:source})),/Invalid project path/);
 });
 test('a publisher-trusted runtime index checks exact input files without exposing cached semantics',async()=>{
- const original=globalThis.crypto;globalThis.crypto=webcrypto;
+ const original=Object.getOwnPropertyDescriptor(globalThis,'crypto');Object.defineProperty(globalThis,'crypto',{configurable:true,value:webcrypto});
  try{
   const documents=[{name:'model.sysml',content:source}],cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:'engine',engineFingerprint:'fingerprint',inputDigest:await sourceDigest(documents),modelRoots:['RealNativeName'],requirementSeeds:['RealNativeName::r'],runtimePackage:'SyspresentRuntimeContext2',exported:{elements:[{'@id':'should-not-escape'}]},views:{unused:{}}};
   const bytes=strToU8(JSON.stringify(cache)),project={manifest:{runtimeCache:'cache.json'},files:{'cache.json':bytes}},options={trustedHash:createHash('sha256').update(bytes).digest('hex'),engineVersion:'engine',engineFingerprint:'fingerprint',documents};
@@ -70,5 +70,5 @@ test('a publisher-trusted runtime index checks exact input files without exposin
   const p=normalizeProject({files:{'model.sysml':source,'runtime-cache.json':bytes}});assert.equal(p.manifest.runtimeCache,'runtime-cache.json');assert.equal('runtimeCache' in projectDescriptor(p),false);
   for(const runtimePackage of ['bad-name','Bad::Name','Bad;Injection',42]){const bad=strToU8(JSON.stringify({...cache,runtimePackage}));const invalid={manifest:project.manifest,files:{'cache.json':bad}};assert.equal(await verifiedRuntimeIndex(invalid,{...options,trustedHash:createHash('sha256').update(bad).digest('hex')}),null);}
   const result=await verifiedRuntimeIndex(project,options);result.modelRoots.push('Mutated');assert.deepEqual((await verifiedRuntimeIndex(project,options)).modelRoots,['RealNativeName']);
- }finally{globalThis.crypto=original;}
+ }finally{if(original)Object.defineProperty(globalThis,'crypto',original);else delete globalThis.crypto;}
 });

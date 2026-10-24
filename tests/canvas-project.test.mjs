@@ -64,7 +64,7 @@ test('requirement usages retain the complete native definition statement and its
 import {webcrypto,createHash} from 'node:crypto';
 import {sourceDigest,verifiedRuntimeCache} from '../src/canvas-prototype/project.mjs';
 test('prepared native cache requires publisher hash, exact sources, engine and native model identity',async()=>{
- const originalCrypto=globalThis.crypto;globalThis.crypto=webcrypto;
+ const originalCrypto=Object.getOwnPropertyDescriptor(globalThis,'crypto');Object.defineProperty(globalThis,'crypto',{configurable:true,value:webcrypto});
  try{
   const documents=[{name:'model.sysml',content:'package Test {}'}];
   const cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:'pinned-engine',engineFingerprint:'binary-hash',modelHash:'native-model',sourceDigest:await sourceDigest(documents),exported:{elements:[]}};
@@ -75,7 +75,7 @@ test('prepared native cache requires publisher hash, exact sources, engine and n
   for(const change of [{trustedHash:undefined},{trustedHash:'forged'},{engineVersion:'other'},{engineFingerprint:'different-binary'},{modelHash:'changed'},{documents:[{...documents[0],content:'package Changed {}'}]}])assert.equal(await verifiedRuntimeCache(project,{...options,...change}),null);
   project.files['runtime-cache.json']=new TextEncoder().encode(JSON.stringify({...cache,exported:{elements:[{'@id':'forged'}]}}));
   assert.equal(await verifiedRuntimeCache(project,options),null);
- }finally{globalThis.crypto=originalCrypto;}
+ }finally{if(originalCrypto)Object.defineProperty(globalThis,'crypto',originalCrypto);else delete globalThis.crypto;}
 });
 
 import {edgeRoute} from '../src/canvas-prototype/geometry.mjs';

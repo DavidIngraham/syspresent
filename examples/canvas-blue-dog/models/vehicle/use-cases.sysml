@@ -50,7 +50,7 @@ package BlueDogUseCases {
         subject context : MissionContext;
         actor operator : Operator;
         actor traffic : OtherVessel;
-        objective 'S-003 Safe recovery' :> safeRecovery;
+        objective 'S-003 Emergency control' :> emergencyControl;
     }
     #systemUseCase use case recoverUpright {
         doc /* For the passive-righting candidate, retain required safety while inverted, recover upright without
@@ -81,4 +81,5 @@ package BlueDogUseCases {
         actor traffic : OtherVessel;
         objective 'S-004 Navigation conspicuity' :> navigationConspicuity;
     }
+    dependency poweredRecoveryBasis from recover to BlueDogRequirements::recoveryPropulsion;
 }

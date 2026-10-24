@@ -1,21 +1,21 @@
 package BlueDogSatisfaction {
     private import BlueDogRequirements::*;
     private import BlueDog::Architecture::missionContext;
-    doc /* Design satisfaction allocations, not verification evidence. Physical
+    doc /* Candidate design satisfaction assertions, not verification evidence. Physical
      * implementation, quantitative acceptance, and verification remain open.
      * Regulatory classification is a project process obligation, not assigned
      * to a component as though hardware alone could establish authorization.
      */
     satisfy BlueDogRequirements::transportability by missionContext.boat.hullAndRig.handling;
     satisfy BlueDogRequirements::desktopManufacture by missionContext.boat.hullAndRig.printedHull;
-    satisfy BlueDogRequirements::serviceability by missionContext.boat.hullAndRig.enclosure;
+    satisfy BlueDogRequirements::serviceability by missionContext.boat;
     satisfy BlueDogRequirements::trafficSafety by missionContext.boat;
     satisfy BlueDogRequirements::operatingBoundary by BlueDogLogicalArchitecture::vessel.boundary;
-    satisfy BlueDogRequirements::safeRecovery by missionContext.boat;
+    satisfy BlueDogRequirements::emergencyControl by missionContext.boat;
     satisfy BlueDogRequirements::navigationConspicuity by missionContext.boat.signaling;
     satisfy BlueDogRequirements::environmentalEnvelope by missionContext.boat;
     satisfy BlueDogRequirements::marineDurability by missionContext.boat;
-    satisfy BlueDogRequirements::stabilityAndFouling by missionContext.boat;
+    satisfy BlueDogRequirements::capsizeResilience by missionContext.boat;
     satisfy BlueDogRequirements::recoveryPropulsion by missionContext.boat;
     satisfy BlueDogRequirements::recoveryEnergy by missionContext.boat;
     satisfy BlueDogRequirements::telemetryEquipment by missionContext.shoreSupport.monitoringStation;
@@ -44,7 +44,7 @@ package BlueDogSatisfaction {
     satisfy BlueDogRequirements::freshwaterExposure by missionContext.boat;
     satisfy BlueDogRequirements::enclosureSealing by missionContext.boat.hullAndRig.enclosure;
     satisfy BlueDogRequirements::wetMechanicalIntegrity by missionContext.boat.hullAndRig;
-    satisfy BlueDogRequirements::wetElectricalIntegrity by BlueDogLogicalArchitecture::vessel.communications;
+    satisfy BlueDogRequirements::wetElectricalIntegrity by missionContext.boat;
     satisfy BlueDogRequirements::solarHeating by BlueDogLogicalArchitecture::vessel.energy;
     satisfy BlueDogRequirements::printedMaterialAging by missionContext.boat.hullAndRig.printedHull;
     satisfy BlueDogRequirements::selfRighting by missionContext.boat;
@@ -57,7 +57,7 @@ package BlueDogSatisfaction {
     satisfy BlueDogRequirements::launchEnergyAdmission by BlueDogLogicalArchitecture::vessel.energy;
     satisfy BlueDogRequirements::challengeMotorInhibition by BlueDogLogicalArchitecture::vessel.recovery;
 
-    // Proposed allocations of atomic acceptance leaves; not verification evidence.
+    // Candidate satisfaction assertions for acceptance leaves; evidence remains open.
     satisfy BlueDogRequirements::energyEstimateCadence by BlueDogLogicalArchitecture::vessel.energy;
     satisfy BlueDogRequirements::reserveEstimateCadence by BlueDogLogicalArchitecture::vessel.energy;
     satisfy BlueDogRequirements::energyEstimateAccuracy by BlueDogLogicalArchitecture::vessel.energy;
@@ -219,4 +219,5 @@ package BlueDogSatisfaction {
     satisfy GorgeChallenge::nightOperation by missionContext.boat;
     satisfy GorgeChallenge::abortPersistence by BlueDogLogicalArchitecture::vessel.recovery;
     satisfy GorgeChallenge::recoveryConspicuity by missionContext.boat.signaling;
+    satisfy BlueDogRequirements::vegetationResilience by missionContext.boat;
 }

@@ -104,8 +104,14 @@ Build with `npm run build:canvas`. The native cache preparation and static build
 both validate story references, including the shipped secondary demos. The latter
 uses native declarations directly when no prepared cache is supplied.
 
-The Blue Dog example is pinned to `b94b6e0231587b52cb5bec800dba408456ca701d` and
-includes a complete newcomer narrative with 31 scenes in 14 chapters, from the
+The Blue Dog example contains the 24 October 2026 working-tree model snapshot,
+including uncommitted cleanups based on `b94b6e0231587b52cb5bec800dba408456ca701d`.
+Its `source.json` distinguishes `baseRevision` from the exact captured content:
+98 hashed files comprise 96 model sources, the model README and publication
+queries. The engineering-source digest covers sorted path/NUL/file-hash/LF records.
+Syspresent's committed copy and frozen publication identify the actual bytes;
+the base commit is ancestry, not a claim that it contains the updated model.
+The example includes a complete newcomer narrative with 31 scenes in 14 chapters, from the
 Gorge challenge through requirements, trades, candidate architecture and the
 qualification campaign. The flashlight example supplies a small prepared
 analysis illustration with explicit inputs and no recorded physical result.
