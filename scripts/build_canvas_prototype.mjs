@@ -19,7 +19,7 @@ if(Object.keys(inputs.metafile.inputs).some(name=>name.includes('editors/vscode'
 const files=['app.js','app.js.map'];
 async function copy(from,to){await mkdir(dirname(join(output,to)),{recursive:true});await copyFile(from,join(output,to));files.push(to);}
 for(const name of ['grid-view.css','sequence-view.css','behavior-view.css','scene-regions.css'])await copy('src/canvas-prototype/'+name,name);
-await copy('src/canvas-prototype/index.html','index.html');await copy('src/canvas-prototype/canvas.css','canvas.css');await copy('LICENSE','LICENSE');await copy('THIRD_PARTY_NOTICES','THIRD_PARTY_NOTICES');
+await copy('index.html','index.html');await copy('src/canvas-prototype/canvas.css','canvas.css');await copy('LICENSE','LICENSE');await copy('THIRD_PARTY_NOTICES','THIRD_PARTY_NOTICES');
 for(const name of ['sysml-wasm.wasm','wasm_exec.js','provenance.json','OPENSYSML-LICENSE','GO-LICENSE'])await copy(join(engine,name),'engine/'+name);
 await copy('src/canvas-prototype/engine/worker.js','engine/worker.js');
 await copy('node_modules/fflate/LICENSE','notices/fflate-LICENSE');

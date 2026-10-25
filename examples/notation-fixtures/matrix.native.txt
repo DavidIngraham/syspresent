@@ -1,8 +1,0 @@
-matrix rendering (no view declared; rendering DeskFan directly)
-
-Source / Target      DeskFan::guardedStart  DeskFan::controlled  DeskFan::controller
--------------------  ---------------------  -------------------  -------------------
-DeskFan::controlled  derive
-DeskFan::fan         satisfy                satisfy
-DeskFan::startCycle                                              allocate
-DeskFan::GuardCheck  verify

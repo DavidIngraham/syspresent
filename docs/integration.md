@@ -4,7 +4,7 @@
 
 The graph canvas is Syspresent's primary interface for guided presentations and standalone exploration. OpenSysML Go remains the semantic engine: browser WASM in a worker for the standalone app, native Go for CI and publication builds. Syspresent owns its interactive rendering, layout coordination, transitions and presentation editor. The new canvas does not depend on the VS Code extension's source modules.
 
-The existing viewer reused VS Code-derived drawing and layout modules. That was a useful prototype decision, but it is historical implementation rather than the target architecture. Do not describe the new canvas as implemented merely because the old viewer can display a native diagram. Reuse of independent general-purpose geometry or layout packages remains possible with explicit interfaces and provenance.
+The canvas is the sole application and is served directly at the GitHub Pages project root. Publication stages a fresh canvas site and retains content-addressed canvas ZIP archives. Independent geometry and layout packages remain behind explicit interfaces with source provenance.
 
 The immediate implementation and verification scope is [the canvas prototype](canvas-prototype.md). The broader requirements in `model/requirements.sysml` remain intended product behavior. In particular, this prototype does not by itself establish all notation support, complete project editing or reader-study acceptance.
 
@@ -55,7 +55,7 @@ Publications include the complete project by default. Scoped publications remain
 5. Capture and export a scene referencing an authored native view, then reload the exercised portable format.
 6. Independently review native semantic claims, actual browser behavior and the limits of the prototype evidence.
 
-Only then use the result to choose/finalize renderer and layout interfaces and plan the broader notation, complete editor and human-usability work. Preserve legacy viewer compatibility separately; replacing it is not proof that every existing view is supported. No upstream dependency PRs are authorized by this integration work.
+Only then use the result to choose/finalize renderer and layout interfaces and plan the broader notation, complete editor and human-usability work. Making canvas the default is not proof that every required view is supported. No upstream dependency PRs are authorized by this integration work.
 
 ## Connection layout and selection
 

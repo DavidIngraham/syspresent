@@ -8,7 +8,7 @@ Never open, reopen or submit upstream dependency PRs, including drafts, unless D
 
 ## Architecture and reuse
 
-Use native OpenSysML parsing, queries, evaluation and rendering semantics. Do not create a second SysML parser or infer relationships from labels. The current canvas architecture uses OpenSysML Go natively and as browser WASM in a worker, behind an explicit semantic/view contract. Syspresent owns its interactive renderer, dynamic layout, transitions, narrative and authoring policy. Do not add dependencies on the VS Code extension source for the new canvas; legacy reuse remains historical implementation, not the target architecture. Keep Blue Dog names out of generic code.
+Use native OpenSysML parsing, queries, evaluation and rendering semantics. Do not create a second SysML parser or infer relationships from labels. The current canvas architecture uses OpenSysML Go natively and as browser WASM in a worker, behind an explicit semantic/view contract. Syspresent owns its interactive renderer, dynamic layout, transitions, narrative and authoring policy. Do not add dependencies on the VS Code extension source for the canvas. Keep Blue Dog names out of generic code.
 
 ## Validation and publication
 

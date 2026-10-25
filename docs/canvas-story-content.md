@@ -2,8 +2,7 @@
 
 The standalone canvas uses ordinary `story.md`, presentation-owned SysML views
 and bundled assets. These features extend `type: scene` blocks; they do not change
-native view selection or run an analysis. The previous viewer's stop/figure block
-format remains separate.
+native view selection or run an analysis.
 
 ## Chapters and direct links
 

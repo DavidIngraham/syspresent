@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add a validated canvas archive to an existing static site without changing its links."""
+"""Stage the sole canvas application at the root of an empty publication directory."""
 import argparse
 import hashlib
 import json
@@ -32,9 +32,11 @@ def stage(archive, site):
         for name, expected in manifest['assets'].items():
             if hashlib.sha256(zipped.read(name)).hexdigest() != expected:
                 raise ValueError('Snapshot hash mismatch: ' + name)
-        destination = site / 'canvas-prototype'
+        destination = site
         if any(PurePosixPath(name).parts[0] == 'reviews' for name in names):
             raise ValueError('The reviews namespace is reserved for immutable archives')
+        if site.exists() and any(site.iterdir()):
+            raise ValueError('Publication requires an empty site directory')
         retained = destination / 'reviews' / (digest + '.zip')
         targets = [destination / name for name in names]
         # Validate every path before changing any published file.
@@ -53,7 +55,7 @@ def stage(archive, site):
         if not retained.exists():
             with retained.open('xb') as output:
                 output.write(data)
-    return {'urlPath': 'canvas-prototype/', 'snapshot': digest, 'viewerRevision': manifest['revision']}
+    return {'urlPath': '', 'snapshot': digest, 'viewerRevision': manifest['revision']}
 
 
 if __name__ == '__main__':

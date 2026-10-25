@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import {showLanding} from '../src/canvas-prototype/landing.mjs';
 
-const html = await readFile(new URL('../src/canvas-prototype/index.html', import.meta.url), 'utf8');
+const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
 test('entry screen exposes demos and local import without exposing empty model controls', () => {
   const {document} = new JSDOM(html).window;

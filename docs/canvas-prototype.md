@@ -35,11 +35,11 @@ Human usability requirement SP-072 remains unaccepted until an actual representa
 
 Use focused tasks with clear owned files and a coordinator integrating contract, runtime and canvas changes. Do not apply the Blue Dog agent workflow to this project. Serialize generated artifact updates and publication. An independent reviewer should inspect the resulting implementation and browser experience, especially identity, edge direction, scope boundaries, model-loading failures, stale worker results, narrative overlap and export fidelity. No agent publishes independently or opens upstream dependency PRs.
 
-The old viewer may coexist with the prototype. Documentation must distinguish the target architecture, the old implementation and features actually demonstrated by this milestone. Keep a concrete evidence record in the final integration report rather than editing planned verification verdicts to pass without a model-backed result.
+The canvas is the sole viewer. Documentation must distinguish intended product behavior from features actually demonstrated by this milestone. Keep a concrete evidence record in the final integration report rather than editing planned verification verdicts to pass without a model-backed result.
 
 ## Evidence recorded on 18 October 2026
 
-The implementation is `src/canvas-prototype/`; the fixture is `examples/canvas-prototype/`. `npm run build:canvas` emits `build/canvas-prototype/site/`, a complete static-site ZIP, and a write-once ZIP under `build/canvas-prototype/snapshots/<sha256>.zip`. Separate publication uses `/canvas-prototype/`, without replacing the existing viewer or adding a blog/catalog link. `.github/workflows/canvas.yml` reproduces the engine and artifact build without VS Code source dependencies; this workflow has not yet been observed running on GitHub.
+The implementation is `src/canvas-prototype/`; the fixture is `examples/canvas-prototype/`. `npm run build:canvas` emits `build/canvas-prototype/site/`, a complete static-site ZIP, and a write-once ZIP under `build/canvas-prototype/snapshots/<sha256>.zip`. Publication serves the canvas directly at `/syspresent/`; see [CI and Pages](ci.md). `.github/workflows/canvas.yml` reproduces the engine and artifact build without VS Code source dependencies; this workflow has not yet been observed running on GitHub.
 
 The exact local dependency is David's clean branch commit `02a582d3d9baf7b9f59e5aaaa8d65f054b279bc7`. The carried patch against `af37bbf155aea785b8ac494a14afe659244bbcdf` has SHA-256 `1bcab4044a669d6eb9924f982caec510434bc61bfb6f74253c4f5c217a25fff6`. Native and WASM use Go 1.25.11; the WASM binary is 36,688,007 bytes. Provenance includes binary hashes, source diff and patch hashes, runtime version and licenses. The source branch was not pushed and no upstream PR was opened.
 
@@ -56,7 +56,7 @@ Executed checks: 30 focused JavaScript tests (canvas/project/worker/UI recovery)
 
 An independent agent reviewed the implementation and reproduced capture-fidelity, missing-context and asynchronous-navigation defects. The fixes were rechecked, including real native capture parity and independent disconnected-return/animation-race reproductions; no remaining material findings were reported within the prototype scope. Later mobile parallel-layout and explore-in-place changes have focused regression tests and coordinator browser checks. This review does not satisfy SP-072.
 
-The initial Markdown renderer intentionally supports prose, headings, emphasis, code spans and simple lists. Binary assets are preserved by project packaging; rich embedded evidence, substitution, sequence/state/fault-tree/table renderers, live presenting, complete history, folder import and full editor polish remain broader product work. Existing viewer examples and evidence remain separate.
+The initial Markdown renderer intentionally supports prose, headings, emphasis, code spans and simple lists. Binary assets are preserved by project packaging; rich embedded evidence, substitution, sequence/state/fault-tree/table renderers, live presenting, complete history, folder import and full editor polish remain broader product work.
 
 
 ## Blue Dog example and mobile reading
@@ -198,7 +198,7 @@ Basic exploration now works with no manifest, story or prepared views. The optio
 
 Independent read-only review found two material intake defects: a conventionally named views-only source could lose its native roots, and a delayed fetch/read could overwrite a resumed project. Both were repaired and independently rechecked. The browser also exposed a hidden-stage ResizeObserver request with zero dimensions on Home; the viewer now ignores it and has a regression. A final independent followup ran 66 affected checks and reported no remaining material findings. All 276 canvas/worker tests pass. All four specification files parse natively without diagnostics, with specification hash `0d1582f0e45c8a0114692c782a6326ad3464ea3135e17b1e6b5b76025ff88333`. Native cache and static multi-demo build succeed; the engine/model pins remain unchanged.
 
-Rendered checks used 390×720 and 1024×768. The flashlight demo resolves 67 native elements and four authored views. Selecting only its model.sysml opens the actual Flashlight package, parts and verification case with no story or authored-view file. The browser-exported ZIP contains unchanged model.sysml, blank presentation sources and a two-field v2 descriptor (schemaVersion and title); importing that ZIP restores the same active native elements without diagnostics. A separate source named views.sysml containing an Uploaded package, a Sensor definition and its typed usage, but no requirements or native views, also opens correctly. Blue Dog selected from the landing page loads all 13,125 native elements, nine available views and six story scenes, settling on trafficCoexistence and trafficSafety. Local selection path/size/duplicate checks, folder-relative paths, archive traversal rejection, cache trust and legacy compatibility have automated coverage. Physical folder-picker behavior and iOS performance remain unverified; these checks do not establish representative-reader acceptance.
+Rendered checks used 390×720 and 1024×768. The flashlight demo resolves 67 native elements and four authored views. Selecting only its model.sysml opens the actual Flashlight package, parts and verification case with no story or authored-view file. The browser-exported ZIP contains unchanged model.sysml, blank presentation sources and a two-field v2 descriptor (schemaVersion and title); importing that ZIP restores the same active native elements without diagnostics. A separate source named views.sysml containing an Uploaded package, a Sensor definition and its typed usage, but no requirements or native views, also opens correctly. Blue Dog selected from the landing page loads all 13,125 native elements, nine available views and six story scenes, settling on trafficCoexistence and trafficSafety. Local selection path/size/duplicate checks, folder-relative paths, archive traversal rejection, cache trust and portable v1 project compatibility have automated coverage. Physical folder-picker behavior and iOS performance remain unverified; these checks do not establish representative-reader acceptance.
 
 
 ## Native view regions, reader controls and routing
@@ -250,10 +250,7 @@ review. This does not establish physical Safari performance or reader acceptance
 The broader dependency Go suite was attempted but is not green: it includes
 package timeouts, absent pilot corpus/VCS prerequisites, a pre-existing rendering
 metadata expectation mismatch and system Node 18 crypto limitations. Focused native
-build, vet, grid/clone/identity tests and actual WASM checks passed. The unrelated
-legacy viewer JavaScript suite also cannot fully run against this minimal native
-checkout without its VS Code webview dependencies (jsdom, ELK and libavoid); 342
-other root JavaScript checks passed. These limitations are not reported as passes.
+build, vet, grid/clone/identity tests and actual WASM checks passed. These dependency-suite limitations are not reported as passes.
 
 
 ## Structural prominence overview checkpoint

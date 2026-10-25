@@ -1,4 +1,4 @@
-name: Validate standalone canvas prototype
+name: Validate and publish Syspresent
 on:
   push:
     branches: [main]
@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: syspresent-canvas-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   prototype:
     runs-on: ubuntu-24.04
@@ -36,12 +39,18 @@ jobs:
           go test ./tests/wasm -run 'TestCombinedWireParity|TestEngineDependencies|TestCombinedDependencies' -count=1
       - name: Build matching native and browser engines
         run: python3 scripts/wasm-prototype/build.py --source .tools/opensysml-canvas
+      - name: Validate product specification with the native compiler
+        run: |
+          cd .tools/opensysml-canvas
+          go build -o ../sysml ./cmd/sysml
+          cd ../..
+          python3 scripts/validate_spec.py --sysml "$PWD/.tools/sysml"
       - name: Check semantic parity, capture, traversal and UI recovery
         run: |
-          node --test tests/canvas-*.test.mjs tests/wasm-prototype/*.test.mjs
+          npm test
           node scripts/wasm-prototype/parity.mjs
       - name: Build portable static artifact
-        run: npm run build:canvas
+        run: npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: syspresent-canvas-prototype
@@ -49,3 +58,78 @@ jobs:
             build/canvas-prototype/site.zip
             build/canvas-prototype/parity-native.json
           if-no-files-found: error
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: prototype
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: immutable-pages-catalog
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: viewer
+      - uses: actions/download-artifact@v4
+        with:
+          name: syspresent-canvas-prototype
+          path: artifact
+      - name: Stage validated canvas as the project root
+        run: python3 viewer/scripts/stage_canvas_publication.py --archive artifact/site.zip --site site
+      - name: Resolve retained deployment history
+        id: history
+        working-directory: viewer
+        run: |
+          refs=$(git ls-remote origin refs/heads/pages-history)
+          if [ -n "$refs" ]; then
+            read -r revision _ <<< "$refs"
+            echo "ref=$revision" >> "$GITHUB_OUTPUT"
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.history.outputs.ref }}
+          path: history
+      - name: Retain canvas archives and replace the published tree
+        env:
+          HISTORY_EXISTS: ${{ steps.history.outputs.exists }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          # Only canvas archives survive into the current publication.
+          for directory in (Path('history/reviews'), Path('history/canvas-prototype/reviews')):
+              for archive in directory.glob('*.zip'):
+                  data = archive.read_bytes()
+                  if archive.stem != hashlib.sha256(data).hexdigest():
+                      raise SystemExit('Retained canvas archive digest mismatch: ' + str(archive))
+                  target = Path('site/reviews') / archive.name
+                  if target.exists() and target.read_bytes() != data:
+                      raise SystemExit('Immutable canvas archive collision')
+                  target.write_bytes(data)
+          PY
+          if [ "$HISTORY_EXISTS" != true ]; then git -C history switch --orphan pages-history; fi
+          git -C history rm -r --ignore-unmatch .
+          cp -a site/. history/
+          git -C history config user.name github-actions[bot]
+          git -C history config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C history add .
+          if ! git -C history diff --cached --quiet; then
+            git -C history commit -m "Publish canvas at project root for $GITHUB_SHA"
+            git -C history push origin HEAD:pages-history
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment

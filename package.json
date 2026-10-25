@@ -5,6 +5,8 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
+    "build": "npm run build:canvas",
+    "test": "npm run test:canvas && python3 -m unittest discover -s tests -p test_canvas_publication.py",
     "build:canvas": "node scripts/build_canvas_cache.mjs && node scripts/build_canvas_prototype.mjs --runtime-cache build/canvas-prototype/runtime-cache.json",
     "test:canvas": "node --test tests/canvas-*.test.mjs tests/wasm-prototype/*.test.mjs"
   },

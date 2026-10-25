@@ -26,19 +26,29 @@ class CanvasPublicationTests(unittest.TestCase):
                 zipped.writestr(name, data)
         return archive
 
-    def test_preserves_existing_pages_and_retains_identical_archive(self):
+    def test_canvas_is_the_root_and_retains_identical_archive(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            site = root / 'site'
+            archive = self.fixture(root, verified_extra={'app.js': b'Canvas app'})
+            result = module.stage(archive, site)
+            self.assertEqual(result['urlPath'], '')
+            self.assertEqual((site / 'index.html').read_bytes(), b'<h1>Prototype</h1>')
+            self.assertEqual((site / 'app.js').read_bytes(), b'Canvas app')
+            self.assertEqual((site / 'reviews' / (result['snapshot']+'.zip')).read_bytes(), archive.read_bytes())
+            self.assertFalse((site / 'canvas-prototype').exists())
+            self.assertFalse((site / 'catalog.json').exists())
+
+    def test_rejects_nonempty_site_instead_of_merging_retired_pages(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             site = root / 'site'
             site.mkdir()
-            (site / 'index.html').write_bytes(b'Existing catalog')
-            (site / 'catalog.json').write_bytes(b'{"reviews": []}')
-            archive = self.fixture(root)
-            result = module.stage(archive, site)
-            self.assertEqual((site / 'index.html').read_bytes(), b'Existing catalog')
-            self.assertEqual((site / 'catalog.json').read_bytes(), b'{"reviews": []}')
-            self.assertEqual((site / 'canvas-prototype/reviews' / (result['snapshot']+'.zip')).read_bytes(), archive.read_bytes())
-            self.assertEqual(module.stage(archive, site), result)
+            (site / 'index.html').write_bytes(b'Previous publication')
+            with self.assertRaisesRegex(ValueError, 'empty'):
+                module.stage(self.fixture(root), site)
+            self.assertEqual((site / 'index.html').read_bytes(), b'Previous publication')
+            self.assertEqual(len(list(site.iterdir())), 1)
 
     def test_rejects_unsafe_or_unverified_archive_before_copying(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -48,12 +58,12 @@ class CanvasPublicationTests(unittest.TestCase):
                     archive = self.fixture(root, extra)
                     with self.assertRaises(ValueError):
                         module.stage(archive, root / 'site')
-                    self.assertFalse((root / 'site/canvas-prototype').exists())
+                    self.assertFalse((root / 'site').exists())
 
     def test_immutable_archive_directory_cannot_redirect_writes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            destination = root / 'site/canvas-prototype'
+            destination = root / 'site'
             destination.mkdir(parents=True)
             external = root / 'external'
             external.mkdir()
@@ -66,7 +76,7 @@ class CanvasPublicationTests(unittest.TestCase):
     def test_verified_archive_cannot_overwrite_a_previous_review(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            previous = root / 'site/canvas-prototype/reviews/old.zip'
+            previous = root / 'site/reviews/old.zip'
             previous.parent.mkdir(parents=True)
             previous.write_bytes(b'Frozen review')
             archive = self.fixture(root, verified_extra={'reviews/old.zip': b'Replacement'})
@@ -89,4 +99,4 @@ class CanvasPublicationTests(unittest.TestCase):
                         zipped.writestr(name, data)
                 with self.assertRaises(ValueError):
                     module.stage(archive, root / 'site')
-                self.assertFalse((root / 'site/canvas-prototype').exists())
+                self.assertFalse((root / 'site').exists())

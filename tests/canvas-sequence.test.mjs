@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import {sequenceLayout,mountSequence} from '../src/canvas-prototype/sequence-view.mjs';
 const {views}=JSON.parse(await readFile(new URL('fixtures/canvas-views/behaviors.native.json',import.meta.url)));
-const source=await readFile(new URL('../examples/notation-fixtures/model.sysml',import.meta.url),'utf8');
+const source=await readFile(new URL('./fixtures/canvas-views/sequence.sysml',import.meta.url),'utf8');
 test('native message order differs from declaration order; renderer retains order, direction and self message',()=>{
  const native=structuredClone(views.sequence),before=structuredClone(native),view=sequenceLayout(native);
  assert.deepEqual(native,before);

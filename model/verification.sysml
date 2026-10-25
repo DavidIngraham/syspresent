@@ -162,7 +162,7 @@ package SyspresentVerification {
     }
 
     verification def <'SV-016'> landingAndDiscovery {
-        doc /* Open the landing page at phone and landscape sizes without starting a demo or semantic worker. Select each packaged demo. Import plain SysML files, a multi-file folder and a manifest-free ZIP, discover their native roots and views, explore without a story, export compact v2 and reopen. Confirm native parse diagnostics for missing dependencies, safe archive paths and duplicate-name errors, previous-project recovery, publisher-trusted indexes and legacy v1 compatibility. Confirm immutable snapshot assets remain unchanged. Software checks do not establish arbitrary-model or physical-device usability acceptance. */
+        doc /* Open the landing page at phone and landscape sizes without starting a demo or semantic worker. Select each packaged demo. Import plain SysML files, a multi-file folder and a manifest-free ZIP, discover their native roots and views, explore without a story, export compact v2 and reopen. Confirm native parse diagnostics for missing dependencies, safe archive paths and duplicate-name errors, previous-project recovery, publisher-trusted indexes and portable v1 project compatibility. Confirm immutable snapshot assets remain unchanged. Software checks do not establish arbitrary-model or physical-device usability acceptance. */
         objective acceptance {
             verify SyspresentRequirements::CanvasAuthoring::landingAndImport;
             verify SyspresentRequirements::CanvasAuthoring::discoveredProjectMetadata;
