@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "af37bbf155aea785b8ac494a14afe659244bbcdf",
+  "sourceDirty": true,
+  "version": "syspresent-af37bbf155ae-dirty",
+  "sourceDiffSha256": "5c40d9ea03c3fa556855b6fc3f5f8dd3173d2993cf2b2a8d394d11c523576eb1",
+  "carriedPatchSha256": "fdfcc7b7677019189f2bb8e5d9e40e6b2ebf9803cbb80e471e359ae9ee6af15d",
+  "goVersion": "go version go1.25.11 linux/amd64",
+  "license": "Apache-2.0",
+  "runtimeLicense": "BSD-3-Clause",
+  "assets": {
+    "sysml-wasm.wasm": {
+      "sha256": "1a2a025cd18523d51730428015deebb32e752dc7e786311f5c2b243c3a54b6c4",
+      "bytes": 36750877
+    },
+    "wasm_exec.js": {
+      "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
+      "bytes": 16992
+    },
+    "sysml-native": {
+      "sha256": "e586086bdecd1c6e5aa8c961200b52714bd9f0d1d174166bf208479653160e0d",
+      "bytes": 23351480
+    }
+  },
+  "experimentalMapping": true
+}

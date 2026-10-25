@@ -1,0 +1,639 @@
+{
+  "inputs": {
+    "src/canvas-prototype/landing.mjs": {
+      "bytes": 492,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/story-content.mjs": {
+      "bytes": 10480,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/figure-view.mjs": {
+      "bytes": 2014,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/story-content.mjs",
+          "kind": "import-statement",
+          "original": "./story-content.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/reader-settings.mjs": {
+      "bytes": 1175,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/geometry.mjs": {
+      "bytes": 14946,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/routing-style.mjs": {
+      "bytes": 2442,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/view-contract.mjs": {
+      "bytes": 4808,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/grid-view.mjs": {
+      "bytes": 17241,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/core/index.mjs": {
+      "bytes": 24245,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "../view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/sequence-view.mjs": {
+      "bytes": 9994,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/behavior-view.mjs": {
+      "bytes": 4192,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/elkjs/lib/elk-api.js": {
+      "bytes": 9782,
+      "imports": [
+        {
+          "path": "<runtime>",
+          "kind": "import-statement",
+          "external": true
+        }
+      ],
+      "format": "cjs"
+    },
+    "src/canvas-prototype/notation.mjs": {
+      "bytes": 6208,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/elk-layout.mjs": {
+      "bytes": 25362,
+      "imports": [
+        {
+          "path": "node_modules/elkjs/lib/elk-api.js",
+          "kind": "import-statement",
+          "original": "elkjs/lib/elk-api.js"
+        },
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/behavior-view.mjs",
+          "kind": "import-statement",
+          "original": "./behavior-view.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/camera.mjs": {
+      "bytes": 8783,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/scene-regions.mjs": {
+      "bytes": 7716,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/elk-layout.mjs",
+          "kind": "import-statement",
+          "original": "./elk-layout.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/routing-style.mjs",
+          "kind": "import-statement",
+          "original": "./routing-style.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/behavior-view.mjs",
+          "kind": "import-statement",
+          "original": "./behavior-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/camera.mjs",
+          "kind": "import-statement",
+          "original": "./camera.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/preferences.mjs": {
+      "bytes": 4627,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/fflate/esm/browser.js": {
+      "bytes": 89198,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/project.mjs": {
+      "bytes": 14714,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/preferences.mjs",
+          "kind": "import-statement",
+          "original": "./preferences.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/story-content.mjs",
+          "kind": "import-statement",
+          "original": "./story-content.mjs"
+        },
+        {
+          "path": "node_modules/fflate/esm/browser.js",
+          "kind": "import-statement",
+          "original": "fflate"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/browser-project.mjs": {
+      "bytes": 1374,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/project.mjs",
+          "kind": "import-statement",
+          "original": "./project.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/native-project.mjs": {
+      "bytes": 690,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/prominence.mjs": {
+      "bytes": 15633,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/package-explorer.mjs": {
+      "bytes": 3503,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/departures.mjs": {
+      "bytes": 7716,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/graph.mjs": {
+      "bytes": 4250,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/exploration.mjs": {
+      "bytes": 15317,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/prominence.mjs",
+          "kind": "import-statement",
+          "original": "./prominence.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/context.mjs": {
+      "bytes": 13952,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/prominence.mjs",
+          "kind": "import-statement",
+          "original": "./prominence.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/peripheral-routing.mjs": {
+      "bytes": 10016,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/neighborhood.mjs": {
+      "bytes": 17483,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/context.mjs",
+          "kind": "import-statement",
+          "original": "./context.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/peripheral-routing.mjs",
+          "kind": "import-statement",
+          "original": "./peripheral-routing.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/motion.mjs": {
+      "bytes": 3030,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/journey-camera.mjs": {
+      "bytes": 5284,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/camera.mjs",
+          "kind": "import-statement",
+          "original": "./camera.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/motion.mjs",
+          "kind": "import-statement",
+          "original": "./motion.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/documentation.mjs": {
+      "bytes": 1627,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/engine/client.mjs": {
+      "bytes": 1750,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/app.mjs": {
+      "bytes": 97638,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/landing.mjs",
+          "kind": "import-statement",
+          "original": "./landing.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/story-content.mjs",
+          "kind": "import-statement",
+          "original": "./story-content.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/figure-view.mjs",
+          "kind": "import-statement",
+          "original": "./figure-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/reader-settings.mjs",
+          "kind": "import-statement",
+          "original": "./reader-settings.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/routing-style.mjs",
+          "kind": "import-statement",
+          "original": "./routing-style.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/grid-view.mjs",
+          "kind": "import-statement",
+          "original": "./grid-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/sequence-view.mjs",
+          "kind": "import-statement",
+          "original": "./sequence-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/behavior-view.mjs",
+          "kind": "import-statement",
+          "original": "./behavior-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/scene-regions.mjs",
+          "kind": "import-statement",
+          "original": "./scene-regions.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/browser-project.mjs",
+          "kind": "import-statement",
+          "original": "./browser-project.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/native-project.mjs",
+          "kind": "import-statement",
+          "original": "./native-project.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/prominence.mjs",
+          "kind": "import-statement",
+          "original": "./prominence.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/package-explorer.mjs",
+          "kind": "import-statement",
+          "original": "./package-explorer.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/departures.mjs",
+          "kind": "import-statement",
+          "original": "./departures.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/exploration.mjs",
+          "kind": "import-statement",
+          "original": "./exploration.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/preferences.mjs",
+          "kind": "import-statement",
+          "original": "./preferences.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/context.mjs",
+          "kind": "import-statement",
+          "original": "./context.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/neighborhood.mjs",
+          "kind": "import-statement",
+          "original": "./neighborhood.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/journey-camera.mjs",
+          "kind": "import-statement",
+          "original": "./journey-camera.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/camera.mjs",
+          "kind": "import-statement",
+          "original": "./camera.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/peripheral-routing.mjs",
+          "kind": "import-statement",
+          "original": "./peripheral-routing.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/motion.mjs",
+          "kind": "import-statement",
+          "original": "./motion.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/documentation.mjs",
+          "kind": "import-statement",
+          "original": "./documentation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/elk-layout.mjs",
+          "kind": "import-statement",
+          "original": "./elk-layout.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/engine/client.mjs",
+          "kind": "import-statement",
+          "original": "./engine/client.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/project.mjs",
+          "kind": "import-statement",
+          "original": "./project.mjs"
+        }
+      ],
+      "format": "esm"
+    }
+  },
+  "outputs": {
+    "build/canvas-prototype/site/app.js.map": {
+      "imports": [],
+      "exports": [],
+      "inputs": {},
+      "bytes": 783796
+    },
+    "build/canvas-prototype/site/app.js": {
+      "imports": [],
+      "exports": [],
+      "entryPoint": "src/canvas-prototype/app.mjs",
+      "inputs": {
+        "node_modules/elkjs/lib/elk-api.js": {
+          "bytesInOutput": 9829
+        },
+        "src/canvas-prototype/landing.mjs": {
+          "bytesInOutput": 414
+        },
+        "src/canvas-prototype/story-content.mjs": {
+          "bytesInOutput": 11913
+        },
+        "src/canvas-prototype/figure-view.mjs": {
+          "bytesInOutput": 2320
+        },
+        "src/canvas-prototype/reader-settings.mjs": {
+          "bytesInOutput": 1072
+        },
+        "src/canvas-prototype/geometry.mjs": {
+          "bytesInOutput": 15772
+        },
+        "src/canvas-prototype/routing-style.mjs": {
+          "bytesInOutput": 2299
+        },
+        "src/canvas-prototype/view-contract.mjs": {
+          "bytesInOutput": 2436
+        },
+        "src/canvas-prototype/grid-view.mjs": {
+          "bytesInOutput": 17564
+        },
+        "src/canvas-prototype/core/index.mjs": {
+          "bytesInOutput": 15838
+        },
+        "src/canvas-prototype/sequence-view.mjs": {
+          "bytesInOutput": 11120
+        },
+        "src/canvas-prototype/behavior-view.mjs": {
+          "bytesInOutput": 4249
+        },
+        "src/canvas-prototype/elk-layout.mjs": {
+          "bytesInOutput": 27215
+        },
+        "src/canvas-prototype/notation.mjs": {
+          "bytesInOutput": 3902
+        },
+        "src/canvas-prototype/camera.mjs": {
+          "bytesInOutput": 8767
+        },
+        "src/canvas-prototype/scene-regions.mjs": {
+          "bytesInOutput": 8442
+        },
+        "src/canvas-prototype/preferences.mjs": {
+          "bytesInOutput": 3808
+        },
+        "node_modules/fflate/esm/browser.js": {
+          "bytesInOutput": 24695
+        },
+        "src/canvas-prototype/project.mjs": {
+          "bytesInOutput": 15410
+        },
+        "src/canvas-prototype/browser-project.mjs": {
+          "bytesInOutput": 1407
+        },
+        "src/canvas-prototype/native-project.mjs": {
+          "bytesInOutput": 653
+        },
+        "src/canvas-prototype/prominence.mjs": {
+          "bytesInOutput": 14411
+        },
+        "src/canvas-prototype/package-explorer.mjs": {
+          "bytesInOutput": 3635
+        },
+        "src/canvas-prototype/departures.mjs": {
+          "bytesInOutput": 7909
+        },
+        "src/canvas-prototype/graph.mjs": {
+          "bytesInOutput": 4285
+        },
+        "src/canvas-prototype/exploration.mjs": {
+          "bytesInOutput": 15270
+        },
+        "src/canvas-prototype/context.mjs": {
+          "bytesInOutput": 8533
+        },
+        "src/canvas-prototype/peripheral-routing.mjs": {
+          "bytesInOutput": 11314
+        },
+        "src/canvas-prototype/neighborhood.mjs": {
+          "bytesInOutput": 18621
+        },
+        "src/canvas-prototype/motion.mjs": {
+          "bytesInOutput": 3257
+        },
+        "src/canvas-prototype/journey-camera.mjs": {
+          "bytesInOutput": 5168
+        },
+        "src/canvas-prototype/documentation.mjs": {
+          "bytesInOutput": 1673
+        },
+        "src/canvas-prototype/engine/client.mjs": {
+          "bytesInOutput": 1698
+        },
+        "src/canvas-prototype/app.mjs": {
+          "bytesInOutput": 109484
+        }
+      },
+      "bytes": 397531
+    }
+  }
+}

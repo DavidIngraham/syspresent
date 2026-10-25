@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "syspresent.demos.v1",
+  "demos": [
+    {
+      "id": "blue-dog",
+      "title": "Blue Dog: from the Gorge challenge to a defined boat",
+      "description": "Explore the Gorge challenge, sail trade, IC-01 candidate, traffic safety and recovery.",
+      "project": "project.zip",
+      "runtimeCacheHash": "aadb4dcc4ecc7c47ae9b31d9449d046e9e1545e9468afceea5da5c63b94359bb",
+      "publication": "48cbbe086aff1028e5cd45f3939cd2c4b4fdd00366239354613c64d7f353b96b"
+    },
+    {
+      "id": "views",
+      "title": "A desk fan: behavior, grids and shared failures",
+      "description": "Inspect matrices, tables, sequences, states, cases, mixed views and shared fault causes.",
+      "project": "demos/views.zip",
+      "publication": "c10ea62a1ed522f350dc982bf4194ab81eebbf81f097213b632ce15e592278a2"
+    },
+    {
+      "id": "flashlight",
+      "title": "A flashlight: requirement, assembly and switching",
+      "description": "A small model connecting a requirement, the flashlight assembly and switching behavior.",
+      "project": "demos/flashlight.zip",
+      "publication": "3061b5e2180a1ffa17c8b47c7f2e09a00cdf35693766a5238277d6fbbba2d11a"
+    }
+  ]
+}

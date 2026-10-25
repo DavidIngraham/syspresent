@@ -1,0 +1,16 @@
+Syspresent canvas
+---------------------------
+
+The canvas uses Syspresent JavaScript (Apache-2.0), OpenSysML Go/WASM
+(Apache-2.0), the Go browser runtime (BSD-3-Clause), fflate 0.8.2 (MIT),
+and elkjs 0.12.0 (EPL-2.0 option of EPL-2.0 OR GPL-3.0-or-later).
+ELK supplies disposable layout geometry in its own browser worker. Native
+OpenSysML remains the semantic authority. This canvas does not bundle the
+VS Code renderer or libavoid. The static build includes LICENSE,
+engine/OPENSYSML-LICENSE, engine/GO-LICENSE, notices/fflate-LICENSE,
+notices/elkjs-LICENSE, the unmodified ELK API and worker source, package
+metadata and lockfile. ELK source: https://github.com/kieler/elkjs/tree/v0.12.0
+Published source package: https://registry.npmjs.org/elkjs/-/elkjs-0.12.0.tgz. engine/provenance.json records the exact source,
+carried patch and binary hashes. build-inputs.json records browser inputs.
+The reproducible engine source patch and its original base are retained in
+scripts/wasm-prototype; no upstream dependency PR is needed to rebuild it.
