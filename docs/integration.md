@@ -243,7 +243,9 @@ ownership, with paged contents and complete scoped search. Its roots are roots i
 the declaration projection: relation-owned metadata may appear separately when
 its nondeclaration owner is omitted. Browse declarations exposes all directly
 owned attributes/parts and declarations on one direct classifier, retaining
-declared-on identities and inert native source text. Values are not evaluated.
+declared-on identities and inert native source text. These hierarchy compartments
+do not evaluate values; explicit narrative bindings use the separate
+selected-attribute native path below.
 Expanded cards show a disclosed first page; the dialog provides every page.
 
 Part Focus defaults to Effective requirements. Local understanding exposes the
@@ -277,19 +279,32 @@ port directions and supported control symbols. Its solid two-dot typing marker,
 circled-plus ownership marker and supported relationship productions differ
 from exploratory styling. Unknown modifiers, unavailable native roles, overloaded
 kinds and unsupported families have inspectable notices. Native extensions and
-unassessed sequence/grid/fault-tree notation are not certified by this mode.
+sequence/grid/fault-tree subsets retain their per-record limitations. The current
+bounded inventory, helper contracts and remaining gaps are documented in
+[rendering coverage](rendering-coverage.md); none is a claim of complete standards
+compliance.
 
 Adjust layout supports explicit dragging and keyboard movement of active flat
-structural cards, structural groups and bounded nested structural members. Group movement translates native
+structural cards, state nodes, structural/state groups and bounded nested members.
+Mapped action/control and fault-tree nodes support horizontal adjustment to
+preserve the drawing's established reading layers; horizontal positions do not
+impose native branch order, and coordinates do not assert elapsed time. Complete
+action containers may move rigidly where no native succession crosses their
+boundary. Group movement translates native
 descendants, ports, labels and drawing anchors together; external edges reroute
 against stationary peers. Nested moves use the actual fitted parent body and header, rejecting escape,
 header entry and card/native-label collisions. Descendants and actual ports move
-rigidly. Missing parent geometry and behavioral/control movement remain explicitly
-unsupported; pan/zoom remains available without relayout.
+rigidly. Missing parent geometry, unsafe routes and loss of mandatory native labels
+reject a gesture. Synthetic controls and actual ports move only with their owning
+container. Dedicated sequence/grid controls adjust lane widths, message spacing
+and column widths while preserving native identities, explicit event order and
+matrix direction; generic graph movement does not replace those renderers.
+Pan/zoom remains available without relayout.
 
 Positions persist in the project asset syspresent-layouts.json, separate from
 SysML view selection and story narrative. It records native semantic,
-representation and parent identities plus offsets normalized to the graph area.
+representation and parent identities plus offsets normalized to the graph area,
+alongside typed sequence/grid region settings.
 It stores neither a model hash nor a frozen viewport. ZIP export/import retains
 the asset and unchanged system sources. Export is the durable-save boundary;
 model metadata is not automatically retained in browser storage. Back/Forward,
@@ -333,15 +348,21 @@ represented membership, typed-value provenance and a preview through the existin
 native graph/sequence/grid renderer. Validation alone never appends; only Append
 validated slide changes the story. Rejected or obsolete candidates leave it intact.
 
-Inspect native values uses GetSymbol constant attributes. Templates retain native
-documentation or scalar-attribute bindings and resolve afresh on project reload
-and publication validation, including native exact rational formatting and explicit
-same-unit/type assertions. No SysML source-value parsing or implicit conversion is
-used. Missing values, changed types/units, unsupported expressions and values
-requiring runtime inputs fail explicitly. The current engine does not implement
-Evaluate, so input-dependent analysis is not run. A declared constant remains
-distinct from measurement or executed evidence. Native references and structured
-claims can be checked; free prose remains an unverified author draft.
+Inspect native values starts with exact GetSymbol attributes. Templates retain
+native documentation or scalar-attribute bindings and resolve afresh on project
+reload and publication validation, including exact rational/large-integer
+formatting and explicit same-unit/type assertions. If an already identified
+attribute has no static value, only that exact quoted native attribute may be
+evaluated in its selected native owner/subject context. The native result,
+diagnostics and provenance are retained. This path supplies no missing inputs,
+accepts no arbitrary expression text and runs no actions or simulations. Unset,
+undetermined, collection, nonfinite and incompatible values fail explicitly; units
+are not inferred from names or silently converted. The bounded 184-attribute
+survey found 147 supported static values, 13 additional native-evaluated scalars
+and 24 explicit rejections; see [rendering and value coverage](rendering-coverage.md).
+Declared/evaluated values remain distinct from measurement, recorded execution
+and engineering approval. Native references and structured claims can be checked;
+free prose remains an unverified author draft.
 
 The provider-neutral transport interface defaults to unconfigured. Tests use
 explicitly labeled mocked transports with allowlisted identity/documentation/link
@@ -378,3 +399,14 @@ retention is acceptable. Same-origin HTTPS can avoid cross-origin loopback brows
 constraints; loopback CORS/private-network behavior remains untested without a
 chosen service. Direct provider APIs and automatic OpenAI-compatible passthrough
 are not configured.
+
+
+Closed generated-view proposal validation avoids a redundant whole-candidate
+declaration export after verifying original source bytes and presentation-file
+ownership. Existing native names/documentation remain authoritative under that
+unchanged-source boundary; candidate native parse/render and fresh candidate
+GetSymbol/Evaluate calls still validate view membership and typed values.
+The review exposes this reuse. It does not manufacture a publisher-trusted cache
+or establish a pass for large edited-model append/reload: the native whole-model
+exporter can still exhaust WASM's 4 GiB memory during RDF collection annotation.
+See docs/rendering-coverage.md and the final validation record for exact evidence.
