@@ -401,7 +401,11 @@ async function exploreSurface(selection){
 }
 
 function gather(ids,relationships){const set=new Set(ids),elements=state.graph.elements.filter(e=>set.has(e.id));return graphView(state.graph,{elements,relationships:(relationships??state.graph.relationships).filter(e=>set.has(e.source)&&set.has(e.target))},'General View journey');}
-async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=false,camera=createCamera()}={}){
+function transitionTo(view,focus,options){
+ const attempt=performTransition(view,focus,options);state.transitionAttempt=attempt;
+ return attempt.finally(()=>{if(state.transitionAttempt===attempt)state.transitionAttempt=null;});
+}
+async function performTransition(view,focus,{animate=true,journey,allowDisconnected=false,camera=createCamera()}={}){
  const revision=++state.revision,previous=state.view,cameraRevision=state.cameraRevision;
  // Validate the route before committing focus or starting an animation.
  const savedJourney=journey?.length>1&&resolve(journey[0])===state.previousFocus&&resolve(journey.at(-1))===focus?journey.map(resolve):undefined;
@@ -605,7 +609,7 @@ async function capture(){
  const revision=state.revision,modelHash=state.modelHash,sourceView=state.view;
  const result=await prepareNativeCapture(state.project,{view:state.view,graph:state.graph,views:state.views,focus:state.focus,engine:state.engine,title:$('scene-title').value||'Captured view',markdown:$('scene-prose').value,presentation:editorPresentation(),panel:{placement:$('panel-placement').value}});
  if(revision!==state.revision||modelHash!==state.modelHash)return;
- await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(sourceView);$('editor').close();status('Native view captured. Export the project ZIP to retain its definition and slide.');
+ await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:result.viewName});$('editor').close();status('Native view captured. Export the project ZIP to retain its definition and slide.');
 }
 function renderHierarchy(){
  const request=state.hierarchyRequest??{},result=hierarchyPage(state.graph,{...request,query:$('hierarchy-search').value,scopeIds:explorationScope()});
@@ -637,7 +641,7 @@ async function submitQuestion(){
  $('submit-question').disabled=true;
  try{const result=await prepareQuestionSlide(state.project,{view,graph:state.graph,views:state.views,focus:id,engine:state.engine,question,markdown:notice||'This slide references a native model view. No model relationships were inferred from the question text.',presentation:{contextBudget:0}});
  if(revision!==state.revision||modelHash!==state.modelHash)return;
- await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(view);$('question-dialog').close();status('Question appended as a native slide in this story. Export project ZIP to keep the conversation.');
+ await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(view,{targetViewId:result.viewName});$('question-dialog').close();status('Question appended as a native slide in this story. Export project ZIP to keep the conversation.');
  }finally{$('submit-question').disabled=false;}
 }
 function beginManualMove(event,node,representation){
@@ -685,7 +689,7 @@ async function validateAuthoring(){
 }
 async function appendAuthoring(){
  const candidate=state.authoringCandidate;if(!candidate||candidate.revision!==state.revision||candidate.sourceModelHash!==state.modelHash||candidate.proposalText!==$('authoring-proposal').value)throw Error('The model, scope or proposal changed. Validate the proposal again before appending.');
- const sourceView=state.view,project=savePresentationLayouts(candidate.project,state.presentationLayouts);$('authoring-append').disabled=true;await loadProject(project);await showScene(candidate.sceneIndex,false);await retainCapturedLayout(sourceView);invalidateAuthoring();$('authoring-dialog').close();$('editor').close();status('Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.');
+ const sourceView=state.view,project=savePresentationLayouts(candidate.project,state.presentationLayouts);$('authoring-append').disabled=true;await loadProject(project);await showScene(candidate.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:candidate.viewName});invalidateAuthoring();$('authoring-dialog').close();$('editor').close();status('Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.');
 }
 function rollupDrawing(view){
  if(!['definition','interconnection','tree','mixed'].includes(view.kind))return {view,omissions:[{reason:'rollup-unsupported-view',message:'Typed rollups apply to structural graph projections; native behavioral and grid views remain intact.'}],rollups:[]};
@@ -708,7 +712,12 @@ async function saveManualPosition(id,position,prepared=state.visualSnapshot){
  const layouts=state.presentationLayouts.clone();layouts.capture(state.view,prepared.automaticFitted,{positions,area:prepared.area});
  const project=savePresentationLayouts(state.project,layouts);remember();state.presentationLayouts=layouts;state.project=project;state.demo=null;state.publication=null;await frame(state.view);status('Drawing positions saved in the project layout file. Export project ZIP to keep them across sessions; native selection is unchanged.');
 }
-async function retainCapturedLayout(sourceView){
+async function retainCapturedLayout(sourceView,{targetViewId=scene()?.view}={}){
+ const loadRevision=state.loadRevision;
+ // A resize may supersede showScene's first layout. Wait for its current
+ // replacement before binding presentation settings to the committed view.
+ while(state.transitionAttempt){await state.transitionAttempt;if(loadRevision!==state.loadRevision)return;}
+ if(targetViewId&&state.view?.id!==targetViewId)throw Error('The captured native view did not become active; presentation settings have not been aliased.');
  if(sourceView.id===state.view.id||(!state.presentationLayouts.getRegion(sourceView)&&!state.visualSnapshot?.automaticFitted))return;
  const result=state.presentationLayouts.alias(sourceView,state.view,state.visualSnapshot?.automaticFitted);if(result.retained||result.settingsRetained){state.project=savePresentationLayouts(state.project,state.presentationLayouts);await frame(state.view);}if(result.omissions.length)status(result.omissions.map(o=>o.message).join(' '));
 }
