@@ -1,3 +1,4 @@
+import {createModelSession} from './engine/model-session.mjs';
 import {placePortLabels} from './port-labels.mjs';
 import {createFocusedNativeViews} from './focused-native-view.mjs';
 import {placeEndpointLabels} from './endpoint-labels.mjs';
@@ -67,7 +68,7 @@ async function ensureEngine(){
  if(engineReady)return engineReady;
  status('Starting the model engine…');
  state.layoutEngine??=createLayoutEngine({workerUrl:new URL('./layout/elk-worker.js?v='+buildVersion,location.href).href});
- state.engine=createSemanticEngine({assetBase:new URL('./engine/',location.href),assetVersion:buildVersion,workerURL:new URL('./engine/worker.js?v='+buildVersion,location.href)});
+ state.models=createModelSession(createSemanticEngine({assetBase:new URL('./engine/',location.href),assetVersion:buildVersion,workerURL:new URL('./engine/worker.js?v='+buildVersion,location.href)}));state.engine=state.models.engine;
  engineReady=(async()=>{state.engineInfo=await state.engine.ready;const response=await fetch('./engine/provenance.json?v='+buildVersion);if(!response.ok)throw Error('Model engine provenance is unavailable.');state.provenance=await response.json();})().catch(error=>{state.engine?.terminate();engineReady=null;throw error;});
  return engineReady;
 }
@@ -79,22 +80,23 @@ async function demos(){
  demoCatalog=catalog.demos;return demoCatalog;
 }
 async function openDemo(id,{readURL=false}={}){
- const request=++state.loadRevision;++state.revision;busy(true);$('landing-error').hidden=true;status('Opening demo…');
+ const request=++state.loadRevision;++state.revision;discardLoadingModel();busy(true);$('landing-error').hidden=true;status('Opening demo…');
  try{const demo=(await demos()).find(item=>item.id===id);if(!demo)throw Error('Demo not found: '+id);const response=await fetch('./'+demo.project+'?v='+buildVersion);if(!response.ok)throw Error('Demo files are unavailable.');const bytes=new Uint8Array(await response.arrayBuffer());if(demo.publication){const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');if(digest!==demo.publication)throw Error('Published project bytes do not match the catalog snapshot. Reload the publication.');}if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:demo.runtimeCacheHash,loadToken:request,publication:demo.publication,demo:id,readURL});}
  catch(error){if(request===state.loadRevision)throw error;}finally{if(request===state.loadRevision)busy(false);}
 }
-function home(){++state.loadRevision;++state.revision;cancelAnimations();$('project-menu').open=false;$('selection').hidden=true;$('find').hidden=true;for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();busy(false);showLanding(document,true);$('landing-status').textContent='';$('landing-error').hidden=true;$('resume-model').hidden=!state.view;document.title='Syspresent';}
-async function compile(project,{cacheHash=state.trustedCacheHash,progress=status}={}){
+function discardLoadingModel(){state.loadingLease?.dispose().catch(report);state.loadingLease=null;}
+function home(){++state.loadRevision;++state.revision;discardLoadingModel();cancelAnimations();$('project-menu').open=false;$('selection').hidden=true;$('find').hidden=true;for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();busy(false);showLanding(document,true);$('landing-status').textContent='';$('landing-error').hidden=true;$('resume-model').hidden=!state.view;document.title='Syspresent';}
+async function compile(project,{cacheHash=state.trustedCacheHash,progress=status,lease}={}){
  loadPresentationLayouts(project);
- const documents=documentsFor(project),scenes=parseStory(fileText(project,project.manifest.story));
+ const engine=lease.engine,documents=documentsFor(project),scenes=parseStory(fileText(project,project.manifest.story));
  const m=project.manifest;
  let parsed,exported,roots=m.modelRoots,seeds=m.requirementSeeds,runtimePackage;
  const check=result=>{const errors=(result.diagnostics??[]).filter(d=>String(d.severity).toLowerCase().includes('error'));if(errors.length)throw Error(errors.map(d=>`${d.message} (${d.span?.file??'source'}:${d.span?.startLine??'?'})`).join('\n'));if(!result.modelHash)throw Error('Native engine returned no model identity');};
  const index=await verifiedRuntimeIndex(project,{trustedHash:cacheHash,engineVersion:state.engineInfo?.version,engineFingerprint:state.provenance?.assets?.['sysml-wasm.wasm']?.sha256,documents});
  if(index){roots=index.modelRoots;seeds=index.requirementSeeds;runtimePackage=index.runtimePackage;}
  if(!roots?.length||seeds===undefined||!runtimePackage){
-  parsed=await state.engine.call('ParseSources',{documents});check(parsed);
-  exported=await state.engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
+  parsed=await engine.call('ParseSources',{documents});check(parsed);
+  exported=await engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
   const discovered=discoverNativeIndex(parsed,exported,{modelDocumentCount:m.modelSources.length});
   roots=roots?.length?roots:discovered.modelRoots;seeds??=discovered.requirementSeeds;
   runtimePackage='SyspresentRuntimeContext';const names=new Set(exported.elements.map(e=>e.qualifiedName));while(names.has(runtimePackage))runtimePackage+='X';
@@ -102,17 +104,17 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=status
  if(!roots.length)throw Error('No named model declarations were found in the supplied files.');
  progress('Resolving the complete project with OpenSysML WASM…');
  const allDocuments=[...documents,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,seeds)}];
- parsed=await state.engine.call('ParseSources',{documents:allDocuments});check(parsed);
+ parsed=await engine.call('ParseSources',{documents:allDocuments});check(parsed);await lease.retainOnly(parsed.modelHash);
  const cache=await verifiedRuntimeCache(project,{trustedHash:cacheHash,engineVersion:state.engineInfo?.version,engineFingerprint:state.provenance?.assets?.['sysml-wasm.wasm']?.sha256,documents:allDocuments,modelHash:parsed.modelHash});
  progress('Loading model declarations and requirement relationships…');
- exported=structuredClone(cache?.exported??await state.engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'}));
+ exported=structuredClone(cache?.exported??await engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'}));
  if(!Array.isArray(exported.elements))throw Error('Native model export has no element array');
  if(m.modelRoots?.length){const modelRootIDs=parsed.roots.slice(0,m.modelSources.length).flatMap(r=>r.childIds??[]),actual=exported.elements.filter(e=>modelRootIDs.includes(e['@id'])&&e.qualifiedName).map(e=>e.qualifiedName);const missing=actual.filter(name=>!roots.includes(name));if(missing.length)throw Error('Native model roots need rebuilding: '+missing.join(', '));}
- const coverage=requireNativeIdentity(adaptNativeView(seeds.length?(cache?.coverage??await state.engine.call('RenderView',{modelHash:parsed.modelHash,view:runtimePackage+'::coverage',includeSemanticIdentity:true})):{kind:'definition',nodes:[],edges:[]},runtimePackage+'::coverage'));
+ const coverage=requireNativeIdentity(adaptNativeView(seeds.length?(cache?.coverage??await engine.call('RenderView',{modelHash:parsed.modelHash,view:runtimePackage+'::coverage',includeSemanticIdentity:true})):{kind:'definition',nodes:[],edges:[]},runtimePackage+'::coverage'));
  exported.elements=exported.elements.filter(e=>e.qualifiedName!==runtimePackage&&!e.qualifiedName?.startsWith(runtimePackage+'::'));
  const availableViews=exported.elements.filter(e=>e['@type']==='ViewUsage'&&e.qualifiedName&&e['sysx:sourceLine']).map(e=>e.qualifiedName);
  const needed=new Set([...authoringReferencedViews(scenes),...scenes.flatMap(s=>[s.view,...(s.regions??[]).map(r=>r.view)]),...(m.entryView?[m.entryView]:[])]),views=new Map();
- for(const name of needed){if(!availableViews.includes(name))throw Error('Native view does not resolve: '+name);progress('Preparing '+(scenes.find(s=>s.view===name)?.title||'model view')+'…');const raw=cache?.views?.[name]??await state.engine.call('RenderView',{modelHash:parsed.modelHash,view:name,includeSemanticIdentity:true});const view=requireNativeIdentity(adaptNativeView(raw,name));if(!supportsView(view))throw Error('Unsupported native view kind: '+view.kind);views.set(name,view);}
+ for(const name of needed){if(!availableViews.includes(name))throw Error('Native view does not resolve: '+name);progress('Preparing '+(scenes.find(s=>s.view===name)?.title||'model view')+'…');const raw=cache?.views?.[name]??await engine.call('RenderView',{modelHash:parsed.modelHash,view:name,includeSemanticIdentity:true});const view=requireNativeIdentity(adaptNativeView(raw,name));if(!supportsView(view))throw Error('Unsupported native view kind: '+view.kind);views.set(name,view);}
  if(!m.systemOfInterest.length)m.systemOfInterest=[...roots];
  const graph=modelGraph(exported.elements,[...views.values(),coverage]);
  for(const root of project.manifest.systemOfInterest)if(!resolveInGraph(graph,root))throw Error('System of interest does not resolve: '+root);
@@ -122,7 +124,7 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=status
  for(const item of scenes)for(const region of item.regions??[])if(region.focus&&!byName(region.focus))throw Error(`Scene ${item.id}: region ${region.id} focus does not resolve`);
  for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found&&!b.allowDisconnected)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
  if(m.entryFocus&&!byName(m.entryFocus))throw Error('Starting element does not resolve: '+m.entryFocus);
- for(let i=0;i<scenes.length;i++)scenes[i]=await resolveAuthoredScene(scenes[i],{engine:state.engine,modelHash:parsed.modelHash,graph});
+ for(let i=0;i<scenes.length;i++)scenes[i]=await resolveAuthoredScene(scenes[i],{engine,modelHash:parsed.modelHash,graph});
  validateStoryContent(scenes,{files:project.files,pathFor:projectPath,resolve:byName});
  return {project,modelHash:parsed.modelHash,exported,graph,views,scenes,coverage,availableViews};
 }
@@ -135,14 +137,37 @@ function prominenceScope(){
 }
 function busy(value){$('landing').setAttribute('aria-busy',String(value));for(const control of $('landing').querySelectorAll('button:not(#resume-model)'))control.disabled=value;$('loading').hidden=!value;for(const id of ['previous','next','scenes','standalone','return','system-overview','choose-package','workspace-overview','scope-up','scope-clear','view-navigation','view-catalog','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
 async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,demo=null,publication=null,readURL=false}={}){
- const revision=loadToken??++state.loadRevision;if(revision!==state.loadRevision)return;++state.revision;$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
- let compiled;try{await ensureEngine();if(revision!==state.loadRevision)return;compiled=await compile(validateProject(project),{cacheHash,progress:text=>{if(revision===state.loadRevision)status(text);}});}catch(error){if(revision!==state.loadRevision)return;busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision)return;
- let initialScene=0;try{if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){busy(false);throw error;}
- disposeSurfaces();state.assetURLs?.destroy();$('narrative').removeAttribute('data-scene-id');state.presentationLayouts=loadPresentationLayouts(compiled.project);Object.assign(state,compiled,{scopeContext:false,demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],packageScope:null,traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.focusedViews=createFocusedNativeViews({engine:state.engine,modelHash:state.modelHash,declaredViewIds:state.availableViews});state.assetURLs=createAssetURLs(project.files);
- state.trustedCacheHash=cacheHash??null;showLanding(document,false);document.title=project.manifest.title+' · Syspresent';$('resume-model').hidden=false;busy(false);updateLists();$('editor-error').textContent='';$('project-menu').open=false;
- if(state.scenes.length)await showScene(initialScene,false,{urlMode:'replace'});else if(project.manifest.entryView||project.manifest.entryFocus){state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}else await openSystemOverview({record:false});
- status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
- $('boundary').textContent=project.manifest.publication.scope==='scoped'?'Scoped publication · traversal stays within supplied model':'Complete project · standalone exploration available';
+ const revision=loadToken??++state.loadRevision;if(revision!==state.loadRevision)return;++state.revision;invalidateAuthoring();discardLoadingModel();$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
+ let compiled,lease;try{await state.projectDisplay?.finished;await ensureEngine();if(revision!==state.loadRevision)return;lease=state.models.createLease();state.loadingLease=lease;compiled=await compile(validateProject(project),{cacheHash,lease,progress:text=>{if(revision===state.loadRevision)status(text);}});}catch(error){await lease?.dispose();if(state.loadingLease===lease)state.loadingLease=null;if(revision!==state.loadRevision)return;busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision){await lease.dispose();return;}
+ if(state.loadingLease===lease)state.loadingLease=null;
+ let initialScene=0;try{if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){await lease.dispose();busy(false);throw error;}
+ saveSurfaces();const previousLease=state.modelLease,savedURL=location.href,savedTitle=document.title;
+ const infrastructure=new Set(['revision','loadRevision','loadingLease','modelLease','models','engine','engineInfo','provenance','layoutEngine','authoringRequest','authoringLease','authoringCandidate','authoringPreview','authoringFocus','projectDisplay']);
+ const previous=Object.fromEntries(Object.entries(state).filter(([key])=>!infrastructure.has(key)));
+ let finishDisplay,candidateAssets,accepted=false;
+ const display={lease,finished:new Promise(resolve=>{finishDisplay=resolve;})};state.projectDisplay=display;
+ const rollback=async()=>{
+  if(state.projectDisplay!==display)return;
+  const landingVisible=!$('landing').hidden;
+  cancelAnimations();disposeSurfaces();candidateAssets?.destroy();
+  for(const key of Object.keys(state))if(!infrastructure.has(key)&&!Object.hasOwn(previous,key))delete state[key];
+  Object.assign(state,previous,{modelLease:previousLease,surfaces:[],transitioning:false,pendingDestination:null,revision:state.revision+1});
+  $('stage').setAttribute('aria-busy','false');document.title=savedTitle;
+  if(revision===state.loadRevision)history.replaceState(null,'',savedURL);
+  if(state.project){updateLists();showLanding(document,false);if(state.view)await frame(state.view);}
+  else{showLanding(document,true);$('nodes').replaceChildren();$('connections').replaceChildren();}
+  if(revision!==state.loadRevision)showLanding(document,landingVisible);
+ };
+ try{
+  state.modelLease=lease;disposeSurfaces();$('narrative').removeAttribute('data-scene-id');state.presentationLayouts=loadPresentationLayouts(compiled.project);Object.assign(state,compiled,{scopeContext:false,demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],packageScope:null,traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.focusedViews=createFocusedNativeViews({engine:state.engine,modelHash:state.modelHash,declaredViewIds:state.availableViews});state.assetURLs=createAssetURLs(project.files);candidateAssets=state.assetURLs;
+  state.trustedCacheHash=cacheHash??null;showLanding(document,false);document.title=project.manifest.title+' · Syspresent';$('resume-model').hidden=false;updateLists();$('editor-error').textContent='';$('project-menu').open=false;
+  if(state.scenes.length)await showScene(initialScene,false,{urlMode:'replace'});else if(project.manifest.entryView||project.manifest.entryFocus){state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}else await openSystemOverview({record:false});
+  if(revision!==state.loadRevision){await rollback();return;}
+  accepted=true;previous.assetURLs?.destroy();await previousLease?.dispose();if(revision!==state.loadRevision)return;busy(false);
+  status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
+  $('boundary').textContent=project.manifest.publication.scope==='scoped'?'Scoped publication · traversal stays within supplied model':'Complete project · standalone exploration available';
+ }catch(error){if(!accepted)await rollback();if(revision===state.loadRevision)busy(false);throw error;}
+ finally{try{if(!accepted)await lease.dispose();}finally{if(state.projectDisplay===display)state.projectDisplay=null;finishDisplay();}}
 }
 function updateLists(){
  $('scenes').replaceChildren();for(const group of chapterGroups(state.scenes)){const host=group.id?el('optgroup'):$('scenes');if(group.id){host.label=group.title;$('scenes').append(host);}for(const {scene:s,index:i}of group.scenes){const option=el('option',`${i+1}. ${s.title}`);option.value=i;host.append(option);}}
@@ -609,7 +634,7 @@ function editorPresentation(){const config={compartments:$('presentation-compart
 function openEditor(){if(!state.project)return;$('chapter-id').value=scene()?.chapter?.id??'';$('chapter-title').value=scene()?.chapter?.title??'';$('scene-figures').value=JSON.stringify(scene()?.figures??[],null,2);$('scene-context').value=JSON.stringify(scene()?.context??[],null,2);$('scene-regions').value=(scene()?.regions??[]).map(r=>r.view).join('\n');$('scene-title').value=scene()?.title||'New scene';$('scene-prose').value=scene()?.narrative?.template??scene()?.markdown??'';$('panel-placement').value=scene()?.panel?.placement||'right';$('view-source').value=fileText(state.project,$('view-file').value);const p=validatePresentation(scene()?.presentation);$('presentation-compartments').value=p.compartments;$('presentation-expanded').value=p.expanded.join('\n');for(const o of [...$('presentation-emphasis').options])o.selected=p.emphasis.includes(o.value);$('presentation-context').value=p.contextBudget??'';$('presentation-grouping').value=p.grouping;$('editor-error').textContent='';$('editor').showModal();}
 async function capture(){
  const revision=state.revision,modelHash=state.modelHash,sourceView=state.view;
- const result=await prepareNativeCapture(state.project,{view:state.view,graph:state.graph,views:state.views,focus:state.focus,engine:state.engine,title:$('scene-title').value||'Captured view',markdown:$('scene-prose').value,presentation:editorPresentation(),panel:{placement:$('panel-placement').value}});
+ const lease=state.models.createLease();let result;try{result=await prepareNativeCapture(state.project,{view:state.view,graph:state.graph,views:state.views,focus:state.focus,engine:lease.engine,title:$('scene-title').value||'Captured view',markdown:$('scene-prose').value,presentation:editorPresentation(),panel:{placement:$('panel-placement').value}});}finally{await lease.dispose();}
  if(revision!==state.revision||modelHash!==state.modelHash)return;
  await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:result.viewName});$('editor').close();status('Native view captured. Export the project ZIP to retain its definition and slide.');
 }
@@ -641,7 +666,7 @@ async function submitQuestion(){
  if(mode!=='current'){const context=traceContext(state.graph,{focus:id,mode,budget:$('stage').clientWidth<700?5:7,page:0,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()});view=graphView(state.graph,context,modeLabel);notice=context.summary.message;}
  assertInScope(view);const revision=state.revision,modelHash=state.modelHash;
  $('submit-question').disabled=true;
- try{const result=await prepareQuestionSlide(state.project,{view,graph:state.graph,views:state.views,focus:id,engine:state.engine,question,markdown:notice||'This slide references a native model view. No model relationships were inferred from the question text.',presentation:{contextBudget:0}});
+ const lease=state.models.createLease();try{let result;try{result=await prepareQuestionSlide(state.project,{view,graph:state.graph,views:state.views,focus:id,engine:lease.engine,question,markdown:notice||'This slide references a native model view. No model relationships were inferred from the question text.',presentation:{contextBudget:0}});}finally{await lease.dispose();}
  if(revision!==state.revision||modelHash!==state.modelHash)return;
  await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(view,{targetViewId:result.viewName});$('question-dialog').close();status('Question appended as a native slide in this story. Export project ZIP to keep the conversation.');
  }finally{$('submit-question').disabled=false;}
@@ -657,7 +682,7 @@ function beginManualMove(event,node,representation){
  node.addEventListener('pointermove',move);node.addEventListener('pointerup',finish);node.addEventListener('pointercancel',cancel);
 }
 
-function invalidateAuthoring(){state.authoringRequest=(state.authoringRequest??0)+1;state.authoringCandidate=null;$('authoring-validate').disabled=false;$('authoring-append').disabled=true;state.authoringPreview?.destroy();state.authoringPreview=null;$('authoring-preview').replaceChildren();}
+function invalidateAuthoring(){state.authoringRequest=(state.authoringRequest??0)+1;const lease=state.authoringLease;state.authoringLease=null;lease?.dispose().catch(report);state.authoringCandidate=null;$('authoring-validate').disabled=false;$('authoring-append').disabled=true;state.authoringPreview?.destroy();state.authoringPreview=null;$('authoring-preview').replaceChildren();}
 function openAuthoring(){
  invalidateAuthoring();state.authoringFocus=state.selected||state.focus;$('authoring-provider').textContent=authoringProviderStatus().message+' No external calls are enabled.';$('authoring-question').value='Explain '+(qname(state.authoringFocus)||label(state.authoringFocus));$('authoring-review').textContent='';prepareAuthoringContext();$('authoring-dialog').showModal();
 }
@@ -682,16 +707,17 @@ async function inspectAuthoringValues(){
 
 async function validateAuthoring(){
  invalidateAuthoring();const request=state.authoringRequest,revision=state.revision,modelHash=state.modelHash,proposalText=$('authoring-proposal').value;$('authoring-validate').disabled=true;$('authoring-review').textContent='Validating native definitions, membership and narrative bindings…';
- try{const result=await prepareAuthoringProposal(state.project,{proposal:proposalText,graph:state.graph,engine:state.engine,scopeIds:explorationScope()});if(request!==state.authoringRequest||revision!==state.revision||modelHash!==state.modelHash||proposalText!==$('authoring-proposal').value)return;
+ const lease=state.models.createLease();state.authoringLease=lease;let retained=false;
+ try{const result=await prepareAuthoringProposal(state.project,{proposal:proposalText,graph:state.graph,engine:lease.engine,scopeIds:explorationScope()});if(request!==state.authoringRequest||revision!==state.revision||modelHash!==state.modelHash||proposalText!==$('authoring-proposal').value)return;
  state.authoringCandidate={...result,revision,sourceModelHash:modelHash,proposalText};$('authoring-review').textContent=JSON.stringify(result.review,null,2);
- const previewView=await displayNativeView(result.nativeView,{resolver:createFocusedNativeViews({engine:state.engine,modelHash:result.modelHash,declaredViewIds:[result.nativeView.id]})});
+ const previewView=await displayNativeView(result.nativeView,{resolver:createFocusedNativeViews({engine:lease.engine,modelHash:result.modelHash,declaredViewIds:[result.nativeView.id]})});
  const family=rendererFamily(previewView),options={elk:state.layoutEngine,routing:state.reader.routing,renderingMode:state.renderingMode,graph:state.graph,measureLabel:labelSize};const preview=await(family==='sequence'?mountSequence($('authoring-preview'),previewView,options):family==='grid'?mountGrid($('authoring-preview'),previewView,options):mountGraphRegion($('authoring-preview'),sizeView(previewView,resolve(result.scene.focus)),options));
- if(request!==state.authoringRequest||revision!==state.revision||modelHash!==state.modelHash||proposalText!==$('authoring-proposal').value){preview.destroy();return;}state.authoringPreview=preview;$('authoring-append').disabled=false;
- }catch(error){if(request===state.authoringRequest)$('authoring-review').textContent=error.message;throw error;}finally{if(request===state.authoringRequest)$('authoring-validate').disabled=false;}
+ if(request!==state.authoringRequest||revision!==state.revision||modelHash!==state.modelHash||proposalText!==$('authoring-proposal').value){preview.destroy();return;}state.authoringPreview=preview;retained=true;$('authoring-append').disabled=false;
+ }catch(error){if(request===state.authoringRequest){$('authoring-review').textContent=error.message;throw error;}}finally{if(!retained){if(state.authoringLease===lease)state.authoringLease=null;await lease.dispose();}if(request===state.authoringRequest)$('authoring-validate').disabled=false;}
 }
 async function appendAuthoring(){
  const candidate=state.authoringCandidate;if(!candidate||candidate.revision!==state.revision||candidate.sourceModelHash!==state.modelHash||candidate.proposalText!==$('authoring-proposal').value)throw Error('The model, scope or proposal changed. Validate the proposal again before appending.');
- const sourceView=state.view,project=savePresentationLayouts(candidate.project,state.presentationLayouts);$('authoring-append').disabled=true;await loadProject(project);await showScene(candidate.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:candidate.viewName});invalidateAuthoring();$('authoring-dialog').close();$('editor').close();status('Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.');
+ const sourceView=state.view,project=savePresentationLayouts(candidate.project,state.presentationLayouts);invalidateAuthoring();$('authoring-append').disabled=true;await loadProject(project);await showScene(candidate.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:candidate.viewName});invalidateAuthoring();$('authoring-dialog').close();$('editor').close();status('Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.');
 }
 function rollupDrawing(view){
  if(!['definition','interconnection','tree','mixed'].includes(view.kind))return {view,omissions:[{reason:'rollup-unsupported-view',message:'Typed rollups apply to structural graph projections; native behavioral and grid views remain intact.'}],rollups:[]};
@@ -778,11 +804,11 @@ function bind(){
  $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{...(scenes[index].narrative?{narrative:{...scenes[index].narrative,template:$('scene-prose').value}}:{}),...editorStoryContent(),presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project);$('editor').close();await showScene(index,false);}catch(e){report(e);}};
  $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project);$('editor').close();}catch(e){report(e);}};
  $('open-sysml').onclick=()=>$('sysml-files').click();$('open-folder').onclick=()=>$('folder-files').click();$('landing-project').onclick=()=>$('project-file').click();
- for(const [id,folder] of [['sysml-files',false],['folder-files',true]])$(id).onchange=async()=>{const request=++state.loadRevision;++state.revision;try{if($(id).files.length){busy(true);$('landing-error').hidden=true;const project=await projectFromSelection($(id).files,{folder});if(request!==state.loadRevision)return;await loadProject(project,{cacheHash:null,loadToken:request});}}catch(error){if(request===state.loadRevision)report(error);}finally{if(request===state.loadRevision)busy(false);$(id).value='';}};
+ for(const [id,folder] of [['sysml-files',false],['folder-files',true]])$(id).onchange=async()=>{const request=++state.loadRevision;++state.revision;discardLoadingModel();try{if($(id).files.length){busy(true);$('landing-error').hidden=true;const project=await projectFromSelection($(id).files,{folder});if(request!==state.loadRevision)return;await loadProject(project,{cacheHash:null,loadToken:request});}}catch(error){if(request===state.loadRevision)report(error);}finally{if(request===state.loadRevision)busy(false);$(id).value='';}};
  for(const demo of document.querySelectorAll('[data-demo]'))demo.onclick=()=>openDemo(demo.dataset.demo).catch(report);
- $('home').onclick=home;$('resume-model').onclick=async()=>{++state.loadRevision;++state.revision;busy(false);showLanding(document,false);document.title=state.project.manifest.title+' · Syspresent';await frame(state.view).catch(report);};
- $('import-project').onclick=()=>{$('project-file').click();};$('project-file').onchange=async()=>{const request=++state.loadRevision;++state.revision;try{const file=$('project-file').files[0];if(file){busy(true);const bytes=new Uint8Array(await file.arrayBuffer());if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:null,loadToken:request});}}catch(e){if(request===state.loadRevision)report(e);}finally{if(request===state.loadRevision)busy(false);$('project-file').value='';}};
- $('import-markdown').onclick=()=>{$('markdown-file').click();};$('markdown-file').onchange=async()=>{const request=++state.loadRevision;++state.revision;try{const file=$('markdown-file').files[0];if(file){busy(true);const project=structuredClone(state.project);project.files[project.manifest.story]=await file.text();if(request!==state.loadRevision)return;await loadProject(project,{loadToken:request});}}catch(e){if(request===state.loadRevision)report(e);}finally{if(request===state.loadRevision)busy(false);$('markdown-file').value='';}};
+ $('home').onclick=home;$('resume-model').onclick=async()=>{++state.loadRevision;++state.revision;discardLoadingModel();busy(false);showLanding(document,false);document.title=state.project.manifest.title+' · Syspresent';await frame(state.view).catch(report);};
+ $('import-project').onclick=()=>{$('project-file').click();};$('project-file').onchange=async()=>{const request=++state.loadRevision;++state.revision;discardLoadingModel();try{const file=$('project-file').files[0];if(file){busy(true);const bytes=new Uint8Array(await file.arrayBuffer());if(request!==state.loadRevision)return;await loadProject(unpackProject(bytes),{cacheHash:null,loadToken:request});}}catch(e){if(request===state.loadRevision)report(e);}finally{if(request===state.loadRevision)busy(false);$('project-file').value='';}};
+ $('import-markdown').onclick=()=>{$('markdown-file').click();};$('markdown-file').onchange=async()=>{const request=++state.loadRevision;++state.revision;discardLoadingModel();try{const file=$('markdown-file').files[0];if(file){busy(true);const project=structuredClone(state.project);project.files[project.manifest.story]=await file.text();if(request!==state.loadRevision)return;await loadProject(project,{loadToken:request});}}catch(e){if(request===state.loadRevision)report(e);}finally{if(request===state.loadRevision)busy(false);$('markdown-file').value='';}};
  $('export-project').onclick=()=>{try{download('syspresent-project.zip',packProject(projectForExport()),'application/zip');$('project-menu').open=false;}catch(e){report(e);}};$('export-markdown').onclick=()=>{download('story.md',fileText(projectForExport(),state.project.manifest.story),'text/markdown');$('project-menu').open=false;};$('load-example').textContent='Choose another demo';$('load-example').onclick=home;
  $('about').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent='Engine and project details';$('information-text').textContent=JSON.stringify({engine:state.provenance,project:state.project.manifest,modelHash:state.modelHash,graph:{elements:state.graph.elements.length,relationships:state.graph.relationships.length},routing:state.visualSnapshot?.routingMetrics,camera:state.camera,neighborhood:state.visualSnapshot?.neighborhood,view:state.view.id,lastTransition:state.lastTransition,notice:state.exported.notice},null,2);$('information').showModal();};
  let keyboardFocus=false;document.addEventListener('keydown',()=>{keyboardFocus=true;},true);document.addEventListener('pointerdown',()=>{keyboardFocus=false;},true);$('nodes').addEventListener('focusin',event=>{if(!keyboardFocus||state.transitioning||!event.target.matches('.node'))return;const a=state.visualSnapshot?.area;if(!a)return;const r=event.target.getBoundingClientRect(),s=$('stage').getBoundingClientRect(),x=r.x-s.x,y=r.y-s.y;if(x<a.x||y<a.y||x+r.width>a.x+a.width||y+r.height>a.y+a.height){takeCameraControl();applyCamera({...state.camera,x:state.camera.x+a.x+a.width/2-x-r.width/2,y:state.camera.y+a.y+a.height/2-y-r.height/2});}});
