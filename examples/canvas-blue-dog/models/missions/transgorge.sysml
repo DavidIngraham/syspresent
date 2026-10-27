@@ -14,13 +14,14 @@ package GorgeChallenge {
     attribute maximumOverallLength : LengthValue = 1.2 [m];
     requirement def <'C-000'> TransGorgeChallenge {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall complete the Trans-Gorge challenge under C-001, C-003 through C-010 and C-012 through C-027.*/
+        doc /* The vessel shall autonomously sail one round trip from Bingen, around buoy 16 near Stevenson, and back to Bingen.*/
         metadata rationale : ModelingMetadata::Rationale { text = "One Bingen–Stevenson–Bingen circuit defines the finite challenge. Repeated circuits are a separate future endurance objective."; }
+        comment conditions /* Qualification requires C-001, C-003 through C-010 and C-012 through C-027 to be met for the same attempt. These cover the course, onboard control, sail propulsion, monitoring, safety, recovery and vessel constraints. Repeated circuits under C-002 are a future objective. The course gates require review before launch; there is no completion deadline.*/
     }
     requirement transGorgeChallenge : TransGorgeChallenge;
     requirement def <'C-001'> CourseCompletion {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall cross the configured Bingen departure, buoy 16 rounding checkpoints and Bingen finish gates in order during one attempt. */
+        doc /* The vessel shall cross the Bingen departure gate, the buoy 16 rounding checkpoints and the Bingen finish gate in that order during one attempt.*/
         comment conditions /* TransGorgeCourse defines nominal marker references and directed finite gate segments. Completion has no elapsed-time deadline. Position history must demonstrate crossings; touching a gate line alone does not count. */
         metadata issue : ModelingMetadata::Issue { text = "The marker-based gate proposal remains subject to the course safety review before launch; route corridor and current notice exclusions must accompany the accepted configuration."; }
     }

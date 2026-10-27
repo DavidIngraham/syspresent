@@ -2,14 +2,14 @@
   "repository": "https://github.com/DavidIngraham/sv-blue-dog",
   "baseRevision": "b94b6e0231587b52cb5bec800dba408456ca701d",
   "sourceState": "working-tree",
-  "capturedAt": "2026-10-24T15:01:59.493948+00:00",
-  "sourceDigest": "ed92bb2f80c4f963569d00920cf426231f0094b1092d226dcff95ea67e6a08d1",
+  "capturedAt": "2026-10-25T21:16:02.589280+00:00",
+  "sourceDigest": "0f571178c03eea5c19fd133ccb2bbe9d6d83c1570d7d9a12e6e155742770dd22",
   "sourceDigestFormat": "SHA-256 over sorted UTF-8 path + NUL + lowercase file SHA-256 + LF records",
   "modelValidationRuntimeRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
   "files": [
     {
       "path": "models/README.md",
-      "sha256": "67d9e6ae4bee83076109d3923c4db2d656f0018a961b5052c8e45d06dd760e9d"
+      "sha256": "3482dfac7d6383401bd51397bd9f14d28385a48f1c4d205d7fe4c744bafa11e0"
     },
     {
       "path": "models/analyses/actuation.sysml",
@@ -321,7 +321,7 @@
     },
     {
       "path": "models/missions/transgorge.sysml",
-      "sha256": "28a3deec02e3b2b7e9c69bb880d5f4c8b3d5e5627c7318506d5156c32dafd920"
+      "sha256": "8db7d86e3bf70b572fe73d580384781377379c1605c1c916b4644633e8babfe3"
     },
     {
       "path": "models/missions/verification.sysml",
@@ -333,7 +333,7 @@
     },
     {
       "path": "models/vehicle/architecture.sysml",
-      "sha256": "b5cb5660303d5db76c434b0feacba250f2cdcb51c0f6d0622e91e2311f8c53b9"
+      "sha256": "e4651373e288a9775b08877b812dadc5635e26f003c54d30be14ca90b027116e"
     },
     {
       "path": "models/vehicle/behavior-contracts.sysml",
@@ -369,7 +369,7 @@
     },
     {
       "path": "models/vehicle/requirements.sysml",
-      "sha256": "b2f1105cb06e3b804c974dbd5e01bda4f4912730e1edb36c837cf4f6eb5d73b4"
+      "sha256": "7210e69406d98c468f57c1d73b3d06630d45b4fd2d20299f3c88e52e8b89682e"
     },
     {
       "path": "models/vehicle/satisfaction.sysml",
