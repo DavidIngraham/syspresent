@@ -27,8 +27,8 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `761d37ebd01ce37b69a46e0b9fc71671f46ac310`
-on David's local `david/syspresent-wasm-prototype` branch. The carried
+The prototype dependency revision is `b1ea888051d2423acdf5c35fab11fac531fc24b2`
+on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
 without publishing a dependency branch; a patch-applied source tree is honestly
@@ -38,7 +38,7 @@ Build both engines from the same local dependency revision:
 
 ```sh
 python3 scripts/wasm-prototype/build.py \
-  --source /home/david/repos/opensysml-syspresent-wasm
+  --source /home/david/repos/opensysml-syspresent-voice-identity
 node --stack-size=8192 --no-concurrent-sparkplug scripts/wasm-prototype/parity.mjs
 node --test tests/wasm-prototype/client.test.mjs
 ```
@@ -142,5 +142,16 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `761d37ebd01ce37b69a46e0b9fc71671f46ac310` (clean).
-Carried-patch SHA-256: `fdfcc7b7677019189f2bb8e5d9e40e6b2ebf9803cbb80e471e359ae9ee6af15d`.
+Current source revision: `b1ea888051d2423acdf5c35fab11fac531fc24b2` (clean).
+Carried-patch SHA-256: `951f2344ff859869b88e735c8c876c2d9e3c349fdddbdb0a864931de621bb8e1`.
+
+## Distinct parallel native relationships
+
+General graph deduplication now includes a located native source origin
+(document and span), so two separate satisfaction declarations between the same
+endpoints retain separate edge identities. Rediscovering one declaration still
+deduplicates; unlocated artifacts keep the existing fallback. The native and WASM
+engines are rebuilt from the same clean local commit. The parity harness checks
+two actual native satisfaction IDs, repeated rendering, and adapter deduplication
+across repeated views. This changes identity retention, not relationship kinds,
+directions, selection semantics or the source model.

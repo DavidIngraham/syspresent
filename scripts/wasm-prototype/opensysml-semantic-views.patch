@@ -19,11 +19,18 @@ index 000000000..387935b6f
 +++ b/changes/unreleased/matrix-cell-identities.added.md
 @@ -0,0 +1 @@
 +- **Semantic matrix axes and relationship cells.** Native and browser engine JSON renderings preserve target column identities and every declared relationship occurrence in a cell, including repeated relationships of the same kind. Cell records carry native source and target identities; derivation matrices retain original-to-derived direction. Existing string columns and cells remain unchanged.
+diff --git a/changes/unreleased/parallel-rendered-relationships.fixed.md b/changes/unreleased/parallel-rendered-relationships.fixed.md
+new file mode 100644
+index 000000000..1e217374a
+--- /dev/null
++++ b/changes/unreleased/parallel-rendered-relationships.fixed.md
+@@ -0,0 +1 @@
++- Preserve distinct source relationship declarations with identical endpoints in general views, including parallel satisfaction assertions, while deduplicating repeated discovery of the same declaration.
 diff --git a/docs/project/spec-compliance.md b/docs/project/spec-compliance.md
-index e909e790a..9e5efd7ca 100644
+index e909e790a..6f2d4654e 100644
 --- a/docs/project/spec-compliance.md
 +++ b/docs/project/spec-compliance.md
-@@ -3580,3 +3580,21 @@ Synthetic or unrepresented artifacts remain unidentified; no label matching is u
+@@ -3580,3 +3580,39 @@ Synthetic or unrepresented artifacts remain unidentified; no label matching is u
  - Status: additive tool API, not a SysML notation extension. Identity conversion remains subject
    to the documented experimental RDF/API mapping coverage. Run timeline payloads are not added
    to RenderView by this change.
@@ -45,6 +52,24 @@ index e909e790a..9e5efd7ca 100644
 +| Declaration projection preserves complete source-backed API objects and model-wide identities, while explicitly identifying omitted infrastructure. | `ModelToAPIJSONDeclarationsInModel`, `modelToRDFProjectedInModel` | `TestAPIJSONDeclarationsPreservesNativeObjects`, `TestModelDeclarationsMatchesFullCrossDocumentConversion`, `TestDeclarationProjectionIsExplicitAndKeepsParsedModel` | Implemented, opt-in; underlying API mapping remains experimental. |
 +| Render identity inventory agrees with converter identity scopes, quoted names, source origins and normative library identities without RDF emission. | `NewDeclarationElementIDsInModel`, `renderidentity.BindInventory` | `TestDeclarationIdentityInventoryPreservesScopesAndNormativeIDs`, `TestModelDeclarationsMatchesFullCrossDocumentConversion` | Implemented; native identity facts are authoritative. |
 +| Native requirement context uses an explicit deterministic depth frontier; depth zero is induced selection and bounded views preserve directed dependencies. | `RequirementContext`, `requirementContextDepth`, `generalGraph.relate` | `TestRequirementContextDepthIsDeterministic`, `TestRequirementContextInducedSelectionAndLegacy`, `TestRequirementContextRejectsInvalidDepth`, `TestDOTEdgeKinds` | Implemented as an OpenSysML rendering extension; legacy unannotated views retain existing behavior. |
++
++
++## General-view relationship identity
++
++General views retain one edge per source declaration, endpoint pair, kind and
++label. Distinct parallel assertions therefore retain distinct source origins and
++canonical semantic identities through native JSON rendering; repeated discovery
++of the same declaration does not duplicate its edge. This is rendering identity,
++not a claim that satisfaction assertions are executed or accepted.
++
++| Contract | Implementation | Verification | Status |
++| --- | --- | --- | --- |
++| Distinct source declarations survive identical endpoints and labels | `internal/ir/view/general.go:generalGraph.add` | `TestGeneralGraphDeduplicatesBySourceOrigin`, `TestGeneralViewParallelSatisfactionOrigins` | ✅ faithful |
++| Parallel satisfaction identities remain stable across cached identity-enabled and ordinary requests | `internal/frontend/engine` rendering and native identity binding | `TestRenderParallelSatisfactionIdentities` | ✅ faithful |
++
++Edges whose producing declaration is not located retain the existing endpoint,
++kind and label deduplication. The renderer does not invent a source identity for
++such artifacts.
 diff --git a/docs/reference/wasm.md b/docs/reference/wasm.md
 index aef650495..67a959409 100644
 --- a/docs/reference/wasm.md
@@ -730,6 +755,103 @@ index 02715c438..cb1f99781 100644
  type JEvaluateRequest struct {
  	ModelHash       string `json:"modelHash,omitempty"`
  	Expression      string `json:"expression,omitempty"`
+diff --git a/internal/frontend/engine/parallel_identity_test.go b/internal/frontend/engine/parallel_identity_test.go
+new file mode 100644
+index 000000000..ab2846b15
+--- /dev/null
++++ b/internal/frontend/engine/parallel_identity_test.go
+@@ -0,0 +1,91 @@
++package engine
++
++import (
++	"context"
++	"encoding/json"
++	"testing"
++)
++
++func TestRenderParallelSatisfactionIdentities(t *testing.T) {
++	eng, err := New()
++	if err != nil {
++		t.Fatal(err)
++	}
++	call := func(method string, params any, response any) {
++		t.Helper()
++		payload, err := json.Marshal(params)
++		if err != nil {
++			t.Fatal(err)
++		}
++		result, err := eng.Call(context.Background(), method, payload)
++		if err != nil {
++			t.Fatalf("%s: %v", method, err)
++		}
++		if err := json.Unmarshal(result, response); err != nil {
++			t.Fatal(err)
++		}
++	}
++	const source = `package Parallel {
++        private import StandardViewDefinitions::*;
++        requirement target;
++        part vehicle;
++        satisfy target by vehicle;
++        satisfy target by vehicle;
++        view requirements : GeneralView {
++            @OpenSysMLRenderings::RequirementContext { relationshipDepth = 2; }
++            filter @SysML::RequirementUsage;
++            expose target;
++            expose target;
++        }
++    }`
++	var parsed JParseSourcesResponse
++	call("ParseSources", map[string]any{"documents": []map[string]string{{"name": "parallel.sysml", "content": source}}}, &parsed)
++	if parsed.ModelHash == "" {
++		t.Fatal("no native model identity")
++	}
++	var exported struct {
++		Elements []map[string]any `json:"elements"`
++	}
++	call("ExportModel", map[string]any{"modelHash": parsed.ModelHash, "projection": "declarations"}, &exported)
++	expected := map[string]bool{}
++	for _, element := range exported.Elements {
++		if element["@type"] == "SatisfyRequirementUsage" {
++			expected[element["@id"].(string)] = true
++		}
++	}
++	if len(expected) != 2 {
++		t.Fatalf("native declaration export has %d satisfaction assertions, want 2", len(expected))
++	}
++	for iteration, identity := range []bool{true, false, true} {
++		var rendered JRenderViewResponse
++		call("RenderView", JRenderViewRequest{ModelHash: parsed.ModelHash, View: "Parallel::requirements", IncludeSemanticIdentity: identity}, &rendered)
++		byNode := map[string]string{}
++		for _, node := range rendered.Nodes {
++			byNode[node.ID] = node.SemanticID
++		}
++		if len(rendered.Nodes) != 2 {
++			t.Fatalf("render %d duplicated endpoint nodes: %+v", iteration, rendered.Nodes)
++		}
++		seen, count := map[string]bool{}, 0
++		for _, edge := range rendered.Edges {
++			if edge.Kind != "satisfy" {
++				continue
++			}
++			count++
++			if identity {
++				if !expected[edge.SemanticID] || seen[edge.SemanticID] || edge.IdentityStatus != "mapped" {
++					t.Fatalf("render %d lost assertion identity: %+v", iteration, edge)
++				}
++				if byNode[edge.From] != "Parallel__vehicle" || byNode[edge.To] != "Parallel__target" {
++					t.Fatalf("render %d changed native endpoints: %+v", iteration, edge)
++				}
++				seen[edge.SemanticID] = true
++			} else if edge.SemanticID != "" {
++				t.Fatalf("unrequested identity leaked from cached rendering: %+v", edge)
++			}
++		}
++		if count != 2 {
++			t.Fatalf("render %d has %d satisfaction edges, want 2", iteration, count)
++		}
++	}
++}
 diff --git a/internal/frontend/engine/render_identity_test.go b/internal/frontend/engine/render_identity_test.go
 index d6d76fe11..332c66144 100644
 --- a/internal/frontend/engine/render_identity_test.go
@@ -1039,10 +1161,10 @@ index d1dc299bf..14ea9e6f2 100644
  		EdgeAssociation:    `"a" -> "b" [label="k", dir=none];`,
  		EdgeInclude:        `"a" -> "b" [label="k", style=dashed];`,
 diff --git a/internal/ir/view/general.go b/internal/ir/view/general.go
-index 8072b8e2d..84c40968a 100644
+index 8072b8e2d..fc0c4f6fb 100644
 --- a/internal/ir/view/general.go
 +++ b/internal/ir/view/general.go
-@@ -162,14 +162,17 @@ func (r *Renderer) metaclassGraph(fqn string) (Kind, bool) {
+@@ -162,26 +162,29 @@ func (r *Renderer) metaclassGraph(fqn string) (Kind, bool) {
  
  // generalGraph is one requirement, definition or package rendering being built.
  type generalGraph struct {
@@ -1068,7 +1190,12 @@ index 8072b8e2d..84c40968a 100644
  }
  
  type generalEdgeKey struct {
-@@ -181,7 +184,7 @@ type generalEdgeKey struct {
+ 	from, to, label string
+ 	kind            EdgeKind
+-	// origin tells apart the import edges distinct declarations draw.
++	// origin retains distinct relationship declarations with identical endpoints.
+ 	origin Origin
+ }
  
  // renderGeneral draws the exposed elements the graph's kind admits as nodes,
  // in exposure order, and the relationships between them as edges.
@@ -1115,6 +1242,21 @@ index 8072b8e2d..84c40968a 100644
  }
  
  // generalDraws says what a graph of the kind draws as nodes.
+@@ -306,11 +331,11 @@ func (g *generalGraph) drawn(sym *symbols.Symbol) *Node {
+ 	return g.nodes[symbols.KeyOf(sym)]
+ }
+ 
+-// add records an edge once: an import edge once per import declaration.
++// add records an edge once per source declaration and endpoint pair.
+ func (g *generalGraph) add(edge Edge) {
+ 	key := generalEdgeKey{from: edge.From, to: edge.To, label: edge.text(), kind: edge.Kind}
+-	if edge.Kind == EdgeImport {
+-		key.origin = edge.Origin
++	if edge.Origin.Located() {
++		key.origin = Origin{Doc: edge.Origin.Doc, Span: edge.Origin.Span}
+ 	}
+ 	if g.edges[key] {
+ 		return
 @@ -570,6 +595,8 @@ func (g *generalGraph) requirementRelationships() []Edge {
  			out = append(out, g.deriveEdges(sym)...)
  		case sym.Kind == symbols.SymbolDependency && g.r.annotatedBy(sym, refinementMetadata):
@@ -1163,6 +1305,90 @@ index 8072b8e2d..84c40968a 100644
  				out = append(out, edge)
  			}
  		}
+diff --git a/internal/ir/view/general_identity_test.go b/internal/ir/view/general_identity_test.go
+new file mode 100644
+index 000000000..54d85bc26
+--- /dev/null
++++ b/internal/ir/view/general_identity_test.go
+@@ -0,0 +1,78 @@
++package view
++
++import (
++	"testing"
++
++	"github.com/Open-MBEE/OpenSysML/internal/syntax/source"
++)
++
++func TestGeneralGraphDeduplicatesBySourceOrigin(t *testing.T) {
++	first := Origin{Doc: "parallel.sysml", Span: source.Span{Offset: 10, Len: 20}}
++	second := Origin{Doc: "parallel.sysml", Span: source.Span{Offset: 40, Len: 20}}
++	for _, kind := range []EdgeKind{EdgeSatisfy, EdgeDependency, EdgeAllocate, EdgeImport} {
++		t.Run(kind.String(), func(t *testing.T) {
++			output := &Rendering{}
++			graph := &generalGraph{out: output, edges: map[generalEdgeKey]bool{}}
++			a := Edge{From: "part", To: "requirement", Kind: kind, Label: kind.String(), Origin: first}
++			b := a
++			b.Origin = second
++			graph.add(a)
++			graph.add(b)
++			graph.add(a)
++			graph.add(b)
++			sameDeclaration := a
++			sameDeclaration.Origin.Name = source.Span{Offset: 12, Len: 3}
++			graph.add(sameDeclaration)
++			if len(output.Edges) != 2 {
++				t.Fatalf("distinct source declarations became %d edges, want 2", len(output.Edges))
++			}
++			if output.Edges[0].Origin != first || output.Edges[1].Origin != second {
++				t.Fatalf("source origins or insertion order changed: %+v", output.Edges)
++			}
++		})
++	}
++}
++
++func TestGeneralViewParallelSatisfactionOrigins(t *testing.T) {
++	rendering := renderSource(t, "Parallel::requirements", `package Parallel {
++        private import StandardViewDefinitions::*;
++        requirement target;
++        part vehicle;
++        satisfy target by vehicle;
++        satisfy target by vehicle;
++        view requirements : GeneralView {
++            @OpenSysMLRenderings::RequirementContext { relationshipDepth = 2; }
++            filter @SysML::RequirementUsage;
++            expose target;
++            expose target;
++        }
++    }`)
++	origins := map[Origin]bool{}
++	for _, edge := range rendering.Edges {
++		if edge.Kind != EdgeSatisfy {
++			continue
++		}
++		if !edge.Origin.Located() || origins[edge.Origin] {
++			t.Fatalf("missing or repeated satisfaction origin: %+v", edge)
++		}
++		origins[edge.Origin] = true
++	}
++	if len(origins) != 2 {
++		t.Fatalf("got %d satisfaction declarations, want 2: %+v", len(origins), rendering.Edges)
++	}
++	if len(rendering.Roots) != 2 {
++		t.Fatalf("parallel edges duplicated their shared endpoint nodes: %+v", rendering.Roots)
++	}
++}
++
++func TestGeneralGraphUnlocatedEdgesRemainDeduplicated(t *testing.T) {
++	output := &Rendering{}
++	graph := &generalGraph{out: output, edges: map[generalEdgeKey]bool{}}
++	edge := Edge{From: "part", To: "requirement", Kind: EdgeSatisfy}
++	graph.add(edge)
++	edge.Origin = Origin{Doc: "synthetic.sysml", Name: source.Span{Offset: 1, Len: 3}}
++	graph.add(edge)
++	if len(output.Edges) != 1 {
++		t.Fatalf("unlocated artifacts acquired synthetic relationship identity: %+v", output.Edges)
++	}
++}
 diff --git a/internal/ir/view/grid.go b/internal/ir/view/grid.go
 new file mode 100644
 index 000000000..2085af386

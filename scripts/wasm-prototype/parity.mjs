@@ -114,6 +114,29 @@ try {
     }
     views[view] = a;
   }
+  const parallelDocuments=[{name:'parallel-identity.sysml',content:`package ParallelIdentity {
+    private import StandardViewDefinitions::*;
+    part vehicle;
+    requirement target;
+    satisfy target by vehicle;
+    satisfy target by vehicle;
+    view relationships : GeneralView { filter @SysML::RequirementUsage; expose target; }
+  }`}];
+  const parallelParsed=await native.call('ParseSources',{documents:parallelDocuments});
+  assert.deepEqual(await wasm.call('ParseSources',{documents:parallelDocuments}),parallelParsed,'Parallel native assertions must parse identically in WASM');
+  assert.equal(parallelParsed.diagnostics?.length||0,0);
+  const parallelExported=await native.call('ExportModel',{modelHash:parallelParsed.modelHash,projection:'declarations'});
+  assert.deepEqual(await wasm.call('ExportModel',{modelHash:parallelParsed.modelHash,projection:'declarations'}),parallelExported);
+  const assertionIds=parallelExported.elements.filter(e=>e['@type']==='SatisfyRequirementUsage').map(e=>e['@id']).sort();
+  assert.equal(assertionIds.length,2,'Fixture must declare two distinct native satisfaction assertions');
+  const parallelParams={modelHash:parallelParsed.modelHash,view:'ParallelIdentity::relationships',includeSemanticIdentity:true};
+  const parallelView=await native.call('RenderView',parallelParams);
+  assert.deepEqual(await wasm.call('RenderView',parallelParams),parallelView,'Native and WASM must retain every parallel relationship identity');
+  assert.deepEqual(await native.call('RenderView',parallelParams),parallelView,'Repeated rendering must not invent occurrences');
+  assert.deepEqual(parallelView.edges.filter(e=>e.kind==='satisfy').map(e=>e.semanticId).sort(),assertionIds);
+  const parallelGraph=modelGraph(parallelExported.elements,[adaptNativeView(parallelView,'ParallelIdentity::relationships'),adaptNativeView(parallelView,'ParallelIdentity::repeated')]);
+  assert.deepEqual(parallelGraph.relationships.filter(e=>e.kind==='satisfy').map(e=>e.nativeRelationship).sort(),assertionIds,'Adapter must deduplicate repeated projections while retaining distinct native assertions');
+  const parallelIdentity={assertionIds,view:parallelView};
   const boundedSource = "package BoundedViews { private import StandardViewDefinitions::*; view portable : GeneralView { @OpenSysMLRenderings::RequirementContext { relationshipDepth = 1; } filter @SysML::RequirementUsage; expose Flashlight::portable; } }";
   const boundedDocuments = [...documents, { name: 'bounded.sysml', content: boundedSource }];
   const boundedParsed = await native.call('ParseSources', { documents: boundedDocuments });
@@ -238,8 +261,8 @@ try {
   const contextIDs = new Set(portableContext.elements.map(element => element.id));
   for (const id of ['Flashlight__light', 'Flashlight__MassCheck', 'Flashlight__massCheck']) assert.ok(contextIDs.has(id), `Standalone requirement context lost native endpoint: ${id}`);
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract }, null, 2) + '\n');
-  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size,
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract, parallelIdentity }, null, 2) + '\n');
+  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size, parallelRelationships: assertionIds.length,
     views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: view.edges.length }])) }, null, 2));
 } finally { native.close(); }
 // Go remains resident by design. This harness owns the process lifetime.
