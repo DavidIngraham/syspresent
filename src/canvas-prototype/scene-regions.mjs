@@ -1,3 +1,4 @@
+import {focusedFace,focusedEdgeAppearance,focusedNotationNotices} from './focused-notation.mjs';
 import {layoutDiagram} from './elk-layout.mjs';
 import {fitDiagram} from './geometry.mjs';
 import {edgeAppearance,markerDefinition} from './notation.mjs';
@@ -24,7 +25,7 @@ export function updateRegionReferences(previous,names) {
   return result;
 }
 /** Secondary graph regions use the same native layout/notation but an independent camera. */
-export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,selectedIds:sharedIds,state={},onStateChange,elk,routing='square',measureLabel}={}) {
+export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,selectedIds:sharedIds,state={},onStateChange,elk,routing='square',renderingMode='exploratory',graph,measureLabel}={}) {
   const doc=host.ownerDocument,ns='http://www.w3.org/2000/svg';
   const svg=(name,attrs={})=>{const node=doc.createElementNS(ns,name);for(const [k,v]of Object.entries(attrs))node.setAttribute(k,v);return node;};
   const width=host.clientWidth||480,height=host.clientHeight||400;
@@ -33,13 +34,13 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
   const viewport=doc.createElement('div');viewport.className='region-graph';viewport.tabIndex=0;viewport.setAttribute('aria-label',view.title||'Model graph');
   const world=doc.createElement('div');world.className='region-world';viewport.append(world);
   const drawing=svg('svg',{width,height,'aria-label':'Model relationships'}),defs=svg('defs'),prefix='region-'+(++serial)+'-';
-  for(const name of ['open-arrow','filled-arrow','hollow-triangle','diamond','hollow-diamond','containment']){
-    const {path,fill,...attrs}=markerDefinition(name),marker=svg('marker',{...attrs,id:prefix+name,markerUnits:'userSpaceOnUse'});
-    marker.append(svg('path',{d:path,fill:fill==='line'?'#426869':fill==='background'?'#fff':'none',stroke:'#426869'}));defs.append(marker);
+  for(const name of ['open-arrow','filled-arrow','hollow-triangle','diamond','hollow-diamond','containment','definition-two-dot','owned-membership']){
+    const {path,fill,adornments=[],...attrs}=markerDefinition(name),marker=svg('marker',{...attrs,id:prefix+name,markerUnits:'userSpaceOnUse'});
+    for(const shape of [{path,fill},...adornments])marker.append(svg('path',{d:shape.path,fill:shape.fill==='line'?'#426869':shape.fill==='background'?'#fff':'none',stroke:'#426869'}));defs.append(marker);
   }
-  drawing.append(defs);world.append(drawing);const targets=[],edgeTargets=[],notices=[...(view.notices??[]),...(layout.diagnostics??[]).map(d=>d.message||d.reason)];
+  drawing.append(defs);world.append(drawing);const targets=[],edgeTargets=[],notices=[...(renderingMode==='focused'?focusedNotationNotices(view,graph):[]),...(view.notices??[]),...(layout.diagnostics??[]).map(d=>d.message||d.reason)];
   for(const edge of fitted.edges){
-    const appearance=edgeAppearance(edge,{viewKind:view.kind}),a=fitted.nodes.find(n=>n.id===edge.source),b=fitted.nodes.find(n=>n.id===edge.target);
+    const appearance=(renderingMode==='focused'?focusedEdgeAppearance:edgeAppearance)(edge,{viewKind:view.kind}),a=fitted.nodes.find(n=>n.id===edge.source),b=fitted.nodes.find(n=>n.id===edge.target);
     if(!appearance.supported)notices.push(appearance.notice);
     const record={semanticId:edge.semanticId,kind:'relationship',label:edge.label||edge.kind,relationships:[{semanticId:edge.semanticId,sourceSemanticId:a?.semanticId,targetSemanticId:b?.semanticId,kind:edge.kind,label:edge.label}]};
     if(!edge.points?.length||edge.routingBlocked){notices.push(`Connection route unavailable: ${edge.label||edge.kind}`);continue;}
@@ -56,7 +57,7 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
   for(const n of fitted.nodes){
     const node=doc.createElement('button');node.className=`node ${n.kind}${n.container?' container':''}`;node.dataset.semanticId=n.semanticId??'';
     const scale=fitted.scale||1;node.style.cssText=`left:${n.x}px;top:${n.y}px;width:${n.width/scale}px;height:${n.height/scale}px;transform:scale(${scale});z-index:${n.container?1:3}`;
-    const face=behaviorFace(doc,n);
+    const face=renderingMode==='focused'?focusedFace(doc,n,graph):behaviorFace(doc,n);
     if(face)node.append(face);else{for(const [cls,text]of [['kind',`«${n.kind}»`],['name',n.name],['detail',n.displayDetail]])if(text){const span=doc.createElement('span');span.className=cls;span.textContent=text;node.append(span);}}
     node.onclick=e=>{e.stopPropagation();select(n.semanticId);changed();onSelect?.({semanticId:n.semanticId,name:n.name,label:n.name,kind:'element'});};world.append(node);targets.push({node,n});
   }

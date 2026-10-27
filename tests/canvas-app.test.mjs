@@ -5,7 +5,7 @@ import {build} from 'esbuild';
 import {JSDOM,VirtualConsole} from 'jsdom';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import {routeConflicts} from '../src/canvas-prototype/peripheral-routing.mjs';
-import {packProject} from '../src/canvas-prototype/project.mjs';
+import {packProject,unpackProject,fileText} from '../src/canvas-prototype/project.mjs';
 const {outputFiles}=await build({entryPoints:['src/canvas-prototype/app.mjs'],bundle:true,format:'iife',write:false,logLevel:'silent'});
 const html=await readFile('index.html','utf8');
 const raw=[{'@id':'orphan','@type':'PartUsage',qualifiedName:'Model::orphan',declaredName:'orphan','sysx:sourceLine':4},{'@id':'Model','@type':'Package',qualifiedName:'Model',declaredName:'Model','sysx:sourceLine':1},{'@id':'req','@type':'RequirementUsage',qualifiedName:'Model::req',declaredName:'req','sysx:sourceLine':2},{'@id':'part','@type':'PartUsage',qualifiedName:'Model::part',declaredName:'part','sysx:sourceLine':3},{'@id':'view','@type':'ViewUsage',qualifiedName:'Views::requirements','sysx:sourceLine':1}];
@@ -15,36 +15,41 @@ const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfIn
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
 async function pickPackage(h,name){const d=h.document;d.getElementById('choose-package').click();const search=d.getElementById('package-search');search.value=name;search.dispatchEvent(new h.window.Event('input'));const choice=[...d.querySelectorAll('#package-list button')].find(b=>b.textContent===name);assert.ok(choice,'native package is offered');choice.click();await until(()=>!d.getElementById('package-dialog').open&&sceneSettled(d));}
-async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,size={width:1000,height:700}}={}){
- let workerCount=0,resizeCallback;const nativeRequests=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,rollupFixture=false,nativeCaptureFixture=false,authoringFixture=false,focusedFixture=false,initialCount=2,size={width:1000,height:700}}={}){
+ let workerCount=0,resizeCallback;const nativeRequests=[],nativeCalls=[],fetchCalls=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
  if(storyContent){const block=JSON.parse(fixtureFiles['story.md'].split('```syspresent\n')[1].split('\n```')[0]);Object.assign(block,{chapter:{id:'challenge',title:'Challenge'},figures:[{id:'course',title:'Course map',asset:'assets/course.svg',alt:'Course map',caption:'Illustrative course.',provenance:{source:'Model',context:'Fixture'},modelRefs:['Model::req']}],context:[{kind:'candidate',title:'Candidate',text:'Proposed boat.',modelRefs:['Model::part']}]});fixtureFiles['story.md']='```syspresent\n'+JSON.stringify(block)+'\n```\n\nRead [the requirement](model:Model::req) and [hidden context](model:Model::orphan).';fixtureFiles['assets/course.svg']='<svg xmlns="http://www.w3.org/2000/svg"/>';}
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
+ if(focusedFixture)structuralRaw.push({'@id':'mass-attribute','@type':'AttributeUsage',qualifiedName:'Model::Device::mass',declaredName:'mass',owner:{'@id':'definition'},'sysx:sourceLine':110});
  if(hierarchyFixture)structuralRaw.push(...Array.from({length:65},(_,i)=>({'@id':'extra-part-'+i,'@type':'PartUsage',qualifiedName:'Model::Device::extra'+String(i).padStart(2,'0'),declaredName:'extra'+String(i).padStart(2,'0'),owner:{'@id':'definition'},'sysx:sourceLine':20+i})),{'@id':'voltage','@type':'AttributeUsage',qualifiedName:'Model::Device::voltage',declaredName:'voltage',owner:{'@id':'definition'},'sysx:sourceLine':99});
  if(packageFixture)structuralRaw.push({'@id':'run','@type':'ActionDefinition',qualifiedName:'Model::Nested::Run',declaredName:'Run',owner:{'@id':'nested'},'sysx:sourceLine':16});
+ if(rollupFixture)structuralRaw.push(...['a','b'].map(id=>({'@id':id,'@type':'Package',qualifiedName:'Model::'+id.toUpperCase(),declaredName:id.toUpperCase(),owner:{'@id':'Model'},'sysx:sourceLine':100})),...['a','b'].map(id=>({'@id':'hidden-'+id,'@type':'PartUsage',qualifiedName:'Model::'+id.toUpperCase()+'::hidden',declaredName:'hidden',owner:{'@id':id},'sysx:sourceLine':101})),...['one','two'].map(id=>({'@id':'native-dependency-'+id,'@type':'Dependency',client:[{'@id':'hidden-a'}],supplier:[{'@id':'hidden-b'}],'sysx:sourceLine':102})));
  const fixtureRaw=raw.map(e=>packageFixture&&e['@id']==='req'?{...e,owner:{'@id':'nested'}}:structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
  const fixtureManifest={...manifest,...(entryView?{entryView}:{}),...(entryFocus?{entryFocus}:{})};
  if(noStory)fixtureFiles['story.md']='# Explore the supplied model\n\nNo authored scenes.';
  if(overviewFixture)structuralRaw.push({'@id':'outside','@type':'PartDefinition',qualifiedName:'Foreign::outside',declaredName:'outside','sysx:sourceLine':14},{'@id':'outside-dependency','@type':'Dependency',client:[{'@id':'definition'}],supplier:[{'@id':'outside'}]});
  if(overviewPort)structuralRaw.push({'@id':'control-port','@type':'PortUsage',qualifiedName:'Model::controlPort',declaredName:'controlPort',owner:{'@id':'Model'},'sysx:sourceLine':15});
- let pendingRender,holdLayout=false,holdCountdown=null;const heldLayouts=[];
- const window=new JSDOM(html,{url,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole()}).window;
+ let authoredViews=[],holdNextParse=false,capturedNative=false,pendingRender,holdLayout=false,holdCountdown=null;const heldLayouts=[],heldParses=[];
+ const massValue={numerator:'1',denominator:'4'};const window=new JSDOM(html,{url,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole()}).window;
  if(storedSettings)window.localStorage.setItem('syspresent.reader.v1',JSON.stringify(storedSettings));
- window.URL.createObjectURL=()=> 'blob:fixture';window.URL.revokeObjectURL=()=>{};
+ const blobs=new Map(),downloads=[];window.Blob=Blob;window.TextDecoder=TextDecoder;window.TextEncoder=class{encode(value){return new window.Uint8Array(new TextEncoder().encode(value));}};window.URL.createObjectURL=blob=>{const url='blob:fixture-'+blobs.size;blobs.set(url,blob);return url;};window.URL.revokeObjectURL=()=>{};const anchorClick=window.HTMLAnchorElement.prototype.click;window.HTMLAnchorElement.prototype.click=function(){if(this.download)downloads.push({name:this.download,blob:blobs.get(this.href)});else anchorClick.call(this);};
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};const ownRealm=value=>{if(value===null||typeof value!=='object')return value;if(ArrayBuffer.isView(value))return new window.Uint8Array(value);if(Array.isArray(value))return window.Array.from(value,ownRealm);if(value instanceof Set)return new window.Set([...value].map(ownRealm));if(value instanceof Map)return new window.Map([...value].map(([k,v])=>[ownRealm(k),ownRealm(v)]));return window.Object.fromEntries(Object.entries(value).map(([k,v])=>[k,ownRealm(v)]));};window.structuredClone=value=>ownRealm(structuredClone(value));window.ResizeObserver=class{constructor(fn){resizeCallback=fn;}observe(){}};
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return size.width;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return size.height;}});
- window.fetch=async url=>({ok:true,arrayBuffer:async()=>packProject({manifest:fixtureManifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?fixtureManifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});
- window.Worker=class{constructor(url){workerCount++;this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
+ window.fetch=async url=>{fetchCalls.push(String(url));return ({ok:true,arrayBuffer:async()=>packProject({manifest:fixtureManifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?fixtureManifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});};
+ window.Worker=class{constructor(url){workerCount++;this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(method)nativeCalls.push({method,params});if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='Initialize')respond({version:'test'});
-  else if(method==='ParseSources')respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});
-  else if(method==='ExportModel')respond({elements:structuredClone([...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...((secondScene||secondView)?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
+  else if(method==='ParseSources'){capturedNative=nativeCaptureFixture&&params.documents.some(d=>d.content.includes('package CanvasCaptured2'));authoredViews=authoringFixture?[2,3,4,5].filter(n=>params.documents.some(d=>d.content.includes('package CanvasAuthored'+n))):[];const reply=()=>respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});if(holdNextParse){holdNextParse=false;heldParses.push(reply);}else reply();}
+  else if(method==='ExportModel')respond({elements:structuredClone([...authoredViews.map(n=>({'@id':'authored-view-'+n,'@type':'ViewUsage',qualifiedName:'CanvasAuthored'+n+'::slide',declaredName:'slide','sysx:sourceLine':210+n})),...(capturedNative?[{'@id':'captured-view','@type':'ViewUsage',qualifiedName:'CanvasCaptured2::slide',declaredName:'slide','sysx:sourceLine':200}]:[]),...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...((secondScene||secondView)?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
+  else if(method==='GetSymbol')respond(authoringFixture&&params.symbolId==='Model::part'?{symbol:{id:'native-part-symbol',attributes:[{name:'mass',type:'ISQBase::MassValue',unit:'kg',value:{rationalValue:{numerator:massValue.numerator,denominator:massValue.denominator}}}]}}:{error:'Native fixture symbol is unavailable'});
+  else if(method==='RenderView'&&authoringFixture&&authoredViews.some(n=>params.view==='CanvasAuthored'+n+'::slide'))respond({kind:'interconnection',nodes:[{...native.nodes[1],id:'authored-part-representation'}],edges:[]});
+  else if(method==='RenderView'&&nativeCaptureFixture&&params.view==='CanvasCaptured2::slide')respond({kind:'interconnection',nodes:[{...native.nodes[1],id:'captured-part-representation'}],edges:[]});
   else if(method==='RenderView'&&params.view==='Views::other')respond(structuredClone(secondView??{kind:'requirement',nodes:[{id:'o',semanticId:'orphan',identityStatus:'mapped',name:'orphan',kind:'part'}],edges:[]}));
   else if(method==='RenderView'&&params.view.startsWith('#')){nativeRequests.push(params.view);pendingRender=()=>respond(emptyNative?{kind:'action',nodes:[],edges:[]}:packageFixture&&params.view.startsWith('#action:')?{kind:'action',nodes:[{id:'run-native',semanticId:'run',name:'Native run activity',kind:'action',identityStatus:'mapped'}],edges:[]}:{kind:'interconnection',nodes:[native.nodes[1]],edges:[]});}
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(fixtureNative));
  }terminate(){}};
- window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===2)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,nativeRequests,story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===initialCount)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
+ return {window,nativeRequests,nativeCalls,fetchCalls,downloads,setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('package workspace scopes search and traversal, offers native view switching and restores scene handoff',async()=>{
  const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
@@ -807,8 +812,163 @@ test('voice UI dragging moves only the selected card and reset restores automati
   const node=target(),pointer=(name,x,y)=>node.dispatchEvent(new h.window.MouseEvent(name,{button:0,clientX:x,clientY:y,bubbles:true,cancelable:true}));
   // jsdom lacks the browser onpointerdown event-handler property dispatch.
   node.onpointerdown(new h.window.MouseEvent('pointerdown',{button:0,clientX:100,clientY:100,bubbles:true,cancelable:true}));pointer('pointermove',400,100);pointer('pointerup',400,100);
-  await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Manual position kept')).catch(error=>{throw Error(error.message+': '+d.getElementById('status').textContent+' / '+target().style.transform);});
+  await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Drawing positions saved')).catch(error=>{throw Error(error.message+': '+d.getElementById('status').textContent+' / '+target().style.transform);});
   assert.notEqual(target().style.transform,original);assert.equal(peer().style.transform,stationary);assert.equal(d.querySelector('#connections g[data-context="false"]').dataset.source,'part');
   d.getElementById('reset-layout').click();await until(()=>sceneSettled(d)&&target().style.transform===original);assert.equal(peer().style.transform,stationary);
+ }finally{h.window.close();}
+});
+
+
+const rollupNative={kind:'definition',nodes:[{id:'native-a',semanticId:'a',identityStatus:'mapped',name:'A',kind:'package'},{id:'native-b',semanticId:'b',identityStatus:'mapped',name:'B',kind:'package'}],edges:[]};
+const manualTarget=(d,id)=>d.querySelector('.node[data-context="false"][data-semantic-id="'+id+'"]');
+async function exportAndImport(h){
+ const d=h.document;d.getElementById('export-project').click();const download=h.downloads.at(-1);assert.equal(download?.name,'syspresent-project.zip');
+ const bytes=new Uint8Array(await download.blob.arrayBuffer()),project=unpackProject(bytes),input=d.getElementById('project-file');
+ const parses=h.nativeCalls.filter(call=>call.method==='ParseSources').length;Object.defineProperty(input,'files',{configurable:true,value:[{arrayBuffer:async()=>bytes.buffer}]});input.dispatchEvent(new h.window.Event('change'));
+ await until(()=>h.nativeCalls.filter(call=>call.method==='ParseSources').length>parses&&d.getElementById('loading').hidden&&sceneSettled(d)&&d.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(error=>{throw Error(error.message+': '+d.getElementById('status').textContent);});
+ return project;
+}
+test('remaining UI typed rollups drill into exact native links and preserve scope plus Back and Forward',async()=>{
+ const h=await harness({nativeView:rollupNative,rollupFixture:true}),d=h.document;
+ try{
+  const toggle=d.getElementById('show-rollups');toggle.checked=true;toggle.dispatchEvent(new h.window.Event('change'));
+  const aggregate=()=>d.querySelector('#connections g[data-relationship^="presentation-rollup:"]');
+  await until(()=>sceneSettled(d)&&aggregate());
+  assert.equal(aggregate().dataset.source,'a');assert.equal(aggregate().dataset.target,'b');assert.equal(aggregate().dataset.kind,'dependency');assert.match(aggregate().textContent,/×2|2 native/);
+  aggregate().dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));
+  assert.equal(d.getElementById('rollup-dialog').open,true);assert.match(d.getElementById('rollup-summary').textContent,/2 native dependency/);
+  assert.match(d.getElementById('rollup-list').textContent,/native-dependency-one/);assert.match(d.getElementById('rollup-list').textContent,/native-dependency-two/);
+  assert.match(d.getElementById('rollup-list').textContent,/hidden-a|Model::A::hidden/);assert.match(d.getElementById('rollup-list').textContent,/hidden-b|Model::B::hidden/);
+  d.getElementById('rollup-expand').click();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='hidden-a,hidden-b');
+  assert.equal(aggregate(),null,'drilldown displays native endpoints rather than inventing container relationships');
+  const direct=[...d.querySelectorAll('#connections g[data-context="false"]')];assert.equal(direct.length,2);assert.ok(direct.every(e=>e.dataset.source==='hidden-a'&&e.dataset.target==='hidden-b'));
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&aggregate());assert.equal(toggle.checked,true);
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='hidden-a,hidden-b');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&aggregate());
+  await pickPackage(h,'Model::A');assert.equal(aggregate(),null);assert.equal(d.getElementById('scope-label').textContent,'Model::A');
+  d.getElementById('context-details').click();assert.match(d.getElementById('information-text').textContent,/outside-scope/);
+  assert.equal(d.querySelectorAll('#scenes option').length,1,'rollup inspection and browsing do not append slides');
+ }finally{h.window.close();}
+});
+test('remaining UI portable layout survives source ZIP export import and reversible reset',async()=>{
+ const h=await harness(),d=h.document;
+ try{
+  const target=()=>manualTarget(d,'part'),peer=()=>manualTarget(d,'req'),original=target().style.transform,stationary=peer().style.transform;
+  d.getElementById('adjust-layout').click();target().click();const move=action(d,'Move right');assert.ok(move);move.click();
+  await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Drawing positions saved'));const moved=target().style.transform;
+  assert.notEqual(moved,original);assert.equal(peer().style.transform,stationary);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&target().style.transform===original);
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&target().style.transform===moved);
+  const project=await exportAndImport(h);assert.ok(project.files['syspresent-layouts.json'],JSON.stringify(Object.keys(project.files)));const layout=JSON.parse(fileText(project,'syspresent-layouts.json'));
+  assert.equal(layout.schemaVersion,'syspresent.presentation-layouts.v1');assert.ok(layout.views.some(v=>v.placements.some(p=>p.semanticId==='part')));
+  assert.equal(fileText(project,'model.sysml'),files['model.sysml']);assert.equal(fileText(project,'views.sysml'),files['views.sysml']);
+  await until(()=>sceneSettled(d)&&target().style.transform===moved);assert.equal(peer().style.transform,stationary);
+  d.getElementById('reset-layout').click();await until(()=>sceneSettled(d)&&target().style.transform===original);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&target().style.transform===moved);
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&target().style.transform===original);
+ }finally{h.window.close();}
+});
+
+test('remaining UI explicit native capture rebinds portable placement by semantic identity and survives ZIP import',async()=>{
+ const h=await harness({nativeCaptureFixture:true}),d=h.document;
+ try{
+  manualTarget(d,'part').click();action(d,'Internal view').click();await until(h.pending);h.release();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='part');
+  const target=()=>manualTarget(d,'part'),automatic=target().style.transform;
+  d.getElementById('adjust-layout').click();target().click();action(d,'Move right').click();await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Drawing positions saved'));
+  const moved=target().style.transform;assert.notEqual(moved,automatic);
+  d.getElementById('edit').click();d.getElementById('scene-title').value='Reusable internal view';d.getElementById('capture-scene').click();
+  await until(()=>sceneSettled(d)&&d.querySelectorAll('#scenes option').length===2&&!d.getElementById('editor').open).catch(error=>{throw Error(error.message+': '+d.getElementById('status').textContent);});
+  assert.equal(target().dataset.representation,'captured-part-representation');assert.notEqual(target().style.transform,automatic);
+  const project=await exportAndImport(h);assert.ok(project.files['syspresent-layouts.json'],JSON.stringify(Object.keys(project.files)));const layout=JSON.parse(fileText(project,'syspresent-layouts.json'));
+  assert.match(fileText(project,'views/captured-views.sysml'),/view def Definition/);
+  const saved=layout.views.find(v=>v.viewId==='CanvasCaptured2::slide');assert.ok(saved);assert.equal(saved.placements[0].semanticId,'part');assert.equal(saved.placements[0].representationId,'captured-part-representation');
+  d.getElementById('next').click();await until(()=>sceneSettled(d)&&d.getElementById('scenes').value==='1'&&activeIDs(d).join(',')==='part');
+  assert.equal(target().dataset.representation,'captured-part-representation');assert.notEqual(target().style.transform,automatic);
+ }finally{h.window.close();}
+});
+
+
+const massProposal=(title='Native mass')=>({schemaVersion:'syspresent.authoring-proposal.v1',question:'What is the declared mass?',title,focus:'part',view:{definition:'InterconnectionView',expose:['part'],kinds:[],membership:'native'},narrative:{schemaVersion:'syspresent.narrative.v1',template:'Declared mass: {{mass}}.',bindings:[{name:'mass',symbol:'part',attribute:'mass',type:'ISQBase::MassValue',unit:'kg',decimals:2}]},references:['part'],relationshipClaims:[]});
+const proposalInput=(h,proposal)=>{const input=h.document.getElementById('authoring-proposal');input.value=typeof proposal==='string'?proposal:JSON.stringify(proposal);input.dispatchEvent(new h.window.Event('input'));};
+const openNativeAuthoring=h=>{const d=h.document;manualTarget(d,'part').click();d.getElementById('edit').click();d.getElementById('author-native-slide').click();};
+test('remaining UI offline native authoring validates repeated proposals, appends only explicitly and refreshes typed values on import',async()=>{
+ const h=await harness({authoringFixture:true}),d=h.document;
+ try{
+  const fetchCount=h.fetchCalls.length;openNativeAuthoring(h);
+  assert.match(d.getElementById('authoring-provider').textContent,/No LLM provider|unconfigured/i);assert.equal(d.getElementById('authoring-generate').disabled,true);d.getElementById('authoring-generate').click();assert.equal(h.fetchCalls.length,fetchCount);
+  assert.match(d.getElementById('authoring-review').textContent,/not an LLM response/);
+  d.getElementById('authoring-values-button').click();await until(()=>d.getElementById('authoring-values').textContent.includes('mass'));
+  assert.match(d.getElementById('authoring-values').textContent,/0.25 kg/);
+  proposalInput(h,massProposal());d.getElementById('authoring-validate').click();await until(()=>!d.getElementById('authoring-append').disabled);
+  assert.match(d.getElementById('authoring-review').textContent,/native:GetSymbol/);assert.ok(d.querySelector('#authoring-preview .node[data-semantic-id="part"]'));assert.equal(d.querySelectorAll('#scenes option').length,1);
+  d.getElementById('authoring-validate').click();await until(()=>!d.getElementById('authoring-append').disabled);assert.equal(d.querySelectorAll('#scenes option').length,1,'validation does not append');
+  d.getElementById('authoring-append').click();await until(()=>sceneSettled(d)&&!d.getElementById('authoring-dialog').open&&d.querySelectorAll('#scenes option').length===2);
+  assert.match(d.getElementById('narrative').textContent,/Declared mass: 0.25 kg/);assert.equal(h.fetchCalls.length,fetchCount,'local authoring sends no model content via fetch');
+  h.setMass('1','2');const project=await exportAndImport(h);assert.match(fileText(project,'views/authored-proposals.sysml'),/view def Definition/);assert.match(fileText(project,'story.md'),/syspresent.narrative.v1/);
+  d.getElementById('next').click();await until(()=>sceneSettled(d)&&d.getElementById('scenes').value==='1'&&d.getElementById('narrative').textContent.includes('Declared mass: 0.50 kg'));
+  openNativeAuthoring(h);proposalInput(h,massProposal('Native mass again'));d.getElementById('authoring-validate').click();await until(()=>!d.getElementById('authoring-append').disabled);d.getElementById('authoring-append').click();
+  await until(()=>sceneSettled(d)&&!d.getElementById('authoring-dialog').open&&d.querySelectorAll('#scenes option').length===3);assert.match(d.getElementById('narrative').textContent,/Native mass again/);assert.match(d.getElementById('narrative').textContent,/0.50 kg/);
+ }finally{h.window.close();}
+});
+test('remaining UI invalid or stale native authoring proposals never append or replace the current scene',async()=>{
+ const h=await harness({authoringFixture:true}),d=h.document;
+ try{
+  openNativeAuthoring(h);const initialIDs=activeIDs(d),count=()=>d.querySelectorAll('#scenes option').length;
+  proposalInput(h,'{invalid');d.getElementById('authoring-validate').click();await until(()=>d.getElementById('authoring-review').textContent.includes('valid JSON'));assert.equal(count(),1);assert.equal(d.getElementById('authoring-append').disabled,true);assert.deepEqual(activeIDs(d),initialIDs);
+  const wrong=massProposal();wrong.narrative.bindings[0].unit='lb';proposalInput(h,wrong);d.getElementById('authoring-validate').click();await until(()=>d.getElementById('authoring-review').textContent.includes('Unit conversion is unsupported'));assert.equal(count(),1);assert.deepEqual(activeIDs(d),initialIDs);
+  proposalInput(h,massProposal());h.holdParse();d.getElementById('authoring-validate').click();await until(h.parsePending);proposalInput(h,massProposal('Changed while native parse pending'));h.releaseParse();
+  await until(()=>!d.getElementById('authoring-validate').disabled);assert.equal(d.getElementById('authoring-append').disabled,true);assert.equal(count(),1);assert.deepEqual(activeIDs(d),initialIDs);
+  d.getElementById('authoring-validate').click();await until(()=>!d.getElementById('authoring-append').disabled);
+  d.getElementById('authoring-proposal').value=JSON.stringify(massProposal('Changed without input event'));d.getElementById('authoring-append').click();await until(()=>d.getElementById('status').textContent.includes('Validate the proposal again'));assert.equal(count(),1);assert.deepEqual(activeIDs(d),initialIDs);
+ }finally{h.window.close();}
+});
+
+test('remaining UI focused notation distinguishes definitions usages compartments and official typing markers',async()=>{
+ const fixture={kind:'definition',nodes:[{id:'native-definition',semanticId:'definition',identityStatus:'mapped',name:'Device',kind:'part'},{id:'native-part',semanticId:'part',identityStatus:'mapped',name:'part',kind:'part'}],edges:[{id:'native-typing',from:'native-part',to:'native-definition',kind:'typing',label:'typing'}]};
+ const h=await harness({structuralFixture:true,focusedFixture:true,nativeView:fixture}),d=h.document;
+ try{
+  const mode=d.getElementById('rendering-mode');mode.value='focused';mode.dispatchEvent(new h.window.Event('change'));
+  await until(()=>sceneSettled(d)&&d.querySelector('.focused-face'));
+  const definition=manualTarget(d,'definition'),usage=manualTarget(d,'part');assert.equal(definition.querySelector('.focused-face').dataset.shape,'rectangle');assert.equal(usage.querySelector('.focused-face').dataset.shape,'rounded');
+  assert.equal(definition.querySelector('.focused-keyword').textContent,'«part def»');assert.equal(usage.querySelector('.focused-keyword').textContent,'«part»');assert.match(usage.querySelector('.focused-name').textContent,/part : Device/);
+  assert.ok([...definition.querySelectorAll('.focused-compartment-title')].some(n=>n.textContent==='attributes'));assert.ok([...definition.querySelectorAll('.focused-compartment-title')].some(n=>n.textContent==='parts'));
+  assert.equal(definition.querySelector('.focused-compartment-line[data-semantic-id="mass-attribute"]').textContent,'mass');
+  const edge=d.querySelector('#connections g[data-context="false"][data-kind="typing"]'),line=edge.querySelector('.edge-line:not(.edge-outgoing)');assert.equal(edge.dataset.source,'part');assert.equal(edge.dataset.target,'definition');assert.equal(line.getAttribute('stroke-dasharray'),null);assert.equal(line.getAttribute('marker-end'),'url(#edge-definition-two-dot)');
+  assert.equal(d.querySelectorAll('marker#edge-definition-two-dot path').length,2,'hollow triangle and two native typing dots are both drawn');
+  const before=[...d.querySelectorAll('.node')].map(n=>n.style.transform);usage.click();assert.deepEqual([...d.querySelectorAll('.node')].map(n=>n.style.transform),before);
+ }finally{h.window.close();}
+});
+test('remaining UI focused ownership uses circled plus at native owner without reversing endpoints',async()=>{
+ const fixture={kind:'definition',nodes:[{id:'native-package',semanticId:'Model',identityStatus:'mapped',name:'Model',kind:'package'},{id:'native-part',semanticId:'part',identityStatus:'mapped',name:'part',kind:'part'}],edges:[{id:'native-owner',from:'native-package',to:'native-part',kind:'containment',label:'owns'}]};
+ const h=await harness({structuralFixture:true,nativeView:fixture}),d=h.document;
+ try{
+  const mode=d.getElementById('rendering-mode');mode.value='focused';mode.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&d.querySelector('.focused-face'));
+  const edge=d.querySelector('#connections g[data-context="false"][data-kind="containment"]'),line=edge.querySelector('.edge-line:not(.edge-outgoing)');assert.equal(edge.dataset.source,'Model');assert.equal(edge.dataset.target,'part');assert.equal(line.getAttribute('marker-start'),'url(#edge-owned-membership)');assert.equal(line.getAttribute('marker-end'),null);assert.equal(manualTarget(d,'Model').querySelector('.focused-face').dataset.shape,'package');
+ }finally{h.window.close();}
+});
+
+
+test('remaining UI nested adjustment stays local then follows ancestor movement and survives portable import',async()=>{
+ const fixture={kind:'interconnection',nodes:[{id:'compound-definition',semanticId:'definition',identityStatus:'mapped',name:'Device',kind:'part'},{id:'compound-sensor',semanticId:'sensor',identityStatus:'mapped',name:'sensor',kind:'part',parentId:'compound-definition'},{id:'r',semanticId:'req',identityStatus:'mapped',name:'req',kind:'requirement'}],edges:[{id:'native-owned-sensor',from:'compound-definition',to:'compound-sensor',kind:'composition',label:'part'},{id:'native-sensor-dependency',from:'compound-sensor',to:'r',kind:'dependency',label:'dependency'}]};
+ const h=await harness({structuralFixture:true,nativeView:fixture,initialCount:3}),d=h.document;
+ try{
+  const root=()=>manualTarget(d,'definition'),child=()=>manualTarget(d,'sensor'),peer=()=>manualTarget(d,'req'),originalRoot=root().style.transform,originalChild=child().style.transform,stationary=peer().style.transform;
+  const coords=node=>/translate\(([-.\d]+)px,([-.\d]+)px\)/.exec(node.style.transform).slice(1).map(Number),beforeRoot=coords(root()),beforeChild=coords(child()),close=(actual,expected)=>Math.abs(actual-expected)<.001;
+  d.getElementById('adjust-layout').click();root().click();action(d,'Move right').click();await until(()=>sceneSettled(d)&&close(coords(root())[0],beforeRoot[0]+40));
+  const afterRoot=coords(root()),afterChild=coords(child());assert.equal(afterChild[0]-beforeChild[0],40);assert.equal(afterRoot[1],beforeRoot[1]);assert.equal(afterChild[1],beforeChild[1]);assert.equal(peer().style.transform,stationary);
+  child().click();assert.ok(action(d,'Move right'),'native child exposes safe local adjustment');action(d,'Move right').click();
+  await until(()=>sceneSettled(d)&&close(coords(child())[0],afterChild[0]+8));assert.deepEqual(coords(root()),afterRoot);assert.equal(peer().style.transform,stationary);
+  child().click();action(d,'Move down').click();await until(()=>sceneSettled(d)&&close(coords(child())[1],afterChild[1]+8));const nested=coords(child());assert.deepEqual(coords(root()),afterRoot);assert.equal(peer().style.transform,stationary);
+  const moving=child();moving.onpointerdown(new h.window.MouseEvent('pointerdown',{button:0,clientX:100,clientY:100,bubbles:true,cancelable:true}));for(const name of ['pointermove','pointerup'])moving.dispatchEvent(new h.window.MouseEvent(name,{button:0,clientX:100,clientY:-500,bubbles:true,cancelable:true}));
+  await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('parent content bounds'));assert.deepEqual(coords(child()),nested);assert.deepEqual(coords(root()),afterRoot);assert.equal(peer().style.transform,stationary);
+  root().click();action(d,'Move right').click();await until(()=>sceneSettled(d)&&close(coords(root())[0],afterRoot[0]+40)&&close(coords(child())[0],nested[0]+40));
+  const movedRoot=coords(root()),movedChild=coords(child());assert.equal(movedChild[1],nested[1]);assert.equal(peer().style.transform,stationary);
+  const external=d.querySelector('#connections g[data-kind="dependency"][data-context="false"]');assert.equal(external.dataset.source,'sensor');assert.equal(external.dataset.target,'req');
+  const project=await exportAndImport(h),layout=JSON.parse(fileText(project,'syspresent-layouts.json')),record=layout.views.find(v=>v.viewId==='Views::requirements');
+  assert.ok(record.placements.some(p=>p.semanticId==='definition'));assert.ok(record.placements.some(p=>p.semanticId==='sensor'&&p.parentSemanticId==='definition'));
+  await until(()=>sceneSettled(d)&&close(coords(root())[0],movedRoot[0])&&close(coords(child())[0],movedChild[0])&&close(coords(child())[1],movedChild[1]));assert.equal(peer().style.transform,stationary);
+  d.getElementById('reset-layout').click();await until(()=>sceneSettled(d)&&root().style.transform===originalRoot&&child().style.transform===originalChild);assert.equal(peer().style.transform,stationary);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&close(coords(root())[0],movedRoot[0])&&close(coords(child())[0],movedChild[0]));
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&root().style.transform===originalRoot&&child().style.transform===originalChild);
  }finally{h.window.close();}
 });

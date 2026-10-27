@@ -210,8 +210,8 @@ slots stay unused rather than showing arbitrary asymmetric detail. Eligibility
 requires a native declared name or short name; generated qualified names alone
 do not qualify. Single-child package wrappers
 may be skipped; actual part/behavior boundaries are retained. Native edges between
-selected identities remain unchanged, and omitted descendants do not acquire
-aggregate links. Ties use native qualified names and semantic IDs. Disconnected
+selected identities remain unchanged. Automatic overview does not silently add
+aggregate links; the explicit exploratory rollup control adds separate presentation artifacts. Ties use native qualified names and semantic IDs. Disconnected
 branches remain selectable even when no engineering links join them.
 
 Cards show children and distinct-neighbor counts. Overview selection explains the
@@ -264,25 +264,93 @@ declared native view, then parses/renders it before committing the project.
 Arbitrary graph captures must match native selected identities and directed
 relationship occurrences exactly; unsupported projections fail without mutation.
 Export project ZIP retains view source and slides. This uses the authored native
-pipeline without adding a provider or credentials. Free-form LLM interpretation,
-metadata-driven narrative/value interpolation and relationship rollup aggregates
-remain outstanding; no aggregate relationships are fabricated.
+pipeline without adding a provider or credentials. Optional provider-neutral authoring is described below. No aggregate is inserted
+into the native semantic graph.
 
 Exploratory rendering is default. Focused notation disables peripheral context,
 relationship emphasis and exploratory journeys, while retaining native active
 membership. It is not a claim of complete standards compliance. The official
 reference checked is [OMG SysML 2.0 Language, formal/2026-03-02](https://www.omg.org/spec/SysML/2.0/Language/PDF),
-section 8.2.3, including attributes/parts compartments. Current cards and supported
-markers cover only part of that notation; native extensions and unsupported
-markers remain disclosed.
+section 8.2.3, including attributes/parts compartments. The focused renderer uses a separately measured native descriptor: square
+definitions, rounded usages, typed names, separate owned compartments, actual
+port directions and supported control symbols. Its solid two-dot typing marker,
+circled-plus ownership marker and supported relationship productions differ
+from exploratory styling. Unknown modifiers, unavailable native roles, overloaded
+kinds and unsupported families have inspectable notices. Native extensions and
+unassessed sequence/grid/fault-tree notation are not certified by this mode.
 
-Adjust layout enables explicit card dragging in supported flat structural views;
-stationary peers keep their positions and connections reroute on release.
-Compound, native-port and behavioral drawings reject movement explicitly.
-Positions are session-only, keyed by model/view/prepared geometry, discarded on
-reload and excluded from native capture/export. Reset manual layout restores
-calculated geometry. Pan/zoom remains available for complex internals. Portable
-layout persistence is still an open product decision.
+Adjust layout supports explicit dragging and keyboard movement of active flat
+structural cards, structural groups and bounded nested structural members. Group movement translates native
+descendants, ports, labels and drawing anchors together; external edges reroute
+against stationary peers. Nested moves use the actual fitted parent body and header, rejecting escape,
+header entry and card/native-label collisions. Descendants and actual ports move
+rigidly. Missing parent geometry and behavioral/control movement remain explicitly
+unsupported; pan/zoom remains available without relayout.
+
+Positions persist in the project asset syspresent-layouts.json, separate from
+SysML view selection and story narrative. It records native semantic,
+representation and parent identities plus offsets normalized to the graph area.
+It stores neither a model hash nor a frozen viewport. ZIP export/import retains
+the asset and unchanged system sources. Export is the durable-save boundary;
+model metadata is not automatically retained in browser storage. Back/Forward,
+reset and native capture restore or uniquely rebind the independent placement
+state. Fresh native geometry remains authoritative; missing/ambiguous identities,
+changed parents and unsafe restored arrangements produce explicit omissions and
+retain safe automatic geometry.
+
+### Typed relationship rollups
+
+Display > Roll up hidden links explicitly adds typed, directed drawing overlays
+between visible native containing parts/packages. Actual owner paths determine
+each representative. Scope is checked on the underlying native endpoints before
+rollup; isolated Gorge cannot regain external allocations through a container.
+Each overlay retains every underlying graph record, known native relationship ID,
+API/view occurrence and owner path. Known identities count once across repeated
+projections; unresolved identity is labeled connection records, never a claim of
+distinct modeled relationships. Select an overlay for paged provenance and Open
+this page as graph; drilldown rechecks current scope, ownership and stale records.
+
+Aggregates never enter modelGraph, semantic traversal or native view capture.
+Native satisfaction edge identities are accepted only when the engine maps their
+origins to actual SatisfyRequirementUsage declarations. The updated Blue Dog model
+exposes 216 such identities; the Blue Dog-to-Gorge satisfaction rollup contains
+seven known native relationships. Other unavailable native identity mappings
+remain explicit limitations of the loaded projection. The carried native dependency
+patch also preserves distinct located source origins when parallel assertions
+share endpoints/kind, while repeated discovery of one declaration deduplicates.
+
+### Grounded native authoring and fresh narratives
+
+Edit > Author native slide opens local proposal review with the provider visibly
+unconfigured. Prepare local context exposes a bounded selection of native
+identities, documentation and typed directed links. A local starter copies native
+documentation bindings; it is explicitly not LLM output. Proposal JSON declares
+native view definition kind, exposed native references and native type filters,
+plus narrative templates, bindings, references and optional structured
+relationship claims. Native parse/render verifies membership and scope; claims
+must match exact native directed records. The review shows emitted SysML,
+represented membership, typed-value provenance and a preview through the existing
+native graph/sequence/grid renderer. Validation alone never appends; only Append
+validated slide changes the story. Rejected or obsolete candidates leave it intact.
+
+Inspect native values uses GetSymbol constant attributes. Templates retain native
+documentation or scalar-attribute bindings and resolve afresh on project reload
+and publication validation, including native exact rational formatting and explicit
+same-unit/type assertions. No SysML source-value parsing or implicit conversion is
+used. Missing values, changed types/units, unsupported expressions and values
+requiring runtime inputs fail explicitly. The current engine does not implement
+Evaluate, so input-dependent analysis is not run. A declared constant remains
+distinct from measurement or executed evidence. Native references and structured
+claims can be checked; free prose remains an unverified author draft.
+
+The provider-neutral transport interface defaults to unconfigured. Tests use
+explicitly labeled mocked transports with allowlisted identity/documentation/link
+fields; no network implementation, provider, credential storage or paid call is
+configured. Live generation requires a provider/endpoint choice, a decision about
+which selected metadata may leave the browser, and explicit transmission approval.
+It must use the same native proposal validation and rendering path. Existing
+snapshots remain immutable and software evidence does not establish engineering
+or full OMG notation acceptance.
 
 The October 25 pending Blue Dog example refresh was copied byte-for-byte from
 the six dirty files in the original SysPresent checkout. Its source.json identifies
@@ -290,3 +358,23 @@ the working-tree snapshot: all 98 listed source hashes matched the current
 sv-blue-dog-editorial files when integrated. Original checkout edits were preserved.
 This source refresh and software validation imply neither engineering acceptance
 nor a new Blue Dog architecture.
+
+
+The optional JSON gateway adapter accepts an explicitly supplied loopback or
+same-origin HTTP(S) endpoint; it has no default target. A gateway request uses
+syspresent.authoring-gateway.v1 and contains the question, selected native IDs,
+qualified names and kinds, with documentation and directed links only when
+allowlisted. It sends no full model sources, cookies, bearer tokens or browser
+credentials, and retains no gateway configuration. Redirects and credential/query
+URLs are rejected. The server owns provider/model choice and credentials; responses
+contain a structured authoring proposal that still undergoes native validation and
+review. Tests inject mocked fetch only. No actual gateway was identified in
+repository conventions or live-tested, and no endpoint is configured.
+
+The concrete live-generation decision is whether to use a user-designated local
+JSON gateway with server-held credentials, which provider/model it should call,
+which selected metadata fields may leave the browser, and what request logging/
+retention is acceptable. Same-origin HTTPS can avoid cross-origin loopback browser
+constraints; loopback CORS/private-network behavior remains untested without a
+chosen service. Direct provider APIs and automatic OpenAI-compatible passthrough
+are not configured.

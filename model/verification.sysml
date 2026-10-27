@@ -198,7 +198,7 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
     verification def <'SV-020'> conversationalExploration {
-        doc /* Exercise complete native ownership pagination/search and attribute/part compartments, isolated/contextual package navigation, part effective requirements with collapsed native path inspection, and explicit local/global overrides. Submit consecutive explicit questions and confirm exactly one native slide per submission with none from browsing. Compile captured definitions, round-trip ZIP and rerender after source changes. Reject unsupported captures without mutation. Check focused context/emphasis exclusion and supported manual movement with peer stability, native edge identity/direction and collision rejection. Independently assess aggregate rollup, LLM-assisted authoring, full notation coverage and portable layout persistence before accepting their outstanding obligations. */
+        doc /* Exercise complete native ownership pagination/search and attribute/part compartments, isolated/contextual package navigation, part effective requirements with collapsed native path inspection, and explicit local/global overrides. Submit consecutive explicit questions and confirm exactly one native slide per submission with none from browsing. Compile captured definitions, round-trip ZIP and rerender after source changes. Reject unsupported captures without mutation. Check focused context/emphasis exclusion and supported manual movement with peer stability, native edge identity/direction and collision rejection. Check typed rollup counts against actual native identities and repeated occurrences, scope-checked drilldown and graph isolation. Exercise portable layout source/ZIP roundtrip, changed geometry and missing-identity diagnostics, rigid groups and native ports. Validate offline and mocked authoring, native filter membership, stale/rejected candidates, fresh rational constants/documentation and publication failures on incompatible bindings. Inspect supported focused productions against official OMG notation and explicitly report remaining unsupported families. Live provider generation and full notation acceptance require separate authorization and evidence. */
         objective acceptance {
             verify SyspresentRequirements::ConversationalExploration::completeHierarchy;
             verify SyspresentRequirements::ConversationalExploration::partUnderstanding;
@@ -208,6 +208,10 @@ package SyspresentVerification {
             verify SyspresentRequirements::ConversationalExploration::reusableNativeCapture;
             verify SyspresentRequirements::ConversationalExploration::focusedNotation;
             verify SyspresentRequirements::ConversationalExploration::manualLocalLayout;
+            verify SyspresentRequirements::ConversationalExploration::groundedAuthoring;
+            verify SyspresentRequirements::ConversationalExploration::portableLayoutIdentity;
+            verify SyspresentRequirements::ConversationalExploration::freshNarrativeBindings;
+            verify SyspresentRequirements::ConversationalExploration::inspectableNotationCoverage;
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
