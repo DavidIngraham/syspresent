@@ -15,11 +15,12 @@ const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfIn
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
 async function pickPackage(h,name){const d=h.document;d.getElementById('choose-package').click();const search=d.getElementById('package-search');search.value=name;search.dispatchEvent(new h.window.Event('input'));const choice=[...d.querySelectorAll('#package-list button')].find(b=>b.textContent===name);assert.ok(choice,'native package is offered');choice.click();await until(()=>!d.getElementById('package-dialog').open&&sceneSettled(d));}
-async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,size={width:1000,height:700}}={}){
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,size={width:1000,height:700}}={}){
  let workerCount=0,resizeCallback;const nativeRequests=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
  if(storyContent){const block=JSON.parse(fixtureFiles['story.md'].split('```syspresent\n')[1].split('\n```')[0]);Object.assign(block,{chapter:{id:'challenge',title:'Challenge'},figures:[{id:'course',title:'Course map',asset:'assets/course.svg',alt:'Course map',caption:'Illustrative course.',provenance:{source:'Model',context:'Fixture'},modelRefs:['Model::req']}],context:[{kind:'candidate',title:'Candidate',text:'Proposed boat.',modelRefs:['Model::part']}]});fixtureFiles['story.md']='```syspresent\n'+JSON.stringify(block)+'\n```\n\nRead [the requirement](model:Model::req) and [hidden context](model:Model::orphan).';fixtureFiles['assets/course.svg']='<svg xmlns="http://www.w3.org/2000/svg"/>';}
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
+ if(hierarchyFixture)structuralRaw.push(...Array.from({length:65},(_,i)=>({'@id':'extra-part-'+i,'@type':'PartUsage',qualifiedName:'Model::Device::extra'+String(i).padStart(2,'0'),declaredName:'extra'+String(i).padStart(2,'0'),owner:{'@id':'definition'},'sysx:sourceLine':20+i})),{'@id':'voltage','@type':'AttributeUsage',qualifiedName:'Model::Device::voltage',declaredName:'voltage',owner:{'@id':'definition'},'sysx:sourceLine':99});
  if(packageFixture)structuralRaw.push({'@id':'run','@type':'ActionDefinition',qualifiedName:'Model::Nested::Run',declaredName:'Run',owner:{'@id':'nested'},'sysx:sourceLine':16});
  const fixtureRaw=raw.map(e=>packageFixture&&e['@id']==='req'?{...e,owner:{'@id':'nested'}}:structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
  const fixtureManifest={...manifest,...(entryView?{entryView}:{}),...(entryFocus?{entryFocus}:{})};
@@ -318,6 +319,12 @@ test('part and package actions expose structural context on the canvas and histo
  const active=()=>[...d.querySelectorAll('.node[data-context="false"]')];
  const clickAction=text=>{const control=[...d.querySelectorAll('#selection button')].find(b=>b.textContent===text);assert.ok(control,text);control.click();};
  d.querySelector('[data-semantic-id="part"]').click();clickAction('Focus');
+ await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Effective requirements'));
+ assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['part','req']));
+ assert.equal(d.querySelector('.node[data-context="true"]'),null,'effective requirements keep collapsed inheritance out of peripheral context');
+ assert.equal(d.querySelectorAll('#connections g[data-kind="typing"][data-context="false"]').length,0);
+ d.querySelector('.node[data-context="false"][data-semantic-id="part"]').click();
+ const local=[...d.querySelectorAll('#selection button')].find(b=>b.textContent.startsWith('Local understanding'));assert.ok(local);local.click();
  await until(()=>active().length===5&&d.getElementById('status').textContent.includes('matching structural'));
  assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['part','Model','definition','sensor','processor']));
  assert.equal(d.querySelectorAll('#connections g[data-kind="typing"][data-context="false"]').length,1);
@@ -727,5 +734,81 @@ test('comparison relationship selection highlights all native duplicates and gra
   assert.equal(gridCell(d,0,1).getAttribute('aria-pressed'),'true');
   assert.equal(d.querySelectorAll('#connections g.traced').length,1);
   assert.equal(scroll.scrollTop,100);assert.equal(scroll.scrollLeft,50);
+ }finally{h.window.close();}
+});
+
+
+test('voice UI hierarchy reaches every declaration page and exposes part and attribute details',async()=>{
+ const h=await harness({structuralFixture:true,hierarchyFixture:true}),d=h.document;
+ try{
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&!d.getElementById('workspace-controls').hidden);
+  d.getElementById('browse-hierarchy').click();
+  const find=d.getElementById('hierarchy-search');find.value='Model::Device';find.dispatchEvent(new h.window.Event('input'));
+  assert.equal(d.querySelectorAll('#hierarchy-list .hierarchy-row').length,50);assert.equal(d.getElementById('hierarchy-next').disabled,false);
+  d.getElementById('hierarchy-next').click();assert.ok(d.querySelector('#hierarchy-list').textContent.includes('extra64'));assert.equal(d.getElementById('hierarchy-next').disabled,true);
+  d.getElementById('hierarchy-previous').click();assert.equal(d.querySelectorAll('#hierarchy-list .hierarchy-row').length,50);
+  const row=[...d.querySelectorAll('#hierarchy-list .hierarchy-row')].find(r=>r.querySelector('span').textContent==='Model::Device');assert.ok(row);
+  [...row.querySelectorAll('button')].find(b=>b.textContent==='Declarations').click();assert.equal(d.getElementById('declarations-dialog').open,true);
+  assert.match(d.getElementById('declaration-summary').textContent,/declared|declaration/i);assert.ok(d.querySelectorAll('#declaration-list .hierarchy-row').length>5);
+  const allDetails=()=>d.getElementById('declaration-list').textContent;let detailText=allDetails();while(!d.getElementById('declaration-next').disabled){d.getElementById('declaration-next').click();detailText+=allDetails();}
+  assert.match(detailText,/voltage/);assert.match(detailText,/attribute/i);assert.match(detailText,/extra64/);
+  d.getElementById('declarations-dialog').close();d.getElementById('hierarchy-dialog').close();
+  assert.equal(d.querySelectorAll('#scenes option').length,1,'manual hierarchy and details browsing does not append slides');
+ }finally{h.window.close();}
+});
+
+test('voice UI focused rendering removes peripheral opacity and preserves native active connections',async()=>{
+ const h=await harness({contextNeighbor:true,presentation:{emphasis:['verify']}}),d=h.document;
+ try{
+  assert.ok(d.querySelector('.node[data-context="true"]'));
+  const before=d.querySelector('#connections g[data-context="false"]');assert.ok(Number(before.style.opacity)<1);
+  const chooser=d.getElementById('rendering-mode');chooser.value='focused';chooser.dispatchEvent(new h.window.Event('change'));
+  await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('compliance is not established')).catch(error=>{throw Error(error.message+': '+chooser.value+' / '+d.getElementById('status').textContent);});
+  assert.equal(d.querySelector('.node[data-context="true"]'),null);assert.equal(d.getElementById('adjust-layout').disabled,true);
+  const active=d.querySelector('#connections g[data-context="false"]');assert.equal(Number(active.style.opacity),1);assert.equal(active.dataset.source,'part');assert.equal(active.dataset.target,'req');assert.equal(active.dataset.kind,'satisfy');
+  assert.deepEqual(activeIDs(d),['part','req']);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&chooser.value==='exploratory');assert.ok(d.querySelector('.node[data-context="true"]'));
+ }finally{h.window.close();}
+});
+
+test('voice UI explicit questions append ordered slides while manual browsing keeps the conversation unchanged',async()=>{
+ const h=await harness(),d=h.document;
+ try{
+  const count=()=>d.querySelectorAll('#scenes option').length;
+  assert.equal(count(),1);d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);
+  d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Ask as a new slide').click();
+  assert.equal(d.getElementById('question-dialog').open,true);d.getElementById('question-text').value='Which requirement does this part satisfy?';d.getElementById('submit-question').click();
+  await until(()=>!d.getElementById('question-dialog').open&&sceneSettled(d)&&count()===2);
+  assert.equal(d.querySelector('#narrative h2').textContent,'Which requirement does this part satisfy?');
+  d.getElementById('previous').click();await until(()=>sceneSettled(d)&&d.querySelector('#narrative h2').textContent==='Control the part');assert.equal(count(),2);
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Ask as a new slide').click();d.getElementById('question-text').value='Show the same native view again';d.getElementById('submit-question').click();
+  await until(()=>sceneSettled(d)&&count()===3&&!d.getElementById('question-dialog').open);assert.equal(d.querySelector('#narrative h2').textContent,'Show the same native view again');
+  assert.match(d.getElementById('status').textContent,/Question appended/);
+ }finally{h.window.close();}
+});
+
+test('voice UI external trace context is explicit and history restores isolated package scope',async()=>{
+ const h=await harness({structuralFixture:true,packageFixture:true}),d=h.document;
+ try{
+  await pickPackage(h,'Model::Nested');d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Focus').click();await until(()=>sceneSettled(d)&&activeIDs(d).length===1);
+  const toggle=d.getElementById('scope-context-toggle');assert.equal(toggle.checked,false);
+  toggle.checked=true;toggle.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&activeIDs(d).includes('part')).catch(error=>{throw Error(error.message+': '+toggle.checked+' / '+activeIDs(d)+' / '+d.getElementById('status').textContent);});
+  assert.equal(d.getElementById('scope-label').textContent,'Model::Nested + external context');assert.equal(toggle.checked,true);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&!toggle.checked);assert.deepEqual(activeIDs(d),['req']);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+ }finally{h.window.close();}
+});
+
+test('voice UI dragging moves only the selected card and reset restores automatic geometry',async()=>{
+ const h=await harness(),d=h.document;
+ try{
+  const target=()=>d.querySelector('.node[data-context="false"][data-semantic-id="part"]'),peer=()=>d.querySelector('.node[data-context="false"][data-semantic-id="req"]');
+  const original=target().style.transform,stationary=peer().style.transform;
+  d.getElementById('adjust-layout').click();assert.equal(d.getElementById('adjust-layout').getAttribute('aria-pressed'),'true');
+  const node=target(),pointer=(name,x,y)=>node.dispatchEvent(new h.window.MouseEvent(name,{button:0,clientX:x,clientY:y,bubbles:true,cancelable:true}));
+  // jsdom lacks the browser onpointerdown event-handler property dispatch.
+  node.onpointerdown(new h.window.MouseEvent('pointerdown',{button:0,clientX:100,clientY:100,bubbles:true,cancelable:true}));pointer('pointermove',400,100);pointer('pointerup',400,100);
+  await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Manual position kept')).catch(error=>{throw Error(error.message+': '+d.getElementById('status').textContent+' / '+target().style.transform);});
+  assert.notEqual(target().style.transform,original);assert.equal(peer().style.transform,stationary);assert.equal(d.querySelector('#connections g[data-context="false"]').dataset.source,'part');
+  d.getElementById('reset-layout').click();await until(()=>sceneSettled(d)&&target().style.transform===original);assert.equal(peer().style.transform,stationary);
  }finally{h.window.close();}
 });

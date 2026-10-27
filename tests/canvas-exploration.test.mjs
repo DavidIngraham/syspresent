@@ -140,7 +140,7 @@ test('part contents and container are directional, retaining native owners and d
  const g=structureFixture(),contents=traceContext(g,{focus:'part',mode:'contents',budget:5}),container=traceContext(g,{focus:'part',mode:'container'});
  assert.deepEqual(contents.targets,['peer','subpart']);assert.deepEqual(new Set(ids(contents)),new Set(['part','type','peer','subpart']));
  assert.deepEqual(container.targets,['assembly']);assert.deepEqual(container.relationships,[g.relationships[0]]);
- assert.deepEqual(structuralActions(g,'part').map(a=>[a.mode,a.count]),[['contents',2],['container',1]]);
+ assert.deepEqual(structuralActions(g,'part').map(a=>[a.mode,a.count]),[['contents',2],['container',1],['effective',6],['local-understanding',10],['global-impact',8]]);
  assert.ok(!ids(contents).includes('package'));assert.ok(!ids(contents).includes('requirement0'));
 });
 test('package focus exposes native containing package and declaration contents without membership plumbing',()=>{

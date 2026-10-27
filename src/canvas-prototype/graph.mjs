@@ -18,6 +18,14 @@ export function modelGraph(raw,views=[]){
   // A part's owned PartUsage is engineering composition, not a path through memberships.
   if(['PartUsage','PartDefinition'].includes(item['@type']))for(const child of refs(item.ownedMember))if(index.get(child)?.kind==='PartUsage')add(id,child,'composition',`part:${id}:${child}`);
   if(item['@type']?.endsWith('Usage'))for(const type of refs(item.type))add(id,type,'typing',`typing:${id}:${type}`);
+  // Native API `specializes` names the actual general classifier. The
+  // declaration projection omits subclassification plumbing but retains its
+  // native identity in ownedSubclassification. Never infer inheritance from
+  // labels, type ancestry or qualified-name prefixes.
+  if(item['@type']?.endsWith('Definition')){
+   const generals=refs(item.specializes),nativeIds=refs(item.ownedSubclassification);
+   for(const general of generals)add(id,general,'specialization',`specialization:${id}:${general}`,generals.length===1&&nativeIds.length===1?nativeIds[0]:undefined);
+  }
   if(item['@type']==='Documentation')for(const owner of refs(item.owner)){const target=index.get(owner);if(target&&!target.description)target.description=item.body||'';}
  }
  for(const view of views){const nodes=new Map(view.nodes.map(n=>[n.id,n.semanticId]));for(const [i,edge] of view.edges.entries()){

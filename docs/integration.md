@@ -235,3 +235,58 @@ remains the primary scene; figures share responsive region layout. Shared demo
 links check the publication archive digest and native model identity. Authored
 evidence categories never become native verdicts. Build and browser validation
 resolve references using native declarations and preserve source/asset bytes.
+
+## Explicit questions, complete declarations and part context
+
+The Hierarchy control traverses every loaded source declaration through native
+ownership, with paged contents and complete scoped search. Its roots are roots in
+the declaration projection: relation-owned metadata may appear separately when
+its nondeclaration owner is omitted. Browse declarations exposes all directly
+owned attributes/parts and declarations on one direct classifier, retaining
+declared-on identities and inert native source text. Values are not evaluated.
+Expanded cards show a disclosed first page; the dialog provides every page.
+
+Part Focus defaults to Effective requirements. Local understanding exposes the
+existing structural context; Global impact exposes native definitions,
+specializations and usages. Effective obligations follow explicit native typing,
+specialization, satisfaction or owned requirement usages. Definitions used only
+as templates are not obligations. Inherited nodes may collapse, but paths retain
+native identities/kinds and Context lists them. The canvas does not fabricate a
+shortcut edge. Counts describe the loaded projection. Include external context
+is an explicit, reversible choice within the retained package workspace; isolated
+scope remains the default.
+
+Ask as a new slide takes a selected native identity and a supported question mode.
+The optional wording is a slide label, not a natural-language semantic query.
+Only explicit submission appends a slide to the same story. A candidate captures
+a real reusable view definition plus an exposed view usage, or references a
+declared native view, then parses/renders it before committing the project.
+Arbitrary graph captures must match native selected identities and directed
+relationship occurrences exactly; unsupported projections fail without mutation.
+Export project ZIP retains view source and slides. This uses the authored native
+pipeline without adding a provider or credentials. Free-form LLM interpretation,
+metadata-driven narrative/value interpolation and relationship rollup aggregates
+remain outstanding; no aggregate relationships are fabricated.
+
+Exploratory rendering is default. Focused notation disables peripheral context,
+relationship emphasis and exploratory journeys, while retaining native active
+membership. It is not a claim of complete standards compliance. The official
+reference checked is [OMG SysML 2.0 Language, formal/2026-03-02](https://www.omg.org/spec/SysML/2.0/Language/PDF),
+section 8.2.3, including attributes/parts compartments. Current cards and supported
+markers cover only part of that notation; native extensions and unsupported
+markers remain disclosed.
+
+Adjust layout enables explicit card dragging in supported flat structural views;
+stationary peers keep their positions and connections reroute on release.
+Compound, native-port and behavioral drawings reject movement explicitly.
+Positions are session-only, keyed by model/view/prepared geometry, discarded on
+reload and excluded from native capture/export. Reset manual layout restores
+calculated geometry. Pan/zoom remains available for complex internals. Portable
+layout persistence is still an open product decision.
+
+The October 25 pending Blue Dog example refresh was copied byte-for-byte from
+the six dirty files in the original SysPresent checkout. Its source.json identifies
+the working-tree snapshot: all 98 listed source hashes matched the current
+sv-blue-dog-editorial files when integrated. Original checkout edits were preserved.
+This source refresh and software validation imply neither engineering acceptance
+nor a new Blue Dog architecture.

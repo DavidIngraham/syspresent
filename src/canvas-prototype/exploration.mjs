@@ -6,6 +6,7 @@
 import {isDeclarationKind} from './graph.mjs';
 import {ENGINEERING_RELATIONSHIPS} from './core/index.mjs';
 import {createProminenceIndex} from './prominence.mjs';
+import {partContext,isPartElement} from './part-exploration.mjs';
 
 const engineeringKinds=new Set(ENGINEERING_RELATIONSHIPS);
 const requirementKinds=new Set(['RequirementDefinition','RequirementUsage']);
@@ -138,6 +139,8 @@ export function requirementActions(graph,focus,options={}){
  * selected. Native source/target direction, IDs and relationship kinds survive.
  */
 export function traceContext(graph,options={}){
+ if(['effective','global-impact'].includes(options.mode))return partContext(graph,options);
+ if(options.mode==='local-understanding'){const result=traceContext(graph,{...options,mode:'context'});result.mode='local-understanding';result.summary.message+=' Local understanding exposes direct native type and contents; inherited definitions and other usages remain behind Global impact.';return result;}
  const {focus,mode='context',budget=7,page=0}=options;
  if(!Number.isInteger(budget)||budget<1)throw new Error('Invalid exploration budget');
  if(!Number.isInteger(page)||page<0)throw new Error('Invalid exploration page');
@@ -184,5 +187,7 @@ export function traceContext(graph,options={}){
 /** Structural actions share exactly the same bounded projection as Focus. */
 export function structuralActions(graph,focus,options={}){
  const prepared=prepare(graph);
- return [...structuralModes].map(mode=>{const data=projection(graph,focus,mode,options,prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
+ const actions=[...structuralModes].map(mode=>{const data=projection(graph,focus,mode,options,prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
+ if(isPartElement(prepared.elements.get(focus)))for(const [mode,label]of [['effective','Effective requirements'],['local-understanding','Local understanding'],['global-impact','Global impact']]){const context=traceContext(graph,{...options,focus,mode});actions.push({mode,label,count:context.total,enabled:true,summary:context.summary});}
+ return actions;
 }

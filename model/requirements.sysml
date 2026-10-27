@@ -114,7 +114,7 @@ package SyspresentRequirements {
     }
     package Exploration {
         requirement <'SP-040'> localContext {
-            doc /* The explorer shall start from a focused element or authored view and allow search and selective relationship-directed expansion instead of requiring a full-model overview. Requirement exploration shall default to engineering relationships, including explicit definition-to-usage context and modeled constraints, while retaining documentation and ownership internals as opt-in context. Part exploration shall prioritize its containing assembly, explicit direct type and declared subparts; package exploration shall prioritize its containing package and directly owned declarations. Part composition and package ownership shall remain distinct. Definition-declared parts shall retain their native identities and an explicit direct typing bridge rather than appear as fabricated children of a usage. Structural expansion shall remain bounded, offer separate contents and container actions, and preserve native connections among selected contents. */
+            doc /* The explorer shall start from a focused element or authored view and allow search and selective relationship-directed expansion instead of requiring a full-model overview. Requirement exploration shall default to engineering relationships, including explicit definition-to-usage context and modeled constraints, while retaining documentation and ownership internals as opt-in context. Part local-understanding exploration shall prioritize its containing assembly, explicit direct type and declared subparts; package exploration shall prioritize its containing package and directly owned declarations. Part composition and package ownership shall remain distinct. Definition-declared parts shall retain their native identities and an explicit direct typing bridge rather than appear as fabricated children of a usage. Structural expansion shall remain bounded, offer separate contents and container actions, and preserve native connections among selected contents. */
             comment scope /* First release */
         }
         requirement <'SP-041'> typedFilters {
@@ -308,4 +308,31 @@ package SyspresentRequirements {
             doc /* Standalone exploration shall provide a persistent native view chooser outside the presentation editor and element action menus. The chooser shall offer declared native views and applicable focused structural or behavioral views using native identities and element categories. Switching views shall preserve package scope. A native view whose represented elements or relationship endpoints cross that scope shall be reported before replacing the current viewpoint; the reader may explicitly clear scope to open the complete view. Native behavioral or grid payloads shall not be silently trimmed or reconstructed to fit a reader scope. Unsupported or empty native results shall be reported without substituting a misleading notation. */
         }
     }
+    package ConversationalExploration {
+        requirement <'SP-100'> completeHierarchy {
+            doc /* Readers shall be able to navigate every loaded source declaration through native ownership or complete paged search. Canvas compartments shall expose native attribute and internal-part declarations with progressive disclosure and explicit limits. Classifier-owned declarations shall retain their identities and declaration context rather than become runtime instances. */
+        }
+        requirement <'SP-101'> partUnderstanding {
+            doc /* Part-focused exploration shall default to effective modeled requirements with inheritance collapsed. Readers shall explicitly choose local understanding or global impact to inspect native definitions, inheritance and usages. Collapsed paths shall retain inspectable underlying identities and kinds without fabricated direct relationships. Missing projected links shall not be represented as model-wide absence. */
+        }
+        requirement <'SP-102'> scopedContextChoice {
+            doc /* Package exploration shall default to isolated native ownership scope. Readers shall explicitly include external relationship context without losing the selected package, and Back shall restore the scope and context choice. Isolated views shall disclose outside-scope targets. Native grids and behavioral views shall preserve their complete semantics. */
+        }
+        requirement <'SP-103'> relationshipAggregation {
+            doc /* Presentation aggregates shall identify omitted context, preserve underlying native relationship identities, direction and kinds, and allow drilldown to those relationships. Rolling a relationship up to a containing block or package shall not create a new modeled relationship. */
+        }
+        requirement <'SP-104'> explicitQuestionSlides {
+            doc /* Each explicit supported model question shall append one slide in the same conversation, using deterministic native selection and rendering. Manual browsing shall not append slides. Question wording shall not invent semantic relationships. Native view definitions and filters may be authored with optional LLM assistance using existing model narrative and typed attribute interpolation; provider and privacy configuration shall remain explicit. */
+        }
+        requirement <'SP-105'> reusableNativeCapture {
+            doc /* Explicit capture shall retain a real reusable native SysML view definition and usage or reference an existing native authored view. The capture shall be freshly resolvable after source changes and portable with its story. A bitmap, cached geometry or model-version-specific snapshot shall not substitute for the native selection. Unsupported exact captures shall fail before modifying the project. */
+        }
+        requirement <'SP-106'> focusedNotation {
+            doc /* Exploratory rendering shall be the default. A focused notation mode may reflow active native content and shall exclude exploratory opacity and surrounding-context effects. Supported notation claims shall be checked against official OMG SysML v2 notation; unsupported notation and incomplete conformance shall be stated explicitly. */
+        }
+        requirement <'SP-107'> manualLocalLayout {
+            doc /* Readers and authors shall be able to adjust supported exploratory drawing positions explicitly while preserving semantic identities, native directions and stationary peers. Complex internals shall remain explorable by local pan and zoom without mandatory global reshuffling. Manual drawing state shall remain distinct from native model properties and frozen snapshots. */
+        }
+    }
+
 }

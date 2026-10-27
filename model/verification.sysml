@@ -197,4 +197,19 @@ package SyspresentVerification {
         }
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
+    verification def <'SV-020'> conversationalExploration {
+        doc /* Exercise complete native ownership pagination/search and attribute/part compartments, isolated/contextual package navigation, part effective requirements with collapsed native path inspection, and explicit local/global overrides. Submit consecutive explicit questions and confirm exactly one native slide per submission with none from browsing. Compile captured definitions, round-trip ZIP and rerender after source changes. Reject unsupported captures without mutation. Check focused context/emphasis exclusion and supported manual movement with peer stability, native edge identity/direction and collision rejection. Independently assess aggregate rollup, LLM-assisted authoring, full notation coverage and portable layout persistence before accepting their outstanding obligations. */
+        objective acceptance {
+            verify SyspresentRequirements::ConversationalExploration::completeHierarchy;
+            verify SyspresentRequirements::ConversationalExploration::partUnderstanding;
+            verify SyspresentRequirements::ConversationalExploration::scopedContextChoice;
+            verify SyspresentRequirements::ConversationalExploration::relationshipAggregation;
+            verify SyspresentRequirements::ConversationalExploration::explicitQuestionSlides;
+            verify SyspresentRequirements::ConversationalExploration::reusableNativeCapture;
+            verify SyspresentRequirements::ConversationalExploration::focusedNotation;
+            verify SyspresentRequirements::ConversationalExploration::manualLocalLayout;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }

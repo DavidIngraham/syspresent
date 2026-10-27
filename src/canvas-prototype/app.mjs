@@ -1,3 +1,7 @@
+import {elementCompartments,compartmentText} from './element-compartments.mjs';
+import {prepareNativeCapture,prepareQuestionSlide} from './conversation.mjs';
+import {renderingPolicy,renderingPreferences} from './rendering-policy.mjs';
+import {createManualLayout,applyManualPositions,moveLayoutNode,manualLayoutSupport} from './manual-layout.mjs';
 import {showLanding} from './landing.mjs';
 import {validateStoryContent,renderMarkdown,renderContext,chapterGroups,sceneFromURL,sceneURL,checkSharedModel} from './story-content.mjs';
 import {createAssetURLs,mountFigure} from './figure-view.mjs';
@@ -11,7 +15,7 @@ import {regionAreas,mountGraphRegion,updateRegionReferences} from './scene-regio
 import {projectFromSelection} from './browser-project.mjs';
 import {discoverNativeIndex} from './native-project.mjs';
 import {buildSystemOverview,nativeScopeIds} from './prominence.mjs';
-import {isPackage,packageMembers,packageCatalog,containingPackage,outsidePackage,focusViewKinds} from './package-explorer.mjs';
+import {isPackage,packageMembers,packageCatalog,containingPackage,outsidePackage,focusViewKinds,hierarchyPage} from './package-explorer.mjs';
 import {planDepartures} from './departures.mjs';
 import {requirementActions,structuralActions,isStructuralElement,traceContext} from './exploration.mjs';
 import {resolvePresentation,validatePresentation,PRESENTATION_RELATIONSHIP_KINDS} from './preferences.mjs';
@@ -28,12 +32,13 @@ import {edgeAppearance,markerDefinition} from './notation.mjs';
 import {createSemanticEngine} from './engine/client.mjs';
 import {engineeringContext,findEngineeringRoute,findHierarchyRoute,planTransition,directTypingContext} from './core/index.mjs';
 import {adaptNativeView,modelGraph,graphView,requireNativeIdentity} from './graph.mjs';
-import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,appendScene,captureViewSource,requirementCoverageSource,verifiedRuntimeCache,verifiedRuntimeIndex,projectPath} from './project.mjs';
+import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,requirementCoverageSource,verifiedRuntimeCache,verifiedRuntimeIndex,projectPath} from './project.mjs';
 const buildVersion=document.querySelector('meta[name="syspresent-build"]')?.content||'development';
 const $=id=>document.getElementById(id),el=(name,text,cls)=>{const e=document.createElement(name);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
 const button=(text,fn)=>{const e=el('button',text);e.type='button';e.onclick=()=>Promise.resolve(fn()).catch(report);return e;};
 const state={engine:null,project:null,graph:null,views:new Map(),scenes:[],sceneIndex:0,focus:null,selected:null,view:null,displayed:null,exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),reduce:matchMedia('(prefers-reduced-motion: reduce)').matches,revision:0,loadRevision:0,animations:[],transitioning:false,provenance:null,history:[],future:[],presentation:{},traceRequest:null,camera:createCamera(),cameraRevision:0,neighborhoodBudget:null};
 try{state.reader=loadReaderSettings(localStorage);}catch{state.reader=loadReaderSettings(null);}
+state.renderingMode='exploratory';state.scopeContext=false;state.manualLayout=createManualLayout();state.adjustLayout=false;
 state.surfaceStates={};state.surfaces=[];state.selectedIds=[];state.comparison=null;state.activeRegion='primary';
 const report=error=>{const message=error.message||String(error);$('status').textContent=message;$('editor-error').textContent=message;if(!$('landing').hidden){$('landing-error').textContent=message;$('landing-error').hidden=false;$('landing-status').textContent='';}console.error(error);};
 const elementIndexes=new WeakMap();
@@ -44,9 +49,9 @@ const resolve=value=>resolveInGraph(state.graph,value);
 const qname=id=>element(id)?.qualifiedName;
 const scene=()=>state.scenes[state.sceneIndex];
 function scopeIds(){const roots=state.project.manifest.systemOfInterest;return state.graph.elements.filter(e=>roots.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);}
-function explorationScope(){return state.exploring&&state.packageScope?packageMembers(state.graph,state.packageScope):undefined;}
+function explorationScope(){return state.exploring&&state.packageScope&&!state.scopeContext?packageMembers(state.graph,state.packageScope):undefined;}
 function assertInScope(view,scopeId=state.packageScope){
- const outside=outsidePackage(view,scopeId?packageMembers(state.graph,scopeId):undefined);
+ const outside=outsidePackage(view,scopeId&&!state.scopeContext?packageMembers(state.graph,scopeId):undefined);
  if(outside.length)throw Error(`This native view includes ${outside.length} elements outside ${label(scopeId)}. Choose Whole project to open the complete view. The native view has not been trimmed.`);
 }
 function status(text){$('status').textContent=text;$('loading-phase').textContent=text;if(!$('landing').hidden)$('landing-status').textContent=text;}
@@ -124,7 +129,7 @@ async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,d
  const revision=loadToken??++state.loadRevision;if(revision!==state.loadRevision)return;++state.revision;$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);status('Parsing project with OpenSysML WASM…');$('selection').hidden=true;
  let compiled;try{await ensureEngine();if(revision!==state.loadRevision)return;compiled=await compile(validateProject(project),{cacheHash,progress:text=>{if(revision===state.loadRevision)status(text);}});}catch(error){if(revision!==state.loadRevision)return;busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision)return;
  let initialScene=0;try{if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){busy(false);throw error;}
- disposeSurfaces();state.assetURLs?.destroy();$('narrative').removeAttribute('data-scene-id');Object.assign(state,compiled,{demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],packageScope:null,traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.assetURLs=createAssetURLs(project.files);
+ disposeSurfaces();state.assetURLs?.destroy();$('narrative').removeAttribute('data-scene-id');state.manualLayout.clear();Object.assign(state,compiled,{scopeContext:false,demo,publication,narrativeState:{},sceneIndex:0,selected:null,selectedIds:[],exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),view:null,displayed:null,history:[],future:[],packageScope:null,traceRequest:null,traceInfo:null,presentation:{},extraViews:new Map(),neighborhoodBudget:null,surfaceStates:{},comparison:null,activeRegion:'primary'});state.assetURLs=createAssetURLs(project.files);
  state.trustedCacheHash=cacheHash??null;showLanding(document,false);document.title=project.manifest.title+' · Syspresent';$('resume-model').hidden=false;busy(false);updateLists();$('editor-error').textContent='';$('project-menu').open=false;
  if(state.scenes.length)await showScene(initialScene,false,{urlMode:'replace'});else if(project.manifest.entryView||project.manifest.entryFocus){state.focus=resolve(project.manifest.entryFocus??project.manifest.systemOfInterest[0]);const entry=state.views.get(project.manifest.entryView);if(entry)await openExploration(entry,state.focus,{record:false});else await explore(state.focus);}else await openSystemOverview({record:false});
  status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
@@ -150,7 +155,7 @@ function panelGeometry(view=state.view){
 }
 function sizeView(view,focus,{compact=false}={}){return {...view,nodes:view.nodes.map(n=>{
  const preferences=displayPreferences(),expanded=compartmentVisible(n,{mode:state.reader.compartments,focus,expanded:state.expanded,collapsed:state.collapsed}),documentation=documentationFor(state.graph,n.semanticId);
- const detail=[...new Set([behaviorNodeDetail(n),...(expanded?[documentation.text||n.detail]:[])].filter(Boolean))].join('\n');
+ const detail=[...new Set([behaviorNodeDetail(n),...(expanded?[documentation.text||n.detail,compartmentText(state.graph,n.semanticId)]:[])].filter(Boolean))].join('\n');
  const attribution=detail&&documentation.text&&documentation.source?.id!==n.semanticId?`Statement from ${documentation.source.qualifiedName||documentation.source.name}\n`:'';
  const displayDetail=attribution+detail;
  const displayID=element(n.semanticId)?.native?.declaredShortName||documentation.source?.native?.declaredShortName||'';
@@ -165,13 +170,15 @@ async function prepareFrame(view,focus,panels,{journey=false}={}){
  const stage=$('stage'),area=primaryArea(view,panels,journey);
  const layoutFor=compact=>layoutDiagram(sizeView(view,focus,{compact}),{width:area.width,height:area.height,elk:state.layoutEngine,measureLabel:labelSize,grouping:displayPreferences().grouping});
  let layout=await layoutFor(false),fitted=fitDiagram(layout,area);
+ const placementKey=JSON.stringify([state.modelHash,view.id,area,view.kind,fitted.nodes.map(n=>[n.id,n.x,n.y,n.width,n.height])]);
+ if(renderingPolicy(state.renderingMode).manualLayout){const positions=state.manualLayout.get(placementKey);if(Object.keys(positions).length)fitted=applyManualPositions({...fitted,kind:view.kind},positions,{measureLabel:labelSize,area});}
  // Prefer readable names over shrinking an automatically expanded statement.
  // Explicit reader compartment choices must not be silently compacted to fit.
  const active=fitted.nodes.map(n=>({...n,scale:fitted.scale,opacity:1,context:false}));
  const routed=fitted.edges;
  const labelObstacles=[...routed.filter(e=>e.labelBox).map((e,i)=>({...e.labelBox,id:'label-obstacle:'+i})),...active.flatMap(n=>n.portLabelBox?[{...n.portLabelBox,id:'port-label:'+n.id}]:[])];
  const routeObstacles=routed.flatMap(e=>e.points.slice(1).map((p,i)=>({id:'route:'+e.id+':'+i,x:Math.min(p.x,e.points[i].x)-3,y:Math.min(p.y,e.points[i].y)-3,width:Math.max(6,Math.abs(p.x-e.points[i].x)+6),height:Math.max(6,Math.abs(p.y-e.points[i].y)+6)})));
- const budget=state.neighborhoodBudget??displayPreferences().contextBudget,context=view.overview&&!journey?{view:{nodes:[],edges:[]},elements:[],omissions:[]}:surroundingContext(state.graph,layout,{budget:journey?Math.min(8,budget):budget,focus,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()});
+ const budget=view.traceRequest?.mode==='effective'?0:renderingPolicy(state.renderingMode).contextBudget??state.neighborhoodBudget??displayPreferences().contextBudget,context=view.overview&&!journey?{view:{nodes:[],edges:[]},elements:[],omissions:[]}:surroundingContext(state.graph,layout,{budget:journey?Math.min(8,budget):budget,focus,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()});
  context.view.nodes=context.view.nodes.map(node=>({...node,...measureCard(document,node,'')}));
  const fringe=prepareNeighborhood(context,active,area,{width:160,height:80,gap:72,activeEdges:routed,labelObstacles,obstacles:[...labelObstacles,...routeObstacles],measureLabel:labelSize});
  const ghosts=fringe.nodes.map(n=>({...n,scale:1,opacity:.3,context:true,displayDetail:'',displayID:''}));
@@ -185,10 +192,10 @@ async function prepareFrame(view,focus,panels,{journey=false}={}){
  });
  const notationNotices=layout.edges.map(e=>({e,appearance:edgeAppearance(e,{viewKind:view.kind})})).filter(p=>!p.appearance.supported).map(p=>({reason:'unsupported-notation',target:p.e.target,relationshipId:p.e.id,message:p.appearance.notice}));
  const omissions=[...(layout.omissions??view.omissions??[]),...(view.notices??[]).map(message=>({reason:'native-view',message:typeof message==='string'?message:JSON.stringify(message)})),...notationNotices,...fringe.omissions,...fringe.notices,...routed.filter(e=>e.labelOmitted||e.routingBlocked).map(e=>({reason:e.labelOmitted?'label-space':'route-space',target:e.semanticTarget||e.target,relationshipId:e.semanticId||e.id}))];
- return {view,focus,journey,nodes,edges,area,width:stage.clientWidth,height:stage.clientHeight,panels,scale:fitted.scale,layout,omissions,routingMetrics:fringe.routingMetrics,worldBounds:fringe.worldBounds,neighborhood:{shown:context.elements.length,total:context.elements.length+new Set(context.omissions.filter(o=>o.reason==='budget').map(o=>o.target)).size,budget}};
+ return {view,focus,journey,nodes,edges,area,fitted,placementKey,width:stage.clientWidth,height:stage.clientHeight,panels,scale:fitted.scale,layout,omissions,routingMetrics:fringe.routingMetrics,worldBounds:fringe.worldBounds,neighborhood:{shown:context.elements.length,total:context.elements.length+new Set(context.omissions.filter(o=>o.reason==='budget').map(o=>o.target)).size,budget}};
 }
 function face(n){const behavior=behaviorFace(document,n);if(behavior){if(n.overviewLabel)behavior.append(el('span',n.overviewLabel,'prominence'));return behavior;}const host=el('span',undefined,'node-face');if(n.kind==='port'&&!n.overviewLabel){const text=n.label??n.name??'';if(text)host.append(el('span',text,'port-name'));return host;}const short=(n.name?.split('::').at(-1)||n.kind).replace(/([a-z0-9])([A-Z])/g,'$1\u200b$2');host.append(el('span',`«${n.kind}»${n.displayID?' '+n.displayID:''}${n.type?' : '+n.type:''}`,'kind'),el('span',short,'name'));if(n.displayDetail)host.append(el('span',n.displayDetail,'detail'));if(n.overviewLabel)host.append(el('span',n.overviewLabel,'prominence'));return host;}
-function visualNode(n){if(n.kind==='context-boundary'){const marker=el('span',undefined,'node context-boundary');marker.title='Additional model context: '+(n.name||n.semanticId);marker.setAttribute('role','img');marker.setAttribute('aria-label',marker.title);marker.dataset.context='true';const glyph=el('span','›','continuation-glyph');glyph.style.transform=`rotate(${({EAST:0,SOUTH:90,WEST:180,NORTH:270})[n.continuationDirection]??0}deg)`;marker.append(glyph);return marker;}const node=el('button',undefined,`node ${n.kind}${n.overviewLabel?' overview-card':''}${n.container?' container':''}${n.context?' peripheral':''}${n.semanticId&&n.semanticId===state.selected?' selected':''}`);node.type='button';node.dataset.representation=n.id;if(n.semanticId)node.dataset.semanticId=n.semanticId;node.dataset.context=String(!!n.context);node.setAttribute('aria-label',`${n.name||n.kind}: select ${n.kind}${n.context?' (surrounding context)':''}`);node.style.zIndex=String(n.context?0:n.container?1:3);node.append(face(n));node.onclick=event=>{event.stopPropagation();select(n.semanticId,n);};node.oncontextmenu=event=>{event.preventDefault();select(n.semanticId,n);};return node;}
+function visualNode(n){if(n.kind==='context-boundary'){const marker=el('span',undefined,'node context-boundary');marker.title='Additional model context: '+(n.name||n.semanticId);marker.setAttribute('role','img');marker.setAttribute('aria-label',marker.title);marker.dataset.context='true';const glyph=el('span','›','continuation-glyph');glyph.style.transform=`rotate(${({EAST:0,SOUTH:90,WEST:180,NORTH:270})[n.continuationDirection]??0}deg)`;marker.append(glyph);return marker;}const node=el('button',undefined,`node ${n.kind}${n.overviewLabel?' overview-card':''}${n.container?' container':''}${n.context?' peripheral':''}${n.semanticId&&n.semanticId===state.selected?' selected':''}`);node.type='button';node.dataset.representation=n.id;if(n.semanticId)node.dataset.semanticId=n.semanticId;node.dataset.context=String(!!n.context);node.setAttribute('aria-label',`${n.name||n.kind}: select ${n.kind}${n.context?' (surrounding context)':''}`);node.style.zIndex=String(n.context?0:n.container?1:3);node.append(face(n));node.onclick=event=>{event.stopPropagation();if(node.dataset.dragged){delete node.dataset.dragged;return;}select(n.semanticId,n);};node.onpointerdown=event=>beginManualMove(event,node,n);node.oncontextmenu=event=>{event.preventDefault();select(n.semanticId,n);};return node;}
 const rectValues=n=>({x:n.x,y:n.y,width:n.width,height:n.height,scale:n.scale??1,opacity:n.opacity??1,context:n.context?1:0});
 function presenceTrack(frames,key,collection){return frames.map((f,index)=>{const item=f[collection].find(n=>n.key===key);if(item)return item;let nearest;for(let distance=1;distance<frames.length&&!nearest;distance++)nearest=frames[index-distance]?.[collection].find(n=>n.key===key)??frames[index+distance]?.[collection].find(n=>n.key===key);return {...nearest,opacity:0};});}
 function applyCamera(value){state.camera=createCamera(value);const c=state.camera;$('graph-world').style.transform=`translate(${c.x}px,${c.y}px) scale(${c.scale})`;}
@@ -382,7 +389,7 @@ async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=f
  let oldPanel;try{
  oldPanel=!$('narrative').hidden?$('narrative').cloneNode(true):null;if(oldPanel){oldPanel.removeAttribute('id');oldPanel.classList.add('narrative-outgoing');oldPanel.setAttribute('aria-hidden','true');$('stage').append(oldPanel);}
  const panels=panelGeometry(view),projection=rendererFamily(view)==='graph'?view:gather(representedIdentities(view).filter(id=>element(id)).slice(0,24)),target=await prepareFrame(projection,focus,panels),frames=[];if(revision!==state.revision){oldPanel?.remove();return;}
- if(state.visualSnapshot&&animate&&!state.reduce&&cameraRevision===state.cameraRevision){frames.push(state.visualSnapshot);if(plan?.journeyRequired&&!disconnected){for(const step of plan.stages.filter(step=>step.viewKind==='gv')){frames.push(await prepareFrame(gather(step.semanticIds,step.route),step.focusId??focus,panels,{journey:true}));if(revision!==state.revision){oldPanel?.remove();return;}}}frames.push(target);const anchors=destinationAnchors(view,focus,panels,target);if(anchors)frames.push(anchors);}else frames.push(target);
+ if(state.visualSnapshot&&animate&&!state.reduce&&renderingPolicy(state.renderingMode).journeys&&cameraRevision===state.cameraRevision){frames.push(state.visualSnapshot);if(plan?.journeyRequired&&!disconnected){for(const step of plan.stages.filter(step=>step.viewKind==='gv')){frames.push(await prepareFrame(gather(step.semanticIds,step.route),step.focusId??focus,panels,{journey:true}));if(revision!==state.revision){oldPanel?.remove();return;}}}frames.push(target);const anchors=destinationAnchors(view,focus,panels,target);if(anchors)frames.push(anchors);}else frames.push(target);
  if(revision!==state.revision){oldPanel?.remove();return;}
  if(cameraRevision!==state.cameraRevision)frames.splice(0,frames.length,target);
  const result=await paintFrames(frames,{duration:frames.length>2?Math.max(1700,(frames.length-1)*420):frames.length>1?780:0,caption:disconnected?'No engineering route · explicit view jump':plan?.route?.strategy==='ownership-ancestor'?'Model ownership route · location, not derivation':'',outgoingPanel:oldPanel,cameraTarget:cameraRevision===state.cameraRevision?camera:state.camera});
@@ -395,7 +402,7 @@ async function transitionTo(view,focus,{animate=true,journey,allowDisconnected=f
 async function showScene(index,animate=true,{record=false,urlMode='push'}={}){
  if(index<0||index>=state.scenes.length)return;
  const saved=snapshot(),savedHistory=[...state.history],savedFuture=[...state.future],savedURL=location.href;
- if(record)remember();state.sceneIndex=index;state.exploring=false;state.packageScope=null;state.neighborhoodBudget=null;state.traceRequest=null;state.traceInfo=null;state.comparison=null;state.activeRegion='primary';state.presentation=structuredClone(state.scenes[index].presentation??{});state.expanded=new Set();state.collapsed=new Set();updateExplorationControls();const s=scene();const focus=resolve(s.focus),view=state.views.get(s.view);
+ if(record)remember();state.sceneIndex=index;state.exploring=false;state.packageScope=null;state.scopeContext=false;state.neighborhoodBudget=null;state.traceRequest=null;state.traceInfo=null;state.comparison=null;state.activeRegion='primary';state.presentation=structuredClone(state.scenes[index].presentation??{});state.expanded=new Set();state.collapsed=new Set();updateExplorationControls();const s=scene();const focus=resolve(s.focus),view=state.views.get(s.view);
  let navigationRevision;try{if(!focus||!view)throw Error('Scene focus or native view is unavailable');syncSceneURL(urlMode);const pending=transitionTo(view,focus,{animate,journey:s.journey,allowDisconnected:true});navigationRevision=state.revision;await pending;}
  catch(error){if(navigationRevision!==undefined&&navigationRevision!==state.revision)return;state.history=savedHistory;state.future=savedFuture;restoreValues(saved);if(urlMode!=='none')history.replaceState(null,'',savedURL);if(saved.view)await transitionTo(saved.view,saved.focus,{animate:false,allowDisconnected:true,camera:saved.camera});throw error;}
  finally{updateExplorationControls();$('scenes').value=state.sceneIndex;$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;$('return').hidden=!state.exploring||!state.scenes.length;$('standalone').hidden=state.exploring;}
@@ -432,22 +439,23 @@ function editorStoryContent(){
  if(!!id!==!!title)throw Error('Chapter ID and title must be supplied together');
  return {chapter:id?{id,title}:undefined,figures:JSON.parse($('scene-figures').value||'[]'),context:JSON.parse($('scene-context').value||'[]')};
 }
-function displayPreferences(){return {...resolvePresentation(state.presentation,{width:$('stage').clientWidth,resolve}),compartments:({all:'expanded',none:'compact',focused:'auto'})[state.reader.compartments]};}
-function snapshot(){saveSurfaces();return {view:state.pendingDestination?.view??state.view,focus:state.pendingDestination?.focus??state.focus,sceneIndex:state.sceneIndex,exploring:state.exploring,packageScope:state.packageScope??null,selected:state.selected,selectedIds:[...state.selectedIds],expanded:[...state.expanded],collapsed:[...state.collapsed],presentation:structuredClone(state.presentation),traceRequest:structuredClone(state.traceRequest),traceInfo:structuredClone(state.traceInfo??null),camera:{...state.camera},neighborhoodBudget:state.neighborhoodBudget,surfaceStates:structuredClone(state.surfaceStates),comparison:state.comparison,activeRegion:state.activeRegion};}
-function restoreValues(target){disposeSurfaces();Object.assign(state,{sceneIndex:target.sceneIndex,exploring:target.exploring,packageScope:target.packageScope??null,selected:target.selected,selectedIds:[...(target.selectedIds??[target.selected].filter(Boolean))],expanded:new Set(target.expanded),collapsed:new Set(target.collapsed),presentation:structuredClone(target.presentation),traceRequest:structuredClone(target.traceRequest),neighborhoodBudget:target.neighborhoodBudget??null,surfaceStates:structuredClone(target.surfaceStates??{}),comparison:target.comparison??null,activeRegion:target.activeRegion??'primary'});state.traceInfo=structuredClone(target.traceInfo??null);}
+function displayPreferences(){return renderingPreferences({...resolvePresentation(state.presentation,{width:$('stage').clientWidth,resolve}),compartments:({all:'expanded',none:'compact',focused:'auto'})[state.reader.compartments]},state.renderingMode);}
+function snapshot(){saveSurfaces();return {view:state.pendingDestination?.view??state.view,focus:state.pendingDestination?.focus??state.focus,sceneIndex:state.sceneIndex,exploring:state.exploring,packageScope:state.packageScope??null,scopeContext:state.scopeContext,renderingMode:state.renderingMode,selected:state.selected,selectedIds:[...state.selectedIds],expanded:[...state.expanded],collapsed:[...state.collapsed],presentation:structuredClone(state.presentation),traceRequest:structuredClone(state.traceRequest),traceInfo:structuredClone(state.traceInfo??null),camera:{...state.camera},neighborhoodBudget:state.neighborhoodBudget,surfaceStates:structuredClone(state.surfaceStates),comparison:state.comparison,activeRegion:state.activeRegion};}
+function restoreValues(target){disposeSurfaces();Object.assign(state,{sceneIndex:target.sceneIndex,exploring:target.exploring,packageScope:target.packageScope??null,scopeContext:target.scopeContext??false,renderingMode:target.renderingMode??'exploratory',selected:target.selected,selectedIds:[...(target.selectedIds??[target.selected].filter(Boolean))],expanded:new Set(target.expanded),collapsed:new Set(target.collapsed),presentation:structuredClone(target.presentation),traceRequest:structuredClone(target.traceRequest),neighborhoodBudget:target.neighborhoodBudget??null,surfaceStates:structuredClone(target.surfaceStates??{}),comparison:target.comparison??null,activeRegion:target.activeRegion??'primary'});state.traceInfo=structuredClone(target.traceInfo??null);}
 function remember(){if(!state.view)return;state.history.push(snapshot());if(state.history.length>40)state.history.shift();state.future=[];updateExplorationControls();}
 function updateWorkspaceControls(){
  $('workspace-controls').hidden=!state.exploring;
  if(!state.project||!state.graph)return;
  const scope=state.packageScope,scopeName=scope?qname(scope):'Whole project';
- $('scope-label').textContent=scopeName;$('scope-label').title=scopeName;
+ $('scope-context').hidden=!scope;$('scope-context').querySelector('input').checked=state.scopeContext;$('rendering-mode').value=state.renderingMode;$('adjust-layout').disabled=!renderingPolicy(state.renderingMode).manualLayout;$('adjust-layout').setAttribute('aria-pressed',String(state.adjustLayout));
+ $('scope-label').textContent=scopeName+(state.scopeContext?' + external context':'');$('scope-label').title=scopeName;
  $('scope-clear').hidden=!scope;$('scope-up').hidden=!scope||!containingPackage(state.graph,scope);
  $('search-scope').textContent=scope?'Search within '+scopeName:'Search the loaded project';
  const select=$('view-navigation');select.replaceChildren();
  const add=(host,value,text)=>{const option=el('option',text);option.value=value;host.append(option);return option;};
  add(select,'overview',scope?'Package overview':'Project overview');
  const focusGroup=el('optgroup');focusGroup.label='Focused element · '+label(state.focus);
- for(const item of focusViewKinds(element(state.focus)))add(focusGroup,item.id,item.label);select.append(focusGroup);
+ for(const item of [...focusViewKinds(element(state.focus)),...(['PartUsage','PartDefinition'].includes(element(state.focus)?.kind)?[{id:'effective',label:'Effective requirements'},{id:'local-understanding',label:'Local understanding'},{id:'global-impact',label:'Global impact'}]:[])])add(focusGroup,item.id,item.label);select.append(focusGroup);
  const views=el('optgroup');views.label='Declared native views';
  const catalog=state.availableViews.map(name=>({name,short:element(resolve(name))?.native.declaredName||name,kind:state.views.get(name)?.kind})),counts=new Map();
  for(const item of catalog)counts.set(item.short,(counts.get(item.short)??0)+1);
@@ -467,7 +475,7 @@ async function switchWorkspaceView(value){
  if(value==='overview')await openSystemOverview();
  else if(value.startsWith('authored:'))await openNativeView(value.slice(9));
  else if(value.startsWith('native:'))await explore(state.focus,value.slice(7));
- else if(['context','contents'].includes(value))await followTrace(state.focus,value);
+ else if(['context','contents','effective','local-understanding','global-impact'].includes(value))await followTrace(state.focus,value);
 }
 async function openNativeView(name,{compare=false}={}){
  const revision=++state.revision,modelHash=state.modelHash;let view=state.views.get(name);
@@ -486,7 +494,7 @@ async function openNativeView(name,{compare=false}={}){
 function updateExplorationControls(){
  const exploring=state.exploring;document.querySelector('header nav').hidden=exploring;$('exploration-controls').hidden=!exploring&&!state.history.length&&!state.future.length;$('explore-back').disabled=!state.history.length;$('explore-forward').disabled=!state.future.length;
  $('return').hidden=!exploring||!state.scenes.length;$('standalone').hidden=exploring;updateWorkspaceControls();
- const request=state.traceRequest,info=state.traceInfo;$('exploration-label').textContent=exploring?(state.view?.overview?`${state.packageScope?'Package':'System'} overview · ${state.view.overview.summary.shown} of ${state.view.overview.summary.total}`:request&&info?`${info.mode==='context'?'Context':({origins:'Origins',derived:'Derived requirements',impact:'Design impact',verification:'Verification',contents:'Parts / contents',container:'Containing element'})[info.mode]} · ${label(request.focus)} · ${info.shown} of ${info.total}`:label(state.focus)):'Guided scene';$('exploration-label').title=$('exploration-label').textContent;
+ const request=state.traceRequest,info=state.traceInfo;$('exploration-label').textContent=exploring?(state.view?.overview?`${state.packageScope?'Package':'System'} overview · ${state.view.overview.summary.shown} of ${state.view.overview.summary.total}`:request&&info?`${info.mode==='context'?'Context':({origins:'Origins',derived:'Derived requirements',impact:'Design impact',verification:'Verification',contents:'Parts / contents',container:'Containing element',effective:'Effective requirements','local-understanding':'Local understanding','global-impact':'Global impact'})[info.mode]} · ${label(request.focus)} · ${info.shown} of ${info.total}`:label(state.focus)):'Guided scene';$('exploration-label').title=$('exploration-label').textContent;
  $('trace-previous').hidden=!request||!info||info.pages<2;$('trace-next').hidden=!request||!info||info.pages<2;$('trace-previous').disabled=!info||info.page===0;$('trace-next').disabled=!info||info.page>=info.pages-1;
  if(info?.pages>1)$('trace-next').textContent=`More (${info.page+1}/${info.pages})`;
 }
@@ -497,7 +505,7 @@ async function restoreHistory(direction){
 }
 async function openExploration(view,id,{request=null,info=null,record=true,resetRegions=false,scopeId=state.packageScope}={}){
  assertInScope(view,scopeId);
- const previous=snapshot(),history=[...state.history],future=[...state.future];if(record)remember();if(resetRegions){state.comparison=null;state.activeRegion='primary';}state.packageScope=scopeId??null;state.neighborhoodBudget=null;state.exploring=true;state.traceRequest=request;state.traceInfo=info;if(request)state.presentation={...state.presentation,emphasis:[]};updateExplorationControls();const revision=state.revision+1;
+ const previous=snapshot(),history=[...state.history],future=[...state.future];if(record)remember();if(resetRegions){state.comparison=null;state.activeRegion='primary';}if(state.packageScope!==(scopeId??null))state.scopeContext=false;state.packageScope=scopeId??null;state.neighborhoodBudget=null;state.exploring=true;state.traceRequest=request;state.traceInfo=info;if(request)state.presentation={...state.presentation,emphasis:[]};updateExplorationControls();const revision=state.revision+1;
  try{await transitionTo(view,id,{allowDisconnected:true});if(revision!==state.revision)return;updateExplorationControls();status(info?.summary.message??view.overview?.summary.message??'Explore this native view · select an element for contextual actions');}
  catch(error){if(revision!==state.revision)return;state.history=history;state.future=future;restoreValues(previous);updateExplorationControls();if(previous.view)await transitionTo(previous.view,previous.focus,{animate:false,allowDisconnected:true,camera:previous.camera});throw error;}
 }
@@ -513,7 +521,7 @@ async function openSystemOverview({record=true,scopeId=state.packageScope}={}){
 }
 async function explore(id,kind){
  if(!id||!element(id))throw Error('Model target unavailable');
- if(!kind){await followTrace(id,'context');return;}
+ if(!kind){await followTrace(id,['PartUsage','PartDefinition'].includes(element(id)?.kind)?'effective':'context');return;}
  const revision=++state.revision,modelHash=state.modelHash,q=qname(id);
  if(!q)throw Error('Native view requires a qualified model identity');
  status('Preparing native '+kind+' view…');
@@ -529,9 +537,9 @@ async function explore(id,kind){
  state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);
  await openExploration(view,id);
 }
-async function followTrace(id,mode,page=0){
+async function followTrace(id,mode,page=0,{record=true}={}){
  const request={focus:id,mode,budget:$('stage').clientWidth<700?5:7,page},context=traceContext(state.graph,{...request,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()}),view=graphView(state.graph,context,mode+' of '+label(id));view.traceRequest=request;
- await openExploration(view,id,{request,info:context});
+ await openExploration(view,id,{request,info:context,record});
 }
 function select(id,node,origin){clearTrace();highlightSelection([id],origin);const menu=$('selection');menu.replaceChildren(el('strong',node?.name||label(id)));menu.hidden=false;
  if(!id){menu.append(el('p','This native notation element or embedded port has no independent model-element identity in this projection.'),button('Close',()=>{menu.hidden=true;}));return;}
@@ -547,7 +555,7 @@ function select(id,node,origin){clearTrace();highlightSelection([id],origin);con
  const advanced=el('details'),summary=el('summary','Other relationships');advanced.append(summary);
  const kinds=[...new Set(state.graph.relationships.filter(r=>r.source===id||r.target===id).map(r=>r.kind))].filter(k=>!['typing','owner','specialization'].includes(k));
  for(const kind of kinds)advanced.append(button(`Follow ${kind} relationships`,async()=>{const context=engineeringContext(state.graph,{focus:id,scopeIds:explorationScope(),relationshipKinds:[kind],depth:1,budget:7});await openExploration(graphView(state.graph,context),id);}));
- menu.append(advanced);
+ menu.append(advanced);menu.append(button('Browse declarations',()=>openDeclarations(id)),button('Locate in hierarchy',()=>openHierarchy(id)),button('Ask as a new slide',()=>openQuestion(id)));
  const typing=directTypingContext(state.graph,id);if(typing.elements.length>1&&!outsidePackage(graphView(state.graph,typing),explorationScope()).length)menu.append(button('Show direct type context',async()=>{await openExploration(graphView(state.graph,typing,'Explicit typing context'),id);}));
  menu.append(button('Close',()=>{menu.hidden=true;}));
 }
@@ -563,12 +571,54 @@ function download(name,bytes,type){const blob=new Blob([bytes],{type}),url=URL.c
 function editorPresentation(){const config={compartments:$('presentation-compartments').value,expanded:$('presentation-expanded').value.split('\n').map(s=>s.trim()).filter(Boolean),emphasis:[...$('presentation-emphasis').selectedOptions].map(o=>o.value),grouping:$('presentation-grouping').value};if($('presentation-context').value!=='')config.contextBudget=Number($('presentation-context').value);resolvePresentation(config,{resolve});return validatePresentation(config);}
 function openEditor(){if(!state.project)return;$('chapter-id').value=scene()?.chapter?.id??'';$('chapter-title').value=scene()?.chapter?.title??'';$('scene-figures').value=JSON.stringify(scene()?.figures??[],null,2);$('scene-context').value=JSON.stringify(scene()?.context??[],null,2);$('scene-regions').value=(scene()?.regions??[]).map(r=>r.view).join('\n');$('scene-title').value=scene()?.title||'New scene';$('scene-prose').value=scene()?.markdown||'';$('panel-placement').value=scene()?.panel?.placement||'right';$('view-source').value=fileText(state.project,$('view-file').value);const p=validatePresentation(scene()?.presentation);$('presentation-compartments').value=p.compartments;$('presentation-expanded').value=p.expanded.join('\n');for(const o of [...$('presentation-emphasis').options])o.selected=p.emphasis.includes(o.value);$('presentation-context').value=p.contextBudget??'';$('presentation-grouping').value=p.grouping;$('editor-error').textContent='';$('editor').showModal();}
 async function capture(){
- if(!state.view)throw Error('Open a view before capturing a scene');let viewName=state.view.id;
- const project=structuredClone(state.project),number=state.scenes.length+1;
- if(!state.views.has(viewName)){if(!state.view.capture)throw Error('This focused graph cannot yet be captured faithfully as a native SysML view. Open a declared view, Internal view, or Activity view, then capture it.');const names=[state.view.capture.root];const name='scene'+number;const packageName='CanvasCaptured'+number;const filename='captured-views.sysml';const declaration=captureViewSource({packageName,name,qualifiedNames:names,definition:state.view.capture.definition});project.files[filename]=(project.files[filename]?fileText(project,filename)+'\n':'')+declaration;if(!project.manifest.viewSources.includes(filename))project.manifest.viewSources.push(filename);viewName=packageName+'::'+name;}
- const s={type:'scene',id:'captured-'+Date.now(),title:$('scene-title').value||'Captured view',view:viewName,focus:qname(state.focus),panel:{placement:$('panel-placement').value},presentation:editorPresentation(),markdown:$('scene-prose').value};
- if(!s.focus)throw Error('Captured focus needs a native qualified identity');appendScene(project,s);await loadProject(project);await showScene(state.scenes.length-1,false);$('editor').close();status('Scene captured. Export the project ZIP or Markdown to keep it.');
+ const revision=state.revision,modelHash=state.modelHash;
+ const result=await prepareNativeCapture(state.project,{view:state.view,graph:state.graph,views:state.views,focus:state.focus,engine:state.engine,title:$('scene-title').value||'Captured view',markdown:$('scene-prose').value,presentation:editorPresentation(),panel:{placement:$('panel-placement').value}});
+ if(revision!==state.revision||modelHash!==state.modelHash)return;
+ await loadProject(result.project);await showScene(result.sceneIndex,false);$('editor').close();status('Native view captured. Export the project ZIP to retain its definition and slide.');
 }
+function renderHierarchy(){
+ const request=state.hierarchyRequest??{},result=hierarchyPage(state.graph,{...request,query:$('hierarchy-search').value,scopeIds:explorationScope()});
+ state.hierarchyRequest={...request,page:result.page};const list=$('hierarchy-list');list.replaceChildren();
+ $('hierarchy-location').textContent=request.parentId?(qname(request.parentId)||label(request.parentId)):'Roots in the loaded declaration projection';
+ $('hierarchy-summary').textContent=result.summary;$('hierarchy-previous').disabled=!result.hasPrevious;$('hierarchy-next').disabled=!result.hasNext;
+ for(const item of result.items){const row=el('div',undefined,'hierarchy-row');row.append(el('span',item.qualifiedName||item.label),el('small',item.kind+' · '+item.childCount+' children'),button('Open',async()=>{$('hierarchy-dialog').close();await explore(item.id);}),button('Declarations',()=>openDeclarations(item.id)));
+ if(item.childCount)row.append(button('Contents',()=>{state.hierarchyRequest={parentId:item.id,page:0};$('hierarchy-search').value='';renderHierarchy();}));list.append(row);}
+}
+function openHierarchy(parentId=null){state.hierarchyRequest={parentId,page:0};$('hierarchy-search').value='';renderHierarchy();$('hierarchy-dialog').showModal();}
+function openDeclarations(id,page=0){
+ const result=elementCompartments(state.graph,id,{page,pageSize:20});state.declarationRequest={id,page:result.page};
+ $('declaration-title').textContent=qname(id)||label(id);$('declaration-summary').textContent=result.summary;const list=$('declaration-list');list.replaceChildren();
+ for(const classifier of result.classifiers)list.append(button('Definition: '+classifier.label,()=>openDeclarations(classifier.id)));
+ for(const item of result.items){const row=el('div',undefined,'hierarchy-row');row.append(el('strong',item.label+(item.typeLabels.length?' : '+item.typeLabels.join(', '):'')),el('small',item.category+' · declared on '+item.declaredOnLabel),el('pre',item.provenance.sourceText||item.valueStatus),button('Explore declaration',async()=>{$('declarations-dialog').close();$('hierarchy-dialog').close();await explore(item.id);}));list.append(row);}
+ $('declaration-previous').disabled=!result.hasPrevious;$('declaration-next').disabled=!result.hasNext;if(!$('declarations-dialog').open)$('declarations-dialog').showModal();
+}
+function openQuestion(id){
+ state.questionFocus=id;const modes=$('question-mode');modes.replaceChildren();
+ const actions=['RequirementUsage','RequirementDefinition'].includes(element(id)?.kind)?requirementActions(state.graph,id):isStructuralElement(element(id))?structuralActions(state.graph,id):[];
+ for(const action of [{mode:'current',label:'Explain the current native view'},...actions]){const option=el('option',action.label);option.value=action.mode;modes.append(option);}
+ $('question-text').value='';$('question-focus').textContent=qname(id)||label(id);$('question-dialog').showModal();
+}
+async function submitQuestion(){
+ const id=state.questionFocus,mode=$('question-mode').value,modeLabel=$('question-mode').selectedOptions[0].textContent,question=$('question-text').value.trim()||modeLabel+' — '+(qname(id)||label(id));
+ let view=state.view,notice='';
+ if(mode!=='current'){const context=traceContext(state.graph,{focus:id,mode,budget:$('stage').clientWidth<700?5:7,page:0,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()});view=graphView(state.graph,context,modeLabel);notice=context.summary.message;}
+ assertInScope(view);const revision=state.revision,modelHash=state.modelHash;
+ $('submit-question').disabled=true;
+ try{const result=await prepareQuestionSlide(state.project,{view,graph:state.graph,views:state.views,focus:id,engine:state.engine,question,markdown:notice||'This slide references a native model view. No model relationships were inferred from the question text.',presentation:{contextBudget:0}});
+ if(revision!==state.revision||modelHash!==state.modelHash)return;
+ await loadProject(result.project);await showScene(result.sceneIndex,false);$('question-dialog').close();status('Question appended as a native slide in this story. Export project ZIP to keep the conversation.');
+ }finally{$('submit-question').disabled=false;}
+}
+function beginManualMove(event,node,representation){
+ if(!state.adjustLayout||event.button!==0)return;event.stopPropagation();event.preventDefault();takeCameraControl();
+ const prepared=state.visualSnapshot,support=manualLayoutSupport({...prepared.fitted,kind:state.view.kind},representation.id);if(!support.supported){status(support.reason);return;}
+ const start={x:event.clientX,y:event.clientY},base=prepared.fitted.nodes.find(n=>n.id===representation.id);let delta={x:0,y:0},moved=false;node.setPointerCapture?.(event.pointerId);
+ const move=e=>{delta={x:(e.clientX-start.x)/state.camera.scale,y:(e.clientY-start.y)/state.camera.scale};if(Math.hypot(delta.x,delta.y)<4&&!moved)return;moved=true;node.style.transform='translate('+(base.x+delta.x)+'px,'+(base.y+delta.y)+'px) scale('+prepared.fitted.scale+')';$('connections').style.visibility='hidden';};
+ const finish=async e=>{node.removeEventListener('pointermove',move);node.removeEventListener('pointerup',finish);node.removeEventListener('pointercancel',cancel);node.releasePointerCapture?.(event.pointerId);$('connections').style.visibility='';if(!moved)return;node.dataset.dragged='true';try{if(prepared!==state.visualSnapshot)throw Error('The drawing changed during the move; try again.');const position={x:base.x+delta.x,y:base.y+delta.y};moveLayoutNode({...prepared.fitted,kind:state.view.kind},{id:representation.id,...position},{measureLabel:labelSize,area:prepared.area});state.manualLayout.set(prepared.placementKey,representation.id,position);await frame(state.view);status('Manual position kept for this drawing in this session. Exported native selection is unchanged.');}catch(error){await frame(state.view);report(error);}};
+ const cancel=()=>{node.removeEventListener('pointermove',move);node.removeEventListener('pointerup',finish);node.removeEventListener('pointercancel',cancel);$('connections').style.visibility='';frame(state.view).catch(report);};
+ node.addEventListener('pointermove',move);node.addEventListener('pointerup',finish);node.addEventListener('pointercancel',cancel);
+}
+
 function contextNotice(notice){
  if(notice.message)return notice.message;
  if(notice.reason==='context-route-fallback')return `Connection layout: ${notice.continued??0} shortened; ${notice.unrepresented??0} not drawn in this view. Native relationships: ${(notice.relationships??[]).join(', ')}.`;
@@ -585,11 +635,22 @@ function omissionDisclosure(omissions,overview){
  return heading+'\n\n'+omissions.slice(0,100).map(contextNotice).join('\n')+(omissions.length>100?`\n\nShowing 100 of ${omissions.length} omitted records. Use Find to locate another named model element.`:'');
 }
 function bind(){
+ $('browse-hierarchy').onclick=()=>openHierarchy();
+ $('hierarchy-search').oninput=()=>{state.hierarchyRequest.page=0;renderHierarchy();};
+ $('hierarchy-roots').onclick=()=>{state.hierarchyRequest={page:0};$('hierarchy-search').value='';renderHierarchy();};
+ $('hierarchy-up').onclick=()=>{const id=state.hierarchyRequest?.parentId,parent=id?state.graph.containment.find(e=>e.nativeRole==='owner'&&e.target===id)?.source:null;state.hierarchyRequest={parentId:parent,page:0};$('hierarchy-search').value='';renderHierarchy();};
+ $('hierarchy-previous').onclick=()=>{state.hierarchyRequest.page--;renderHierarchy();};$('hierarchy-next').onclick=()=>{state.hierarchyRequest.page++;renderHierarchy();};
+ $('declaration-previous').onclick=()=>openDeclarations(state.declarationRequest.id,state.declarationRequest.page-1);$('declaration-next').onclick=()=>openDeclarations(state.declarationRequest.id,state.declarationRequest.page+1);
+ $('submit-question').onclick=()=>submitQuestion().catch(report);
+ $('adjust-layout').onclick=()=>{state.adjustLayout=!state.adjustLayout;updateWorkspaceControls();$('camera-menu').open=false;status(state.adjustLayout?'Drag active structural cards to adjust this drawing. Positions are kept in this session only.':'Layout adjustment off.');};
+ $('reset-layout').onclick=()=>{if(state.visualSnapshot)state.manualLayout.clear(state.visualSnapshot.placementKey);frame(state.view).catch(report);};
  $('contents').onclick=openContents;$('share-scene').onclick=shareScene;
  $('copy-scene-link').onclick=async()=>{try{await navigator.clipboard.writeText($('share-url').value);$('share-note').textContent='Scene link copied.';}catch{$('share-url').focus();$('share-url').select();$('share-note').textContent='Select and copy the scene link below.';}};
  const navigateURL=()=>{if(!state.project||!state.demo)return;const demo=new URLSearchParams(location.search).get('demo');if(demo!==state.demo){if(demo)openDemo(demo,{readURL:true}).catch(report);else home();return;}try{checkSharedModel(location.href,state.modelHash,state.publication);const index=sceneFromURL(location.href,state.scenes);if(index!==state.sceneIndex||state.exploring)showScene(index,false,{urlMode:'none'}).catch(report);}catch(error){report(error);}};
  window.addEventListener('popstate',navigateURL);window.addEventListener('hashchange',navigateURL);
 
+ $('rendering-mode').onchange=async()=>{const mode=$('rendering-mode').value;remember();state.renderingMode=mode;state.adjustLayout=false;updateExplorationControls();await frame(state.view);status(renderingPolicy(state.renderingMode).notice||'Exploratory rendering');};
+ $('scope-context-toggle').onchange=async()=>{const prior=state.scopeContext,include=$('scope-context-toggle').checked;remember();state.scopeContext=include;try{if(state.traceRequest)await followTrace(state.traceRequest.focus,state.traceRequest.mode,0,{record:false});else await openSystemOverview({record:false});}catch(e){state.scopeContext=prior;updateWorkspaceControls();report(e);}};
  $('global-compartments').value=state.reader.compartments;$('global-routing').value=state.reader.routing;
  for(const [id,key]of [['global-compartments','compartments'],['global-routing','routing']])$(id).onchange=async()=>{try{state.reader={...state.reader,[key]:$(id).value};try{saveReaderSettings(localStorage,state.reader);}catch{}if(key==='compartments'){state.expanded.clear();state.collapsed.clear();}if(state.view)await frame(state.view);}catch(e){report(e);}};
  $('open-folder').hidden=!('webkitdirectory' in $('folder-files'));
@@ -603,7 +664,7 @@ function bind(){
  bindCameraControls({element:$('stage'),getViewportArea:()=>state.visualSnapshot?.area,getCamera:()=>state.camera,setCamera:applyCamera,onGestureStart:takeCameraControl,shouldHandleTarget:target=>target===$('stage')||!!target?.closest?.('#graph-viewport')});$('reduce').setAttribute('aria-pressed',state.reduce);$('reduce').onclick=()=>{state.reduce=!state.reduce;$('reduce').setAttribute('aria-pressed',state.reduce);if(state.reduce)state.motion?.finish();};$('find-toggle').onclick=()=>{$('find').hidden=!$('find').hidden;if(!$('find').hidden)$('search').focus();};
  $('search').oninput=()=>{const q=$('search').value.trim().toLowerCase();$('search-results').replaceChildren();if(!q)return;const hits=state.graph.elements.filter(e=>e.qualifiedName&&e.layer==='project'&&e.native.declaredName&&(!explorationScope()||explorationScope().includes(e.id))&&(e.name+' '+e.qualifiedName).toLowerCase().includes(q));for(const e of hits.slice(0,30))$('search-results').append(button(e.qualifiedName,async()=>{$('find').hidden=true;await explore(e.id);}));};
  $('open-view').onclick=()=>openNativeView($('views').value).catch(report);$('compare-view').onclick=()=>openNativeView($('views').value,{compare:true}).catch(report);
- $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent=state.view?.overview?'Overview selection':'Prepared neighborhood';const omissions=state.displayOmissions??state.displayed?.omissions??[],n=state.visualSnapshot?.neighborhood;const summary=state.view?.overview?(state.view.overview.summary.message+'\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n'):n?`${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.\n\n`:'';$('information-text').textContent=summary+omissionDisclosure(omissions,!!state.view?.overview)+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
+ $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent=state.view?.overview?'Overview selection':'Prepared neighborhood';const omissions=state.displayOmissions??state.displayed?.omissions??[],n=state.visualSnapshot?.neighborhood;const summary=state.view?.overview?(state.view.overview.summary.message+'\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n'):n?`${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.\n\n`:'';$('information-text').textContent=renderingPolicy(state.renderingMode).notice+'\n\n'+summary+(state.traceInfo?.paths?.length?'Collapsed native paths:\n'+state.traceInfo.paths.map(p=>p.elementIds.map(id=>qname(id)||id).join(' → ')+' ['+p.kind+']').join('\n')+'\n\n':'')+omissionDisclosure(omissions,!!state.view?.overview)+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
  $('edit').onclick=openEditor;$('view-file').onchange=()=>{$('view-source').value=fileText(state.project,$('view-file').value);};
  $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{...editorStoryContent(),presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project);$('editor').close();await showScene(index,false);}catch(e){report(e);}};
  $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project);$('editor').close();}catch(e){report(e);}};
