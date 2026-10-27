@@ -27,7 +27,7 @@ try{
  const parsed=await call('ParseSources',{documents});
  if((parsed.diagnostics??[]).some(d=>String(d.severity).toLowerCase().includes('error')))throw Error('Native model has errors: '+JSON.stringify(parsed.diagnostics));
  const exported=await call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
- await validateProjectStory(project,{exported});
+ await validateProjectStory(project,{exported,engine:{call},modelHash:parsed.modelHash});
  const provenance=JSON.parse(await readFile(resolve(option('--provenance','build/canvas-prototype/engine/provenance.json')),'utf8'));
  const render=view=>call('RenderView',{modelHash:parsed.modelHash,view,includeSemanticIdentity:true});
  const coverage=requirementSeeds.length?await render(runtimePackage+'::coverage'):{kind:'definition',nodes:[],edges:[]},scenes=parseStory(fileText(project,manifest.story)),views={};
