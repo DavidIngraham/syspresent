@@ -214,23 +214,19 @@ for the earlier baseline and followup limits.
 
 ## Large-model native authoring boundary
 
-A fresh isolated browser run confirmed that a redundant candidate-wide native
-declaration export can exhaust the 4 GiB WASM address space during RDF collection
-annotation. This occurred before the selected attribute was evaluated; a fresh
-full-model WASM query resolves the actual batteryWhKg alias to native Integer
-140. The fatal trace is build/voice-selected-alias-direct-trace-results.json.
+Closed generated-view proposal review still validates native parse/render
+membership, exact references, scope, directed claims and fresh candidate
+GetSymbol/Evaluate values. Existing source identity/documentation reuse is allowed
+only while original source bytes and view-file ownership remain unchanged.
+Unknown bindings and concurrent source changes reject; no trusted publisher cache
+is fabricated.
 
-Closed generated-view proposal validation now reuses the loaded native source
-identity/documentation index only while original source bytes and view-file
-ownership remain unchanged. Candidate parsing, native rendering, exact membership,
-scope and relationship-claim validation remain required. Each selected attribute
-still uses the candidate model's fresh GetSymbol/Evaluate response. Unknown
-bindings and concurrent source changes reject explicitly; no trusted cache or
-new modeled relationship is fabricated.
-
-This bounded avoidance concerns proposal review. It does not repair the native
-whole-model exporter or establish a pass for large edited Blue Dog append/reload
-or ZIP reindexing. Those paths still require the broad export and retain the
-confirmed memory limitation. A future bounded native declaration-export/index
-handoff is needed before claiming those large-model flows pass. Compact native
-append, source refresh, capture and ZIP workflows are separate verified cases.
+Edited-project reindexing continues through the actual native declaration exporter.
+Its memory fix retains the same source-backed objects and ordered collection
+values while avoiding annotation of omitted subjects, reusing RDF indexes and
+reclaiming temporary document state. Explicit app leases release intermediate,
+failed, stale and superseded native model versions. Browser work-phase collection
+addresses delayed transient reclamation between large parse/render/export calls.
+See [native memory validation](native-memory-validation.md) for the exact preserved
+4 GiB baseline, byte-equivalence proof, repeated-flow measurements and test limits.
+The earlier successful trace file is not retained fatal evidence.

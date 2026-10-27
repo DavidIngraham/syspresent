@@ -73,7 +73,7 @@ try {
   const wasm = await wasmClient();
   const serverInfo = await native.call('GetServerInfo', {});
   assert.deepEqual(await wasm.call('GetServerInfo', {}), serverInfo, 'Native and WASM capability contract must match');
-  for (const capability of ['render_view', 'semantic_rendering_identity', 'export_model','symbol_attributes','evaluate_subject','big_int_values']) assert.ok(serverInfo.capabilities.includes(capability));
+  for (const capability of ['render_view', 'semantic_rendering_identity', 'export_model','symbol_attributes','evaluate_subject','big_int_values','release_model','memory_stats']) assert.ok(serverInfo.capabilities.includes(capability));
   const parsed = await native.call('ParseSources', { documents });
   const wasmParsed = await wasm.call('ParseSources', { documents });
   assert.deepEqual(wasmParsed, parsed, 'Native and WASM parsing must have the same hash, roots and diagnostics');
@@ -305,8 +305,34 @@ try {
   const pins=pipeline.nodes.flatMap(node=>node.ports??[]);assert.equal(pins.length,2);assert.deepEqual(pins.map(pin=>pin.direction).sort(),['in','out']);for(const pin of pins){assert.equal(pin.parameter,true);assert.equal(pin.identityStatus,'mapped');assert.ok(galleryIDs.has(pin.semanticId));}
   const state=notationViews['NativeNotationParity::states'].nodes.find(node=>node.state?.behaviors?.length===3);assert.ok(state,'Structured entry/do/exit roles must not be flattened away');assert.equal(state.state.parallel,true);assert.deepEqual(state.state.behaviors.map(b=>b.role),['entry','do','exit']);for(const behavior of state.state.behaviors){assert.equal(behavior.identityStatus,'mapped');assert.ok(galleryIDs.has(behavior.semanticId));assert.ok(behavior.text);}
   const notationContract={parsed:galleryParsed,views:notationViews};
+  // Disposal is explicit: current callers keep their model while superseded
+  // candidates release both validation and execution caches in one operation.
+  const lifecycle={};
+  const disposableDocuments=[{name:'disposable.sysml',content:'package Disposable { attribute value = 7; }'}];
+  const disposable=await native.call('ParseSources',{documents:disposableDocuments});
+  assert.deepEqual(await wasm.call('ParseSources',{documents:disposableDocuments}),disposable);
+  for(const client of [native,wasm]){
+    const before=await client.call('GetMemoryStats',{collect:true});
+    assert.equal(before.collected,true);assert.ok(before.modelHashes.includes(disposable.modelHash));
+    for(const field of ['heapAllocBytes','heapInUseBytes','heapSysBytes','totalAllocBytes','heapObjects','numGC'])assert.ok(Number.isSafeInteger(before[field])&&before[field]>=0,field+' must be measured native memory metadata');
+    assert.ok(before.heapAllocBytes<=before.heapSysBytes,'Live Go heap and acquired heap arenas must be separate');
+  }
+  lifecycle.released=await native.call('ReleaseModel',{modelHash:disposable.modelHash});
+  assert.deepEqual(await wasm.call('ReleaseModel',{modelHash:disposable.modelHash}),lifecycle.released);
+  assert.equal(lifecycle.released.released,true);
+  lifecycle.repeated=await native.call('ReleaseModel',{modelHash:disposable.modelHash});
+  assert.deepEqual(await wasm.call('ReleaseModel',{modelHash:disposable.modelHash}),lifecycle.repeated);assert.equal(lifecycle.repeated.released,false);
+  for(const client of [native,wasm]){
+    const after=await client.call('GetMemoryStats',{collect:true});
+    assert.ok(!after.modelHashes.includes(disposable.modelHash));assert.equal(after.retainedModels,lifecycle.released.retainedModels);
+    const stillCurrent=await client.call('RenderView',{modelHash:galleryParsed.modelHash,view:'ViewDemo::BehaviorViews::sequence',includeSemanticIdentity:true,show:['parameter-symbols','port-symbols','typings','edge-labels']});
+    assert.deepEqual(stillCurrent,notationViews['ViewDemo::BehaviorViews::sequence'],'Releasing a candidate must preserve the current model and sequence ordering');
+    const reparsed=await client.call('ParseSources',{documents:disposableDocuments});assert.deepEqual(reparsed,disposable,'Released sources must reparse with identical native identity');
+  }
+  lifecycle.reparsed=disposable.modelHash;
+
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract, parallelIdentity,valueContract,notationContract }, null, 2) + '\n');
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract, parallelIdentity,valueContract,notationContract,lifecycle }, null, 2) + '\n');
   console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size, parallelRelationships: assertionIds.length,valueAttributes:Object.keys(evaluatedAttributes).length,notationViews:Object.keys(notationViews).length,
     views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: view.edges.length }])) }, null, 2));
 } finally { native.close(); }

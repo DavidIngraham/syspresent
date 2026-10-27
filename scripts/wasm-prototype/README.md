@@ -27,7 +27,7 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `505baf09110e5af9720164186c77cd19d9e5b45e`
+The prototype dependency revision is `a148595ae662847965777157c2943942fd88657a`
 on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
@@ -58,7 +58,7 @@ Semantic calls are synchronous inside Go, but isolated from the canvas thread.
 Terminating the worker cancels the complete engine session; the prototype does not
 claim per-request cooperative cancellation, incremental model editing, or automatic
 external library fetching. Supplied files and the embedded standard library are
-available for resolution. The cache retains sixteen parsed models.
+available for resolution. The combined engine retains up to sixteen parsed models for compatibility. The app uses explicit model leases and ReleaseModel to dispose superseded and abandoned versions; settled projects retain one native model, and reviewed candidates have a separate temporary owner.
 
 
 ## Full models and declaration projection
@@ -80,8 +80,11 @@ complete project remains parsed for native views and `GetSymbol`. Omitting the
 option retains full export. This projection does not limit the loaded source model
 to a presentation or selected story area.
 
-Native declaration conversion shares all model identity scopes, processes complete
-per-document graphs and releases omitted expression graph storage between documents.
+Native declaration conversion shares all model identity scopes, materializes each
+document before retaining source-backed subjects, then annotates only retained
+collections. Annotation reuses the graph index and serializes one collection at a
+time, preserving order and primitive spelling. Temporary encoder graphs are
+collected before the merged declaration graph is serialized.
 Native render identity uses the converter's identity inventory and cached semantic
 model without serializing a full RDF graph. Native tests compare declaration objects
 and identity origins against the complete conversion, including cross-document,
@@ -142,8 +145,8 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `505baf09110e5af9720164186c77cd19d9e5b45e` (clean).
-Carried-patch SHA-256: `951f2344ff859869b88e735c8c876c2d9e3c349fdddbdb0a864931de621bb8e1`.
+Current source revision: `a148595ae662847965777157c2943942fd88657a` (clean).
+Carried-patch SHA-256: `fce8cae9cbbdee08e7c9ba443874a8cea102f3c9c426e5a382dc58ad59adedb5`.
 
 ## Distinct parallel native relationships
 
@@ -155,3 +158,44 @@ engines are rebuilt from the same clean local commit. The parity harness checks
 two actual native satisfaction IDs, repeated rendering, and adapter deduplication
 across repeated views. This changes identity retention, not relationship kinds,
 directions, selection semantics or the source model.
+
+
+## Reproducible export and model-lifecycle measurements
+
+Use Node 22.14.0 and the paired engine above. These local harnesses refuse to
+overwrite their result JSON and record source/engine digests. They preserve fatal
+console output separately. The browser harness serves only 127.0.0.1 and blocks
+external requests; Playwright and Chromium must already be available.
+
+~~~sh
+node --stack-size=8192 scripts/wasm-prototype/profile-export-memory.mjs   --mode single --output build/memory-single.json
+node --stack-size=8192 scripts/wasm-prototype/profile-export-memory.mjs   --mode candidate --output build/memory-candidate.json
+node scripts/wasm-prototype/browser-export-memory.mjs   --cycles 3 --output build/memory-browser.json   --playwright /path/to/playwright/index.mjs --chromium /path/to/chrome
+~~~
+
+The single and candidate modes deliberately retain their parsed models to expose
+native export pressure. The browser test exercises actual UI leases, repeated
+validation, explicit append, original source bytes in ZIP, same-worker reload and
+fresh-worker import. It samples native GetMemoryStats after calls without forcing
+collection during the flows. Its final explicit collection measures retained heap.
+
+GetMemoryStats reports allocated Go HeapAlloc (possibly including unswept garbage),
+acquired HeapSys, cumulative TotalAlloc and retained model hashes. These are
+distinct from actual WebAssembly.Memory.buffer.byteLength and JS heap.
+ReleaseModel atomically disposes validation/execution caches without interrupting
+a submitted request. Released WASM pages remain in the growing linear-memory
+buffer and can be reused; disposal does not promise buffer shrinkage.
+
+For per-document native export stages, build and run scripts/export-memory in the
+carried native dependency. It records normative materialization, projection,
+collection annotation, merge, explicit collection and serialization separately.
+See [native memory validation](../../docs/native-memory-validation.md) for the measured before/after evidence and
+its limits. Historical 88-document measurements above describe the earlier source
+set and do not substitute for this updated-model regression.
+
+Large JS/WASM parse, render and export calls now collect at their return boundary
+when both their cumulative allocation and remaining allocated heap reach 64 MiB.
+Actual model disposal collects a material heap at the same threshold. Small calls
+and desktop/native collection policy are unchanged. This work-phase budget is not
+a memory cap for a single native operation. GetMemoryStats exposes phase counts,
+collection duration, before/after heap, GC goal and exact GC settings.

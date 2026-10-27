@@ -1,7 +1,11 @@
 # Native exploration, layouts and authoring validation
 
+The [native memory validation record](native-memory-validation.md) supersedes the
+earlier large edited-project memory limitation below and records the current
+paired engine, preserved baseline and measured scope.
+
 The local feature branch preserves the integrated Blue Dog source refresh and
-implements SP-103 and SP-107 through SP-111 alongside the earlier exploration
+implements SP-103 and SP-107 through SP-112 alongside the earlier exploration
 requirements. Software checks do not establish engineering acceptance, a live LLM
 service, full OMG conformance or representative-reader acceptance.
 
@@ -40,7 +44,7 @@ owner/subject context. It supplies no missing inputs, exposes no arbitrary
 expression text and runs no actions or simulations. Provider configuration and
 external model-data transmission remain unchanged and unconfigured.
 
-Current paired-engine provenance identifies clean source
+The notation/value followup paired-engine provenance identifies clean source
 505baf09110e5af9720164186c77cd19d9e5b45e, Go 1.25.11 and carried patch SHA-256
 fdd7e2e056d2ac44fa990e47e22709de6ed73bfec98ea3a5620df121b8e6cdae.
 Affected native view/combined/identity checks, build, vet, formatting/documentation

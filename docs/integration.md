@@ -407,6 +407,10 @@ ownership. Existing native names/documentation remain authoritative under that
 unchanged-source boundary; candidate native parse/render and fresh candidate
 GetSymbol/Evaluate calls still validate view membership and typed values.
 The review exposes this reuse. It does not manufacture a publisher-trusted cache
-or establish a pass for large edited-model append/reload: the native whole-model
-exporter can still exhaust WASM's 4 GiB memory during RDF collection annotation.
-See docs/rendering-coverage.md and the final validation record for exact evidence.
+replace native reindexing of edited projects. The carried exporter now projects
+declarations before annotation and reclaims obsolete document state before JSON
+serialization. Explicit app model leases release superseded and abandoned
+versions; browser-only measured work-phase collection prevents temporary
+parse/render garbage accumulating across requests. See
+[native memory validation](native-memory-validation.md) for preserved failures,
+semantic-equivalence evidence, browser measurements and exact test limits.

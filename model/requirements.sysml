@@ -346,6 +346,10 @@ package SyspresentRequirements {
         requirement <'SP-111'> inspectableNotationCoverage {
             doc /* Focused rendering shall use verified OMG graphical productions for supported native kinds and preserve native directions, definitions/usages, owned compartments and actual port directions. Unsupported families, overloaded relationship kinds, unavailable roles and unsupported modifiers shall have inspectable per-kind diagnostics. Coverage evidence shall distinguish actual native view and construct inventory, renderer helper assessment, browser acceptance and standards conformance. Supported sequence and grid productions shall use their native event, participant, row, column and relationship-cell records; absent production or endpoint-role data shall be diagnosed rather than inferred from labels. Native extension families rendered through a supported base production shall retain an explicit extension notice. Exploratory relationship rollups shall not be presented as standard modeled relationships in focused mode. */
         }
+        requirement <'SP-112'> nativeModelLifecycle {
+            doc /* Native declaration export shall preserve source-backed objects, native identities, directed relationship occurrences and ordered collection values without first serializing annotations for omitted projection subjects. The application shall retain native model versions only while owned by the current project, active validation or an in-flight request, and release superseded, failed and abandoned candidate state explicitly. A failed or stale load shall preserve the current project's usable semantic model. Diagnostics shall distinguish measured live Go heap, acquired heap arenas and WASM linear memory; memory evidence shall identify source size, retained versions and exercised operations. Repeated edited-project append and portable reload shall be validated without silently omitting model semantics or substituting a second parser. */
+        }
+
     }
 
 }

@@ -216,4 +216,14 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
 
+    verification def <'SV-021'> nativeModelMemory {
+        doc /* Preserve pre-fix engine and source hashes, then compare fresh single-model declaration export, current plus candidate export and the actual edited Blue Dog append/reload path. Record WASM buffer bytes, allocated Go heap, post-collection retained heap, acquired arenas and model counts separately. Compare exact declaration objects and ordered collection values before and after optimization, including cross-document references, libraries, parallel relationships and primitive values. Repeat candidate validation, append, same-worker ZIP reload and fresh-worker ZIP import; confirm native attribute refresh, original system-source bytes and a bounded retained-model count. Exercise failed and stale loads, same-hash leases, submitted requests and resize-replaced initial layouts without losing the previous model. Software memory measurements apply to the exercised engine, sources and browser, not arbitrary project or physical-device limits. */
+        objective acceptance {
+            verify SyspresentRequirements::ConversationalExploration::nativeModelLifecycle;
+            verify SyspresentRequirements::ConversationalExploration::reusableNativeCapture;
+            verify SyspresentRequirements::ConversationalExploration::freshNarrativeBindings;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }
