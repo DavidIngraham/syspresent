@@ -19,6 +19,13 @@ index 000000000..387935b6f
 +++ b/changes/unreleased/matrix-cell-identities.added.md
 @@ -0,0 +1 @@
 +- **Semantic matrix axes and relationship cells.** Native and browser engine JSON renderings preserve target column identities and every declared relationship occurrence in a cell, including repeated relationships of the same kind. Cell records carry native source and target identities; derivation matrices retain original-to-derived direction. Existing string columns and cells remain unchanged.
+diff --git a/changes/unreleased/native-notation-facts.added.md b/changes/unreleased/native-notation-facts.added.md
+new file mode 100644
+index 000000000..5f7cddd87
+--- /dev/null
++++ b/changes/unreleased/native-notation-facts.added.md
+@@ -0,0 +1 @@
++- Preserve native derivation/refinement roles, directed flow/message productions, state behavior compartments, parameter identities and explicit sequence occurrence orders in standalone rendering JSON, without replacing existing edge kinds or inferring semantics from labels.
 diff --git a/changes/unreleased/parallel-rendered-relationships.fixed.md b/changes/unreleased/parallel-rendered-relationships.fixed.md
 new file mode 100644
 index 000000000..1e217374a
@@ -26,11 +33,18 @@ index 000000000..1e217374a
 +++ b/changes/unreleased/parallel-rendered-relationships.fixed.md
 @@ -0,0 +1 @@
 +- Preserve distinct source relationship declarations with identical endpoints in general views, including parallel satisfaction assertions, while deduplicating repeated discovery of the same declaration.
+diff --git a/changes/unreleased/symbol-large-integers.fixed.md b/changes/unreleased/symbol-large-integers.fixed.md
+new file mode 100644
+index 000000000..0f2b3384b
+--- /dev/null
++++ b/changes/unreleased/symbol-large-integers.fixed.md
+@@ -0,0 +1 @@
++- Preserve exact decimal integer attribute values outside signed 64-bit bounds in core and combined GetSymbol JSON instead of truncating them.
 diff --git a/docs/project/spec-compliance.md b/docs/project/spec-compliance.md
-index e909e790a..6f2d4654e 100644
+index e909e790a..7f6a2429b 100644
 --- a/docs/project/spec-compliance.md
 +++ b/docs/project/spec-compliance.md
-@@ -3580,3 +3580,39 @@ Synthetic or unrepresented artifacts remain unidentified; no label matching is u
+@@ -3580,3 +3580,64 @@ Synthetic or unrepresented artifacts remain unidentified; no label matching is u
  - Status: additive tool API, not a SysML notation extension. Identity conversion remains subject
    to the documented experimental RDF/API mapping coverage. Run timeline payloads are not added
    to RenderView by this change.
@@ -70,6 +84,31 @@ index e909e790a..6f2d4654e 100644
 +Edges whose producing declaration is not located retain the existing endpoint,
 +kind and label deduplication. The renderer does not invent a source identity for
 +such artifacts.
++
++
++## Standalone native notation facts
++
++The standalone native/JavaScript/WASM JSON renderer exports additional semantic
++facts needed by a focused graphical client. These are additive tool transport
++facts, not a claim of complete OMG graphical conformance and not a change to the
++underlying model. Existing edge kind, direction, occurrence order and labels are
++preserved. Unmapped declaration origins remain explicitly unmapped when identity
++is requested; display artifacts acquire no fabricated model identities.
++
++| Contract | Implementation | Verification | Status |
++| --- | --- | --- | --- |
++| Derivation connections preserve derived-to-original native roles, actual end names and the matched RequirementDerivation metadata; refinement dependencies preserve client-to-supplier roles | `general.go:deriveEdges`, `generalGraph.relate`; `engine.marshalRenderView` | `TestNativeNotationFactsAndCloneIsolation`, `TestNativeNotationWireIdentityAndDisclosure` | ✅ native semantic facts; client notation coverage remains separate |
++| Flow, succession-flow and message productions remain distinct; optional native parameter symbols preserve declared direction and canonical declaration identity | `notation_facts.go:flowNotation`, `interconnection.go`, `behavior.go:actionEdges`, `renderidentity.BindInventory` | `TestNativeNotationWireIdentityAndDisclosure` | ✅ native AST/lowered facts; hidden pins require the existing `parameter-symbols` display option |
++| State entry/do/exit behaviors and parallel state structure survive independently of flattened detail text | `behavior.go:stateNotation`, `clone.go`, `data.go` | `TestNativeNotationFactsAndCloneIsolation`, `TestNativeNotationWireIdentityAndDisclosure` | ✅ lowered behavior roles; does not add a new execution engine |
++| Sequence message endpoints preserve actual occurrence kind, canonical identity, declared direction and owner-derived displayed lifeline; explicit successions retain their endpoints separately from message row order | `sequence.go:sequenceRef`, `renderSequence`, `orderMessages` | `TestNativeNotationFactsAndCloneIsolation`, `TestNativeNotationWireIdentityAndDisclosure` | ✅ source partial order; a stable topological linearization is presentation order, and cycle fallback is explicit. No asynchronous/synchronous/return subtype is inferred |
++| Core and combined GetSymbol retain arbitrary-precision integer constants as exact decimal bigIntValue when outside signed 64-bit bounds | `core.attributeValue`, `core.JValue` | `TestGetSymbolExactIntegerBounds` | ✅ exact scalar value; additive standalone JSON arm, not a protobuf extension |
++
++Rendering clones and data projections isolate all new mutable records, including
++nested endpoint refs and port identities, so identity-enabled requests cannot
++contaminate later ordinary cached requests. No AST node or raw source is added to
++the wire shape. State transition trigger/guard/effect labels remain the existing
++native text; structured operands, sequence timing and unsupported diagram
++constructs are not claimed by this addition.
 diff --git a/docs/reference/wasm.md b/docs/reference/wasm.md
 index aef650495..67a959409 100644
 --- a/docs/reference/wasm.md
@@ -171,6 +210,75 @@ index aef650495..67a959409 100644
 +Bounded views include directed native `Dependency` client-to-supplier edges as well
 +as satisfaction, verification, derivation, refinement and allocation relationships.
 +Unannotated views retain the legacy gathering and relationship selection.
+diff --git a/internal/frontend/combined/bigint_symbol_test.go b/internal/frontend/combined/bigint_symbol_test.go
+new file mode 100644
+index 000000000..ca7282e54
+--- /dev/null
++++ b/internal/frontend/combined/bigint_symbol_test.go
+@@ -0,0 +1,63 @@
++package combined
++
++import (
++	"context"
++	"encoding/json"
++	"github.com/Open-MBEE/OpenSysML/internal/frontend/core"
++	"testing"
++)
++
++// Both the core and combined native wire paths retain arbitrary-precision integers.
++func TestGetSymbolExactIntegerBounds(t *testing.T) {
++	c, err := core.New()
++	if err != nil {
++		t.Fatal(err)
++	}
++	s, err := New("integer-bounds")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, server := range []struct {
++		name string
++		call func(context.Context, string, []byte) ([]byte, error)
++	}{{"core", c.Call}, {"combined", s.Call}} {
++		t.Run(server.name, func(t *testing.T) {
++			payload, _ := json.Marshal(map[string]any{"documents": []map[string]string{{"name": "integer.sysml", "content": `package Integers { private import ScalarValues::*; part source { attribute bounded:Integer=9223372036854775807; attribute minimum:Integer=-9223372036854775808; attribute huge:Integer=18446744073709551616; attribute small:Integer=-9223372036854775809; } }`}}})
++			parsed, err := server.call(context.Background(), "ParseSources", payload)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var model struct {
++				ModelHash string `json:"modelHash"`
++			}
++			if err := json.Unmarshal(parsed, &model); err != nil {
++				t.Fatal(err)
++			}
++			payload, _ = json.Marshal(map[string]string{"modelHash": model.ModelHash, "symbolId": "Integers::source"})
++			body, err := server.call(context.Background(), "GetSymbol", payload)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var reply struct {
++				Symbol struct {
++					Attributes []struct {
++						Name  string
++						Value map[string]string
++					}
++				}
++			}
++			if err := json.Unmarshal(body, &reply); err != nil {
++				t.Fatalf("%v: %s", err, body)
++			}
++			values := map[string]map[string]string{}
++			for _, a := range reply.Symbol.Attributes {
++				values[a.Name] = a.Value
++			}
++			for _, want := range []struct{ name, arm, value string }{{"bounded", "intValue", "9223372036854775807"}, {"minimum", "intValue", "-9223372036854775808"}, {"huge", "bigIntValue", "18446744073709551616"}, {"small", "bigIntValue", "-9223372036854775809"}} {
++				if len(values[want.name]) != 1 || values[want.name][want.arm] != want.value {
++					t.Errorf("%s=%v want %s:%s", want.name, values[want.name], want.arm, want.value)
++				}
++			}
++		})
++	}
++}
 diff --git a/internal/frontend/combined/combined.go b/internal/frontend/combined/combined.go
 index e3494202a..72a5c5d8c 100644
 --- a/internal/frontend/combined/combined.go
@@ -389,8 +497,37 @@ index 000000000..7c63ef207
 +		t.Fatal("exported a partial parse")
 +	}
 +}
+diff --git a/internal/frontend/core/core.go b/internal/frontend/core/core.go
+index a25c1232a..ae8e4a7da 100644
+--- a/internal/frontend/core/core.go
++++ b/internal/frontend/core/core.go
+@@ -435,7 +435,10 @@ func attributeValue(value *symbolfacts.Value) *JValue {
+ 	}
+ 	switch value.Const.Kind {
+ 	case semantics.ValInt:
+-		return &JValue{IntValue: ptr(I64(value.Const.Int))}
++		if n, fits := value.Const.Int64(); fits {
++			return &JValue{IntValue: ptr(I64(n))}
++		}
++		return &JValue{BigIntValue: ptr(value.Const.FormatInt())}
+ 	case semantics.ValRational:
+ 		if f, exact := value.Const.BinaryExact(); exact {
+ 			return &JValue{RealValue: ptr(F64(f))}
+diff --git a/internal/frontend/core/json.go b/internal/frontend/core/json.go
+index 03c01976e..a70df3b6c 100644
+--- a/internal/frontend/core/json.go
++++ b/internal/frontend/core/json.go
+@@ -180,6 +180,8 @@ type JAttributeInfo struct {
+ 
+ // JValue holds the constant attribute value arms the core can derive.
+ type JValue struct {
++	// BigIntValue is the exact decimal integer outside signed 64-bit bounds.
++	BigIntValue *string `json:"bigIntValue,omitempty"`
+ 	IntValue    *I64    `json:"intValue,omitempty"`
+ 	RealValue   *F64    `json:"realValue,omitempty"`
+ 	BoolValue   *bool   `json:"boolValue,omitempty"`
 diff --git a/internal/frontend/engine/engine.go b/internal/frontend/engine/engine.go
-index 6da0930c0..10e6b945e 100644
+index 6da0930c0..ef6df64f3 100644
 --- a/internal/frontend/engine/engine.go
 +++ b/internal/frontend/engine/engine.go
 @@ -98,6 +98,7 @@ type cachedModel struct {
@@ -430,7 +567,60 @@ index 6da0930c0..10e6b945e 100644
  			return nil, statusError(codeInvalidArgument, err.Error())
  		}
  	}
-@@ -420,6 +434,23 @@ func marshalRenderView(data view.Data) ([]byte, error) {
+@@ -354,13 +368,14 @@ func (e *Engine) renderView(req *JRenderViewRequest) ([]byte, error) {
+ 
+ func marshalRenderView(data view.Data) ([]byte, error) {
+ 	out := &JRenderViewResponse{
+-		View:    data.View,
+-		Kind:    string(data.Kind),
+-		Stated:  data.Stated,
+-		Notices: data.Notices,
+-		Shown:   data.Shown,
+-		Nodes:   make([]JRenderNode, 0, len(data.Nodes)),
+-		Edges:   make([]JRenderEdge, 0, len(data.Edges)),
++		View:             data.View,
++		SequenceOrdering: data.SequenceOrdering,
++		Kind:             string(data.Kind),
++		Stated:           data.Stated,
++		Notices:          data.Notices,
++		Shown:            data.Shown,
++		Nodes:            make([]JRenderNode, 0, len(data.Nodes)),
++		Edges:            make([]JRenderEdge, 0, len(data.Edges)),
+ 	}
+ 	if out.Notices == nil {
+ 		out.Notices = []string{}
+@@ -377,6 +392,7 @@ func marshalRenderView(data view.Data) ([]byte, error) {
+ 	}
+ 	for _, node := range data.Nodes {
+ 		item := JRenderNode{
++			State:          jRenderState(node.State),
+ 			ID:             node.ID,
+ 			IdentityStatus: node.IdentityStatus, SemanticID: node.SemanticID, QualifiedName: node.QualifiedName, Text: node.Text, StandIn: node.StandIn, Verdict: node.Verdict,
+ 			Kind:            node.Kind,
+@@ -401,7 +417,7 @@ func marshalRenderView(data view.Data) ([]byte, error) {
+ 		}
+ 		for _, port := range node.Ports {
+ 			item.Ports = append(item.Ports, JRenderPort{
+-				ID: port.ID, Name: port.Name, Type: port.Type, Direction: port.Direction.String(),
++				ID: port.ID, Name: port.Name, Type: port.Type, Direction: port.Direction.String(), Parameter: port.Parameter, SemanticID: port.SemanticID, QualifiedName: port.QualifiedName, IdentityStatus: port.IdentityStatus,
+ 			})
+ 		}
+ 		out.Nodes = append(out.Nodes, item)
+@@ -410,16 +426,36 @@ func marshalRenderView(data view.Data) ([]byte, error) {
+ 		item := JRenderEdge{
+ 			From: edge.From, To: edge.To, FromPort: edge.FromPort, ToPort: edge.ToPort,
+ 			IdentityStatus: edge.IdentityStatus, SemanticID: edge.SemanticID, QualifiedName: edge.QualifiedName, FromLabel: edge.FromLabel, ToLabel: edge.ToLabel, Name: edge.Name,
+-			Label: edge.Text(), Kind: edge.Kind.String(), Style: jRenderStyle(edge.Style),
++			Label: edge.Text(), Kind: edge.Kind.String(), Style: jRenderStyle(edge.Style), Notation: jRenderNotation(edge.Notation),
+ 		}
+ 		for _, point := range edge.Route {
+ 			item.Route = append(item.Route, JRenderPoint{X: point.X, Y: point.Y})
+ 		}
+ 		out.Edges = append(out.Edges, item)
+ 	}
++	for _, order := range data.SequenceOrders {
++		out.SequenceOrders = append(out.SequenceOrders, JRenderSequenceOrder{JRenderSemanticRef: *jRenderRef(&order.SemanticRef), SourceEvent: jRenderRef(order.SourceEvent), TargetEvent: jRenderRef(order.TargetEvent)})
++	}
  	for _, row := range data.Rows {
  		out.Rows = append(out.Rows, JRenderRow{Cells: row.Cells, SemanticID: row.SemanticID, QualifiedName: row.QualifiedName, IdentityStatus: row.IdentityStatus})
  	}
@@ -454,6 +644,33 @@ index 6da0930c0..10e6b945e 100644
  	return marshal(out)
  }
  
+@@ -1104,3 +1140,26 @@ func unquotedName(id string) (string, bool) {
+ 	}
+ 	return strings.Join(segments, "::"), true
+ }
++
++func jRenderRef(ref *view.SemanticRef) *JRenderSemanticRef {
++	if ref == nil {
++		return nil
++	}
++	return &JRenderSemanticRef{Kind: ref.Kind, Name: ref.Name, LifelineID: ref.LifelineID, Direction: ref.Direction, SemanticID: ref.SemanticID, QualifiedName: ref.QualifiedName, IdentityStatus: ref.IdentityStatus}
++}
++func jRenderNotation(n *view.Notation) *JRenderNotation {
++	if n == nil {
++		return nil
++	}
++	return &JRenderNotation{Production: n.Production, DeclarationKind: n.DeclarationKind, Classification: n.Classification, SourceRole: n.SourceRole, TargetRole: n.TargetRole, SourceEndName: n.SourceEndName, TargetEndName: n.TargetEndName, SourceEvent: jRenderRef(n.SourceEvent), TargetEvent: jRenderRef(n.TargetEvent)}
++}
++func jRenderState(n *view.StateNotation) *JRenderState {
++	if n == nil {
++		return nil
++	}
++	out := &JRenderState{Parallel: n.Parallel, Behaviors: []JRenderStateBehavior{}}
++	for _, b := range n.Behaviors {
++		out.Behaviors = append(out.Behaviors, JRenderStateBehavior{JRenderSemanticRef: *jRenderRef(&b.SemanticRef), Role: b.Role, Text: b.Text})
++	}
++	return out
++}
 diff --git a/internal/frontend/engine/export.go b/internal/frontend/engine/export.go
 new file mode 100644
 index 000000000..3f92f33a5
@@ -689,10 +906,10 @@ index 000000000..b71248327
 +	}
 +}
 diff --git a/internal/frontend/engine/json.go b/internal/frontend/engine/json.go
-index 02715c438..cb1f99781 100644
+index 02715c438..5f8e19c7c 100644
 --- a/internal/frontend/engine/json.go
 +++ b/internal/frontend/engine/json.go
-@@ -335,16 +335,18 @@ type JRenderViewRequest struct {
+@@ -335,16 +335,20 @@ type JRenderViewRequest struct {
  }
  
  type JRenderViewResponse struct {
@@ -706,6 +923,8 @@ index 02715c438..cb1f99781 100644
 -	Edges   []JRenderEdge  `json:"edges"`
 -	Columns []string       `json:"columns,omitempty"`
 -	Rows    []JRenderRow   `json:"rows,omitempty"`
++	SequenceOrders    []JRenderSequenceOrder    `json:"sequenceOrders,omitempty"`
++	SequenceOrdering  string                    `json:"sequenceOrdering,omitempty"`
 +	View              string                    `json:"view"`
 +	Kind              string                    `json:"kind"`
 +	Stated            string                    `json:"stated"`
@@ -721,7 +940,70 @@ index 02715c438..cb1f99781 100644
  }
  
  type JRenderCanvas struct {
-@@ -424,6 +426,33 @@ type JRenderRow struct {
+@@ -354,6 +358,7 @@ type JRenderCanvas struct {
+ }
+ 
+ type JRenderNode struct {
++	State           *JRenderState `json:"state,omitempty"`
+ 	IdentityStatus  string        `json:"identityStatus,omitempty"`
+ 	SemanticID      string        `json:"semanticId,omitempty"`
+ 	QualifiedName   string        `json:"qualifiedName,omitempty"`
+@@ -379,10 +384,14 @@ type JRenderNode struct {
+ }
+ 
+ type JRenderPort struct {
+-	ID        string `json:"id"`
+-	Name      string `json:"name"`
+-	Type      string `json:"type,omitempty"`
+-	Direction string `json:"direction,omitempty"`
++	Parameter      bool   `json:"parameter"`
++	SemanticID     string `json:"semanticId,omitempty"`
++	QualifiedName  string `json:"qualifiedName,omitempty"`
++	IdentityStatus string `json:"identityStatus,omitempty"`
++	ID             string `json:"id"`
++	Name           string `json:"name"`
++	Type           string `json:"type,omitempty"`
++	Direction      string `json:"direction,omitempty"`
+ }
+ 
+ type JRenderStyle struct {
+@@ -396,20 +405,21 @@ type JRenderStyle struct {
+ }
+ 
+ type JRenderEdge struct {
+-	IdentityStatus string         `json:"identityStatus,omitempty"`
+-	SemanticID     string         `json:"semanticId,omitempty"`
+-	QualifiedName  string         `json:"qualifiedName,omitempty"`
+-	FromLabel      string         `json:"fromLabel,omitempty"`
+-	ToLabel        string         `json:"toLabel,omitempty"`
+-	Name           string         `json:"name,omitempty"`
+-	From           string         `json:"from"`
+-	To             string         `json:"to"`
+-	FromPort       string         `json:"fromPort,omitempty"`
+-	ToPort         string         `json:"toPort,omitempty"`
+-	Label          string         `json:"label"`
+-	Kind           string         `json:"kind"`
+-	Style          *JRenderStyle  `json:"style,omitempty"`
+-	Route          []JRenderPoint `json:"route,omitempty"`
++	Notation       *JRenderNotation `json:"notation,omitempty"`
++	IdentityStatus string           `json:"identityStatus,omitempty"`
++	SemanticID     string           `json:"semanticId,omitempty"`
++	QualifiedName  string           `json:"qualifiedName,omitempty"`
++	FromLabel      string           `json:"fromLabel,omitempty"`
++	ToLabel        string           `json:"toLabel,omitempty"`
++	Name           string           `json:"name,omitempty"`
++	From           string           `json:"from"`
++	To             string           `json:"to"`
++	FromPort       string           `json:"fromPort,omitempty"`
++	ToPort         string           `json:"toPort,omitempty"`
++	Label          string           `json:"label"`
++	Kind           string           `json:"kind"`
++	Style          *JRenderStyle    `json:"style,omitempty"`
++	Route          []JRenderPoint   `json:"route,omitempty"`
+ }
+ 
+ type JRenderPoint struct {
+@@ -424,6 +434,33 @@ type JRenderRow struct {
  	Cells          []string `json:"cells"`
  }
  
@@ -755,6 +1037,181 @@ index 02715c438..cb1f99781 100644
  type JEvaluateRequest struct {
  	ModelHash       string `json:"modelHash,omitempty"`
  	Expression      string `json:"expression,omitempty"`
+@@ -500,3 +537,39 @@ type JTraceEvent struct {
+ 	Taken        string   `json:"taken,omitempty"`
+ 	Text         string   `json:"text"`
+ }
++
++// Native notation facts are additive and never inferred from labels.
++type JRenderSemanticRef struct {
++	Direction      string `json:"direction,omitempty"`
++	Kind           string `json:"kind"`
++	Name           string `json:"name,omitempty"`
++	LifelineID     string `json:"lifelineId,omitempty"`
++	SemanticID     string `json:"semanticId,omitempty"`
++	QualifiedName  string `json:"qualifiedName,omitempty"`
++	IdentityStatus string `json:"identityStatus,omitempty"`
++}
++type JRenderNotation struct {
++	Production      string              `json:"production"`
++	DeclarationKind string              `json:"declarationKind,omitempty"`
++	Classification  string              `json:"classification,omitempty"`
++	SourceRole      string              `json:"sourceRole,omitempty"`
++	TargetRole      string              `json:"targetRole,omitempty"`
++	SourceEndName   string              `json:"sourceEndName,omitempty"`
++	TargetEndName   string              `json:"targetEndName,omitempty"`
++	SourceEvent     *JRenderSemanticRef `json:"sourceEvent,omitempty"`
++	TargetEvent     *JRenderSemanticRef `json:"targetEvent,omitempty"`
++}
++type JRenderState struct {
++	Parallel  bool                   `json:"parallel"`
++	Behaviors []JRenderStateBehavior `json:"behaviors"`
++}
++type JRenderStateBehavior struct {
++	JRenderSemanticRef
++	Role string `json:"role"`
++	Text string `json:"text"`
++}
++type JRenderSequenceOrder struct {
++	JRenderSemanticRef
++	SourceEvent *JRenderSemanticRef `json:"sourceEvent,omitempty"`
++	TargetEvent *JRenderSemanticRef `json:"targetEvent,omitempty"`
++}
+diff --git a/internal/frontend/engine/notation_facts_test.go b/internal/frontend/engine/notation_facts_test.go
+new file mode 100644
+index 000000000..32505804c
+--- /dev/null
++++ b/internal/frontend/engine/notation_facts_test.go
+@@ -0,0 +1,129 @@
++package engine
++
++import (
++	"context"
++	"encoding/json"
++	"os"
++	"testing"
++)
++
++func TestNativeNotationWireIdentityAndDisclosure(t *testing.T) {
++	eng, err := New()
++	if err != nil {
++		t.Fatal(err)
++	}
++	call := func(method string, params any, out any) {
++		t.Helper()
++		p, _ := json.Marshal(params)
++		body, err := eng.Call(context.Background(), method, p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := json.Unmarshal(body, out); err != nil {
++			t.Fatalf("%v:%s", err, body)
++		}
++	}
++	sequence, err := os.ReadFile("../../ir/view/testdata/sequence.sysml")
++	if err != nil {
++		t.Fatal(err)
++	}
++	action := `package Actions { private import StandardViewDefinitions::*; item def Value; action def Source {out value:Value;} action def Sink {in value:Value;} action def Pipe {action source:Source; then action sink:Sink; flow source.value to sink.value;} view pipe:ActionFlowView {expose Pipe;} }`
++	state, err := os.ReadFile("../../ir/view/testdata/state-do.sysml")
++	if err != nil {
++		t.Fatal(err)
++	}
++	general, err := os.ReadFile("../../ir/view/testdata/general.sysml")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var parsed JParseSourcesResponse
++	call("ParseSources", map[string]any{"documents": []map[string]string{{"name": "sequence.sysml", "content": string(sequence)}, {"name": "action.sysml", "content": action}, {"name": "state-do.sysml", "content": string(state)}, {"name": "general.sysml", "content": string(general)}}}, &parsed)
++	for _, identity := range []bool{true, false, true} {
++		var out JRenderViewResponse
++		call("RenderView", JRenderViewRequest{ModelHash: parsed.ModelHash, View: "SequenceViews::pubSubView", IncludeSemanticIdentity: identity}, &out)
++		if len(out.Edges) != 3 || len(out.SequenceOrders) != 3 {
++			t.Fatalf("wire lost native occurrences: %+v", out)
++		}
++		for _, edge := range out.Edges {
++			n := edge.Notation
++			if n == nil || n.Production != "message" || n.SourceEvent == nil || n.TargetEvent == nil || n.SourceEvent.Kind != "event occurrence" || n.SourceEvent.LifelineID != edge.From {
++				t.Fatalf("wire facts absent: %+v", edge)
++			}
++			if identity {
++				if n.SourceEvent.SemanticID == "" || n.SourceEvent.IdentityStatus != "mapped" {
++					t.Fatalf("unbound event: %+v", n)
++				}
++			} else if n.SourceEvent.SemanticID != "" {
++				t.Fatal("cached event identity leaked")
++			}
++		}
++
++		for _, order := range out.SequenceOrders {
++			if order.SourceEvent == nil || order.TargetEvent == nil || order.SourceEvent.LifelineID == "" || order.TargetEvent.LifelineID == "" {
++				t.Fatalf("order endpoint association missing %+v", order)
++			}
++			if identity && (order.SourceEvent.SemanticID == "" || order.TargetEvent.SemanticID == "") {
++				t.Fatal("order endpoint identity missing")
++			}
++			if !identity && (order.SourceEvent.SemanticID != "" || order.TargetEvent.SemanticID != "") {
++				t.Fatal("cached order identity leaked")
++			}
++		}
++		call("RenderView", JRenderViewRequest{ModelHash: parsed.ModelHash, View: "InstrumentViews::peas", IncludeSemanticIdentity: identity}, &out)
++		behaviors := 0
++		for _, node := range out.Nodes {
++			if node.State != nil {
++				for _, b := range node.State.Behaviors {
++					behaviors++
++					if b.Role == "" || b.Kind == "" {
++						t.Fatal("state behavior roles absent")
++					}
++					if !identity && b.SemanticID != "" {
++						t.Fatal("cached state behavior identity leaked")
++					}
++				}
++			}
++		}
++		if behaviors != 7 {
++			t.Fatalf("state behavior wire count=%d", behaviors)
++		}
++		call("RenderView", JRenderViewRequest{ModelHash: parsed.ModelHash, View: "GeneralViews::requirementView", IncludeSemanticIdentity: identity}, &out)
++		derived := false
++		for _, edge := range out.Edges {
++			if edge.Kind == "derive" {
++				derived = edge.Notation != nil && edge.Notation.Production == "derivation" && edge.Notation.SourceRole == "derived"
++			}
++		}
++		if !derived {
++			t.Fatal("derivation native production lost on wire")
++		}
++		call("RenderView", JRenderViewRequest{ModelHash: parsed.ModelHash, View: "Actions::pipe", IncludeSemanticIdentity: identity, Show: []string{"parameter-symbols", "typings"}}, &out)
++		ports := 0
++		for _, node := range out.Nodes {
++			for _, port := range node.Ports {
++				ports++
++				if !port.Parameter {
++					t.Fatal("native parameter flag lost")
++				}
++				if identity && port.IdentityStatus != "mapped" {
++					t.Fatalf("unbound native parameter %+v", port)
++				}
++				if !identity && port.SemanticID != "" {
++					t.Fatal("cached port identity leaked")
++				}
++			}
++		}
++		if ports != 2 {
++			t.Fatalf("ports=%d want2", ports)
++		}
++		flow := false
++		for _, edge := range out.Edges {
++			if edge.Kind == "flow" {
++				flow = edge.FromPort != "" && edge.ToPort != "" && edge.Notation != nil && edge.Notation.Production == "flow"
++			}
++		}
++		if !flow {
++			t.Fatalf("native directed flow ports absent %+v", out.Edges)
++		}
++	}
++}
 diff --git a/internal/frontend/engine/parallel_identity_test.go b/internal/frontend/engine/parallel_identity_test.go
 new file mode 100644
 index 000000000..ab2846b15
@@ -894,7 +1351,7 @@ index 72d16960f..01c277566 100644
 -	return "semantic rendering identity is unavailable on JS/WASI; use the native engine or gRPC service"
 -}
 diff --git a/internal/frontend/renderidentity/identity.go b/internal/frontend/renderidentity/identity.go
-index ee4a0e968..ecf14d7de 100644
+index ee4a0e968..90f5be0f3 100644
 --- a/internal/frontend/renderidentity/identity.go
 +++ b/internal/frontend/renderidentity/identity.go
 @@ -1,31 +1,43 @@
@@ -956,7 +1413,60 @@ index ee4a0e968..ecf14d7de 100644
  	library := map[symbols.Origin]export.ElementIdentity{}
  	if index != nil {
  		index.Registered(func(_ string, syms []*symbols.Symbol) {
-@@ -83,5 +95,29 @@ func Bind(data *view.Data, documents []Document, index *symbols.Index) error {
+@@ -53,8 +65,29 @@ func Bind(data *view.Data, documents []Document, index *symbols.Index) error {
+ 		identity, ok := library[origin]
+ 		return identity, ok
+ 	}
++	bindRef := func(ref *view.SemanticRef) {
++		if ref == nil {
++			return
++		}
++		ref.IdentityStatus = "unmapped"
++		if identity, ok := lookup(ref.Origin); ok {
++			ref.SemanticID, ref.QualifiedName, ref.IdentityStatus = identity.ID, identity.QualifiedName, "mapped"
++		}
++	}
+ 	for i := range data.Nodes {
+ 		node := &data.Nodes[i]
++		for j := range node.Ports {
++			port := &node.Ports[j]
++			port.IdentityStatus = "unmapped"
++			if identity, ok := lookup(port.Origin); ok {
++				port.SemanticID, port.QualifiedName, port.IdentityStatus = identity.ID, identity.QualifiedName, "mapped"
++			}
++		}
++		if node.State != nil {
++			for j := range node.State.Behaviors {
++				bindRef(&node.State.Behaviors[j].SemanticRef)
++			}
++		}
+ 		node.IdentityStatus = "unmapped"
+ 		if node.Synthetic || node.StandIn || (node.NameSynthesized && !node.Origin.Located()) {
+ 			node.IdentityStatus = "synthetic"
+@@ -69,12 +102,22 @@ func Bind(data *view.Data, documents []Document, index *symbols.Index) error {
+ 	}
+ 	for i := range data.Edges {
+ 		edge := &data.Edges[i]
++		if edge.Notation != nil {
++			bindRef(edge.Notation.SourceEvent)
++			bindRef(edge.Notation.TargetEvent)
++		}
+ 		edge.IdentityStatus = "unmapped"
+ 		if identity, ok := lookup(edge.Origin); ok {
+ 			edge.SemanticID, edge.QualifiedName = identity.ID, identity.QualifiedName
+ 			edge.IdentityStatus = "mapped"
+ 		}
+ 	}
++	for i := range data.SequenceOrders {
++		order := &data.SequenceOrders[i]
++		bindRef(&order.SemanticRef)
++		bindRef(order.SourceEvent)
++		bindRef(order.TargetEvent)
++	}
+ 	for i := range data.Rows {
+ 		row := &data.Rows[i]
+ 		row.IdentityStatus = "unmapped"
+@@ -83,5 +126,29 @@ func Bind(data *view.Data, documents []Document, index *symbols.Index) error {
  			row.IdentityStatus = "mapped"
  		}
  	}
@@ -1064,11 +1574,108 @@ index 4ba88d55a..000000000
 -		t.Fatal("unsupported binding changed native data")
 -	}
 -}
+diff --git a/internal/ir/view/behavior.go b/internal/ir/view/behavior.go
+index ce9686ea2..984484314 100644
+--- a/internal/ir/view/behavior.go
++++ b/internal/ir/view/behavior.go
+@@ -55,6 +55,7 @@ func (r *Renderer) stateMachineNode(view, machine *symbols.Symbol, graph *lower.
+ 	record func(*symbols.Symbol, *Node)) *Node {
+ 	root := &Node{ID: ids.take(), Kind: declKind(machine), Name: r.notationName(machine), NameSynthesized: r.model.NameSynthesized(machine),
+ 		Type: declType(machine), Origin: symbolOrigin(machine), Inherited: inheritedOrigins(graph.Inherited()), Geometry: r.geometryOf(view, machine, out)}
++	root.State = r.stateNotation(graph.Behaviors[graph.Machine], len(graph.TopRegions) > 0, root.Origin.Doc)
+ 	r.dress(view, machine, root, out)
+ 	if record != nil {
+ 		record(machine, root)
+@@ -182,7 +183,7 @@ func (r *Renderer) entryEdges(view, machine *symbols.Symbol, graph *lower.StateG
+ 			}
+ 		}
+ 		out.Edges = append(out.Edges, Edge{
+-			From: start.ID, To: target.ID, Label: label, Kind: EdgeTransition,
++			From: start.ID, To: target.ID, Label: label, Kind: EdgeTransition, Notation: &Notation{Production: "state-transition", SourceRole: "source", TargetRole: "target"},
+ 			Origin: nodeOrigin(doc, entry.Decl), Route: r.declaredRouteOf(view, machine, entry.Decl, out),
+ 			Style: r.declaredEdgeDress(view, machine, entry.Decl, start.ID, target.ID, out),
+ 		})
+@@ -203,7 +204,7 @@ func (r *Renderer) transitionEdges(view, machine *symbols.Symbol, graph *lower.S
+ 		doc := docOf(graph, transition.Decl, machine.DocName)
+ 		out.Edges = append(out.Edges, Edge{
+ 			From: nodes[src].ID, To: target.ID, Label: r.transitionLabel(doc, transition, r.declaredNameSynthesized(machine, transition.Decl)),
+-			Kind: EdgeTransition, Origin: nodeOrigin(doc, transition.Decl), Route: r.declaredRouteOf(view, machine, transition.Decl, out),
++			Kind: EdgeTransition, Notation: &Notation{Production: "state-transition", SourceRole: "source", TargetRole: "target"}, Origin: nodeOrigin(doc, transition.Decl), Route: r.declaredRouteOf(view, machine, transition.Decl, out),
+ 			Style: r.declaredEdgeDress(view, machine, transition.Decl, nodes[src].ID, target.ID, out),
+ 		})
+ 	}
+@@ -270,6 +271,7 @@ func (r *Renderer) stateNode(state *ast.StateNode, graph *lower.StateGraph, mach
+ 		node.Kind, node.Name, node.Type, node.NameSynthesized = "final", ast.DoneFeature, "", true
+ 		return node
+ 	}
++	node.State = r.stateNotation(graph.Behaviors[state], len(graph.CompositeStates[state]) > 0, node.Origin.Doc)
+ 	var detail []string
+ 	if graph.UnconditionalStart(bodyOwning(graph, state)) == state {
+ 		detail = append(detail, "initial")
+@@ -638,7 +640,7 @@ func (r *Renderer) actionEdges(subject actionSubject, graph *lower.ActionGraph,
+ 			edgeDoc := docOf(graph, decl, doc)
+ 			label := r.successionLabel(edge, edgeDoc, doc, r.declaredNameSynthesized(subject.elem, decl))
+ 			out.Edges = append(out.Edges, Edge{From: nodes[src].ID, To: to.ID, Label: label,
+-				Kind: EdgeSuccession, Origin: nodeOrigin(edgeDoc, decl), Route: r.declaredRouteOf(subject.view, subject.elem, decl, out),
++				Kind: EdgeSuccession, Notation: &Notation{Production: "action-succession", SourceRole: "source", TargetRole: "target"}, Origin: nodeOrigin(edgeDoc, decl), Route: r.declaredRouteOf(subject.view, subject.elem, decl, out),
+ 				Style: r.declaredEdgeDress(subject.view, subject.elem, decl, nodes[src].ID, to.ID, out)})
+ 		}
+ 		for _, flow := range graph.DataFlows[src] {
+@@ -651,7 +653,7 @@ func (r *Renderer) actionEdges(subject actionSubject, graph *lower.ActionGraph,
+ 			synthesized := r.declaredNameSynthesized(subject.elem, flow.Decl)
+ 			out.Edges = append(out.Edges, Edge{From: nodes[src].ID, To: to.ID, Label: flowLabel(flow, synthesized), Name: edgeName(flow.Name, synthesized),
+ 				FromPort: portNamed(nodes[src], flow.SourcePin, PortOut), ToPort: portNamed(to, flow.TargetPin, PortIn),
+-				Kind: EdgeFlow, Origin: nodeOrigin(docOf(graph, flow.Decl, doc), flow.Decl), Route: r.declaredRouteOf(subject.view, subject.elem, flow.Decl, out),
++				Kind: EdgeFlow, Notation: flowNotation(flow.Decl), Origin: nodeOrigin(docOf(graph, flow.Decl, doc), flow.Decl), Route: r.declaredRouteOf(subject.view, subject.elem, flow.Decl, out),
+ 				Style: r.declaredEdgeDress(subject.view, subject.elem, flow.Decl, nodes[src].ID, to.ID, out)})
+ 		}
+ 	}
+@@ -1125,3 +1127,27 @@ func declScope(sym *symbols.Symbol) *symbols.Scope {
+ 	}
+ 	return sym.OwnerScope
+ }
++
++func (r *Renderer) stateNotation(behaviors *lower.StateBehaviors, parallel bool, doc string) *StateNotation {
++	out := &StateNotation{Parallel: parallel}
++	if behaviors == nil {
++		return out
++	}
++	for _, part := range []struct {
++		role string
++		list []lower.StateBehavior
++	}{{"entry", behaviors.Entry}, {"do", behaviors.Do}, {"exit", behaviors.Exit}} {
++		for _, behavior := range part.list {
++			behaviorDoc := doc
++			if declared := symbols.DocNameOf(behavior.Scope); declared != "" {
++				behaviorDoc = declared
++			}
++			ref := SemanticRef{Origin: nodeOrigin(behaviorDoc, behavior.Node)}
++			if behavior.Node != nil {
++				ref.Kind = ast.Notation(behavior.Node)
++			}
++			out.Behaviors = append(out.Behaviors, StateBehaviorNotation{Role: part.role, Text: r.behaviorText(doc, behavior), SemanticRef: ref})
++		}
++	}
++	return out
++}
 diff --git a/internal/ir/view/clone.go b/internal/ir/view/clone.go
-index 7dec25767..dfa5232c0 100644
+index 7dec25767..8ec2ff461 100644
 --- a/internal/ir/view/clone.go
 +++ b/internal/ir/view/clone.go
-@@ -26,6 +26,8 @@ func (r *Rendering) Clone() *Rendering {
+@@ -8,10 +8,12 @@ func (r *Rendering) Clone() *Rendering {
+ 	}
+ 	out := *r
+ 	out.drawn = nil
++	out.SequenceOrders = cloneSequenceOrders(r.SequenceOrders)
+ 	out.Roots = cloneNodes(r.Roots)
+ 	out.Edges = append([]Edge(nil), r.Edges...)
+ 	for i := range out.Edges {
+ 		out.Edges[i].Route = append([]Point(nil), r.Edges[i].Route...)
++		out.Edges[i].Notation = cloneNotation(r.Edges[i].Notation)
+ 		out.Edges[i].Style = cloneStyle(r.Edges[i].Style)
+ 	}
+ 	out.Notes = append([]Note(nil), r.Notes...)
+@@ -26,6 +28,8 @@ func (r *Rendering) Clone() *Rendering {
  		out.Rows[i] = append([]string(nil), row...)
  	}
  	out.RowOrigins = append([]Origin(nil), r.RowOrigins...)
@@ -1077,6 +1684,14 @@ index 7dec25767..dfa5232c0 100644
  	out.Notices = append([]string(nil), r.Notices...)
  	return &out
  }
+@@ -37,6 +41,7 @@ func cloneNodes(nodes []*Node) []*Node {
+ 	out := make([]*Node, len(nodes))
+ 	for i, node := range nodes {
+ 		copied := *node
++		copied.State = cloneState(node.State)
+ 		copied.Children = cloneNodes(node.Children)
+ 		copied.Ports = append([]Port(nil), node.Ports...)
+ 		for j, port := range copied.Ports {
 diff --git a/internal/ir/view/d2.go b/internal/ir/view/d2.go
 index ff079d220..411414079 100644
 --- a/internal/ir/view/d2.go
@@ -1091,10 +1706,19 @@ index ff079d220..411414079 100644
  	}
  	w.writeArrow(indent, w.end(edge.From, edge.FromPort), w.end(edge.To, edge.ToPort), arrow, edge.Label, class, edge.Style, edge.Origin, d2EndLabels(edge)...)
 diff --git a/internal/ir/view/data.go b/internal/ir/view/data.go
-index fa4498336..71245a095 100644
+index fa4498336..bf0a847d5 100644
 --- a/internal/ir/view/data.go
 +++ b/internal/ir/view/data.go
-@@ -23,6 +23,9 @@ type Data struct {
+@@ -5,6 +5,8 @@ package view
+ // rendering and what the rendering could not represent. It carries no protocol
+ // or wire concern — a caller speaking one converts it.
+ type Data struct {
++	SequenceOrders   []SequenceOrder
++	SequenceOrdering string
+ 	// View is the rendered view by qualified name, "" for a rendering of exposed
+ 	// elements alone (RenderExposed).
+ 	View string
+@@ -23,6 +25,9 @@ type Data struct {
  	// Columns and Rows are the tabular rendering, empty for every other kind.
  	Columns []string
  	Rows    []RowData
@@ -1104,7 +1728,23 @@ index fa4498336..71245a095 100644
  	// Lanes are a run timeline's object machines.
  	Lanes []Lane
  	// Canvas is the drawing surface the view states, nil for none.
-@@ -120,17 +123,19 @@ func (r *Rendering) DataWith(options Options) Data {
+@@ -37,6 +42,7 @@ type Data struct {
+ 
+ // NodeData is one node of a rendering, with the node it is nested in.
+ type NodeData struct {
++	State     *StateNotation
+ 	Synthetic bool
+ 	// SemanticID and QualifiedName are populated by a native export adapter.
+ 	IdentityStatus string
+@@ -71,6 +77,7 @@ type NodeData struct {
+ 
+ // EdgeData is one edge of a rendering, joining two node IDs.
+ type EdgeData struct {
++	Notation       *Notation
+ 	IdentityStatus string
+ 	SemanticID     string
+ 	QualifiedName  string
+@@ -120,17 +127,20 @@ func (r *Rendering) DataWith(options Options) Data {
  
  func (r *Rendering) data(ports *portView) Data {
  	out := Data{
@@ -1119,6 +1759,7 @@ index fa4498336..71245a095 100644
 -		Notes:    r.Notes,
 -		Shown:    r.Shown.Names(),
 -		Notices:  r.Notices,
++		SequenceOrders: cloneSequenceOrders(r.SequenceOrders), SequenceOrdering: r.SequenceOrdering,
 +		View:              r.View,
 +		Kind:              r.Kind,
 +		Stated:            r.Stated,
@@ -1135,6 +1776,26 @@ index fa4498336..71245a095 100644
  	}
  	if refusals := refusedPictureNotices(r.Pictures, r.pictureRefusals()); len(refusals) > 0 {
  		out.Notices = append(append([]string(nil), r.Notices...), refusals...)
+@@ -139,7 +149,7 @@ func (r *Rendering) data(ports *portView) Data {
+ 		out.Nodes = appendNodeData(out.Nodes, root, "", ports)
+ 	}
+ 	for _, edge := range r.Edges {
+-		out.Edges = append(out.Edges, EdgeData{From: edge.From, To: edge.To, FromPort: edge.FromPort, ToPort: edge.ToPort,
++		out.Edges = append(out.Edges, EdgeData{Notation: cloneNotation(edge.Notation), From: edge.From, To: edge.To, FromPort: edge.FromPort, ToPort: edge.ToPort,
+ 			Label: edge.Label, FromLabel: edge.FromLabel, ToLabel: edge.ToLabel, Name: edge.Name, Kind: edge.Kind, Origin: edge.Origin,
+ 			Route: edge.Route, Style: edge.Style})
+ 	}
+@@ -163,8 +173,8 @@ func appendNodeData(out []NodeData, node *Node, parent string, ports *portView)
+ 		nodePorts = ports.of(node)
+ 	}
+ 	out = append(out, NodeData{
+-		Synthetic: node.Synthetic, ID: node.ID, Kind: node.Kind, Name: node.Name, NameSynthesized: node.NameSynthesized, Type: node.Type, Detail: node.Detail,
+-		Text: node.Text, StandIn: node.StandIn, Ports: nodePorts, Parent: parent, Origin: node.Origin, Geometry: node.Geometry, Style: node.Style,
++		State: cloneState(node.State), Synthetic: node.Synthetic, ID: node.ID, Kind: node.Kind, Name: node.Name, NameSynthesized: node.NameSynthesized, Type: node.Type, Detail: node.Detail,
++		Text: node.Text, StandIn: node.StandIn, Ports: append([]Port(nil), nodePorts...), Parent: parent, Origin: node.Origin, Geometry: node.Geometry, Style: node.Style,
+ 		Verdict: node.Verdict,
+ 	})
+ 	for _, child := range node.Children {
 diff --git a/internal/ir/view/dot.go b/internal/ir/view/dot.go
 index ea2bfa0bf..cec80c5f3 100644
 --- a/internal/ir/view/dot.go
@@ -1161,7 +1822,7 @@ index d1dc299bf..14ea9e6f2 100644
  		EdgeAssociation:    `"a" -> "b" [label="k", dir=none];`,
  		EdgeInclude:        `"a" -> "b" [label="k", style=dashed];`,
 diff --git a/internal/ir/view/general.go b/internal/ir/view/general.go
-index 8072b8e2d..fc0c4f6fb 100644
+index 8072b8e2d..2aac2b0f1 100644
 --- a/internal/ir/view/general.go
 +++ b/internal/ir/view/general.go
 @@ -162,26 +162,29 @@ func (r *Renderer) metaclassGraph(fqn string) (Kind, bool) {
@@ -1280,7 +1941,53 @@ index 8072b8e2d..fc0c4f6fb 100644
  		return Edge{}, false
  	}
  	for _, end := range []*symbols.Symbol{from, to} {
-@@ -846,6 +878,10 @@ func (g *generalGraph) deriveEdges(sym *symbols.Symbol) []Edge {
+@@ -638,7 +670,14 @@ func (g *generalGraph) relate(from, to *symbols.Symbol, kind EdgeKind, origin *s
+ 			return Edge{}, false
+ 		}
+ 	}
+-	return Edge{From: g.node(from).ID, To: g.node(to).ID, Kind: kind, Label: kind.String(), Origin: symbolOrigin(origin)}, true
++	edge := Edge{From: g.node(from).ID, To: g.node(to).ID, Kind: kind, Label: kind.String(), Origin: symbolOrigin(origin)}
++	if origin != nil && !origin.EffectiveName() {
++		edge.Name = edgeName(origin.Name, g.r.model.NameSynthesized(origin))
++	}
++	if kind == EdgeRefine {
++		edge.Notation = &Notation{Production: "refinement", DeclarationKind: declKind(origin), Classification: refinementMetadata, SourceRole: "client", TargetRole: "supplier"}
++	}
++	return edge, true
+ }
+ 
+ // resolvedEnds resolves both ends of a relationship, reporting an end that
+@@ -808,7 +847,8 @@ func (g *generalGraph) deriveEdges(sym *symbols.Symbol) []Edge {
+ 	if sym.Scope == nil {
+ 		return nil
+ 	}
+-	var originals, derived []*symbols.Symbol
++	type endTarget struct{ target, end *symbols.Symbol }
++	var originals, derived []endTarget
+ 	for _, end := range append(slices.Clone(sym.Scope.Members()), sym.Scope.AnonymousMembers()...) {
+ 		usage, ok := end.Decl.(*ast.Usage)
+ 		if !ok || !usage.IsEnd {
+@@ -828,15 +868,16 @@ func (g *generalGraph) deriveEdges(sym *symbols.Symbol) []Edge {
+ 			continue
+ 		}
+ 		if isOriginal {
+-			originals = append(originals, target)
++			originals = append(originals, endTarget{target, end})
+ 		} else {
+-			derived = append(derived, target)
++			derived = append(derived, endTarget{target, end})
+ 		}
+ 	}
+ 	var out []Edge
+ 	for _, d := range derived {
+ 		for _, o := range originals {
+-			if edge, ok := g.relate(d, o, EdgeDerive, sym); ok {
++			if edge, ok := g.relate(d.target, o.target, EdgeDerive, sym); ok {
++				edge.Notation = &Notation{Production: "derivation", DeclarationKind: declKind(sym), Classification: derivationMetadata, SourceRole: "derived", TargetRole: "original", SourceEndName: edgeName(d.end.Name, g.r.model.NameSynthesized(d.end) || d.end.EffectiveName()), TargetEndName: edgeName(o.end.Name, g.r.model.NameSynthesized(o.end) || o.end.EffectiveName())}
+ 				out = append(out, edge)
+ 			}
+ 		}
+@@ -846,6 +887,10 @@ func (g *generalGraph) deriveEdges(sym *symbols.Symbol) []Edge {
  
  // refineEdges draws a #refinement dependency from each client to each supplier.
  func (g *generalGraph) refineEdges(sym *symbols.Symbol) []Edge {
@@ -1291,7 +1998,7 @@ index 8072b8e2d..fc0c4f6fb 100644
  	dep, ok := sym.Decl.(*ast.Dependency)
  	if !ok {
  		return nil
-@@ -853,11 +889,11 @@ func (g *generalGraph) refineEdges(sym *symbols.Symbol) []Edge {
+@@ -853,11 +898,11 @@ func (g *generalGraph) refineEdges(sym *symbols.Symbol) []Edge {
  	var out []Edge
  	for _, client := range dep.Clients {
  		for _, supplier := range dep.Suppliers {
@@ -1491,6 +2198,19 @@ index 000000000..c05071778
 +		t.Fatal("editing exported data or a clone mutated the native rendering")
 +	}
 +}
+diff --git a/internal/ir/view/interconnection.go b/internal/ir/view/interconnection.go
+index cbedffb73..175b64175 100644
+--- a/internal/ir/view/interconnection.go
++++ b/internal/ir/view/interconnection.go
+@@ -323,7 +323,7 @@ func (w *featureWalk) connectionEdges(connector *symbols.Symbol) {
+ 		for j := i + 1; j < len(resolved); j++ {
+ 			out.Edges = append(out.Edges, Edge{
+ 				From: resolved[i].node.ID, To: resolved[j].node.ID, FromPort: resolved[i].port, ToPort: resolved[j].port,
+-				Label: label, Kind: kind, Origin: symbolOrigin(connector), Route: slices.Clone(route), Style: style,
++				Label: label, Kind: kind, Origin: symbolOrigin(connector), Notation: connectorNotation(connector, kind), Route: slices.Clone(route), Style: style,
+ 			})
+ 		}
+ 	}
 diff --git a/internal/ir/view/matrix.go b/internal/ir/view/matrix.go
 index aa0923b00..4bb4f67a2 100644
 --- a/internal/ir/view/matrix.go
@@ -1571,6 +2291,170 @@ index c7aa0a278..2f19e6dbd 100644
  		return "-.->"
  	case EdgeComposition, EdgeReference, EdgeContainment:
  		return "---"
+diff --git a/internal/ir/view/notation_facts.go b/internal/ir/view/notation_facts.go
+new file mode 100644
+index 000000000..932590112
+--- /dev/null
++++ b/internal/ir/view/notation_facts.go
+@@ -0,0 +1,92 @@
++package view
++
++import (
++	"github.com/Open-MBEE/OpenSysML/internal/semantic/symbols"
++	"github.com/Open-MBEE/OpenSysML/internal/syntax/ast"
++)
++
++// SemanticRef identifies an actual native declaration used by notation.
++// Identity fields are populated only by the canonical export adapter.
++type SemanticRef struct {
++	Kind, Name, LifelineID, Direction         string
++	SemanticID, QualifiedName, IdentityStatus string
++	Origin                                    Origin
++}
++
++// Notation records native production and endpoint roles without changing EdgeKind.
++type Notation struct {
++	Production, DeclarationKind, Classification          string
++	SourceRole, TargetRole, SourceEndName, TargetEndName string
++	SourceEvent, TargetEvent                             *SemanticRef
++}
++
++// StateNotation preserves native state behavior compartments before text flattening.
++type StateNotation struct {
++	Parallel  bool
++	Behaviors []StateBehaviorNotation
++}
++
++// StateBehaviorNotation describes a lowered state behavior, not a runtime instance.
++type StateBehaviorNotation struct {
++	Role, Text string
++	SemanticRef
++}
++
++// SequenceOrder is an explicit native partial-order constraint, not an adjacent row.
++type SequenceOrder struct {
++	SemanticRef
++	SourceEvent, TargetEvent *SemanticRef
++}
++
++func cloneRef(ref *SemanticRef) *SemanticRef {
++	if ref == nil {
++		return nil
++	}
++	copied := *ref
++	return &copied
++}
++func cloneNotation(n *Notation) *Notation {
++	if n == nil {
++		return nil
++	}
++	copied := *n
++	copied.SourceEvent, copied.TargetEvent = cloneRef(n.SourceEvent), cloneRef(n.TargetEvent)
++	return &copied
++}
++func cloneState(n *StateNotation) *StateNotation {
++	if n == nil {
++		return nil
++	}
++	copied := *n
++	copied.Behaviors = append([]StateBehaviorNotation(nil), n.Behaviors...)
++	return &copied
++}
++func cloneSequenceOrders(orders []SequenceOrder) []SequenceOrder {
++	out := append([]SequenceOrder(nil), orders...)
++	for i := range out {
++		out[i].SourceEvent = cloneRef(orders[i].SourceEvent)
++		out[i].TargetEvent = cloneRef(orders[i].TargetEvent)
++	}
++	return out
++}
++
++// flowNotation classifies the native flow declaration, never its displayed label.
++func flowNotation(decl ast.Node) *Notation {
++	n := &Notation{Production: "flow", SourceRole: "source", TargetRole: "target"}
++	if u, ok := decl.(*ast.Usage); ok {
++		n.DeclarationKind = ast.Notation(u)
++		if u.Keyword == "message" {
++			n.Production = "message"
++		} else if u.IsSuccessionFlow() {
++			n.Production = "succession-flow"
++		}
++	}
++	return n
++}
++
++func connectorNotation(sym *symbols.Symbol, kind EdgeKind) *Notation {
++	if kind == EdgeFlow {
++		return flowNotation(sym.Decl)
++	}
++	return nil
++}
+diff --git a/internal/ir/view/notation_facts_test.go b/internal/ir/view/notation_facts_test.go
+new file mode 100644
+index 000000000..ec7723484
+--- /dev/null
++++ b/internal/ir/view/notation_facts_test.go
+@@ -0,0 +1,60 @@
++package view
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestNativeNotationFactsAndCloneIsolation(t *testing.T) {
++	seq := render(t, "sequence.sysml", "SequenceViews::pubSubView")
++	if seq.SequenceOrdering != "partial-order-linearization" || len(seq.SequenceOrders) != 3 {
++		t.Fatalf("explicit sequence ordering missing: %s %d", seq.SequenceOrdering, len(seq.SequenceOrders))
++	}
++	for _, edge := range seq.Edges {
++		n := edge.Notation
++		if n == nil || n.Production != "message" || n.SourceEvent == nil || n.TargetEvent == nil || n.SourceEvent.Kind != "event occurrence" || n.SourceEvent.LifelineID != edge.From || n.TargetEvent.LifelineID != edge.To || !n.SourceEvent.Origin.Located() {
++			t.Fatalf("native message facts lost: %+v", edge)
++		}
++	}
++	copy := seq.Clone()
++	copy.Edges[0].Notation.SourceEvent.Kind = "changed"
++	copy.SequenceOrders[0].SourceEvent.Kind = "changed"
++	if seq.Edges[0].Notation.SourceEvent.Kind == "changed" || seq.SequenceOrders[0].SourceEvent.Kind == "changed" {
++		t.Fatal("clone aliases sequence semantic facts")
++	}
++	states := render(t, "state-do.sysml", "InstrumentViews::peas")
++	count := 0
++	var walk func(*Node)
++	walk = func(n *Node) {
++		if n.State != nil {
++			for _, b := range n.State.Behaviors {
++				count++
++				if !b.Origin.Located() || b.Kind == "" || b.Role == "" {
++					t.Fatalf("unlocated state behavior: %+v", b)
++				}
++			}
++		}
++		for _, c := range n.Children {
++			walk(c)
++		}
++	}
++	for _, n := range states.Roots {
++		walk(n)
++	}
++	if count != 7 {
++		t.Fatalf("state behaviors=%d want7", count)
++	}
++	general := render(t, "general.sysml", "GeneralViews::requirementView")
++	derive, refine := false, false
++	for _, e := range general.Edges {
++		if e.Kind == EdgeDerive {
++			derive = e.Notation != nil && e.Notation.Production == "derivation" && e.Notation.SourceRole == "derived" && e.Notation.TargetRole == "original"
++		}
++		if e.Kind == EdgeRefine {
++			refine = e.Notation != nil && e.Notation.Production == "refinement" && e.Notation.SourceRole == "client" && strings.Contains(e.Notation.Classification, "Refinement")
++		}
++	}
++	if !derive || !refine {
++		t.Fatalf("derive=%v refine=%v", derive, refine)
++	}
++}
 diff --git a/internal/ir/view/plantuml.go b/internal/ir/view/plantuml.go
 index 52db979a7..a07141abc 100644
 --- a/internal/ir/view/plantuml.go
@@ -1715,6 +2599,98 @@ index 000000000..65a3c4e89
 +		}
 +	}
 +}
+diff --git a/internal/ir/view/sequence.go b/internal/ir/view/sequence.go
+index 860ebd368..fe6a84ece 100644
+--- a/internal/ir/view/sequence.go
++++ b/internal/ir/view/sequence.go
+@@ -69,6 +69,10 @@ func (r *Renderer) renderSequence(exposed []*symbols.Symbol, out *Rendering) {
+ 			"%s states no direction; a sequence rendering shows directed messages only",
+ 			r.noticeSubject(connector)))
+ 	}
++	for _, order := range stated.orders {
++		out.SequenceOrders = append(out.SequenceOrders, SequenceOrder{SemanticRef: SemanticRef{Name: order.name, Kind: "succession", Origin: order.origin}, SourceEvent: sequenceRef(order.from, lifelines), TargetEvent: sequenceRef(order.to, lifelines)})
++	}
++	out.SequenceOrdering = "partial-order-linearization"
+ 	out.Edges = r.orderMessages(r.messages(stated.flows, lifelines, out), stated.orders, out)
+ }
+ 
+@@ -105,6 +109,7 @@ type message struct {
+ type order struct {
+ 	from, to *symbols.Symbol
+ 	name     string
++	origin   Origin
+ }
+ 
+ // interactions are what a sequence rendering reads between lifelines: the flows
+@@ -203,7 +208,7 @@ func (r *Renderer) addSuccessionUsage(succession *symbols.Symbol, into *interact
+ 	if succession.Name != "" && !succession.EffectiveName() {
+ 		name = localName(succession)
+ 	}
+-	into.orders = append(into.orders, order{from: from, to: to, name: name})
++	into.orders = append(into.orders, order{from: from, to: to, name: name, origin: symbolOrigin(succession)})
+ }
+ 
+ // addSuccessionEdges records the orders a member-attached `then` states, which
+@@ -219,7 +224,7 @@ func (r *Renderer) addSuccessionEdges(sym *symbols.Symbol, into *interactions) {
+ 		if from == nil || to == nil {
+ 			continue
+ 		}
+-		into.orders = append(into.orders, order{from: from, to: to})
++		into.orders = append(into.orders, order{from: from, to: to, origin: nodeOrigin(sym.DocName, edge)})
+ 	}
+ }
+ 
+@@ -290,10 +295,12 @@ func (r *Renderer) messages(flows []*symbols.Symbol, lifelines map[*symbols.Symb
+ 		if len(nodes) != 2 {
+ 			continue
+ 		}
++		notation := flowNotation(flow.Decl)
++		notation.SourceEvent, notation.TargetEvent = sequenceRef(ends[0], lifelines), sequenceRef(ends[1], lifelines)
+ 		messages = append(messages, message{
+ 			flow: flow, from: ends[0], to: ends[1],
+ 			edge: Edge{From: nodes[0].ID, To: nodes[1].ID, Label: r.messageLabel(flow), Kind: EdgeFlow,
+-				Origin: symbolOrigin(flow)},
++				Origin: symbolOrigin(flow), Notation: notation},
+ 		})
+ 	}
+ 	sort.SliceStable(messages, func(i, j int) bool { return declaredBefore(messages[i].flow, messages[j].flow) })
+@@ -457,6 +464,7 @@ func (r *Renderer) orderMessages(messages []message, orders []order, out *Render
+ 			return rank[messages[i].from] < rank[messages[j].from]
+ 		})
+ 	} else {
++		out.SequenceOrdering = "declaration-order-cycle-fallback"
+ 		out.Notices = append(out.Notices, fmt.Sprintf(
+ 			"successions form a cycle (%s); the messages are shown in declaration order",
+ 			strings.Join(r.cyclicOrders(stated, at, sorted), ", ")))
+@@ -597,3 +605,28 @@ func lifelineLike(sym *symbols.Symbol) bool {
+ 	}
+ 	return false
+ }
++
++func sequenceRef(sym *symbols.Symbol, lifelines map[*symbols.Symbol]*Node) *SemanticRef {
++	if sym == nil {
++		return nil
++	}
++	ref := &SemanticRef{Kind: declKind(sym), Name: localName(sym), Origin: symbolOrigin(sym)}
++	if sym.Recorded() && sym.Facts.Modifiers.Has(symbols.ModEvent) {
++		ref.Kind = "event occurrence"
++	}
++	if usage, ok := sym.Decl.(*ast.Usage); ok {
++		if usage.IsEvent {
++			ref.Kind = "event occurrence"
++		}
++		if usage.Direction != ast.DirNone {
++			ref.Direction = usage.Direction.String()
++		}
++	}
++	for owner := sym; owner != nil; owner = owner.Owner() {
++		if node := lifelines[owner]; node != nil {
++			ref.LifelineID = node.ID
++			break
++		}
++	}
++	return ref
++}
 diff --git a/internal/ir/view/text.go b/internal/ir/view/text.go
 index 7b9e85d09..57bd8c7fc 100644
 --- a/internal/ir/view/text.go
@@ -1729,7 +2705,7 @@ index 7b9e85d09..57bd8c7fc 100644
  	case EdgeAssociation:
  		return "--"
 diff --git a/internal/ir/view/view.go b/internal/ir/view/view.go
-index db46760ca..571113e85 100644
+index db46760ca..1d13ced44 100644
 --- a/internal/ir/view/view.go
 +++ b/internal/ir/view/view.go
 @@ -218,6 +218,8 @@ const (
@@ -1750,7 +2726,40 @@ index db46760ca..571113e85 100644
  	}
  	return "edge"
  }
-@@ -457,6 +461,9 @@ type Rendering struct {
+@@ -270,6 +274,7 @@ func (k EdgeKind) String() string {
+ // transitions leave. Children are the nodes nested in it, which is how a
+ // rendering carries containment.
+ type Node struct {
++	State *StateNotation
+ 	// Synthetic marks a generated notation vertex rather than a model declaration.
+ 	Synthetic bool
+ 	// ID identifies the node within its rendering, and is what an edge names.
+@@ -328,6 +333,7 @@ type Node struct {
+ // action, which an object flow ends at, or a port a part has from its
+ // definition, which a connector ends at.
+ type Port struct {
++	SemanticID, QualifiedName, IdentityStatus string
+ 	// ID identifies the port within its rendering, and is what an edge names.
+ 	ID string
+ 	// Name is the pin's name, as the notation writes it.
+@@ -393,6 +399,7 @@ func (p Port) label() string {
+ 
+ // Edge joins two nodes of a rendering.
+ type Edge struct {
++	Notation *Notation
+ 	// From and To are node IDs.
+ 	From string
+ 	To   string
+@@ -430,6 +437,8 @@ type Edge struct {
+ // Rendering is what a view or run renders to. It is a value, not a live view of
+ // the model: nothing in it points back into the AST.
+ type Rendering struct {
++	SequenceOrders   []SequenceOrder
++	SequenceOrdering string
+ 	// View is the rendered view, by qualified name as the notation writes it.
+ 	View string
+ 	// Kind is the rendering produced.
+@@ -457,6 +466,9 @@ type Rendering struct {
  	Lanes []Lane
  	// RowOrigins is where each row's element was declared, one entry per row.
  	RowOrigins []Origin
@@ -1760,7 +2769,7 @@ index db46760ca..571113e85 100644
  	// Shown is the optional notation elements the view's rendering shows, read
  	// from the rendering the view states; nil is DefaultShown.
  	Shown Shown
-@@ -581,7 +588,9 @@ func (r *Renderer) render(view *symbols.Symbol, drawn *Drawn) (*Rendering, error
+@@ -581,7 +593,9 @@ func (r *Renderer) render(view *symbols.Symbol, drawn *Drawn) (*Rendering, error
  	case KindSequence:
  		r.renderSequence(exposed, out)
  	case KindRequirement, KindDefinition, KindPackage:
@@ -1771,7 +2780,7 @@ index db46760ca..571113e85 100644
  	default:
  		// Unreachable: KindOf refuses an unsupported kind.
  		return nil, &UnsupportedKindError{Kind: kind, View: r.notationName(view), Stated: stated}
-@@ -629,7 +638,9 @@ func (r *Renderer) RenderExposed(exposed []*symbols.Symbol, kind Kind, stated st
+@@ -629,7 +643,9 @@ func (r *Renderer) RenderExposed(exposed []*symbols.Symbol, kind Kind, stated st
  	case KindSequence:
  		r.renderSequence(exposed, out)
  	case KindRequirement, KindDefinition, KindPackage:

@@ -73,7 +73,7 @@ try {
   const wasm = await wasmClient();
   const serverInfo = await native.call('GetServerInfo', {});
   assert.deepEqual(await wasm.call('GetServerInfo', {}), serverInfo, 'Native and WASM capability contract must match');
-  for (const capability of ['render_view', 'semantic_rendering_identity', 'export_model']) assert.ok(serverInfo.capabilities.includes(capability));
+  for (const capability of ['render_view', 'semantic_rendering_identity', 'export_model','symbol_attributes','evaluate_subject','big_int_values']) assert.ok(serverInfo.capabilities.includes(capability));
   const parsed = await native.call('ParseSources', { documents });
   const wasmParsed = await wasm.call('ParseSources', { documents });
   assert.deepEqual(wasmParsed, parsed, 'Native and WASM parsing must have the same hash, roots and diagnostics');
@@ -260,9 +260,54 @@ try {
   const portableContext = engineeringContext(graph, { focus: 'Flashlight__portable', depth: 1, budget: 24 });
   const contextIDs = new Set(portableContext.elements.map(element => element.id));
   for (const id of ['Flashlight__light', 'Flashlight__MassCheck', 'Flashlight__massCheck']) assert.ok(contextIDs.has(id), `Standalone requirement context lost native endpoint: ${id}`);
+  // Additive value metadata must agree and must actually be present. Comparing
+  // two empty/dropped payloads would not prove the new semantic contract.
+  const valueDocuments=[{name:'attribute-interpolation.sysml',content:await readFile(resolve('tests/fixtures/attribute-interpolation.sysml'),'utf8')}];
+  const valueParsed=await native.call('ParseSources',{documents:valueDocuments});
+  assert.deepEqual(await wasm.call('ParseSources',{documents:valueDocuments}),valueParsed);
+  assert.deepEqual(valueParsed.diagnostics??[],[],'Attribute interpolation fixture must compile');
+  const valueSymbols={};
+  for(const symbolId of ['AttributeInterpolation::source','AttributeInterpolation::linked']){
+    const params={modelHash:valueParsed.modelHash,symbolId},symbol=await native.call('GetSymbol',params);
+    assert.deepEqual(await wasm.call('GetSymbol',params),symbol,'Native and WASM typed attribute facts must agree');valueSymbols[symbolId]=symbol;
+  }
+  assert.deepEqual(valueSymbols['AttributeInterpolation::source'].symbol.attributes.find(a=>a.name==='huge').value,{bigIntValue:'18446744073709551616'},'GetSymbol must not truncate an unbounded integer to int64');
+  const evaluatedAttributes={};
+  for(const attribute of ['identifier','distance','batteryWhKg','state','huge','unsetInput','sequenceValues']){
+    const params={modelHash:valueParsed.modelHash,expression:"'"+attribute+"'",contextSymbolId:'AttributeInterpolation::linked',subjectSymbolId:'AttributeInterpolation::linked'},result=await native.call('Evaluate',params);
+    assert.deepEqual(await wasm.call('Evaluate',params),result,'Native and WASM explicit attribute context must agree');assert.ok(!result.error,JSON.stringify(result));evaluatedAttributes[attribute]=result;
+  }
+  assert.equal(evaluatedAttributes.identifier.result.stringValue,'IC-fixture');
+  assert.equal(evaluatedAttributes.distance.result.quantity.unit,'m');assert.deepEqual(evaluatedAttributes.distance.result.quantity.rationalMagnitude,{numerator:'6',denominator:'5'});
+  assert.equal(evaluatedAttributes.batteryWhKg.result.intValue,'140');
+  assert.equal(evaluatedAttributes.state.result.enumLiteral.literalId,'AttributeInterpolation::Evidence::unknown');
+  assert.equal(evaluatedAttributes.state.result.enumLiteral.enumerationId,'AttributeInterpolation::Evidence');
+  assert.equal(evaluatedAttributes.huge.result.bigIntValue,'18446744073709551616');
+  assert.equal(evaluatedAttributes.unsetInput.result.unset,true,'Unbound inputs remain unset in both runtimes');
+  assert.equal(evaluatedAttributes.sequenceValues.result.sequence.elements.length,3,'Collections remain structured native values');
+  const valueContract={parsed:valueParsed,symbols:valueSymbols,evaluatedAttributes};
+
+  const galleryDocuments=[{name:'native-gallery.sysml',content:await readFile(resolve('examples/canvas-views/model.sysml'),'utf8')},{name:'notation-parity.sysml',content:await readFile(resolve('tests/fixtures/notation-parity.sysml'),'utf8')}];
+  const galleryParsed=await native.call('ParseSources',{documents:galleryDocuments});
+  assert.deepEqual(await wasm.call('ParseSources',{documents:galleryDocuments}),galleryParsed);assert.deepEqual(galleryParsed.diagnostics??[],[],'Native notation fixture must compile');
+  const galleryDeclarations=await native.call('ExportModel',{modelHash:galleryParsed.modelHash,projection:'declarations'}),galleryIDs=new Set(galleryDeclarations.elements.map(e=>e['@id']));
+  assert.deepEqual(await wasm.call('ExportModel',{modelHash:galleryParsed.modelHash,projection:'declarations'}),galleryDeclarations);
+  const notationViews={};
+  for(const view of ['ViewDemo::BehaviorViews::sequence','ViewDemo::BehaviorViews::states','NativeNotationParity::requirements','NativeNotationParity::pipeline','NativeNotationParity::states']){
+    const params={modelHash:galleryParsed.modelHash,view,includeSemanticIdentity:true,show:['parameter-symbols','port-symbols','typings','edge-labels']},drawing=await native.call('RenderView',params);
+    assert.deepEqual(await wasm.call('RenderView',params),drawing,'Every structured native notation fact must agree in WASM');notationViews[view]=drawing;
+  }
+  const sequence=notationViews['ViewDemo::BehaviorViews::sequence'];assert.equal(sequence.sequenceOrdering,'partial-order-linearization');assert.equal(sequence.sequenceOrders.length,2,'Gallery has two explicit native message-event ordering relationships');
+  for(const edge of sequence.edges){assert.equal(edge.notation.production,'message');for(const [role,lifeline]of [['sourceEvent',edge.from],['targetEvent',edge.to]]){const event=edge.notation[role];assert.equal(event.kind,'event occurrence');assert.equal(event.lifelineId,lifeline);assert.equal(event.identityStatus,'mapped');assert.ok(galleryIDs.has(event.semanticId));}}
+  for(const order of sequence.sequenceOrders){assert.equal(order.kind,'succession');assert.ok(galleryIDs.has(order.semanticId));assert.ok(galleryIDs.has(order.sourceEvent.semanticId));assert.ok(galleryIDs.has(order.targetEvent.semanticId));}
+  const derive=notationViews['NativeNotationParity::requirements'].edges.find(e=>e.kind==='derive');assert.ok(derive?.notation);assert.deepEqual([derive.notation.production,derive.notation.sourceRole,derive.notation.targetRole],['derivation','derived','original']);assert.deepEqual([derive.notation.sourceEndName,derive.notation.targetEndName],['detail','basis']);
+  const pipeline=notationViews['NativeNotationParity::pipeline'],flow=pipeline.edges.find(e=>e.kind==='flow');assert.equal(flow.notation.production,'flow');assert.ok(flow.fromPort&&flow.toPort);
+  const pins=pipeline.nodes.flatMap(node=>node.ports??[]);assert.equal(pins.length,2);assert.deepEqual(pins.map(pin=>pin.direction).sort(),['in','out']);for(const pin of pins){assert.equal(pin.parameter,true);assert.equal(pin.identityStatus,'mapped');assert.ok(galleryIDs.has(pin.semanticId));}
+  const state=notationViews['NativeNotationParity::states'].nodes.find(node=>node.state?.behaviors?.length===3);assert.ok(state,'Structured entry/do/exit roles must not be flattened away');assert.equal(state.state.parallel,true);assert.deepEqual(state.state.behaviors.map(b=>b.role),['entry','do','exit']);for(const behavior of state.state.behaviors){assert.equal(behavior.identityStatus,'mapped');assert.ok(galleryIDs.has(behavior.semanticId));assert.ok(behavior.text);}
+  const notationContract={parsed:galleryParsed,views:notationViews};
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract, parallelIdentity }, null, 2) + '\n');
-  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size, parallelRelationships: assertionIds.length,
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract, parallelIdentity,valueContract,notationContract }, null, 2) + '\n');
+  console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size, parallelRelationships: assertionIds.length,valueAttributes:Object.keys(evaluatedAttributes).length,notationViews:Object.keys(notationViews).length,
     views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: view.edges.length }])) }, null, 2));
 } finally { native.close(); }
 // Go remains resident by design. This harness owns the process lifetime.

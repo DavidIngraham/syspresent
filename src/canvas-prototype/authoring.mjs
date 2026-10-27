@@ -113,20 +113,32 @@ function rationalDecimal(numerator,denominator,decimals){
  const whole=rounded/scale,fraction=String(rounded%scale).padStart(decimals,'0');return (negative&&rounded!==0n?'-':'')+whole+(decimals?'.'+fraction:'');
 }
 export function formatNativeValue(attribute,binding={}){
- const value=attribute.value;if(!value||Object.hasOwn(value,'null')||Object.hasOwn(value,'infinity'))throw Error('Native attribute has no supported constant value; supply an explicit evaluation context instead');
+ const value=attribute.value;
+ if(value?.undetermined)throw Error('Native attribute is undetermined: '+value.undetermined.reason);
+ if(value?.unset)throw Error('Native attribute is unset; no input value was supplied');
+ if(!value||Object.hasOwn(value,'null')||Object.hasOwn(value,'infinity'))throw Error('Native attribute has no supported scalar value');
+ if(Object.hasOwn(value,'quantity')){
+  if(Object.keys(value).length!==1)throw Error('Ambiguous native quantity result');
+  const quantity=value.quantity,arms=['intMagnitude','bigIntMagnitude','realMagnitude','rationalMagnitude'].filter(key=>Object.hasOwn(quantity,key));
+  if(arms.length!==1)throw Error('Unsupported or ambiguous native quantity magnitude');
+  const arm={intMagnitude:'intValue',bigIntMagnitude:'bigIntValue',realMagnitude:'realValue',rationalMagnitude:'rationalValue'}[arms[0]];
+  if(attribute.unit&&quantity.unit&&attribute.unit!==quantity.unit)throw Error('Native quantity unit conflicts with the declared attribute unit');
+  return formatNativeValue({...attribute,unit:quantity.unit??attribute.unit,value:{[arm]:quantity[arms[0]]}},binding);
+ }
  if(binding.type!==undefined&&binding.type!==attribute.type)throw Error('Native attribute type changed: '+attribute.type);
  if(binding.unit!==undefined&&binding.unit!==(attribute.unit??''))throw Error('Unit conversion is unsupported; native unit is '+(attribute.unit??'(unitless)'));
- const arms=['intValue','realValue','boolValue','stringValue','rationalValue'].filter(key=>Object.hasOwn(value,key));if(arms.length!==1)throw Error('Unsupported or ambiguous native scalar value');
+ const arms=['intValue','bigIntValue','realValue','boolValue','stringValue','rationalValue','enumLiteral'].filter(key=>Object.hasOwn(value,key));if(arms.length!==1)throw Error('Unsupported or ambiguous native scalar value ('+Object.keys(value).join(', ')+')');
  const arm=arms[0];let formatted;
  if(arm==='rationalValue')formatted=rationalDecimal(value.rationalValue.numerator,value.rationalValue.denominator,binding.decimals);
- else if(arm==='intValue'){if(!/^-?\d+$/.test(String(value.intValue)))throw Error('Invalid native integer');formatted=rationalDecimal(value.intValue,1,binding.decimals);}
+ else if(arm==='intValue'||arm==='bigIntValue'){if(!/^-?\d+$/.test(String(value[arm])))throw Error('Invalid native integer');formatted=rationalDecimal(value[arm],1,binding.decimals);}
  else if(arm==='realValue'){const number=Number(value.realValue);if(!Number.isFinite(number))throw Error('Unsupported nonfinite native value');formatted=binding.decimals===undefined?String(number):number.toFixed(binding.decimals);}
+ else if(arm==='enumLiteral'){if(binding.decimals!==undefined)throw Error('Decimal formatting requires a native number');formatted=text(value.enumLiteral?.literalId,'native enumeration literal',4096);}
  else{if(binding.decimals!==undefined)throw Error('Decimal formatting requires a native number');formatted=String(value[arm]);}
  return formatted+(attribute.unit?' '+attribute.unit:'');
 }
-/** Resolve fresh native constants/documentation every time a source model is loaded or built. */
+/** Resolve native static facts or selected-attribute values afresh on source load/build. */
 export async function resolveNarrative(record,{engine,modelHash,graph,scopeIds}={}){
- record=validateNarrative(record);const resolve=resolver(graph),values=[],substitutions=new Map(),symbols=new Map();
+ record=validateNarrative(record);const resolve=resolver(graph),values=[],substitutions=new Map(),symbols=new Map(),evaluations=new Map();
  for(const binding of record.bindings){
   const element=allowed(resolve(binding.symbol),scopeIds);let formatted,value;
   if(binding.kind==='documentation'){const documentation=documentationFor(graph,element.id);if(!documentation.text)throw Error('Native documentation is unavailable: '+element.qualifiedName);formatted=documentation.text;value={binding:binding.name,kind:'documentation',symbol:element.id,source:documentation.source?.id,authority:'native-export',text:formatted};}
@@ -135,7 +147,20 @@ export async function resolveNarrative(record,{engine,modelHash,graph,scopeIds}=
    if(!symbols.has(element.id))symbols.set(element.id,await engine.call('GetSymbol',{modelHash,symbolId:element.qualifiedName??element.id}));
    const result=symbols.get(element.id);if(result.error||!result.symbol)throw Error('Native symbol lookup failed: '+(result.error??element.id));
    const matches=(result.symbol.attributes??[]).filter(attribute=>attribute.name===binding.attribute);if(matches.length!==1)throw Error((matches.length?'Ambiguous':'Unavailable')+' native constant attribute: '+binding.attribute);
-   const attribute=matches[0];formatted=formatNativeValue(attribute,binding);value={binding:binding.name,kind:'attribute',symbol:element.id,nativeSymbol:result.symbol.id,attribute:attribute.name,type:attribute.type,unit:attribute.unit??'',value:structuredClone(attribute.value),authority:'native:GetSymbol',interpretation:'declared constant; not a measured value or executed analysis'};
+   let attribute=matches[0],evaluation;
+   // GetSymbol provides static constant facts. A missing value may still be a
+   // native reference/default expression on this exact selected owner. Ask only
+   // for that known attribute in its explicit context; never accept user code,
+   // invent inputs, run actions, or evaluate a different configuration.
+   if(!attribute.value||Object.hasOwn(attribute.value,'null')){
+    const expression="'"+attribute.name.replaceAll('\\','\\\\').replaceAll("'","\\'")+"'",request={modelHash,expression,contextSymbolId:element.qualifiedName??element.id,...(!['Package','Namespace'].includes(element.kind)?{subjectSymbolId:element.qualifiedName??element.id}:{})},key=JSON.stringify([element.id,attribute.name]);
+    if(!evaluations.has(key))evaluations.set(key,await engine.call('Evaluate',request));const response=evaluations.get(key);
+    if(response.error||(response.diagnostics??[]).some(d=>String(d.severity).toLowerCase().includes('error')))throw Error('Native attribute evaluation failed: '+(response.error??response.diagnostics.map(d=>d.message).join('; ')));
+    if(!response.result)throw Error('Native attribute evaluation returned no value for '+attribute.name);
+    evaluation={request,result:structuredClone(response.result),diagnostics:structuredClone(response.diagnostics??[])};
+    attribute={...attribute,value:response.result};
+   }
+   formatted=formatNativeValue(attribute,binding);value={binding:binding.name,kind:'attribute',symbol:element.id,nativeSymbol:result.symbol.id,attribute:attribute.name,type:attribute.type,unit:attribute.value?.quantity?.unit??attribute.unit??'',value:structuredClone(attribute.value),authority:evaluation?'native:Evaluate':'native:GetSymbol',...(evaluation?{evaluation}:{}),interpretation:evaluation?'native attribute value in the explicitly selected owner/subject context; no supplied inputs, action execution, physical measurement or acceptance verdict':'declared constant; not a measured value or executed analysis'};
   }
   substitutions.set(binding.name,formatted);values.push(value);
  }

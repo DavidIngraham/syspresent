@@ -27,7 +27,7 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `b1ea888051d2423acdf5c35fab11fac531fc24b2`
+The prototype dependency revision is `505baf09110e5af9720164186c77cd19d9e5b45e`
 on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
@@ -48,7 +48,7 @@ SHA-256 digests, carried-patch digest and source-diff digest (including untracke
 new files), plus OpenSysML and Go runtime license information. The native executable is a validation tool;
 published static assets need only WASM, its matching runtime, worker and provenance.
 The parity harness compares actual native and WASM parse responses, API graphs and
-four native view projections, including mapped identities and edge endpoints. It
+native view projections, including mapped identities, directed parameter pins, derivation roles, sequence events/orders, state behaviors and exact large-integer attribute values. Native and WASM Evaluate agree for selected attribute interpolation, including quantity/enum values and honest unset/collection rejection. It
 also checks kind-preserving capture of ad hoc action/interconnection views, and
 authoritative discovery of implicit satisfaction and inherited verification through
 a declared requirement coverage view. Standalone requirement context must retain
@@ -142,7 +142,7 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `b1ea888051d2423acdf5c35fab11fac531fc24b2` (clean).
+Current source revision: `505baf09110e5af9720164186c77cd19d9e5b45e` (clean).
 Carried-patch SHA-256: `951f2344ff859869b88e735c8c876c2d9e3c349fdddbdb0a864931de621bb8e1`.
 
 ## Distinct parallel native relationships
