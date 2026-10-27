@@ -27,7 +27,7 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `3f59ff94414bfbd103d4dc655a8383289391feb9`
+The prototype dependency revision is `e4fd5aa4ce5e4b756992fcee2d69459833e5ef56`
 on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
@@ -145,8 +145,8 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `3f59ff94414bfbd103d4dc655a8383289391feb9` (clean).
-Carried-patch SHA-256: `06ff4d7ba0f1178b05adf875033d409e8cec202465103eee1ccdb5366407e63f`.
+Current source revision: `e4fd5aa4ce5e4b756992fcee2d69459833e5ef56` (clean).
+Carried-patch SHA-256: `2ad5d8101a2288bedc01addeac27fed46467a6369e647e3df9f392ac0aa6d80a`.
 
 ## Distinct parallel native relationships
 
@@ -208,3 +208,10 @@ and at least 512 MiB headroom. Worker replacement, retained-model violations and
 a 3584 MiB protective limit fail explicitly. The harness does not force GC during
 cycles; production ReleaseModel collection supplies the post-append heap sample.
 The earlier three-cycle success alone is not a plateau claim.
+
+Large graph reservations now use bounded 65,536-triple allocation bands above
+262,144 triples; large JSON responses use 4 MiB bands above 16 MiB. Both reserve
+less than 25% spare space and preserve actual record lengths. This lets nearby
+source revisions reuse compatible spans in the nonshrinking WASM heap. The
+success envelope uses a local string builder without the formatter/string copy.
+Repeated same-worker stability is an independent acceptance gate.

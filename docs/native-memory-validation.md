@@ -112,7 +112,7 @@ collection's method, allocation, before/after heap and duration, plus the GC goa
 and exact GOGC/soft-limit settings.
 
 The final carried native source is clean
-3f59ff94414bfbd103d4dc655a8383289391feb9. Native lifecycle and actual js/WASM
+e4fd5aa4ce5e4b756992fcee2d69459833e5ef56. Native lifecycle and actual js/WASM
 allocation tests preserve reachable data and verify query skips. Independent
 read-only review found no remaining concrete correctness issue in the exporter,
 phase collection or app ownership changes.
@@ -186,3 +186,34 @@ retention and a 3584 MiB protective limit. Eight policy regressions cover these
 conditions, including growth between cycle baselines. No harness collection is
 permitted during accepted cycles. Only production request/release collection
 provides their heap samples.
+
+## Bounded allocation classes and wire buffers
+
+The exact-capacity build completed eight functional same-worker cycles but failed
+stability. Its completed high-water marks were 2208, 2284, 2316, 2316, 2468,
+2500, 2500 and 2576 MiB. Settled, naturally collected heap rose only from about
+240 to 243 MB with one retained model. The failed stability record is preserved;
+it is not relabeled as a pass.
+
+Slightly larger exact allocations can fail to reuse a previous contiguous span
+even when total idle heap is large. Large graph buffers now reserve 65,536-triple
+bands once their requested count reaches 262,144. The measured source/runtime
+graphs and wrapped variants share the 458,752-triple class. Small graphs remain
+exact; spare capacity is strictly below 25%, and overflow falls back safely.
+Record length, ordering, deduplication, native identities and serialized values
+remain unchanged.
+
+Large response buffers use 4 MiB classes from 16 MiB upward. Standard JSON
+encoding preserves validation and escaping; returning buffer storage avoids an
+exact-size result clone. Success envelopes use an appropriately reserved local
+string builder instead of formatter buffers and a final string copy. Error
+envelopes and small export responses retain their previous behavior. A 26 MiB
+native wire benchmark allocated 100.0 MB per operation before and 67.8 MB after.
+Bounded spare storage can increase fresh allocations; this policy targets
+repeated span reuse, not a universal reduction of fresh-operation peaks.
+
+Native and actual js/WASM byte-equivalence tests cover large bodies, nearby
+revisions, full/declaration metadata, nil, invalid JSON, HTML and UTF-8. Independent
+review found no correctness blocker. Actual same-worker stability still requires
+the late-cycle acceptance window; implementation and unit tests alone do not
+establish it.

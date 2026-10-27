@@ -21,11 +21,11 @@ index 000000000..282bad7c9
 +- Bound declaration export collection storage by projecting native declaration triples before annotation and serializing one indexed collection at a time without duplicating the complete RDF grouping. Preserve native references, collection order and coverage counts.
 diff --git a/changes/unreleased/export-graph-capacity.fixed.md b/changes/unreleased/export-graph-capacity.fixed.md
 new file mode 100644
-index 000000000..1888eb76f
+index 000000000..cc2909918
 --- /dev/null
 +++ b/changes/unreleased/export-graph-capacity.fixed.md
 @@ -0,0 +1 @@
-+- Size merged and root-namespace RDF storage from every emitted provenance and ownership record, and size declaration projections from retained triples, avoiding repeated full-graph buffer growth without changing native objects or ordering.
++- Size merged and root-namespace RDF storage from every emitted provenance and ownership record, and size declaration projections from retained triples, avoiding repeated full-graph buffer growth without changing native objects or ordering. Large export buffers use bounded allocation classes so nearby model versions can reuse contiguous storage; small buffers retain exact capacities.
 diff --git a/changes/unreleased/focused-browser-model-context.added.md b/changes/unreleased/focused-browser-model-context.added.md
 new file mode 100644
 index 000000000..c21ddced6
@@ -33,6 +33,13 @@ index 000000000..c21ddced6
 +++ b/changes/unreleased/focused-browser-model-context.added.md
 @@ -0,0 +1 @@
 +- Add explicit source-declaration API-JSON projection with per-document temporary graph reclamation, reuse native identity inventories without RDF generation, and support bounded requirement context through `OpenSysMLRenderings::RequirementContext`, including directed dependencies.
+diff --git a/changes/unreleased/large-response-buffers.fixed.md b/changes/unreleased/large-response-buffers.fixed.md
+new file mode 100644
+index 000000000..ffb266f81
+--- /dev/null
++++ b/changes/unreleased/large-response-buffers.fixed.md
+@@ -0,0 +1 @@
++- Keep nearby large native export responses in bounded buffer allocation classes and remove redundant formatter copies from JavaScript JSON-RPC envelopes, preserving the standard JSON encoding and exact wire bytes.
 diff --git a/changes/unreleased/matrix-cell-identities.added.md b/changes/unreleased/matrix-cell-identities.added.md
 new file mode 100644
 index 000000000..387935b6f
@@ -132,10 +139,10 @@ index e909e790a..7f6a2429b 100644
 +constructs are not claimed by this addition.
 diff --git a/docs/reference/combined-model-lifecycle.md b/docs/reference/combined-model-lifecycle.md
 new file mode 100644
-index 000000000..359977a26
+index 000000000..7d63272fa
 --- /dev/null
 +++ b/docs/reference/combined-model-lifecycle.md
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,54 @@
 +# Combined service model lifecycle
 +
 +The combined native and WASM service retains parsed models by content hash. Its validation and execution frontends retain separate model state over one frozen standard-library index. The shared least-recently-used bound remains 16 models. Clients that prepare temporary or replacement versions should release hashes once no current or pending operation needs them, rather than waiting for that bound.
@@ -183,6 +190,13 @@ index 000000000..359977a26
 +Browser WASM has a 32-bit linear address space. Parse, render and export can create substantial transient native state that the normal collector eventually reclaims, after linear memory has already grown close to that address limit. On the browser target, the combined service samples cumulative allocation around `ParseSources`, `ParseFile`, `RenderView` and `ExportModel`. After the native work frames return, it collects when that call allocated at least 64 MiB and the current allocated Go heap is at least 64 MiB. Small cache hits and ordinary symbol/value queries do not force collection.
 +
 +This 64 MiB threshold is a work-phase garbage-collection budget, not a live-model limit or a guarantee that a larger model will fit. It does not remove reachable semantic state, change export membership or lower the model retention bound. Explicit ownership and release still control which versions remain reachable. Native nonbrowser builds retain their usual Go GC behavior.
++
++
++## Large response buffers
++
++JSON response buffers of at least 16 MiB use 4 MiB allocation classes, adding less than 25 percent spare capacity. Nearby edited models can reuse the same large allocation size instead of requiring a slightly larger contiguous block for each response. Smaller responses retain their existing encoding path. Normal buffer growth still handles unusually escape-heavy input; content is never truncated to the reservation.
++
++Native export responses still use the standard JSON encoder, including RawMessage validation, HTML escaping and field order. Large responses return the encoder destination's storage directly. JavaScript success envelopes use a preallocated string builder, avoiding the separate formatter buffer and final string copy. Wire bytes remain unchanged; spare capacity is neither serialized nor a model-content limit. These buffers are ordinary garbage-collected allocations, without a persistent response pool.
 diff --git a/docs/reference/wasm.md b/docs/reference/wasm.md
 index aef650495..67a959409 100644
 --- a/docs/reference/wasm.md
@@ -1233,14 +1247,17 @@ index 6da0930c0..ef6df64f3 100644
 +}
 diff --git a/internal/frontend/engine/export.go b/internal/frontend/engine/export.go
 new file mode 100644
-index 000000000..3f92f33a5
+index 000000000..87c0d93cd
 --- /dev/null
 +++ b/internal/frontend/engine/export.go
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,84 @@
 +package engine
 +
 +import (
++	"bytes"
 +	"encoding/json"
++
++	"github.com/Open-MBEE/OpenSysML/internal/frontend/jsonrpc"
 +	"github.com/Open-MBEE/OpenSysML/internal/translate/export"
 +)
 +
@@ -1282,7 +1299,7 @@ index 000000000..3f92f33a5
 +		if err != nil {
 +			return nil, statusError(codeInvalidArgument, err.Error())
 +		}
-+		return json.Marshal(JExportModelResponse{Elements: elements, Experimental: true,
++		return marshalExportResponse(JExportModelResponse{Elements: elements, Experimental: true,
 +			Notice:     "The SysML to API-JSON mapping is experimental; preserve source and provenance.",
 +			Projection: "declarations", ElementCount: &counts.ElementCount, OmittedElementCount: &counts.OmittedElementCount,
 +			CoverageNotice: "Only source-backed declaration objects are included. References to omitted expression, membership and other infrastructure objects retain their native IDs. The complete parsed model remains available for native views and symbol queries."})
@@ -1295,7 +1312,151 @@ index 000000000..3f92f33a5
 +	if err != nil {
 +		return nil, statusError(codeInvalidArgument, err.Error())
 +	}
-+	return json.Marshal(JExportModelResponse{Elements: elements, Experimental: true, Notice: "The SysML to API-JSON mapping is experimental; preserve source and provenance."})
++	return marshalExportResponse(JExportModelResponse{Elements: elements, Experimental: true, Notice: "The SysML to API-JSON mapping is experimental; preserve source and provenance."})
++}
++
++// marshalExportResponse avoids an exact-length clone of a large encoded result.
++func marshalExportResponse(response JExportModelResponse) ([]byte, error) {
++	if len(response.Elements) < 16<<20 {
++		return json.Marshal(response)
++	}
++	metadata := response
++	metadata.Elements = nil
++	encodedMetadata, err := json.Marshal(metadata)
++	if err != nil {
++		return nil, err
++	}
++	// The metadata contains a four-byte null; Encode adds one final newline.
++	size := len(response.Elements) + len(encodedMetadata) - 3
++	var out bytes.Buffer
++	out.Grow(jsonrpc.ResponseCapacity(size))
++	if err := json.NewEncoder(&out).Encode(response); err != nil {
++		return nil, err
++	}
++	return out.Bytes()[:out.Len()-1], nil
++}
+diff --git a/internal/frontend/engine/export_response_test.go b/internal/frontend/engine/export_response_test.go
+new file mode 100644
+index 000000000..f49f63884
+--- /dev/null
++++ b/internal/frontend/engine/export_response_test.go
+@@ -0,0 +1,117 @@
++// Copyright 2025 Open‐MBEE Foundation. All rights reserved.
++// Use of this source code is governed by the LICENSE file.
++
++package engine
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"strings"
++	"testing"
++
++	"github.com/Open-MBEE/OpenSysML/internal/frontend/jsonrpc"
++)
++
++func TestExportResponseEncodingMatchesStandardMarshal(t *testing.T) {
++	zero, count, omitted := 0, 2, 19
++	large := json.RawMessage(`[{"@id":"A","text":"<>&\u2028\u2029` + strings.Repeat("x", 17<<20) + `"}]`)
++	responses := []JExportModelResponse{
++		{},
++		{Elements: json.RawMessage(`[]`), Experimental: true, Notice: "full <>&\nnotation"},
++		{Elements: json.RawMessage(`[ { "@id": "a", "text": "<>&" } ]`), Experimental: true, Projection: "declarations", ElementCount: &count, OmittedElementCount: &omitted, CoverageNotice: "source-backed\nrecords"},
++		{Elements: json.RawMessage(`null`), ElementCount: &zero},
++		{Elements: large, Experimental: true, Notice: "large <&> export", Projection: "declarations", ElementCount: &count, OmittedElementCount: &omitted},
++		{Elements: json.RawMessage("invalid")},
++		{Elements: json.RawMessage(`"` + strings.Repeat("x", 17<<20))},
++	}
++	for i, response := range responses {
++		want, wantErr := json.Marshal(response)
++		got, gotErr := marshalExportResponse(response)
++		if (gotErr == nil) != (wantErr == nil) || gotErr != nil && gotErr.Error() != wantErr.Error() {
++			t.Fatalf("case %d error=%v; want %v", i, gotErr, wantErr)
++		}
++		if !bytes.Equal(got, want) {
++			t.Fatalf("case %d export bytes differ", i)
++		}
++		if gotErr == nil && len(response.Elements) >= 16<<20 {
++			expected := jsonrpc.ResponseCapacity(len(got) + 1)
++			if cap(got) != expected {
++				t.Fatalf("large result cap=%d; want allocation class %d", cap(got), expected)
++			}
++		}
++	}
++}
++
++func TestNearbyLargeExportResponsesShareAllocationClass(t *testing.T) {
++	var capacity int
++	for _, extra := range []int{0, 205, 411, 4096} {
++		response := JExportModelResponse{Elements: json.RawMessage(`["` + strings.Repeat("x", (17<<20)+extra) + `"]`)}
++		got, err := marshalExportResponse(response)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if capacity == 0 {
++			capacity = cap(got)
++		}
++		if cap(got) != capacity {
++			t.Fatalf("small model edit changed large buffer class from %d to %d", capacity, cap(got))
++		}
++	}
++}
++
++var exportResponseBenchmarkResult []byte
++
++func BenchmarkLargeExportResponseBuffers(b *testing.B) {
++	response := JExportModelResponse{Elements: json.RawMessage(`["` + strings.Repeat("x", 26<<20) + `"]`), Experimental: true, Projection: "declarations"}
++	b.Run("marshal-baseline", func(b *testing.B) {
++		b.ReportAllocs()
++		b.SetBytes(int64(len(response.Elements)))
++		for i := 0; i < b.N; i++ {
++			result, err := json.Marshal(response)
++			if err != nil {
++				b.Fatal(err)
++			}
++			exportResponseBenchmarkResult = result
++		}
++	})
++	b.Run("bounded-encoder", func(b *testing.B) {
++		b.ReportAllocs()
++		b.SetBytes(int64(len(response.Elements)))
++		for i := 0; i < b.N; i++ {
++			result, err := marshalExportResponse(response)
++			if err != nil {
++				b.Fatal(err)
++			}
++			exportResponseBenchmarkResult = result
++		}
++	})
++}
++
++var exportWireBenchmarkResult string
++
++func BenchmarkLargeExportWireBuffers(b *testing.B) {
++	response := JExportModelResponse{Elements: json.RawMessage(`["` + strings.Repeat("x", 26<<20) + `"]`), Experimental: true, Projection: "declarations"}
++	b.Run("marshal-formatter-baseline", func(b *testing.B) {
++		b.ReportAllocs()
++		b.SetBytes(int64(len(response.Elements)))
++		for i := 0; i < b.N; i++ {
++			body, err := json.Marshal(response)
++			if err != nil {
++				b.Fatal(err)
++			}
++			exportWireBenchmarkResult = fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":%s}`, body)
++		}
++	})
++	b.Run("bounded-encoder-builder", func(b *testing.B) {
++		b.ReportAllocs()
++		b.SetBytes(int64(len(response.Elements)))
++		for i := 0; i < b.N; i++ {
++			body, err := marshalExportResponse(response)
++			if err != nil {
++				b.Fatal(err)
++			}
++			exportWireBenchmarkResult = jsonrpc.Envelope(body, nil)
++		}
++	})
 +}
 diff --git a/internal/frontend/engine/grid_identity_test.go b/internal/frontend/engine/grid_identity_test.go
 new file mode 100644
@@ -1895,6 +2056,143 @@ index d6d76fe11..332c66144 100644
  	if err != nil {
  		t.Fatal(err)
  	}
+diff --git a/internal/frontend/jsonrpc/jsonrpc.go b/internal/frontend/jsonrpc/jsonrpc.go
+index 05aacf8d2..8d2a84706 100644
+--- a/internal/frontend/jsonrpc/jsonrpc.go
++++ b/internal/frontend/jsonrpc/jsonrpc.go
+@@ -95,7 +95,13 @@ func Envelope(body []byte, err error) string {
+ 		return fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"error":{"code":%d,"message":%s}}`,
+ 			code, quoted)
+ 	}
+-	return fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":%s}`, body)
++	const prefix = `{"jsonrpc":"2.0","id":null,"result":`
++	var out strings.Builder
++	out.Grow(ResponseCapacity(len(prefix) + len(body) + 1))
++	out.WriteString(prefix)
++	out.Write(body)
++	out.WriteByte('}')
++	return out.String()
+ }
+ 
+ // request is one call: the method names a served method, and params carries
+diff --git a/internal/frontend/jsonrpc/response_capacity.go b/internal/frontend/jsonrpc/response_capacity.go
+new file mode 100644
+index 000000000..254abac4d
+--- /dev/null
++++ b/internal/frontend/jsonrpc/response_capacity.go
+@@ -0,0 +1,27 @@
++// Copyright 2025 Open‐MBEE Foundation. All rights reserved.
++// Use of this source code is governed by the LICENSE file.
++
++package jsonrpc
++
++const (
++	largeResponseThreshold = 16 << 20
++	largeResponseQuantum   = 4 << 20
++)
++
++// ResponseCapacity groups large JSON buffers into bounded allocation classes.
++// Small buffers retain their requested size; large buffers add less than 25% slack.
++func ResponseCapacity(size int) int {
++	if size < largeResponseThreshold {
++		return size
++	}
++	remainder := size % largeResponseQuantum
++	if remainder == 0 {
++		return size
++	}
++	padding := largeResponseQuantum - remainder
++	maxInt := int(^uint(0) >> 1)
++	if size > maxInt-padding {
++		return size
++	}
++	return size + padding
++}
+diff --git a/internal/frontend/jsonrpc/response_capacity_test.go b/internal/frontend/jsonrpc/response_capacity_test.go
+new file mode 100644
+index 000000000..f27ea01db
+--- /dev/null
++++ b/internal/frontend/jsonrpc/response_capacity_test.go
+@@ -0,0 +1,79 @@
++// Copyright 2025 Open‐MBEE Foundation. All rights reserved.
++// Use of this source code is governed by the LICENSE file.
++
++package jsonrpc
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"strings"
++	"testing"
++)
++
++func TestResponseCapacityKeepsNearbyLargeResponsesInOneBoundedClass(t *testing.T) {
++	for _, size := range []int{0, 1, 1024, (16 << 20) - 1} {
++		if got := ResponseCapacity(size); got != size {
++			t.Errorf("small capacity(%d)=%d", size, got)
++		}
++	}
++	for _, size := range []int{16 << 20, (16 << 20) + 1, 26 << 20, (26 << 20) + 123, 28 << 20, (28 << 20) + 1} {
++		got := ResponseCapacity(size)
++		if got < size || got-size >= 4<<20 || got%(4<<20) != 0 {
++			t.Errorf("large capacity(%d)=%d; want bounded 4 MiB class", size, got)
++		}
++	}
++	if ResponseCapacity(26<<20) != ResponseCapacity((26<<20)+4096) {
++		t.Fatal("nearby model responses use different classes")
++	}
++	maxInt := int(^uint(0) >> 1)
++	if got := ResponseCapacity(maxInt); got != maxInt {
++		t.Fatalf("overflow capacity=%d; want %d", got, maxInt)
++	}
++}
++
++func TestEnvelopePreservesExistingSuccessAndErrorBytes(t *testing.T) {
++	for _, body := range [][]byte{
++		nil, {}, []byte("null"), []byte(`{"value":"<>&\u2028","n":1}`),
++		[]byte(" invalid JSON\x00\xff"), bytes.Repeat([]byte("x"), (16<<20)+17),
++	} {
++		got := Envelope(body, nil)
++		want := fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":%s}`, body)
++		if got != want {
++			t.Fatalf("success envelope changed for %d bytes", len(body))
++		}
++	}
++	for _, err := range []error{Errorf(CodeInvalidArgument, "invalid <value> & \"quote\""), errors.New("unknown\nerror")} {
++		code, message := ErrorParts(err)
++		// json.Marshal supplies the existing message escaping contract.
++		quoted, marshalErr := json.Marshal(message)
++		if marshalErr != nil {
++			t.Fatal(marshalErr)
++		}
++		want := fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"error":{"code":%d,"message":%s}}`, code, quoted)
++		if got := Envelope([]byte("ignored"), err); got != want {
++			t.Fatalf("error envelope=%s; want %s", got, want)
++		}
++	}
++}
++
++var envelopeBenchmarkResult string
++
++func BenchmarkLargeEnvelopeBuffers(b *testing.B) {
++	body := []byte(`["` + strings.Repeat("x", 26<<20) + `"]`)
++	b.Run("formatter-baseline", func(b *testing.B) {
++		b.ReportAllocs()
++		b.SetBytes(int64(len(body)))
++		for i := 0; i < b.N; i++ {
++			envelopeBenchmarkResult = fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":%s}`, body)
++		}
++	})
++	b.Run("bounded-builder", func(b *testing.B) {
++		b.ReportAllocs()
++		b.SetBytes(int64(len(body)))
++		for i := 0; i < b.N; i++ {
++			envelopeBenchmarkResult = Envelope(body, nil)
++		}
++	})
++}
 diff --git a/internal/frontend/renderidentity/document.go b/internal/frontend/renderidentity/document.go
 index 72d16960f..01c277566 100644
 --- a/internal/frontend/renderidentity/document.go
@@ -3353,10 +3651,10 @@ index db46760ca..1d13ced44 100644
  	}
 diff --git a/internal/translate/export/api_json_projection.go b/internal/translate/export/api_json_projection.go
 new file mode 100644
-index 000000000..1837af79c
+index 000000000..43b92e367
 --- /dev/null
 +++ b/internal/translate/export/api_json_projection.go
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,152 @@
 +package export
 +
 +import (
@@ -3371,14 +3669,15 @@ index 000000000..1837af79c
 +// APIJSONExportStage records an optional declaration-export memory checkpoint.
 +// HeapAlloc includes unswept garbage; HeapSys is acquired arenas, not live objects.
 +type APIJSONExportStage struct {
-+	Document   string
-+	Stage      string
-+	Triples    int
-+	Subjects   int
-+	HeapAlloc  uint64
-+	HeapSys    uint64
-+	TotalAlloc uint64
-+	NumGC      uint32
++	Document       string
++	Stage          string
++	Triples        int
++	TripleCapacity int
++	Subjects       int
++	HeapAlloc      uint64
++	HeapSys        uint64
++	TotalAlloc     uint64
++	NumGC          uint32
 +}
 +
 +// APIJSONDeclarationsOptions reuses native semantics and optionally observes export stages.
@@ -3395,6 +3694,7 @@ index 000000000..1837af79c
 +	point := APIJSONExportStage{Document: document, Stage: stage}
 +	if graph != nil {
 +		point.Triples = graph.Len()
++		point.TripleCapacity = cap(graph.Triples())
 +		point.Subjects = len(graph.Subjects())
 +	}
 +	var stats runtime.MemStats
@@ -3495,7 +3795,7 @@ index 000000000..1837af79c
 +			count++
 +		}
 +	}
-+	triples := make([]rdf.Triple, 0, count)
++	triples := make([]rdf.Triple, 0, graphTripleCapacity(count))
 +	for _, triple := range graph.Triples() {
 +		if selected[triple.Subject] {
 +			triples = append(triples, triple)
@@ -3825,7 +4125,7 @@ index 000000000..961fbdbea
 +}
 diff --git a/internal/translate/export/buffer_capacity_test.go b/internal/translate/export/buffer_capacity_test.go
 new file mode 100644
-index 000000000..25ffa55b9
+index 000000000..bd316dbe4
 --- /dev/null
 +++ b/internal/translate/export/buffer_capacity_test.go
 @@ -0,0 +1,117 @@
@@ -3880,8 +4180,8 @@ index 000000000..25ffa55b9
 +		}
 +	}
 +	merged := mergeDocumentGraphs(encoders, docs)
-+	if cap(merged.Triples()) > upperBound {
-+		t.Fatalf("merged graph grew beyond its complete %d-triple input bound: len=%d cap=%d", upperBound, merged.Len(), cap(merged.Triples()))
++	if cap(merged.Triples()) != graphTripleCapacity(upperBound) {
++		t.Fatalf("merged graph did not retain its bounded %d-triple input class: len=%d cap=%d", upperBound, merged.Len(), cap(merged.Triples()))
 +	}
 +	for _, root := range unownedElements(merged) {
 +		if _, ok := merged.Lexical(root, rdf.OpenSysML+xSourceDocument); !ok {
@@ -3922,8 +4222,8 @@ index 000000000..25ffa55b9
 +			if err != nil {
 +				t.Fatal(err)
 +			}
-+			if cap(wrapped.Triples()) > upperBound {
-+				t.Fatalf("wrapping grew beyond its complete %d-triple bound: len=%d cap=%d roots=%d documents=%d", upperBound, wrapped.Len(), cap(wrapped.Triples()), len(roots), len(wrappers))
++			if cap(wrapped.Triples()) != graphTripleCapacity(upperBound) {
++				t.Fatalf("wrapping did not retain its bounded %d-triple class: len=%d cap=%d roots=%d documents=%d", upperBound, wrapped.Len(), cap(wrapped.Triples()), len(roots), len(wrappers))
 +			}
 +		})
 +	}
@@ -3942,8 +4242,8 @@ index 000000000..25ffa55b9
 +	if projected.Len() != 81 {
 +		t.Fatalf("declaration triples lost: %d", projected.Len())
 +	}
-+	if cap(projected.Triples()) > projected.Len() {
-+		t.Fatalf("projection grew beyond exact retained triple count: len=%d cap=%d", projected.Len(), cap(projected.Triples()))
++	if cap(projected.Triples()) != graphTripleCapacity(projected.Len()) {
++		t.Fatalf("projection did not retain its bounded retained-triple class: len=%d cap=%d", projected.Len(), cap(projected.Triples()))
 +	}
 +}
 diff --git a/internal/translate/export/element_ids.go b/internal/translate/export/element_ids.go
@@ -4000,8 +4300,87 @@ index 93ce34c4c..73d20b1ed 100644
 +	}
 +	return ids, nil
 +}
+diff --git a/internal/translate/export/graph_storage.go b/internal/translate/export/graph_storage.go
+new file mode 100644
+index 000000000..57522ede0
+--- /dev/null
++++ b/internal/translate/export/graph_storage.go
+@@ -0,0 +1,24 @@
++package export
++
++const (
++	largeGraphTripleThreshold = 1 << 18
++	largeGraphTripleQuantum   = 1 << 16
++)
++
++// graphTripleCapacity keeps nearby large model versions in the same allocation class.
++// Small buffers stay exact; rounding adds less than one quarter of the requested size.
++func graphTripleCapacity(count int) int {
++	if count < largeGraphTripleThreshold {
++		return count
++	}
++	remainder := count % largeGraphTripleQuantum
++	if remainder == 0 {
++		return count
++	}
++	extra := largeGraphTripleQuantum - remainder
++	maxInt := int(^uint(0) >> 1)
++	if count > maxInt-extra {
++		return count
++	}
++	return count + extra
++}
+diff --git a/internal/translate/export/graph_storage_test.go b/internal/translate/export/graph_storage_test.go
+new file mode 100644
+index 000000000..e127a6f3c
+--- /dev/null
++++ b/internal/translate/export/graph_storage_test.go
+@@ -0,0 +1,43 @@
++package export
++
++import "testing"
++
++func TestGraphTripleCapacityKeepsSmallBuffersExact(t *testing.T) {
++	for _, count := range []int{0, 1, 12, 25000, largeGraphTripleThreshold - 1} {
++		if got := graphTripleCapacity(count); got != count {
++			t.Fatalf("small capacity %d changed to %d", count, got)
++		}
++	}
++}
++
++func TestGraphTripleCapacityBoundsSpareStorage(t *testing.T) {
++	for count := largeGraphTripleThreshold; count < largeGraphTripleThreshold*12; count += 31 {
++		got := graphTripleCapacity(count)
++		if got < count || got-count >= largeGraphTripleQuantum || got-count > count/4 {
++			t.Fatalf("capacity %d for %d violates bounded spare storage", got, count)
++		}
++		if got%largeGraphTripleQuantum != 0 {
++			t.Fatalf("capacity %d is not a complete large allocation class", got)
++		}
++	}
++}
++
++func TestGraphTripleCapacitySharesNearbyModelVersions(t *testing.T) {
++	for _, count := range []int{436684, 448119, 450000, 458752} {
++		if got := graphTripleCapacity(count); got != 458752 {
++			t.Fatalf("nearby model %d uses capacity %d instead of shared class", count, got)
++		}
++	}
++	if got := graphTripleCapacity(458753); got != 524288 {
++		t.Fatalf("next class is %d", got)
++	}
++}
++
++func TestGraphTripleCapacityDoesNotOverflow(t *testing.T) {
++	maxInt := int(^uint(0) >> 1)
++	for _, count := range []int{maxInt, maxInt - 1, maxInt - largeGraphTripleQuantum + 2, maxInt - largeGraphTripleQuantum + 1} {
++		if got := graphTripleCapacity(count); got != count {
++			t.Fatalf("unroundable or aligned near-limit count %d changed to %d", count, got)
++		}
++	}
++}
 diff --git a/internal/translate/export/rdf_out.go b/internal/translate/export/rdf_out.go
-index 45ad33d59..03ebdd06b 100644
+index 45ad33d59..57469a5a3 100644
 --- a/internal/translate/export/rdf_out.go
 +++ b/internal/translate/export/rdf_out.go
 @@ -2,6 +2,7 @@ package export
@@ -4150,7 +4529,7 @@ index 45ad33d59..03ebdd06b 100644
  	}
  	prefixes := map[string]string{}
 -	triples := make([]rdf.Triple, 0, total+len(encoders))
-+	triples := make([]rdf.Triple, 0, total)
++	triples := make([]rdf.Triple, 0, graphTripleCapacity(total))
  	seen := map[rdf.Triple]bool{} // the triples of subjects more than one document states
  	add := func(t rdf.Triple) {
  		if stated[t.Subject] > 1 {
@@ -4197,7 +4576,7 @@ index 45ad33d59..03ebdd06b 100644
  }
  
 diff --git a/internal/translate/export/root_namespace.go b/internal/translate/export/root_namespace.go
-index 4832c3620..64c825969 100644
+index 4832c3620..8ccb954dc 100644
 --- a/internal/translate/export/root_namespace.go
 +++ b/internal/translate/export/root_namespace.go
 @@ -42,7 +42,13 @@ func withRootNamespace(graph *rdf.Graph) (*rdf.Graph, error) {
@@ -4211,7 +4590,7 @@ index 4832c3620..64c825969 100644
 +			capacity += 3
 +		}
 +	}
-+	triples := make([]rdf.Triple, 0, capacity)
++	triples := make([]rdf.Triple, 0, graphTripleCapacity(capacity))
  	placed := map[rdf.Triple]bool{}
  	wrapperSubjects := map[rdf.Term]bool{}
  	type rootPlace struct {
