@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
+import {readFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {resolve} from 'node:path';
 import ELK from 'elkjs/lib/elk.bundled.js';
@@ -29,5 +30,24 @@ test('native RenderView and fitted ELK parent bounds allow a bounded internal-pa
   const nativeEdge=fitted.edges[0],edge=moved.edges[0];assert.equal(edge.semanticId,nativeEdge.semanticId);assert.equal(edge.source,nativeEdge.source);assert.equal(edge.target,nativeEdge.target);assert.equal(edge.fromPort,nativeEdge.fromPort);assert.equal(edge.toPort,nativeEdge.toPort);
   const attached={...edge,source:edge.sourceAttachment??edge.source,target:edge.targetAttachment??edge.target};assert.equal(edge.routingBlocked,false);assert.equal(routeConnectsEndpoints(edge.points,attached,moved.nodes),true);assert.equal(routeIsClear(edge.points,attached,moved.nodes),true);
   assert.throws(()=>moveLayoutNode(fitted,{id:child.id,x:child.x,y:parent.y+parent.headerHeight-child.height/2},{area}),/parent content bounds/);
+ }finally{engine.close();}
+});
+
+test('live native action, state and fault views retain semantic identity and routes after constrained edits',{skip:!existsSync(binary)},async()=>{
+ const engine=nativeClient(binary);
+ try{
+  const documents=await Promise.all(['sequence.sysml','behaviors.sysml'].map(async name=>({name,content:await readFile(new URL('fixtures/canvas-views/'+name,import.meta.url),'utf8')}))),parsed=await engine.call('ParseSources',{documents}),area={x:0,y:0,width:2400,height:1800};
+  assert.equal((parsed.diagnostics??[]).filter(d=>String(d.severity).toLowerCase().includes('error')).length,0);
+  for(const [name,semanticId,dx,dy]of [['BehaviorViews::mixed','DeskFan__StartCycle__energize',1,0],['BehaviorViews::states','DeskFan__operating__idle',1,1],['PowerSupply::tree','PowerSupply__common',1,0]]){
+   const raw=await engine.call('RenderView',{modelHash:parsed.modelHash,view:name,includeSemanticIdentity:true}),view=adaptNativeView(raw,name),fitted=fitDiagram(await layoutDiagram(view,{elk:new ELK(),width:area.width,height:area.height}),area),before=structuredClone(fitted),node=fitted.nodes.find(item=>item.semanticId===semanticId);
+   assert.ok(node,name+' target');assert.equal(manualLayoutSupport(fitted,node.id).supported,true);
+   const moved=moveLayoutNode(fitted,{id:node.id,x:node.x+dx,y:node.y+dy},{area});assert.deepEqual(fitted,before);
+   for(let i=0;i<fitted.edges.length;i++){
+    const old=fitted.edges[i],edge=moved.edges[i];for(const key of ['semanticId','source','target','kind','label','guard','fromPort','toPort','sourceAttachment','targetAttachment'])assert.deepEqual(edge[key],old[key],name+' '+key);
+    if(edge.routingBlocked)continue;const attached={...edge,source:edge.sourceAttachment??edge.source,target:edge.targetAttachment??edge.target};assert.equal(routeConnectsEndpoints(edge.points,attached,moved.nodes),true);assert.equal(routeIsClear(edge.points,attached,moved.nodes),true);
+   }
+   for(const item of moved.nodes)if(item.id!==node.id)assert.deepEqual(item,fitted.nodes.find(old=>old.id===item.id));
+   if(dy===0)assert.throws(()=>moveLayoutNode(fitted,{id:node.id,x:node.x,y:node.y+1},{area}),/only horizontally/);
+  }
  }finally{engine.close();}
 });

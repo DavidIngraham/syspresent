@@ -5,6 +5,34 @@ const text = value => value === null || value === undefined ? '' : String(value)
 const hasIdentity = value => typeof value === 'string' && value.length > 0;
 const positionKey = (row,column) => `${row}:${column}`;
 
+export const GRID_LAYOUT_SCHEMA='syspresent.grid-layout.v1';
+/** Column identities are native. A heading only guards an identity-less display
+ * column at its original index; it never supplies a model identity. */
+export function gridPresentationLayout(view,layout){
+ if(layout===undefined)return undefined;
+ if(!layout||layout.schemaVersion!==GRID_LAYOUT_SCHEMA||!Array.isArray(layout.columns)||layout.columns.length>2000||Object.keys(layout).some(key=>!['schemaVersion','columns'].includes(key)))throw Error('Invalid grid presentation layout');
+ const seen=new Set(),columns=layout.columns.map(column=>{
+  if(!column||Object.keys(column).some(key=>!['semanticId','index','heading','width'].includes(key))||!Number.isInteger(column.index)||column.index<0||typeof column.heading!=='string'||!(column.semanticId===null||hasIdentity(column.semanticId))||!Number.isFinite(column.width)||column.width<80||column.width>900)throw Error('Invalid native grid column placement');
+  const key=JSON.stringify([column.semanticId,column.index]);if(seen.has(key))throw Error('Duplicate grid column placement');seen.add(key);return {semanticId:column.semanticId,index:column.index,heading:column.heading,width:column.width};
+ });
+ return {schemaVersion:GRID_LAYOUT_SCHEMA,columns};
+}
+export function gridLayoutWidths(view,layout){
+ const value=gridPresentationLayout(view,layout),widths=Object.create(null),notices=[];
+ for(const saved of value?.columns??[]){
+  let indices=[];
+  if(saved.semanticId){indices=(view.columnElements??[]).filter(column=>column.semanticId===saved.semanticId).map(column=>column.index);if(indices.length>1)indices=indices.filter(index=>index===saved.index);}
+  else if(text(view.columns?.[saved.index])===saved.heading&&!(view.columnElements??[]).some(column=>column.index===saved.index&&hasIdentity(column.semanticId)))indices=[saved.index];
+  if(indices.length!==1||indices[0]>=view.columns.length){notices.push({reason:'grid-layout-missing-column',semanticId:saved.semanticId,index:saved.index,message:'Saved column width has no unique native identity or unchanged identity-less display column; default width retained.'});continue;}widths[indices[0]]=saved.width;
+ }
+ return {layout:value,widths,notices};
+}
+export function gridNotationCoverage(view){
+ return {authority:'OMG SysML 2.0 formal/2026-03-02',sections:['7.26','8.2.3.26'],status:'implemented',records:[
+ {role:'view-frame',status:view.id||view.view?'implemented':'rejected',reason:view.id||view.view?'Native view identity labels the frame.':'Native view identity unavailable; no standard frame name invented.'},
+ {role:view.kind==='matrix'?'matrix-axes-and-cells':'table-rows-and-properties',status:'implemented',reason:'Native row/column indices, text values and all relationship-cell occurrences remain intact. Presentation widths never change native direction or membership.'},
+ ],notice:'Native tabular projection based on the standard table/matrix examples. No new relationship or native property identity is inferred from cell text or headings.'};
+}
 /** Sorting is a presentation order over native row indices, never a model edit. */
 export function gridRowOrder(view, sort) {
   const indices = (view.rows ?? []).map((_,index) => index);
@@ -34,7 +62,7 @@ export function mountGrid(host, view, options={}) {
   const semanticIdsFor = selection => [...new Set([
     selection?.semanticId,...(selection?.relationships ?? []).map(item => item.semanticId),
   ].filter(hasIdentity))];
-  const incoming = copy(options.state ?? {});
+  const incoming = copy(options.state ?? {}),restored=gridLayoutWidths(view,incoming.layout);let layoutNotices=[...restored.notices];
   const initialIds = options.selectedIds ?? (hasIdentity(options.selectedId) ? [options.selectedId] : incoming.selectedIds ?? (hasIdentity(incoming.selectedId) ? [incoming.selectedId] : []));
   const sharedSelectionExplicit = Array.isArray(options.selectedIds) || hasIdentity(options.selectedId);
   const initialIdentities = [...new Set(initialIds.filter(hasIdentity))];
@@ -44,7 +72,7 @@ export function mountGrid(host, view, options={}) {
     scrollTop:Math.max(0,Number(incoming.scrollTop)||0),
     scrollLeft:Math.max(0,Number(incoming.scrollLeft)||0),
     sort:matrix ? null : incoming.sort ?? null,
-    widths:{...incoming.widths}, selection:sharedSelectionExplicit && !selectionMatchesShared ? null : incoming.selection ?? null,
+    widths:Object.hasOwn(incoming,'layout')?{...restored.widths}:{...incoming.widths}, ...(incoming.layout?{layout:restored.layout}:{}),selection:sharedSelectionExplicit && !selectionMatchesShared ? null : incoming.selection ?? null,
     selectedId:initialIdentities.length === 1 ? initialIdentities[0] : null,
     selectedIds:initialIdentities,
   };
@@ -66,13 +94,16 @@ export function mountGrid(host, view, options={}) {
     result.addEventListener('click',event => {event.stopPropagation(); action();});
     return result;
   };
-  const shell = el('section','canvas-grid-view');
+  const shell = el('section','canvas-grid-view'+(options.renderingMode==='focused'?' focused-grid':''));
+  if(options.renderingMode==='focused'){const identity=view.id??view.view;if(identity)shell.append(el('div','canvas-grid-frame-label','«view» '+identity));}
+
   shell.setAttribute('aria-label',view.title ?? view.id ?? (matrix ? 'Relationship matrix' : 'Model table'));
   const toolbar = el('div','canvas-grid-toolbar');
   const settings = el('details','canvas-grid-settings');
   settings.append(el('summary',null,'Columns'));
   const widthFields = el('div','canvas-grid-widths');
   settings.append(widthFields); toolbar.append(settings);
+  const reset=button('Reset widths',()=>{const previousLayout=copy(state.layout);state.widths={};delete state.layout;layoutNotices=[];for(const field of widthFields.querySelectorAll('input'))field.value='200';applyWidths();highlight();changed();options.onLayoutChange?.(undefined,{previousLayout});},'canvas-grid-reset-widths');settings.append(reset);
   const summary = el('span','canvas-grid-summary',`${rows.length} rows · ${columns.length} columns`);
   toolbar.append(summary);
   const viewport = el('div','canvas-grid-scroll');
@@ -175,6 +206,7 @@ export function mountGrid(host, view, options={}) {
     const missing = state.selectedIds.some(id => !nativeIds.has(id));
     disclosure.textContent = [
       ...(missing ? ['The selected element is not represented in this view. Your semantic selection is retained.'] : []),
+      ...layoutNotices.map(notice=>notice.message),
       ...(unknownRows ? [`${unknownRows} row${unknownRows === 1 ? ' has' : 's have'} no exported semantic identity.`] : []),
     ].join(' ');
     disclosure.hidden = !disclosure.textContent;
@@ -204,7 +236,9 @@ export function mountGrid(host, view, options={}) {
     input.addEventListener('change',() => {
       const width=Number(input.value);
       if (!Number.isFinite(width) || width < 80 || width > 900) { input.value=String(state.widths[column] ?? 200); return; }
-      state.widths[column]=width; applyWidths(); changed();
+      const previousLayout=copy(state.layout);state.widths[column]=width;
+      const nativeColumnId=columnElements.get(column)?.semanticId,semanticId=hasIdentity(nativeColumnId)?nativeColumnId:null,record={semanticId,index:column,heading:text(label),width},saved=state.layout?.columns??[];
+      state.layout=gridPresentationLayout(view,{schemaVersion:GRID_LAYOUT_SCHEMA,columns:[...saved.filter(item=>semanticId&&[...columnElements.values()].filter(value=>value.semanticId===semanticId).length===1?item.semanticId!==semanticId:!(item.index===column&&item.semanticId===semanticId)),record]});applyWidths();changed();options.onLayoutChange?.(copy(state.layout),{previousLayout});
     });
     field.append(input); widthFields.append(field);
   }

@@ -16,8 +16,8 @@ const simplify=points=>points.filter((p,i)=>!i||p.x!==points[i-1].x||p.y!==point
 const num=(value,fallback)=>Number.isFinite(Number(value))&&Number(value)>0?Number(value):fallback;
 function dimensions(node){const symbol=sizes.get(node.kind);return {width:symbol?.[0]??num(node.width,160),height:symbol?.[1]??num(node.height,76)};}
 function isPort(node,nodes){return node.kind==='port'&&nodes.has(node.parentId);}
-/** Native NodeData.Ports contains rendering pin IDs, not semantic model IDs.
- * Preserve it verbatim; make disposable glyphs only to position the pins.
+/** Native pin IDs remain render-local. When the native contract also supplies
+ * a canonical semantic identity, preserve it independently on the glyph.
  */
 function projectEmbeddedPorts(view){
  const nodes=[...view.nodes],attachments=new Map(),usedIDs=new Set(nodes.map(n=>n.id));
@@ -26,7 +26,7 @@ function projectEmbeddedPorts(view){
   const key=JSON.stringify([owner.id,port.id]);if(attachments.has(key))throw Error('Duplicate native port on '+owner.id+': '+port.id);
   let id='syspresent-native-port:'+key;while(usedIDs.has(id))id+=':';usedIDs.add(id);attachments.set(key,id);
   const name=port.nameSynthesized?'':port.name??'',label=port.type?name+' : '+port.type:name;
-  nodes.push({id,kind:'port',name,label,parentId:owner.id,width:12,height:12,semanticId:null,identityStatus:'modeled-pin',nativePortId:port.id,nativePort:structuredClone(port),direction:port.direction,parameter:port.parameter,origin:structuredClone(port.origin??null)});
+  nodes.push({id,kind:'port',name,label,parentId:owner.id,width:12,height:12,semanticId:port.semanticId??null,identityStatus:port.semanticId?(port.identityStatus??'native'):'modeled-pin',qualifiedName:port.qualifiedName,nativePortId:port.id,nativePort:structuredClone(port),direction:port.direction,parameter:port.parameter,origin:structuredClone(port.origin??null)});
  }
  const edges=view.edges.map(edge=>{
   const result={...edge};for(const [endpoint,field,attachment]of [['source','fromPort','sourceAttachment'],['target','toPort','targetAttachment']]){

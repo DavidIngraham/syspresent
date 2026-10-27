@@ -148,3 +148,9 @@ body.landing-mode{height:auto;min-height:100dvh;overflow:auto}
 #rollup-list>div{padding:.7rem 0;border-bottom:1px solid var(--line)}
 
 #authoring-preview{position:relative;height:340px;min-width:0;border:1px solid var(--line);margin:.75rem 0;overflow:hidden}
+
+/* Guided history is canvas chrome: its first entry must not shrink a settled
+   drawing. The complete workspace row remains in the header during exploration. */
+#canvas-tools{max-width:calc(100% - 24px);flex-wrap:wrap}
+#canvas-tools #exploration-controls.guided-history{flex-basis:auto;border:0;padding:0;flex-wrap:nowrap}
+#canvas-tools .guided-history #exploration-label{display:none}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
-import {mountGrid, gridRowOrder} from '../src/canvas-prototype/grid-view.mjs';
+import {mountGrid, gridRowOrder, gridPresentationLayout, gridLayoutWidths, gridNotationCoverage, GRID_LAYOUT_SCHEMA} from '../src/canvas-prototype/grid-view.mjs';
 
 const nativeMatrix = () => ({
   id:'matrix',kind:'matrix',title:'Coverage',columns:['Requirement','Verification case','Unresolved case'],
@@ -189,4 +189,27 @@ test('native label resolver improves relationship reading while collapsed proven
   assert.match(provenance.textContent,/Target: req-1/);
   assert.ok(lookups.includes('case-1')&&lookups.includes('req-1'));
   assert.deepEqual(view,before);
+});
+
+test('portable grid widths follow native column identities while identity-less headings only guard their original position',()=>{
+ const view=nativeMatrix(),before=structuredClone(view),layout={schemaVersion:GRID_LAYOUT_SCHEMA,columns:[{semanticId:'case-1',index:1,heading:'Verification case',width:360},{semanticId:null,index:0,heading:'Requirement',width:280}]};
+ const reordered={...view,columns:['Requirement','Unresolved case','Renamed native heading'],columnElements:[{index:2,semanticId:'case-1'}]};
+ const result=gridLayoutWidths(reordered,layout);assert.equal(result.widths[2],360);assert.equal(result.widths[0],280);assert.deepEqual(view,before);
+ const stale=gridLayoutWidths({...reordered,columns:['Changed label','Unresolved case','Renamed native heading'],columnElements:[]},layout);
+ assert.equal(Object.keys(stale.widths).length,0);assert.equal(stale.notices.length,2);
+ assert.throws(()=>gridPresentationLayout(view,{...layout,rows:[1,0]}),/Invalid grid/);
+ assert.throws(()=>gridPresentationLayout(view,{schemaVersion:GRID_LAYOUT_SCHEMA,columns:[{...layout.columns[0],width:Infinity}]}),/Invalid native grid/);
+});
+test('grid layout callbacks fire only on width edits and reset, retaining native matrix order and duplicates',()=>{
+ const view=nativeMatrix(),before=structuredClone(view),edits=[],changes=[];
+ const {host,dom,mounted,scroll}=setup(view,{onLayoutChange:(value,details)=>edits.push({value,details}),onStateChange:value=>changes.push(value)});
+ cell(host,0,1).click();scroll.scrollTop=25;scroll.dispatchEvent(new dom.window.Event('scroll'));assert.equal(edits.length,0);
+ const inputs=host.querySelectorAll('.canvas-grid-widths input');inputs[1].value='340';inputs[1].dispatchEvent(new dom.window.Event('change'));
+ assert.equal(edits.length,1);assert.equal(edits[0].value.columns[0].semanticId,'case-1');assert.equal(mounted.getState().selection.relationships.length,2);
+ assert.deepEqual([...host.querySelectorAll('tbody tr')].map(row=>row.dataset.nativeRow),['0','1','2']);
+ host.querySelector('.canvas-grid-reset-widths').click();assert.equal(edits.length,2);assert.equal(edits[1].value,undefined);assert.ok(edits[1].details.previousLayout);assert.equal(mounted.getState().layout,undefined);assert.deepEqual(view,before);
+});
+test('focused native grids retain exact native cell data under an inspectable view frame',()=>{
+ const view=nativeMatrix(),{host}=setup(view,{renderingMode:'focused'});assert.ok(host.querySelector('.focused-grid'));assert.equal(host.querySelector('.canvas-grid-frame-label').textContent,'«view» matrix');
+ assert.equal(host.querySelectorAll('.canvas-grid-sort').length,0);cell(host,0,1).click();assert.equal(host.querySelectorAll('.canvas-grid-inspector li').length,2);assert.equal(gridNotationCoverage(view).status,'implemented');
 });

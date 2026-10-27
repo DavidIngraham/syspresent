@@ -81,3 +81,19 @@ export function transitionGraphView(view, {limit=24,focusedId,visibleIds=[]}={})
     omissions:[...known.keys()].filter(id => !ids.has(id)).map(id => ({target:id,reason:'transition-budget'})),
   };
 }
+
+
+/** Additional native symbol references displayed inside existing representations.
+ * Keep these separate from selection/expose membership: a parameter pin, state
+ * action or sequence event is context within its native owner, not a new tile. */
+export function nativeViewContextIdentities(view){
+ const result=new Set();
+ const add=record=>{if(identity(record?.semanticId))result.add(record.semanticId);};
+ for(const node of view?.nodes??[]){
+  for(const port of node.ports??[])add(port);
+  for(const behavior of node.state?.behaviors??[])add(behavior);
+ }
+ for(const edge of view?.edges??[])for(const event of [edge.notation?.sourceEvent,edge.notation?.targetEvent])add(event);
+ for(const order of view?.sequenceOrders??[])for(const event of [order.sourceEvent,order.targetEvent])add(event);
+ return [...result];
+}

@@ -1,4 +1,5 @@
-import {focusedFace,focusedEdgeAppearance,focusedNotationNotices} from './focused-notation.mjs';
+import {focusedFace,measureFocusedNode,focusedEdgeAppearance,focusedNotationNotices} from './focused-notation.mjs';
+import {placeEndpointLabels} from './endpoint-labels.mjs';
 import {layoutDiagram} from './elk-layout.mjs';
 import {fitDiagram} from './geometry.mjs';
 import {edgeAppearance,markerDefinition} from './notation.mjs';
@@ -29,19 +30,24 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
   const doc=host.ownerDocument,ns='http://www.w3.org/2000/svg';
   const svg=(name,attrs={})=>{const node=doc.createElementNS(ns,name);for(const [k,v]of Object.entries(attrs))node.setAttribute(k,v);return node;};
   const width=host.clientWidth||480,height=host.clientHeight||400;
-  const layout=await layoutDiagram(view,{width,height,elk,measureLabel});
-  const fitted=fitDiagram(layout,{x:0,y:0,width,height});
+  const renderedView=renderingMode==='focused'?{...view,nodes:view.nodes.map(node=>node.focusedDescriptor?{...node}:{...node,...measureFocusedNode(doc,node,graph)}),edges:view.edges.map(edge=>{
+    const appearance=focusedEdgeAppearance(edge,{viewKind:view.kind,graph,view}),{endLabels:oldLabels,...native}=edge;
+    return {...native,label:appearance.label,...(appearance.endLabels?{endLabels:appearance.endLabels}:{})};
+  })}:view;
+  const layout=await layoutDiagram(renderedView,{width,height,elk,measureLabel}),automatic=fitDiagram(layout,{x:0,y:0,width,height});
+  const endpoints=renderingMode==='focused'?placeEndpointLabels(automatic.edges,automatic.nodes,{measureLabel,area:{x:0,y:0,width,height}}):{edges:automatic.edges,omissions:[]};
+  const fitted={...automatic,edges:endpoints.edges};
   const viewport=doc.createElement('div');viewport.className='region-graph';viewport.tabIndex=0;viewport.setAttribute('aria-label',view.title||'Model graph');
   const world=doc.createElement('div');world.className='region-world';viewport.append(world);
   const drawing=svg('svg',{width,height,'aria-label':'Model relationships'}),defs=svg('defs'),prefix='region-'+(++serial)+'-';
-  for(const name of ['open-arrow','filled-arrow','hollow-triangle','diamond','hollow-diamond','containment','definition-two-dot','owned-membership']){
+  for(const name of ['open-arrow','filled-arrow','hollow-triangle','diamond','hollow-diamond','containment','definition-two-dot','owned-membership','redefinition','reference-subsetting']){
     const {path,fill,adornments=[],...attrs}=markerDefinition(name),marker=svg('marker',{...attrs,id:prefix+name,markerUnits:'userSpaceOnUse'});
     for(const shape of [{path,fill},...adornments])marker.append(svg('path',{d:shape.path,fill:shape.fill==='line'?'#426869':shape.fill==='background'?'#fff':'none',stroke:'#426869'}));defs.append(marker);
   }
-  drawing.append(defs);world.append(drawing);const targets=[],edgeTargets=[],notices=[...(renderingMode==='focused'?focusedNotationNotices(view,graph):[]),...(view.notices??[]),...(layout.diagnostics??[]).map(d=>d.message||d.reason)];
+  drawing.append(defs);world.append(drawing);const targets=[],edgeTargets=[],notices=[...(renderingMode==='focused'?focusedNotationNotices(renderedView,graph):[]),...(view.notices??[]),...(layout.diagnostics??[]).map(d=>d.message||d.reason),...endpoints.omissions];
   for(const edge of fitted.edges){
-    const appearance=(renderingMode==='focused'?focusedEdgeAppearance:edgeAppearance)(edge,{viewKind:view.kind}),a=fitted.nodes.find(n=>n.id===edge.source),b=fitted.nodes.find(n=>n.id===edge.target);
-    if(!appearance.supported)notices.push(appearance.notice);
+    const appearance=(renderingMode==='focused'?focusedEdgeAppearance:edgeAppearance)(edge,{viewKind:view.kind,graph,view:renderedView}),a=fitted.nodes.find(n=>n.id===edge.source),b=fitted.nodes.find(n=>n.id===edge.target);
+    if(appearance.notice&&!notices.some(item=>(typeof item==='string'?item:item.message)===appearance.notice))notices.push(appearance.notice);
     const record={semanticId:edge.semanticId,kind:'relationship',label:edge.label||edge.kind,relationships:[{semanticId:edge.semanticId,sourceSemanticId:a?.semanticId,targetSemanticId:b?.semanticId,kind:edge.kind,label:edge.label}]};
     if(!edge.points?.length||edge.routingBlocked){notices.push(`Connection route unavailable: ${edge.label||edge.kind}`);continue;}
     const g=svg('g',{tabindex:0,role:'button','aria-label':record.label});
@@ -50,7 +56,8 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
     if(appearance.line==='dashed')path.setAttribute('stroke-dasharray','5 3');
     const hit=path.cloneNode();hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width',16);
     g.append(hit,path);
-    if(edge.label&&!edge.labelOmitted&&Number.isFinite(edge.x)&&Number.isFinite(edge.y)){const label=svg('text',{x:edge.x,y:edge.y,'font-size':12,fill:'#355e60','paint-order':'stroke',stroke:'white','stroke-width':3});label.textContent=edge.label;g.append(label);}
+    if(edge.label&&!edge.labelOmitted&&Number.isFinite(edge.x)&&Number.isFinite(edge.y)){const label=svg('text',{x:edge.x,y:edge.y,'font-size':12*(edge.labelScale??1),fill:'#355e60','paint-order':'stroke',stroke:'white','stroke-width':3});label.textContent=edge.label;g.append(label);}
+    for(const endLabel of edge.endLabelBoxes??[]){const box=endLabel.box,label=svg('text',{x:box.x,y:box.y+box.height*.78,'font-size':12*(edge.labelScale??1),fill:'#355e60','paint-order':'stroke',stroke:'white','stroke-width':3,class:'endpoint-label','data-end':endLabel.end,'data-role':endLabel.role??''});label.textContent=endLabel.text;g.append(label);}
     const choose=()=>{select(record.semanticId);changed();onSelect?.(record);};
     g.onclick=e=>{e.stopPropagation();choose();};g.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();choose();}};drawing.append(g);edgeTargets.push({node:g,semanticId:edge.semanticId});
   }

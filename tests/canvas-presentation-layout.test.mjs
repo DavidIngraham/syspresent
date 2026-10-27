@@ -81,7 +81,7 @@ test('compound and port safety rejects escaped groups, unknown attachments and b
  assert.equal(manualLayoutSupport(compound(),'port').supported,false);
  const unknown=compound();unknown.edges[1].sourceAttachment='unrepresented-port';assert.equal(manualLayoutSupport(unknown,'assembly').supported,false);
  const action=compound();action.kind='action';assert.equal(manualLayoutSupport(action,'assembly').supported,false);
- const disguised=flat();disguised.nodes[0].kind='fork';assert.equal(manualLayoutSupport(disguised,'b').supported,false);
+ const disguised=flat();disguised.nodes[0].kind='fork';assert.equal(manualLayoutSupport(disguised,'a').supported,false);assert.equal(manualLayoutSupport(disguised,'b').supported,true);
 });
 
 test('bounded nested structural movement keeps parent and peers fixed and rejects header/edge escape',()=>{

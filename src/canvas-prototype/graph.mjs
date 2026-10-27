@@ -41,16 +41,17 @@ export function modelGraph(raw,views=[]){
   // contract separately establishes a relationship identity. Do not match by
   // endpoint pairs or resolve the exported free-text subject in JavaScript.
   const satisfaction=['satisfy','satisfaction'].includes(edge.kind)&&semantic?.kind==='SatisfyRequirementUsage';
-  const nativeRelationship=edge.semanticId&&(edge.identityStatus==='native'||satisfaction||semantic&&!isDeclarationKind(semantic.kind))?edge.semanticId:undefined;
+  const connection=edge.notation?.declarationKind===semantic?.kind&&['ConnectionUsage','FlowUsage','SuccessionFlowUsage','Message'].includes(semantic?.kind)&&['derivation','flow','succession-flow','message'].includes(edge.notation?.production);
+  const nativeRelationship=edge.semanticId&&(edge.identityStatus==='native'||satisfaction||connection||semantic&&!isDeclarationKind(semantic.kind))?edge.semanticId:undefined;
   const occurrence={id:`view:${view.id}:${i}`,viewId:view.id,index:i,representationId:edge.id??null,semanticId:edge.semanticId??null,identityStatus:edge.identityStatus??'unknown',qualifiedName:edge.qualifiedName??null,nativeEdge:structuredClone(edge)};
   const previous=relationships.length;add(source,target,edge.kind,occurrence.id,nativeRelationship);
-  if(relationships.length>previous)relationships.at(-1).occurrences=[occurrence];
+  if(relationships.length>previous){const record=relationships.at(-1);record.occurrences=[occurrence];if(edge.notation)record.notation=structuredClone(edge.notation);}
  }}
  // Keep distinct known native relationships even when their endpoints/kind
  // coincide. Repeated view projections keep every occurrence as provenance on
  // one connection record; a mapped element identity is not a relationship ID.
  const records=new Map();
- for(const edge of relationships){const key=JSON.stringify([edge.source,edge.target,edge.kind,edge.nativeRelationship??null]),prior=records.get(key);if(!prior){records.set(key,edge);continue;}if(edge.occurrences){prior.occurrences??=[];const known=new Set(prior.occurrences.map(o=>o.id));prior.occurrences.push(...edge.occurrences.filter(o=>!known.has(o.id)));}}
+ for(const edge of relationships){const key=JSON.stringify([edge.source,edge.target,edge.kind,edge.nativeRelationship??null]),prior=records.get(key);if(!prior){records.set(key,edge);continue;}if(edge.occurrences){prior.occurrences??=[];const known=new Set(prior.occurrences.map(o=>o.id));prior.occurrences.push(...edge.occurrences.filter(o=>!known.has(o.id)));if(JSON.stringify(prior.notation)!==JSON.stringify(edge.notation))delete prior.notation;}}
  return {elements,containment,relationships:[...records.values()]};
 }
 export function graphView(graph,context,name='Focused General View'){

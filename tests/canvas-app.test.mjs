@@ -15,7 +15,7 @@ const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfIn
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
 async function pickPackage(h,name){const d=h.document;d.getElementById('choose-package').click();const search=d.getElementById('package-search');search.value=name;search.dispatchEvent(new h.window.Event('input'));const choice=[...d.querySelectorAll('#package-list button')].find(b=>b.textContent===name);assert.ok(choice,'native package is offered');choice.click();await until(()=>!d.getElementById('package-dialog').open&&sceneSettled(d));}
-async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,rollupFixture=false,nativeCaptureFixture=false,authoringFixture=false,focusedFixture=false,initialCount=2,size={width:1000,height:700}}={}){
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,rollupFixture=false,nativeCaptureFixture=false,authoringFixture=false,focusedFixture=false,behaviorFixture=false,initialCount=2,size={width:1000,height:700}}={}){
  let workerCount=0,resizeCallback;const nativeRequests=[],nativeCalls=[],fetchCalls=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
  if(storyContent){const block=JSON.parse(fixtureFiles['story.md'].split('```syspresent\n')[1].split('\n```')[0]);Object.assign(block,{chapter:{id:'challenge',title:'Challenge'},figures:[{id:'course',title:'Course map',asset:'assets/course.svg',alt:'Course map',caption:'Illustrative course.',provenance:{source:'Model',context:'Fixture'},modelRefs:['Model::req']}],context:[{kind:'candidate',title:'Candidate',text:'Proposed boat.',modelRefs:['Model::part']}]});fixtureFiles['story.md']='```syspresent\n'+JSON.stringify(block)+'\n```\n\nRead [the requirement](model:Model::req) and [hidden context](model:Model::orphan).';fixtureFiles['assets/course.svg']='<svg xmlns="http://www.w3.org/2000/svg"/>';}
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
@@ -24,12 +24,13 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
  if(hierarchyFixture)structuralRaw.push(...Array.from({length:65},(_,i)=>({'@id':'extra-part-'+i,'@type':'PartUsage',qualifiedName:'Model::Device::extra'+String(i).padStart(2,'0'),declaredName:'extra'+String(i).padStart(2,'0'),owner:{'@id':'definition'},'sysx:sourceLine':20+i})),{'@id':'voltage','@type':'AttributeUsage',qualifiedName:'Model::Device::voltage',declaredName:'voltage',owner:{'@id':'definition'},'sysx:sourceLine':99});
  if(packageFixture)structuralRaw.push({'@id':'run','@type':'ActionDefinition',qualifiedName:'Model::Nested::Run',declaredName:'Run',owner:{'@id':'nested'},'sysx:sourceLine':16});
  if(rollupFixture)structuralRaw.push(...['a','b'].map(id=>({'@id':id,'@type':'Package',qualifiedName:'Model::'+id.toUpperCase(),declaredName:id.toUpperCase(),owner:{'@id':'Model'},'sysx:sourceLine':100})),...['a','b'].map(id=>({'@id':'hidden-'+id,'@type':'PartUsage',qualifiedName:'Model::'+id.toUpperCase()+'::hidden',declaredName:'hidden',owner:{'@id':id},'sysx:sourceLine':101})),...['one','two'].map(id=>({'@id':'native-dependency-'+id,'@type':'Dependency',client:[{'@id':'hidden-a'}],supplier:[{'@id':'hidden-b'}],'sysx:sourceLine':102})));
- const fixtureRaw=raw.map(e=>packageFixture&&e['@id']==='req'?{...e,owner:{'@id':'nested'}}:structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
+ let fixtureRaw=raw.map(e=>packageFixture&&e['@id']==='req'?{...e,owner:{'@id':'nested'}}:structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
+ if(behaviorFixture)fixtureRaw=fixtureRaw.map(element=>['part','req'].includes(element['@id'])?{...element,'@type':'ActionUsage'}:element);
  const fixtureManifest={...manifest,...(entryView?{entryView}:{}),...(entryFocus?{entryFocus}:{})};
  if(noStory)fixtureFiles['story.md']='# Explore the supplied model\n\nNo authored scenes.';
  if(overviewFixture)structuralRaw.push({'@id':'outside','@type':'PartDefinition',qualifiedName:'Foreign::outside',declaredName:'outside','sysx:sourceLine':14},{'@id':'outside-dependency','@type':'Dependency',client:[{'@id':'definition'}],supplier:[{'@id':'outside'}]});
  if(overviewPort)structuralRaw.push({'@id':'control-port','@type':'PortUsage',qualifiedName:'Model::controlPort',declaredName:'controlPort',owner:{'@id':'Model'},'sysx:sourceLine':15});
- let authoredViews=[],holdNextParse=false,capturedNative=false,pendingRender,holdLayout=false,holdCountdown=null;const heldLayouts=[],heldParses=[];
+ let renderOverride;let authoredViews=[],holdNextParse=false,capturedNative=false,pendingRender,holdLayout=false,holdCountdown=null;const heldLayouts=[],heldParses=[];
  const massValue={numerator:'1',denominator:'4'};const window=new JSDOM(html,{url,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole()}).window;
  if(storedSettings)window.localStorage.setItem('syspresent.reader.v1',JSON.stringify(storedSettings));
  const blobs=new Map(),downloads=[];window.Blob=Blob;window.TextDecoder=TextDecoder;window.TextEncoder=class{encode(value){return new window.Uint8Array(new TextEncoder().encode(value));}};window.URL.createObjectURL=blob=>{const url='blob:fixture-'+blobs.size;blobs.set(url,blob);return url;};window.URL.revokeObjectURL=()=>{};const anchorClick=window.HTMLAnchorElement.prototype.click;window.HTMLAnchorElement.prototype.click=function(){if(this.download)downloads.push({name:this.download,blob:blobs.get(this.href)});else anchorClick.call(this);};
@@ -38,6 +39,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return size.width;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return size.height;}});
  window.fetch=async url=>{fetchCalls.push(String(url));return ({ok:true,arrayBuffer:async()=>packProject({manifest:fixtureManifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?fixtureManifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});};
  window.Worker=class{constructor(url){workerCount++;this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(method)nativeCalls.push({method,params});if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
+  if(method==='RenderView'&&renderOverride){const reject=error=>queueMicrotask(()=>this.onmessage({data:{id,error:{message:error.message}}}));let override;try{override=renderOverride(params);}catch(error){reject(error);return;}if(override!==undefined){Promise.resolve(override).then(respond,reject);return;}}
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ParseSources'){capturedNative=nativeCaptureFixture&&params.documents.some(d=>d.content.includes('package CanvasCaptured2'));authoredViews=authoringFixture?[2,3,4,5].filter(n=>params.documents.some(d=>d.content.includes('package CanvasAuthored'+n))):[];const reply=()=>respond({modelHash:'fixture',roots:[{childIds:['Model']}],diagnostics:params.documents.some(d=>d.content.includes('BROKEN'))?[{severity:'error',message:'Native parse rejected broken view'}]:[]});if(holdNextParse){holdNextParse=false;heldParses.push(reply);}else reply();}
   else if(method==='ExportModel')respond({elements:structuredClone([...authoredViews.map(n=>({'@id':'authored-view-'+n,'@type':'ViewUsage',qualifiedName:'CanvasAuthored'+n+'::slide',declaredName:'slide','sysx:sourceLine':210+n})),...(capturedNative?[{'@id':'captured-view','@type':'ViewUsage',qualifiedName:'CanvasCaptured2::slide',declaredName:'slide','sysx:sourceLine':200}]:[]),...structuralRaw,...fixtureRaw.map(e=>(ancestorFixture||foreignOwnerFixture)&&['req','orphan'].includes(e['@id'])?{...e,owner:{'@id':foreignOwnerFixture?'foreign':'Model'}}:e),...(foreignOwnerFixture?[{'@id':'foreign','@type':'Package',qualifiedName:'Foreign::root',declaredName:'root','sysx:sourceLine':1}]:[]),...(ambiguousRefs?['duplicate1','duplicate2'].map(id=>({'@id':id,'@type':'RequirementUsage',qualifiedName:'Model::ambiguous',declaredName:'ambiguous','sysx:sourceLine':9})):[]),...extra.map(e=>({'@id':e.id,'@type':e.kind,qualifiedName:'Model::'+e.id,declaredName:e.id,'sysx:sourceLine':8})),...((secondScene||secondView)?[{'@id':'view2','@type':'ViewUsage',qualifiedName:'Views::other','sysx:sourceLine':2}]:[]),...(contextNeighbor==='shared'?[{'@id':'second-neighbor-link','@type':'Dependency',client:[{'@id':'part'}],supplier:[{'@id':'orphan'}]}]:[]),...(contextNeighbor?[{'@id':'neighbor-link','@type':'Dependency',client:[{'@id':'req'}],supplier:[{'@id':'orphan'}]}]:[])])});
@@ -49,7 +51,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(fixtureNative));
  }terminate(){}};
  window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===initialCount)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,nativeRequests,nativeCalls,fetchCalls,downloads,setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ return {window,nativeRequests,nativeCalls,fetchCalls,downloads,setNativeRender:handler=>{renderOverride=handler;},setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('package workspace scopes search and traversal, offers native view switching and restores scene handoff',async()=>{
  const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
@@ -631,7 +633,7 @@ test('sequence scenes preserve native participant and message order and restore 
   await until(()=>!d.querySelector('.sequence-view')&&sceneSettled(d));
   d.getElementById('explore-back').click();await until(()=>d.querySelector('.sequence-view')&&sceneSettled(d));
   assert.equal(d.querySelector('.sequence-viewport').scrollTop,90);assert.equal(d.querySelector('.sequence-viewport').scrollLeft,45);
-  assert.match(d.querySelector('.sequence-evidence').textContent,/does not represent elapsed time/);
+  assert.match(d.querySelector('.sequence-evidence').textContent,/neither elapsed time nor additional modeled ordering/);
  }finally{h.window.close();}
 });
 test('comparison selection coordinates graph and matrix without scrolling or moving either representation',async()=>{
@@ -970,5 +972,135 @@ test('remaining UI nested adjustment stays local then follows ancestor movement 
   d.getElementById('reset-layout').click();await until(()=>sceneSettled(d)&&root().style.transform===originalRoot&&child().style.transform===originalChild);assert.equal(peer().style.transform,stationary);
   d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&close(coords(root())[0],movedRoot[0])&&close(coords(child())[0],movedChild[0]));
   d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&root().style.transform===originalRoot&&child().style.transform===originalChild);
+ }finally{h.window.close();}
+});
+
+const focusedSourceCalls=h=>h.nativeCalls.filter(call=>call.method==='RenderView'&&Array.isArray(call.params.show));
+const changeMode=(h,mode)=>{const select=h.document.getElementById('rendering-mode');select.value=mode;select.dispatchEvent(new h.window.Event('change'));};
+test('integrated focused mode rerenders source views with exact native show flags and reuses only the loaded-model cache',async()=>{
+ const h=await harness(),d=h.document;
+ try{
+  const parses=h.nativeCalls.filter(call=>call.method==='ParseSources').length,fetches=h.fetchCalls.length;
+  changeMode(h,'focused');await until(()=>sceneSettled(d)&&d.querySelector('.focused-face')&&d.getElementById('status').textContent.includes('compliance is not established'));
+  const calls=focusedSourceCalls(h);assert.equal(calls.length,1);assert.equal(calls[0].params.view,'Views::requirements');assert.equal(calls[0].params.modelHash,'fixture');assert.equal(calls[0].params.includeSemanticIdentity,true);
+  assert.deepEqual([...calls[0].params.show],['parameter-symbols','port-symbols','typings','edge-labels']);assert.deepEqual(activeIDs(d),['part','req']);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('rendering-mode').value==='exploratory'&&!d.querySelector('.focused-face'));
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&d.getElementById('rendering-mode').value==='focused'&&d.querySelector('.focused-face'));
+  assert.equal(focusedSourceCalls(h).length,1,'same loaded native model reuses native profile response');assert.equal(h.nativeCalls.filter(call=>call.method==='ParseSources').length,parses);assert.equal(h.fetchCalls.length,fetches);
+  assert.equal(d.querySelectorAll('#scenes option').length,1,'notation changes do not append slides');
+  const imported=await exportAndImport(h);assert.equal(fileText(imported,'model.sysml'),files['model.sysml']);
+  assert.equal(focusedSourceCalls(h).length,2,'loading a project creates a fresh native profile cache even when this mock model hash is unchanged');assert.ok(d.querySelector('.focused-face'));
+ }finally{h.window.close();}
+});
+test('integrated focused native failures preserve scene selection geometry and history then permit a genuine retry',async()=>{
+ const h=await harness(),d=h.document;
+ try{
+  manualTarget(d,'part').click();const positions=[...d.querySelectorAll('#nodes .node')].map(node=>node.style.transform),url=h.window.location.href,back=d.getElementById('explore-back').disabled;
+  h.setNativeRender(params=>{if(params.show)throw Error('Native focused profile rejected fixture');});
+  changeMode(h,'focused');await until(()=>d.getElementById('status').textContent.includes('Native focused profile rejected fixture'));
+  assert.equal(d.getElementById('rendering-mode').value,'exploratory');assert.equal(d.querySelector('.focused-face'),null);assert.deepEqual(activeIDs(d),['part','req']);assert.deepEqual([...d.querySelectorAll('#nodes .node')].map(node=>node.style.transform),positions);
+  assert.equal(manualTarget(d,'part').classList.contains('selected'),true);assert.equal(d.getElementById('explore-back').disabled,back);assert.equal(h.window.location.href,url);assert.equal(d.querySelectorAll('#scenes option').length,1);
+  h.setNativeRender(undefined);changeMode(h,'focused');await until(()=>sceneSettled(d)&&d.querySelector('.focused-face')&&d.getElementById('status').textContent.includes('compliance is not established'));
+  assert.equal(focusedSourceCalls(h).length,2,'failed native response is not cached as a successful rendering');
+ }finally{h.window.close();}
+});
+test('integrated focused source membership cannot cross isolated package scope or replace the current native view',async()=>{
+ const inside={kind:'requirement',nodes:[structuredClone(native.nodes[0])],edges:[]},h=await harness({structuralFixture:true,packageFixture:true,nativeView:inside,initialCount:1}),d=h.document;
+ try{
+  await pickPackage(h,'Model::Nested');const chooser=d.getElementById('view-navigation');chooser.value='authored:Views::requirements';chooser.dispatchEvent(new h.window.Event('change'));
+  await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='req'&&chooser.value==='authored:Views::requirements');
+  const before=[...d.querySelectorAll('#nodes .node')].map(node=>node.style.transform),back=d.getElementById('explore-back').disabled;
+  h.setNativeRender(params=>params.show?structuredClone(native):undefined);changeMode(h,'focused');
+  await until(()=>d.getElementById('status').textContent.includes('outside Nested'));
+  assert.equal(d.getElementById('rendering-mode').value,'exploratory');assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.deepEqual(activeIDs(d),['req']);assert.deepEqual([...d.querySelectorAll('#nodes .node')].map(node=>node.style.transform),before);assert.equal(d.getElementById('explore-back').disabled,back);
+  assert.equal(d.querySelector('.focused-face'),null);assert.equal(focusedSourceCalls(h).at(-1).params.view,'Views::requirements');
+ }finally{h.window.close();}
+});
+test('integrated delayed focused response cannot switch notation or membership after a newer package navigation',async()=>{
+ const h=await harness({structuralFixture:true,packageFixture:true}),d=h.document;let release;
+ try{
+  h.setNativeRender(params=>params.show?new Promise(resolve=>{release=()=>resolve(structuredClone(native));}):undefined);
+  changeMode(h,'focused');await until(()=>typeof release==='function');
+  await pickPackage(h,'Model::Nested');await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='nested,req,run');
+  release();await new Promise(resolve=>setTimeout(resolve,25));
+  assert.equal(d.getElementById('rendering-mode').value,'exploratory');assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.deepEqual(activeIDs(d),['nested','req','run']);assert.equal(d.querySelector('.focused-face'),null);
+ }finally{h.window.close();}
+});
+test('integrated sequence explicit widths and spacing retain identity and selection across history reset and source ZIP import',async()=>{
+ const before=structuredClone(sequenceFixture),h=await harness({secondScene:true,secondView:sequenceFixture}),d=h.document;
+ try{
+  d.getElementById('next').click();await until(()=>d.querySelector('.sequence-view')&&sceneSettled(d));
+  const input=()=>d.querySelector('.sequence-layout-fields input'),original=Number(input().value),order=()=>[...d.querySelectorAll('.sequence-message')].map(node=>node.dataset.semanticId),nativeOrder=order();
+  const scroll=d.querySelector('.sequence-viewport');scroll.scrollTop=87;scroll.scrollLeft=41;scroll.dispatchEvent(new h.window.Event('scroll'));d.querySelector('.sequence-message').click();
+  input().value='420';input().dispatchEvent(new h.window.Event('change'));await until(()=>d.getElementById('status').textContent.includes('Native region spacing saved'));
+  assert.equal(Number(input().value),420);assert.equal(d.querySelector('.sequence-viewport').scrollTop,87);assert.equal(d.querySelector('.sequence-message').getAttribute('aria-pressed'),'true');assert.deepEqual(order(),nativeOrder);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&Number(input()?.value)===original);assert.equal(d.querySelector('.sequence-message').getAttribute('aria-pressed'),'true');
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&Number(input()?.value)===420);
+  const gap=d.querySelector('[aria-label="Message spacing in pixels"]');gap.value='160';gap.dispatchEvent(new h.window.Event('change'));
+  const project=await exportAndImport(h),layouts=JSON.parse(fileText(project,'syspresent-layouts.json')),record=layouts.regions.find(record=>record.viewId==='Views::other'&&record.viewKind==='sequence');
+  assert.equal(record.layout.lanes[0].semanticId,'part');assert.equal(record.layout.lanes[0].representationId,'part-line');assert.equal(record.layout.lanes[0].width,420);assert.equal(record.layout.messageGap,160);assert.equal(fileText(project,'model.sysml'),files['model.sysml']);
+  assert.doesNotMatch(JSON.stringify(record.layout),/selectedId|scrollTop|modelHash/);d.getElementById('next').click();await until(()=>sceneSettled(d)&&d.querySelector('.sequence-view')&&Number(input()?.value)===420);
+  assert.equal(d.querySelector('[aria-label="Message spacing in pixels"]').value,'160');assert.deepEqual(order(),nativeOrder);
+  d.querySelector('.sequence-layout-fields button').click();await until(()=>Number(input().value)===original);assert.equal(d.querySelector('[aria-label="Message spacing in pixels"]').value,'78');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&Number(input()?.value)===420);assert.equal(d.querySelector('[aria-label="Message spacing in pixels"]').value,'160');
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&Number(input()?.value)===original);assert.deepEqual(order(),nativeOrder);assert.deepEqual(sequenceFixture,before);assert.equal(d.querySelectorAll('#scenes option').length,2);
+ }finally{h.window.close();}
+});
+test('integrated matrix explicit native column width history reset and source ZIP import preserve every cell occurrence and direction',async()=>{
+ const before=structuredClone(gridFixture),h=await harness({secondScene:true,secondView:gridFixture}),d=h.document;
+ try{
+  d.getElementById('next').click();await until(()=>d.querySelector('.canvas-grid-view')&&sceneSettled(d));
+  const input=()=>d.querySelectorAll('.canvas-grid-widths input')[1],width=()=>d.querySelectorAll('.canvas-grid-table col')[1]?.style.width,rows=()=>[...d.querySelectorAll('.canvas-grid-table tbody tr')].map(row=>row.dataset.nativeRow),originalRows=rows();
+  const scroll=d.querySelector('.canvas-grid-scroll');scroll.scrollTop=76;scroll.scrollLeft=34;scroll.dispatchEvent(new h.window.Event('scroll'));gridCell(d,0,1).click();
+  input().value='380';input().dispatchEvent(new h.window.Event('change'));await until(()=>d.getElementById('status').textContent.includes('Native region spacing saved'));assert.equal(width(),'380px');assert.equal(d.querySelectorAll('.canvas-grid-inspector li').length,2);assert.equal(d.querySelector('.canvas-grid-scroll').scrollTop,76);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&width()==='200px');assert.equal(gridCell(d,0,1).getAttribute('aria-pressed'),'true');
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&width()==='380px');assert.deepEqual(rows(),originalRows);
+  const project=await exportAndImport(h),layouts=JSON.parse(fileText(project,'syspresent-layouts.json')),record=layouts.regions.find(record=>record.viewId==='Views::other'&&record.viewKind==='matrix');
+  assert.equal(record.layout.columns[0].semanticId,'req');assert.equal(record.layout.columns[0].index,1);assert.equal(record.layout.columns[0].width,380);assert.equal(fileText(project,'views.sysml'),files['views.sysml']);
+  d.getElementById('next').click();await until(()=>sceneSettled(d)&&d.querySelector('.canvas-grid-view')&&width()==='380px');gridCell(d,0,1).click();assert.equal(d.querySelectorAll('.canvas-grid-inspector li').length,2);assert.match(d.querySelector('.canvas-grid-inspector').textContent,/part → req/);assert.deepEqual(rows(),originalRows);
+  d.querySelector('.canvas-grid-reset-widths').click();await until(()=>width()==='200px');d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&width()==='380px');d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&width()==='200px');
+  assert.deepEqual(gridFixture,before);assert.equal(d.querySelectorAll('#scenes option').length,2);
+ }finally{h.window.close();}
+});
+test('integrated action adjustment exposes horizontal controls and persists no causal vertical displacement',async()=>{
+ const fixture={kind:'action',nodes:[{id:'a',semanticId:'req',identityStatus:'mapped',name:'First native action',kind:'action'},{id:'b',semanticId:'part',identityStatus:'mapped',name:'Second native action',kind:'action'}],edges:[{id:'native-action-order',semanticId:'native-action-order',from:'a',to:'b',kind:'succession',label:'[enabled] native succession',guard:'enabled'}]},before=structuredClone(fixture),h=await harness({nativeView:fixture,behaviorFixture:true}),d=h.document;
+ try{
+  const target=()=>manualTarget(d,'part'),peer=()=>manualTarget(d,'req'),coords=node=>/translate\(([-.\d]+)px,\s*([-.\d]+)px/.exec(node.style.transform).slice(1).map(Number),original=coords(target()),stationary=peer().style.transform;
+  d.getElementById('adjust-layout').click();target().click();assert.equal(action(d,'Move up').disabled,true);assert.equal(action(d,'Move down').disabled,true);assert.equal(action(d,'Move right').disabled,false);
+  action(d,'Move down').click();assert.deepEqual(coords(target()),original);action(d,'Move right').click();await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Drawing positions saved'));
+  const moved=coords(target());assert.equal(moved[0]-original[0],40);assert.equal(moved[1],original[1]);assert.equal(peer().style.transform,stationary);
+  const edge=d.querySelector('#connections g[data-context="false"][data-kind="succession"]');assert.equal(edge.dataset.source,'req');assert.equal(edge.dataset.target,'part');assert.match(edge.textContent,/enabled/);
+  const project=await exportAndImport(h),layout=JSON.parse(fileText(project,'syspresent-layouts.json')),placement=layout.views.find(record=>record.viewId==='Views::requirements').placements.find(record=>record.semanticId==='part');assert.equal(placement.offset.y,0);
+  await until(()=>sceneSettled(d)&&coords(target())[0]===moved[0]);assert.equal(coords(target())[1],original[1]);assert.equal(peer().style.transform,stationary);assert.deepEqual(fixture,before);
+ }finally{h.window.close();}
+});
+
+test('guided history toolbar stays on the canvas through first move capture Back Home and reload and moves to the header only for exploration',async()=>{
+ const fixture={kind:'interconnection',nodes:[structuredClone(native.nodes[1])],edges:[]},h=await harness({nativeView:fixture,nativeCaptureFixture:true,initialCount:1}),d=h.document;
+ const controls=()=>d.getElementById('exploration-controls'),header=()=>d.getElementById('viewer-header'),nav=()=>header().querySelector('nav'),target=()=>manualTarget(d,'part');
+ const guided=()=>{assert.equal(controls().parentElement,d.getElementById('canvas-tools'));assert.equal(controls().classList.contains('guided-history'),true);assert.equal(controls().closest('nav'),null);assert.equal(header().contains(controls()),false);assert.equal(nav().hidden,false);assert.equal(d.querySelectorAll('#exploration-controls').length,1);};
+ const exploring=()=>{assert.equal(controls().parentElement,header());assert.equal(controls().classList.contains('guided-history'),false);assert.equal(controls().closest('nav'),null);assert.equal(controls().hidden,false);assert.equal(nav().hidden,true);assert.equal(d.querySelectorAll('#exploration-controls').length,1);};
+ try{
+  guided();assert.equal(controls().hidden,true);const headerChildren=[...header().children].map(node=>node.id||node.className),automatic=target().style.transform;
+  d.getElementById('adjust-layout').click();target().click();action(d,'Move right').click();await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Drawing positions saved'));
+  const moved=target().style.transform;assert.notEqual(moved,automatic);guided();assert.equal(controls().hidden,false);assert.deepEqual([...header().children].map(node=>node.id||node.className),headerChildren,'first guided edit does not insert a new header row');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&target().style.transform===automatic);guided();
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&target().style.transform===moved);guided();
+  target().click();action(d,'Internal view').click();await until(h.pending);h.release();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden&&activeIDs(d).join(',')==='part');exploring();
+  d.getElementById('edit').click();d.getElementById('scene-title').value='Reusable guided layout';d.getElementById('capture-scene').click();
+  await until(()=>sceneSettled(d)&&d.querySelectorAll('#scenes option').length===2&&!d.getElementById('editor').open&&target()?.dataset.representation==='captured-part-representation').catch(error=>{throw Error(error.message+': '+d.getElementById('status').textContent);});guided();
+  const captured=target().style.transform;assert.equal(d.getElementById('narrative').hidden,false);
+  if(d.getElementById('adjust-layout').getAttribute('aria-pressed')!=='true')d.getElementById('adjust-layout').click();target().click();action(d,'Move right').click();
+  await until(()=>sceneSettled(d)&&target().style.transform!==captured&&d.getElementById('status').textContent.includes('Drawing positions saved'));guided();
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&target().style.transform===captured);guided();assert.equal(controls().hidden,false);
+  d.getElementById('home').click();assert.equal(header().hidden,true);assert.equal(d.getElementById('stage').hidden,true);assert.ok(controls().closest('[hidden]'),'relocated controls are hidden with their viewer surface');
+  d.getElementById('resume-model').click();await until(()=>sceneSettled(d)&&!d.getElementById('stage').hidden&&target()?.style.transform===captured);guided();assert.equal(header().hidden,false);
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden&&!d.getElementById('workspace-controls').hidden);exploring();
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&!d.getElementById('narrative').hidden&&target()?.dataset.representation==='captured-part-representation');guided();
+  const imported=await exportAndImport(h);assert.match(fileText(imported,'views/captured-views.sysml'),/view def Definition/);guided();assert.equal(header().hidden,false);assert.equal(d.getElementById('stage').hidden,false);
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden&&!d.getElementById('workspace-controls').hidden);exploring();
+  d.getElementById('home').click();assert.equal(header().hidden,true);assert.ok(controls().closest('[hidden]'));
+  d.getElementById('resume-model').click();await until(()=>sceneSettled(d)&&!header().hidden&&!d.getElementById('stage').hidden);exploring();
+  d.getElementById('return').click();await until(()=>sceneSettled(d)&&!d.getElementById('narrative').hidden);guided();
  }finally{h.window.close();}
 });

@@ -1,5 +1,5 @@
 /** Reader scope over native ownership. Names are labels, never membership rules. */
-import {representations} from './view-contract.mjs';
+import {representations,nativeViewContextIdentities} from './view-contract.mjs';
 
 const indexes=new WeakMap();
 export const isPackage=element=>['Package','Namespace'].includes(element?.kind);
@@ -46,6 +46,7 @@ export function outsidePackage(view,ids){
   if(['node','row','column'].includes(item.role)&&item.semanticId)represented.add(item.semanticId);
   for(const id of [item.sourceSemanticId,item.targetSemanticId])if(id)represented.add(id);
  }
+ for(const id of nativeViewContextIdentities(view))represented.add(id);
  return [...represented].filter(id=>!allowed.has(id)).sort(compare);
 }
 export function focusViewKinds(element){
@@ -55,6 +56,7 @@ export function focusViewKinds(element){
  if(['PartUsage','PartDefinition'].includes(kind))views.push({id:'native:interconnection',label:'Native internal view'});
  if(isPackage(element))views.push({id:'native:tree',label:'Native tree (complete)'},{id:'native:mixed',label:'Native general view (complete)'});
  if(['ActionUsage','ActionDefinition'].includes(kind))views.push({id:'native:action',label:'Native activity'},{id:'native:sequence',label:'Native sequence'});
+ if(['OccurrenceUsage','OccurrenceDefinition'].includes(kind))views.push({id:'native:sequence',label:'Native sequence'});
  if(['StateUsage','StateDefinition'].includes(kind))views.push({id:'native:state',label:'Native states'});
  return views;
 }

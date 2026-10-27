@@ -19,3 +19,12 @@
 .focused-control-caption{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);font:11px/1.3 system-ui,sans-serif;white-space:pre;max-width:220px}
 .node>.focused-face[data-shape="unsupported"]{border-style:dotted;border-radius:0;background:#fff}
 .focused-unsupported{display:block;padding:5px;font-size:11px;font-style:italic;border-top:1px dotted currentColor}
+
+.focused-extension{display:block;padding:5px;font-size:11px;font-style:italic;border-top:1px dotted currentColor}
+.focused-action-symbol{position:absolute;left:8px;top:8px;width:22px;height:22px}
+.focused-face[data-action-glyph]>.focused-header{padding-left:32px;padding-right:32px}
+
+.node>.focused-face[data-shape="note"]{border:0;background:transparent}
+.focused-note-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.focused-face[data-shape="note"]>.focused-header,.focused-face[data-shape="note"]>.focused-extension{position:relative}
+.focused-face[data-shape="note"]>.focused-header{padding-right:calc(15% + 6px)}
