@@ -215,3 +215,28 @@ less than 25% spare space and preserve actual record lengths. This lets nearby
 source revisions reuse compatible spans in the nonshrinking WASM heap. The
 success envelope uses a local string builder without the formatter/string copy.
 Repeated same-worker stability is an independent acceptance gate.
+
+## Building from the published dependency base
+
+The locally tested native commit is not required on a remote branch. The carried
+patch reconstructs its complete source tree from the published base used by CI:
+
+~~~sh
+git clone --no-checkout https://github.com/DavidIngraham/OpenSysML .tools/opensysml-canvas
+git -C .tools/opensysml-canvas checkout --detach af37bbf155aea785b8ac494a14afe659244bbcdf
+git -C .tools/opensysml-canvas apply --check "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch"
+git -C .tools/opensysml-canvas apply "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch"
+python3 scripts/wasm-prototype/build.py --source .tools/opensysml-canvas
+npm ci --ignore-scripts --no-audit --no-fund
+npm test
+node scripts/wasm-prototype/parity.mjs
+npm run build
+~~~
+
+Use Node 22.14.0 and Go 1.25.11. Applying the patch leaves the dependency
+intentionally dirty: provenance records the published base, complete source diff
+and carried-patch digest, rather than pretending the unpublished local commit was
+checked out. The verified resulting source-tree ID is
+65830302812358fcbe78ab5dd7ef111708d46e3f, equal to the tested native tree.
+No separate dependency publication is needed. A fresh local base-plus-patch
+build and native/WASM parity are recorded under build/memory-carried-reuse-*.

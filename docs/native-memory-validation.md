@@ -217,3 +217,70 @@ revisions, full/declaration metadata, nil, invalid JSON, HTML and UTF-8. Indepen
 review found no correctness blocker. Actual same-worker stability still requires
 the late-cycle acceptance window; implementation and unit tests alone do not
 establish it.
+
+
+## Accepted same-worker regression on October 27, 2026
+
+The final executable payload was tested at SysPresent
+8f7a9ac2b55db065a4fe6c8e0d93857eb448de83 with clean native
+e4fd5aa4ce5e4b756992fcee2d69459833e5ef56. Seven uninterrupted
+validate/append/export-ZIP/reload cycles passed in one semantic worker.
+Completed-cycle linear-memory high-water marks were 1476, 2232, 2264, 2492,
+2492, 2492 and 2492 MiB. The policy accepted cycles 5–7 with zero growth,
+leaving 1681915904 bytes (1604 MiB) below the 4 GiB ceiling. No worker restart or
+harness-forced collection occurred during these cycles.
+
+Production model-release collection left approximately 240.16–242.68 MB of
+allocated Go heap after successive appends, with one retained model; candidate
+review retained two. The final explicit idle collection, performed only after
+acceptance, measured 267880080 bytes with one retained model. This is retained
+Go heap evidence, separate from the nonshrinking 2492 MiB linear buffer, and
+does not predict indefinite stability for every possible source change.
+
+Every cycle appended exactly one scene (32 through 38), preserved all 29
+represented native identities and resolved the selected native attribute to 140.
+All seven exported ZIPs preserve the 98 original SysML source files,
+1481938 bytes, byte for byte. The accepted raw trace is
+build/browser-export-memory-reuse-stress.json; per-ZIP source proof is
+build/browser-export-memory-reuse-source-proof.json. The earlier eight-cycle
+stability failure remains preserved separately.
+
+On the same executable payload, 578 Node tests and 6 Python publication tests
+passed without skips; native/WASM parity and all four product specification
+packages passed. Native full build/vet/formatting and affected RDF, exporter,
+frontend, render-identity and public export contracts passed, including actual
+js/WASM allocation and wire-equivalence tests. The final browser regression suite
+passed 19 workflows with no page errors or external requests. Its scope includes
+capture, layout persistence, Back/Forward, behavior/sequence/grid controls,
+Blue Dog typed rollups and isolated/contextual Gorge navigation.
+
+The complete native test suite is not claimed passed. Earlier baseline failures,
+missing downloaded corpus assets and unresolved timeout comparisons remain
+separate from these scoped passes. The 47-view notation inventory in
+rendering-coverage.md is the earlier 505baf assessment, not a newly run inventory
+against e4fd5. Provider/privacy configuration remains unconfigured.
+
+The carried patch reconstructs exactly the tested native source tree
+65830302812358fcbe78ab5dd7ef111708d46e3f from public base
+af37bbf155aea785b8ac494a14afe659244bbcdf. A fresh base-plus-patch paired
+engine build and parity passed. Provenance honestly records the base as dirty
+with patch/diff SHA-256
+2ad5d8101a2288bedc01addeac27fed46467a6369e647e3df9f392ac0aa6d80a;
+its version metadata and binary digests differ from the clean local native build.
+No separate dependency publication is required.
+
+
+A separate fresh browser imported the last exported ZIP after the uninterrupted
+run completed. It passed with 38 scenes, 41 native views, all 29 represented
+identities unchanged and the exact last model hash. Actual native GetSymbol and
+Evaluate returned the selected integer value 140. Its linear high-water was
+1096 MiB; final collected HeapAlloc was 242541664 bytes with one retained model.
+There were no page errors or external requests. The fresh verifier's subprocess
+returned zero. Both browser sessions and their owned processes closed cleanly.
+
+Fresh evidence is build/browser-export-memory-reuse-fresh.json, SHA-256
+9cab417111f75c8f12abb4fc2bee7463371cb36f2aaf92130cd3b9b2f444dedb.
+The stress driver ended with passed assertions; its outer shell wrapper had an
+exit-status quoting error, so no successful shell-wrapper exit is claimed.
+Driver JSON, continuity, source hashes and independently verified cleanup are
+the evidence for that run.

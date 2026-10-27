@@ -1,8 +1,10 @@
 # Native exploration, layouts and authoring validation
 
-The [native memory validation record](native-memory-validation.md) supersedes the
-earlier large edited-project memory limitation below and records the current
-paired engine, preserved baseline and measured scope.
+Current status, October 27, 2026: the [native memory validation record](native-memory-validation.md)
+supersedes the earlier large edited-project failure below. Seven uninterrupted
+same-worker append/reload cycles now meet the measured plateau policy. Earlier
+engine, test-count and publication statements below describe their named historical
+stages; the memory record gives the current paired engine and measured scope.
 
 The local feature branch preserves the integrated Blue Dog source refresh and
 implements SP-103 and SP-107 through SP-112 alongside the earlier exploration
@@ -124,7 +126,7 @@ build/voice-remaining-{tests-final,spec,parity,build,browser}.log, with screensh
 and browser JSON alongside them. These build outputs are local evidence, not
 committed test fixtures.
 
-## Final native-construct followup (October 27)
+## Historical native-construct followup at 505baf (October 27)
 
 The local followup uses paired clean native source
 `505baf09110e5af9720164186c77cd19d9e5b45e`, carried without an upstream PR.
