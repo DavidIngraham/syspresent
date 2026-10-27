@@ -432,7 +432,7 @@ test('landing does not start a model engine or load a project until the user cho
  d.querySelector('[data-demo="flashlight"]').click();
  await until(()=>d.querySelectorAll('#nodes .node').length===2&&!d.getElementById('stage').hidden);
  d.getElementById('home').click();assert.equal(d.getElementById('landing').hidden,false);assert.equal(d.getElementById('stage').hidden,true);
- d.getElementById('resume-model').click();assert.equal(d.getElementById('landing').hidden,true);h.window.close();
+ d.getElementById('resume-model').click();await until(()=>d.getElementById('landing').hidden);h.window.close();
 });
 
 test('a plain SysML selection opens exploration without a manifest or authored story',async()=>{
@@ -1213,7 +1213,22 @@ test('Home during initial layout rolls the tentative project back before Resume'
   const retained=[...h.nativeModels][0];
   h.holdLayout();d.getElementById('edit').click();d.getElementById('view-source').value='package Views { /* canceled drawing */ }';d.getElementById('apply-views').click();await until(h.layoutPending);
   d.getElementById('home').click();h.releaseLayout();await until(()=>h.nativeModels.size===1&&d.getElementById('landing').hidden===false);
-  assert.equal([...h.nativeModels][0],retained);
+  assert.equal([...h.nativeModels][0],retained);assert.equal(d.getElementById('resume-model').hidden,false,'Resume is visibly available after tentative display rollback');
   d.getElementById('resume-model').click();await until(()=>d.getElementById('landing').hidden&&sceneSettled(d));assert.equal(d.querySelector('#narrative h2').textContent,'Control the part');
+ }finally{h.window.close();}
+});
+
+test('resized initial layout keeps the previous native model until the replacement commits or rolls back',async()=>{
+ const h=await harness({lifecycleFixture:true}),d=h.document;
+ try{
+  const retained=[...h.nativeModels][0],url=h.window.location.href;
+  h.holdLayout();d.getElementById('edit').click();d.getElementById('view-source').value='package Views { /* resized first drawing */ }';d.getElementById('apply-views').click();await until(()=>h.layoutPendingCount()===1);
+  h.holdLayout();h.resize(990,680);await until(()=>h.layoutPendingCount()===2);
+  h.releaseNextLayout();await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(h.layoutPendingCount(),1);assert.equal(d.getElementById('editor').open,true);assert.ok(h.nativeModels.has(retained),'superseded initial attempt cannot release preceding native model');
+  assert.equal(h.nativeModels.size,2);h.releaseNextLayout('Rejected resized initial layout');
+  await until(()=>d.getElementById('editor-error').textContent.includes('Rejected resized initial layout')&&h.nativeModels.size===1&&sceneSettled(d));
+  assert.equal([...h.nativeModels][0],retained);assert.equal(h.window.location.href,url);assert.equal(d.querySelector('#narrative h2').textContent,'Control the part');
+  assert.equal(d.getElementById('resume-model').hidden,false);
  }finally{h.window.close();}
 });
