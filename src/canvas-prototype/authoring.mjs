@@ -180,10 +180,16 @@ export async function prepareAuthoringProposal(project,{proposal,graph,engine,sc
  const resolve=resolver(graph),focus=allowed(resolve(proposal.focus),scopeIds),selected=proposal.view.expose.map(ref=>allowed(resolve(ref),scopeIds));
  if(!selected.every(element=>element.qualifiedName))throw Error('Native view exposures require qualified identities');
  const references=(proposal.references??[]).map(ref=>allowed(resolve(ref),scopeIds).id),claims=groundClaims(proposal,graph,resolve,scopeIds);
+ for(const binding of proposal.narrative.bindings)allowed(resolve(binding.symbol),scopeIds);
+ const sourceDocuments=documentsFor(project),sourceModelDocuments=sourceDocuments.filter(document=>project.manifest.modelSources.includes(document.name)),originalViewSources=[...project.manifest.viewSources];
  const candidate=structuredClone(project),scenes=parseStory(fileText(candidate,candidate.manifest.story)),names=new Set(graph.elements.map(element=>element.qualifiedName));let number=scenes.length+1;
  while(scenes.some(scene=>scene.id==='authored-'+number)||names.has('CanvasAuthored'+number))number++;
  const packageName='CanvasAuthored'+number,source=nativeViewDefinitionSource({packageName,qualifiedNames:selected.map(element=>element.qualifiedName),definition:proposal.view.definition,kinds:proposal.view.kinds??[]}),filename='views/authored-proposals.sysml',viewName=packageName+'::slide';
+ if(Object.hasOwn(candidate.files,filename)&&!candidate.manifest.viewSources.includes(filename))throw Error('Authoring output must be a new or already presentation-owned view file');
  candidate.files[filename]=(Object.hasOwn(candidate.files,filename)?fileText(candidate,filename)+'\n':'')+source;if(!candidate.manifest.viewSources.includes(filename))candidate.manifest.viewSources.push(filename);
+ const expectedViews=originalViewSources.includes(filename)?originalViewSources:[...originalViewSources,filename];
+ const unchangedModel=()=>JSON.stringify(candidate.manifest.modelSources)===JSON.stringify(sourceModelDocuments.map(document=>document.name))&&JSON.stringify(project.manifest.modelSources)===JSON.stringify(sourceModelDocuments.map(document=>document.name))&&JSON.stringify(candidate.manifest.viewSources)===JSON.stringify(expectedViews)&&JSON.stringify(project.manifest.viewSources)===JSON.stringify(originalViewSources)&&sourceDocuments.every(document=>fileText(project,document.name)===document.content&&fileText(candidate,document.name)===(document.name===filename?document.content+'\n'+source:document.content));
+ if(!unchangedModel())throw Error('Closed view authoring cannot alter model sources');
  const parsed=await engine.call('ParseSources',{documents:documentsFor(candidate)}),diagnostics=parsed.diagnostics??[];
  if(diagnostics.some(d=>String(d.severity).toLowerCase().includes('error')||d.code==='nonstandard-notation'))throw Error('Native authored view is invalid: '+diagnostics.map(d=>d.message).join('; '));
  if(!parsed.modelHash)throw Error('Native authored model has no identity');
@@ -194,12 +200,20 @@ export async function prepareAuthoringProposal(project,{proposal,graph,engine,sc
  const wanted=[...new Set(selected.map(element=>element.id))].sort();
  if((proposal.view.membership??'exact')==='exact'&&JSON.stringify([...represented].sort())!==JSON.stringify(wanted))throw Error('Native authored membership differs from the requested exact selection; review native membership explicitly instead');
  if(!represented.includes(focus.id))throw Error('The proposed focus is not represented by the native authored view');
- const fresh=await engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'}),freshGraph=modelGraph(fresh.elements,[nativeView]);
- const narrative=await resolveNarrative(proposal.narrative,{engine,modelHash:parsed.modelHash,graph:freshGraph,scopeIds});
+ // This generator is a closed view-only extension: it can append only a
+ // definition/usage with quoted, already resolved references and native type
+ // filters. It cannot edit system declarations or inject arbitrary SysML.
+ // Reuse those loaded native identities/docs rather than exporting the whole
+ // candidate graph (a full Blue Dog export can exhaust WASM's 4GiB space).
+ // Every value still comes from the freshly parsed candidate model below.
+ if(!unchangedModel())throw Error('Model sources changed while validating the view proposal');
+ const sourceGraphReuse={kind:'closed-view-extension',modelSources:sourceModelDocuments.map(document=>document.name),sourceDocuments:sourceDocuments.map(document=>document.name),viewSource:filename,view:viewName};
+ const narrative=await resolveNarrative(proposal.narrative,{engine,modelHash:parsed.modelHash,graph,scopeIds});
  const scene={type:'scene',id:'authored-'+number,title:proposal.title,question:proposal.question,view:viewName,focus:focus.qualifiedName,panel:{placement:'right'},allowDisconnected:true,markdown:narrative.markdown,narrative:proposal.narrative,authoring:{schemaVersion:AUTHORING_SCHEMA,status:'unverified-author-draft',references,relationshipClaims:claims}};
- appendScene(candidate,scene);validateProject(candidate);validateStoryContent([scene],{resolve:ref=>{try{return resolver(freshGraph)(ref).id;}catch{return undefined;}}});
- const review={source,viewName,selected:wanted,represented,added:represented.filter(id=>!wanted.includes(id)),omitted:wanted.filter(id=>!represented.includes(id)),values:narrative.values,references,relationshipClaims:claims,notices:nativeView.notices??[],narrativeStatus:'Unverified author draft. Native references, typed values and structured relationship claims are checked; prose truth and engineering acceptance are not established.'};
- return {project:candidate,scene,sceneIndex:scenes.length,nativeView,source,viewName,proposal,review,modelHash:parsed.modelHash};
+ if(!unchangedModel())throw Error('Model sources changed while resolving the view narrative');
+ appendScene(candidate,scene);validateProject(candidate);validateStoryContent([scene],{resolve:ref=>{try{return resolver(graph)(ref).id;}catch{return undefined;}}});
+ const review={source,viewName,sourceGraphReuse,selected:wanted,represented,added:represented.filter(id=>!wanted.includes(id)),omitted:wanted.filter(id=>!represented.includes(id)),values:narrative.values,references,relationshipClaims:claims,notices:nativeView.notices??[],narrativeStatus:'Unverified author draft. Native references, typed values and structured relationship claims are checked; prose truth and engineering acceptance are not established.'};
+ return {project:candidate,scene,sceneIndex:scenes.length,nativeView,source,viewName,proposal,review,modelHash:parsed.modelHash,sourceGraphReuse};
 }
 /** Catalog views are needed only where no actual native relationship ID exists.
  * Native IDs survive disposable runtime/helper names. Ad-hoc # views are rendered

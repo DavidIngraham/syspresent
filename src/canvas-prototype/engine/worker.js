@@ -1,5 +1,5 @@
 /* OpenSysML Go runs here: semantic requests never block the canvas thread. */
-let engineReady;
+let engineReady, invocationFailure;
 
 async function initialize({ assetBase, assetVersion }) {
   if (engineReady) return engineReady;
@@ -26,7 +26,14 @@ async function initialize({ assetBase, assetVersion }) {
 }
 
 function invoke(method, params) {
-  const envelope = JSON.parse(globalThis.sysmlWasm.call(method, JSON.stringify(params)));
+  if (invocationFailure) throw invocationFailure;
+  const raw = globalThis.sysmlWasm.call(method, JSON.stringify(params));
+  if (typeof raw !== 'string') {
+    invocationFailure = new Error('The native semantic engine returned no response for ' + method + '. This worker is no longer usable; reload the app before trying again.');
+    invocationFailure.code = 'NATIVE_NO_RESPONSE';
+    throw invocationFailure;
+  }
+  const envelope = JSON.parse(raw);
   if (envelope.error) {
     const error = new Error(envelope.error.message);
     error.code = envelope.error.code;
