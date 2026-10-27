@@ -27,7 +27,7 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `a148595ae662847965777157c2943942fd88657a`
+The prototype dependency revision is `3f59ff94414bfbd103d4dc655a8383289391feb9`
 on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
@@ -145,8 +145,8 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `a148595ae662847965777157c2943942fd88657a` (clean).
-Carried-patch SHA-256: `fce8cae9cbbdee08e7c9ba443874a8cea102f3c9c426e5a382dc58ad59adedb5`.
+Current source revision: `3f59ff94414bfbd103d4dc655a8383289391feb9` (clean).
+Carried-patch SHA-256: `06ff4d7ba0f1178b05adf875033d409e8cec202465103eee1ccdb5366407e63f`.
 
 ## Distinct parallel native relationships
 
@@ -199,3 +199,12 @@ Actual model disposal collects a material heap at the same threshold. Small call
 and desktop/native collection policy are unchanged. This work-phase budget is not
 a memory cap for a single native operation. GetMemoryStats exposes phase counts,
 collection duration, before/after heap, GC goal and exact GC settings.
+
+For address-space stability, add --stress-plateau to browser-export-memory.mjs.
+It runs at least six and at most ten uninterrupted same-worker append/ZIP-reload
+cycles, with one validation per cycle by default. Acceptance requires a late
+three-cycle window with no more than 4 MiB growth in any cycle, 16 MiB combined,
+and at least 512 MiB headroom. Worker replacement, retained-model violations and
+a 3584 MiB protective limit fail explicitly. The harness does not force GC during
+cycles; production ReleaseModel collection supplies the post-append heap sample.
+The earlier three-cycle success alone is not a plateau claim.

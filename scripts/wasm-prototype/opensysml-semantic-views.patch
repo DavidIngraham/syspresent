@@ -19,6 +19,13 @@ index 000000000..282bad7c9
 +++ b/changes/unreleased/declaration-export-memory.fixed.md
 @@ -0,0 +1 @@
 +- Bound declaration export collection storage by projecting native declaration triples before annotation and serializing one indexed collection at a time without duplicating the complete RDF grouping. Preserve native references, collection order and coverage counts.
+diff --git a/changes/unreleased/export-graph-capacity.fixed.md b/changes/unreleased/export-graph-capacity.fixed.md
+new file mode 100644
+index 000000000..1888eb76f
+--- /dev/null
++++ b/changes/unreleased/export-graph-capacity.fixed.md
+@@ -0,0 +1 @@
++- Size merged and root-namespace RDF storage from every emitted provenance and ownership record, and size declaration projections from retained triples, avoiding repeated full-graph buffer growth without changing native objects or ordering.
 diff --git a/changes/unreleased/focused-browser-model-context.added.md b/changes/unreleased/focused-browser-model-context.added.md
 new file mode 100644
 index 000000000..c21ddced6
@@ -3346,10 +3353,10 @@ index db46760ca..1d13ced44 100644
  	}
 diff --git a/internal/translate/export/api_json_projection.go b/internal/translate/export/api_json_projection.go
 new file mode 100644
-index 000000000..63e0cedde
+index 000000000..1837af79c
 --- /dev/null
 +++ b/internal/translate/export/api_json_projection.go
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,150 @@
 +package export
 +
 +import (
@@ -3482,7 +3489,13 @@ index 000000000..63e0cedde
 +			selected[subject] = true
 +		}
 +	}
-+	triples := make([]rdf.Triple, 0, len(selected)*12)
++	count := 0
++	for _, triple := range graph.Triples() {
++		if selected[triple.Subject] {
++			count++
++		}
++	}
++	triples := make([]rdf.Triple, 0, count)
 +	for _, triple := range graph.Triples() {
 +		if selected[triple.Subject] {
 +			triples = append(triples, triple)
@@ -3810,6 +3823,129 @@ index 000000000..961fbdbea
 +		t.Fatalf("referenced identities or coverage changed: counts %+v want %+v; got %s want %s", counts, wantCounts, got, want)
 +	}
 +}
+diff --git a/internal/translate/export/buffer_capacity_test.go b/internal/translate/export/buffer_capacity_test.go
+new file mode 100644
+index 000000000..25ffa55b9
+--- /dev/null
++++ b/internal/translate/export/buffer_capacity_test.go
+@@ -0,0 +1,117 @@
++package export
++
++import (
++	"fmt"
++	"github.com/Open-MBEE/OpenSysML/internal/syntax/parser"
++	"github.com/Open-MBEE/OpenSysML/internal/syntax/source"
++	"github.com/Open-MBEE/OpenSysML/internal/translate/rdf"
++	"testing"
++)
++
++func capacityDocuments(t *testing.T) []ModelDocument {
++	t.Helper()
++	texts := []string{
++		"package A { import External::*; part unit : Thing; } package B; package C;",
++		"package D; package E;",
++		"library package External { part def Thing; }",
++	}
++	documents := make([]ModelDocument, len(texts))
++	for i, text := range texts {
++		file := source.New(fmt.Sprintf("capacity%d.sysml", i), []byte(text))
++		p := parser.New(file)
++		documents[i] = ModelDocument{File: file, Root: p.ParseFile(), Referenced: i == 2}
++		if len(p.Diagnostics) > 0 {
++			t.Fatal(p.Diagnostics)
++		}
++	}
++	return documents
++}
++
++func TestMergedDocumentStorageDoesNotGrowForMultipleRoots(t *testing.T) {
++	docs := capacityDocuments(t)
++	_, encoders, err := prepareModelEncoders(docs, IDQualifiedName)
++	if err != nil {
++		t.Fatal(err)
++	}
++	upperBound := 0
++	for i, e := range encoders {
++		if docs[i].Referenced {
++			continue
++		}
++		if err := e.encodeDocument(docs[i].Root); err != nil {
++			t.Fatal(err)
++		}
++		upperBound += e.graph.Len()
++		for _, triple := range e.graph.Triples() {
++			if triple.Predicate.Value == rdf.OpenSysML+xSourceLanguage {
++				upperBound++
++			}
++		}
++	}
++	merged := mergeDocumentGraphs(encoders, docs)
++	if cap(merged.Triples()) > upperBound {
++		t.Fatalf("merged graph grew beyond its complete %d-triple input bound: len=%d cap=%d", upperBound, merged.Len(), cap(merged.Triples()))
++	}
++	for _, root := range unownedElements(merged) {
++		if _, ok := merged.Lexical(root, rdf.OpenSysML+xSourceDocument); !ok {
++			t.Fatalf("native root lost document provenance: %s", root)
++		}
++	}
++}
++
++func TestRootNamespaceStorageDoesNotGrowForMultipleRoots(t *testing.T) {
++	for _, count := range []int{1, 2, 8} {
++		t.Run(fmt.Sprint(count), func(t *testing.T) {
++			docs := capacityDocuments(t)
++			if count == 1 {
++				docs = docs[:1]
++				file := source.New("single.sysml", []byte("package A;"))
++				docs[0] = ModelDocument{File: file, Root: parser.New(file).ParseFile()}
++			}
++			graph, err := ModelToRDFWith(docs, IDQualifiedName)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if count == 8 {
++				for i := 0; i < 8; i++ {
++					subject := rdf.ElementIRIForID(fmt.Sprintf("extra%d", i))
++					graph.Add(subject, rdf.IRI(rdf.RDFType), rdf.SysMLTerm("Package"))
++					graph.Add(subject, rdf.SysMLTerm(pElementID), rdf.String(fmt.Sprintf("extra%d", i)))
++				}
++			}
++			roots := unownedElements(graph)
++			wrappers := rootWrappers(graph, roots)
++			upperBound := graph.Len() + 15*len(roots) + 2*len(wrappers)
++			for _, wrapper := range wrappers {
++				if len(wrapper.roots) > 1 {
++					upperBound += 3
++				}
++			}
++			wrapped, err := withRootNamespace(graph)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if cap(wrapped.Triples()) > upperBound {
++				t.Fatalf("wrapping grew beyond its complete %d-triple bound: len=%d cap=%d roots=%d documents=%d", upperBound, wrapped.Len(), cap(wrapped.Triples()), len(roots), len(wrappers))
++			}
++		})
++	}
++}
++
++func TestDeclarationProjectionStorageDoesNotGrowForDenseDeclarations(t *testing.T) {
++	graph := rdf.NewGraph()
++	subject := rdf.ElementIRIForID("dense")
++	graph.Add(subject, rdf.OpenSysMLTerm(xSourceLine), rdf.Int(1))
++	for i := 0; i < 80; i++ {
++		graph.Add(subject, rdf.SysMLTerm(fmt.Sprintf("role%d", i)), rdf.String(fmt.Sprint(i)))
++	}
++	omitted := rdf.ElementIRIForID("omitted")
++	graph.Add(omitted, rdf.SysMLTerm("name"), rdf.String("infrastructure"))
++	projected := declarationGraph(graph)
++	if projected.Len() != 81 {
++		t.Fatalf("declaration triples lost: %d", projected.Len())
++	}
++	if cap(projected.Triples()) > projected.Len() {
++		t.Fatalf("projection grew beyond exact retained triple count: len=%d cap=%d", projected.Len(), cap(projected.Triples()))
++	}
++}
 diff --git a/internal/translate/export/element_ids.go b/internal/translate/export/element_ids.go
 index 93ce34c4c..73d20b1ed 100644
 --- a/internal/translate/export/element_ids.go
@@ -3865,7 +4001,7 @@ index 93ce34c4c..73d20b1ed 100644
 +	return ids, nil
 +}
 diff --git a/internal/translate/export/rdf_out.go b/internal/translate/export/rdf_out.go
-index 45ad33d59..df1cbc7cd 100644
+index 45ad33d59..03ebdd06b 100644
 --- a/internal/translate/export/rdf_out.go
 +++ b/internal/translate/export/rdf_out.go
 @@ -2,6 +2,7 @@ package export
@@ -4002,7 +4138,23 @@ index 45ad33d59..df1cbc7cd 100644
  }
  
  // mergeDocumentGraphs is the written documents' graphs as one (a Referenced
-@@ -478,20 +522,41 @@ func encodeDocument(file *source.SourceFile, root *ast.RootNamespace, library st
+@@ -408,9 +452,14 @@ func mergeDocumentGraphs(encoders []*encoder, documents []ModelDocument) *rdf.Gr
+ 			stated[subject]++
+ 		}
+ 		total += e.graph.Len()
++		for _, triple := range e.graph.Triples() {
++			if triple.Predicate.Value == rdf.OpenSysML+xSourceLanguage {
++				total++
++			}
++		}
+ 	}
+ 	prefixes := map[string]string{}
+-	triples := make([]rdf.Triple, 0, total+len(encoders))
++	triples := make([]rdf.Triple, 0, total)
+ 	seen := map[rdf.Triple]bool{} // the triples of subjects more than one document states
+ 	add := func(t rdf.Triple) {
+ 		if stated[t.Subject] > 1 {
+@@ -478,20 +527,41 @@ func encodeDocument(file *source.SourceFile, root *ast.RootNamespace, library st
  
  // encodeDocument writes the graph of the document the encoder was made for.
  func (e *encoder) encodeDocument(root *ast.RootNamespace) error {
@@ -4044,6 +4196,25 @@ index 45ad33d59..df1cbc7cd 100644
  	return nil
  }
  
+diff --git a/internal/translate/export/root_namespace.go b/internal/translate/export/root_namespace.go
+index 4832c3620..64c825969 100644
+--- a/internal/translate/export/root_namespace.go
++++ b/internal/translate/export/root_namespace.go
+@@ -42,7 +42,13 @@ func withRootNamespace(graph *rdf.Graph) (*rdf.Graph, error) {
+ 	// and one the source stated earlier is not inserted again. Every inserted
+ 	// triple is about a namespace, a membership or a root, so only the source
+ 	// triples about those are remembered.
+-	triples := make([]rdf.Triple, 0, graph.Len()+8*len(roots)+8*len(wrappers))
++	capacity := graph.Len() + 15*len(roots) + 2*len(wrappers)
++	for _, wrapper := range wrappers {
++		if len(wrapper.roots) > 1 {
++			capacity += 3
++		}
++	}
++	triples := make([]rdf.Triple, 0, capacity)
+ 	placed := map[rdf.Triple]bool{}
+ 	wrapperSubjects := map[rdf.Term]bool{}
+ 	type rootPlace struct {
 diff --git a/internal/translate/rdf/annotation.go b/internal/translate/rdf/annotation.go
 index 1da840a65..ded7b21d4 100644
 --- a/internal/translate/rdf/annotation.go

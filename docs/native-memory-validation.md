@@ -112,7 +112,77 @@ collection's method, allocation, before/after heap and duration, plus the GC goa
 and exact GOGC/soft-limit settings.
 
 The final carried native source is clean
-a148595ae662847965777157c2943942fd88657a. Native lifecycle and actual js/WASM
+3f59ff94414bfbd103d4dc655a8383289391feb9. Native lifecycle and actual js/WASM
 allocation tests preserve reachable data and verify query skips. Independent
 read-only review found no remaining concrete correctness issue in the exporter,
 phase collection or app ownership changes.
+
+The projected candidate graph contains 436,684 RDF triples for 16,634 returned
+subjects. The largest measured per-document graph was inland-obligations.sysml:
+222,770 annotated triples and 19,384 subjects. These include native membership,
+metadata and normative infrastructure; they are not runtime instances. This
+expanded representation and its temporary indexes explain why source-file bytes
+are not a useful estimate of compiler/export working memory.
+
+Final browser diagnostics report GOGC 100 and the default maximum soft-limit
+setting. No GC-off override or browser callback root leak was found. The exact
+browser/Node pacing difference remains unresolved; the fix addresses the measured
+object lifetimes without depending on a claim about that cause.
+
+## Remaining limits
+
+The phase threshold is not a universal heap cap, and a larger single operation
+can still exceed WASM32's address space. Released arenas remain in the linear
+buffer and can be reused. Stable retained-model count and post-GC heap must not
+be described as a flat buffer or a physical RAM measurement.
+
+Large edited-model discovery and runtime indexing still perform full native
+declaration exports, measured around 30–40 seconds each in the browser runs.
+This change does not claim incremental compilation or mobile editing performance.
+Physical Safari remains untested. Downloaded native corpus roots are absent, so
+their corpus gate skips; the complete native suite and its earlier unresolved
+baseline comparisons are separate from the passing scoped contracts.
+
+## Large-buffer allocation correction and extended stress
+
+The first phase-collection build passed three append/reload cycles but its
+linear buffer grew from 1,552 to 2,436 to 2,772 MiB at successive high-water
+checkpoints. Post-append allocated heap stayed near 240 MB with one model.
+That distinguishes successful flows and bounded model retention from a demonstrated
+address-space plateau.
+
+The growth trace contained repeated 88–92 MiB export allocations. Source review
+found two exact capacity underestimates: merged provenance reserves one triple per
+document but emits one per source-language root (131 roots across 99 documents);
+root wrapping reserves eight triples per root while ownership emission can add
+fifteen, plus namespace facts and ordered-collection annotations. Both can force
+a complete large graph slice to grow. Dense declaration projection also reserved
+twelve triples per declaration although actual records average more than twenty-six.
+
+The corrected native buffers reserve the complete emitted upper bound or count
+the actual retained triples before allocation. Emission loops, deduplication,
+order, identities and references remain unchanged. Fail-first capacity tests
+cover multi-root, imported/referenced and dense declarations. Runtime API JSON
+remains byte-identical at 26,200,164 bytes, SHA-256
+8a7e74cc1e0507c6b6ec2d4cd6f3b698a64765f31131816ae78b3014e88120d2,
+17,269 declarations and 173,739 disclosed omissions. Candidate JSON remains
+identical to the earlier comparison.
+
+| Capacity-fix native measurement | Runtime before / after | Candidate before / after |
+| --- | ---: | ---: |
+| Sampled acquired arenas | 808.42 / 695.14 MB | 762.28 / 669.94 MB |
+| Maximum sampled allocated heap | 683.50 / 582.65 MB | 668.15 / 581.85 MB |
+
+Each export allocates approximately 263–270 MB less cumulatively. This is
+additional native evidence, not a browser plateau claim. Exact output/source
+digests and stage traces are recorded in build/memory-capacity-comparison.json
+and the native build/export-memory/capacity-comparison.json.
+
+The browser harness now requires at least six and at most ten uninterrupted
+same-worker append/reload cycles. Its late three-cycle window permits no more
+than 4 MiB growth per cycle or 16 MiB combined, with at least 512 MiB remaining.
+It rejects worker changes, missing/inconsistent measurements, excessive model
+retention and a 3584 MiB protective limit. Eight policy regressions cover these
+conditions, including growth between cycle baselines. No harness collection is
+permitted during accepted cycles. Only production request/release collection
+provides their heap samples.
