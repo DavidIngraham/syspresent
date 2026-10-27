@@ -14,6 +14,7 @@ test('native canonical parameter identity remains distinct from disposable glyph
  const output=pins.find(node=>node.semanticId==='parameter-out'),input=pins.find(node=>node.semanticId==='parameter-in');
  assert.equal(output.nativePortId,'a.out');assert.equal(input.nativePortId,'b.in');
  assert.notEqual(output.id,output.semanticId);assert.notEqual(output.id,output.nativePortId);
+ assert.equal(output.portSide,'EAST');assert.equal(input.portSide,'WEST');
  assert.equal(output.identityStatus,'mapped');assert.equal(output.qualifiedName,'Model::A::out');
  assert.equal(drawing.edges[0].sourceAttachment,output.id);assert.equal(drawing.edges[0].targetAttachment,input.id);
  assert.equal(drawing.edges[0].semanticId,'flow-native');

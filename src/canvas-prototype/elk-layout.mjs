@@ -26,7 +26,7 @@ function projectEmbeddedPorts(view){
   const key=JSON.stringify([owner.id,port.id]);if(attachments.has(key))throw Error('Duplicate native port on '+owner.id+': '+port.id);
   let id='syspresent-native-port:'+key;while(usedIDs.has(id))id+=':';usedIDs.add(id);attachments.set(key,id);
   const name=port.nameSynthesized?'':port.name??'',label=port.type?name+' : '+port.type:name;
-  nodes.push({id,kind:'port',name,label,parentId:owner.id,width:12,height:12,semanticId:port.semanticId??null,identityStatus:port.semanticId?(port.identityStatus??'native'):'modeled-pin',qualifiedName:port.qualifiedName,nativePortId:port.id,nativePort:structuredClone(port),direction:port.direction,parameter:port.parameter,origin:structuredClone(port.origin??null)});
+  nodes.push({id,kind:'port',name,label,parentId:owner.id,width:12,height:12,semanticId:port.semanticId??null,identityStatus:port.semanticId?(port.identityStatus??'native'):'modeled-pin',qualifiedName:port.qualifiedName,nativePortId:port.id,nativePort:structuredClone(port),portSide:port.portSide??port.side,direction:port.direction,parameter:port.parameter,origin:structuredClone(port.origin??null)});
  }
  const edges=view.edges.map(edge=>{
   const result={...edge};for(const [endpoint,field,attachment]of [['source','fromPort','sourceAttachment'],['target','toPort','targetAttachment']]){
@@ -72,7 +72,8 @@ function makeGraph(view,options,profile){
  }};
  for(const native of view.nodes.filter(n=>actualPorts.has(n.id))){
   const owner=elkNodes.get(native.parentId),incoming=view.edges.find(e=>(e.sourceAttachment??e.source)===native.id||(e.targetAttachment??e.target)===native.id),specified=String(native.portSide??native.side??'').toUpperCase();
-  const side=['NORTH','SOUTH','EAST','WEST'].includes(specified)?specified:(incoming?.sourceAttachment??incoming?.source)===native.id?'SOUTH':'NORTH';
+  const parameterSide=native.parameter===true?({in:'WEST',out:'EAST',inout:'EAST'})[native.direction]:undefined;
+  const side=['NORTH','SOUTH','EAST','WEST'].includes(specified)?specified:parameterSide??((incoming?.sourceAttachment??incoming?.source)===native.id?'SOUTH':'NORTH');
   const text=native.label??native.name,label=text?(options.measureLabel?.(text)??{width:String(text).length*6.5,height:16}):null;
   owner.ports.push({id:native.id,width:num(native.width,12),height:num(native.height,12),...(label?{labels:[{id:native.id+':port-label',text,width:num(label.width,1),height:num(label.height,16)}]}:{}),layoutOptions:{'elk.port.side':side,'elk.port.borderOffset':String(-Math.min(num(native.width,12),num(native.height,12))/2)}});
   anchors.set(native.id,{identityStatus:native.semanticId?'actual-model-port':'modeled-pin',semanticId:native.semanticId??null,representationId:native.id,ownerId:native.parentId,...(native.nativePortId?{nativePortId:native.nativePortId,nativePort:structuredClone(native.nativePort)}:{})});

@@ -1,3 +1,4 @@
+import {placePortLabels} from './port-labels.mjs';
 import {focusedFace,measureFocusedNode,focusedEdgeAppearance,focusedNotationNotices} from './focused-notation.mjs';
 import {placeEndpointLabels} from './endpoint-labels.mjs';
 import {layoutDiagram} from './elk-layout.mjs';
@@ -30,13 +31,14 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
   const doc=host.ownerDocument,ns='http://www.w3.org/2000/svg';
   const svg=(name,attrs={})=>{const node=doc.createElementNS(ns,name);for(const [k,v]of Object.entries(attrs))node.setAttribute(k,v);return node;};
   const width=host.clientWidth||480,height=host.clientHeight||400;
-  const renderedView=renderingMode==='focused'?{...view,nodes:view.nodes.map(node=>node.focusedDescriptor?{...node}:{...node,...measureFocusedNode(doc,node,graph)}),edges:view.edges.map(edge=>{
+  const renderedView=renderingMode==='focused'?{...view,nodes:view.nodes.map(node=>node.focusedDescriptor?{...node}:{...node,...measureFocusedNode(doc,node,graph,{view})}),edges:view.edges.map(edge=>{
     const appearance=focusedEdgeAppearance(edge,{viewKind:view.kind,graph,view}),{endLabels:oldLabels,...native}=edge;
     return {...native,label:appearance.label,...(appearance.endLabels?{endLabels:appearance.endLabels}:{})};
   })}:view;
   const layout=await layoutDiagram(renderedView,{width,height,elk,measureLabel}),automatic=fitDiagram(layout,{x:0,y:0,width,height});
-  const endpoints=renderingMode==='focused'?placeEndpointLabels(automatic.edges,automatic.nodes,{measureLabel,area:{x:0,y:0,width,height}}):{edges:automatic.edges,omissions:[]};
-  const fitted={...automatic,edges:endpoints.edges};
+  const portPlacement=placePortLabels(automatic.nodes,automatic.edges,{area:{x:0,y:0,width,height},scale:automatic.scale,measureLabel});
+  const endpoints=renderingMode==='focused'?placeEndpointLabels(automatic.edges,portPlacement.nodes,{measureLabel,area:{x:0,y:0,width,height}}):{edges:automatic.edges,omissions:[]};
+  const fitted={...automatic,nodes:portPlacement.nodes,edges:endpoints.edges};
   const viewport=doc.createElement('div');viewport.className='region-graph';viewport.tabIndex=0;viewport.setAttribute('aria-label',view.title||'Model graph');
   const world=doc.createElement('div');world.className='region-world';viewport.append(world);
   const drawing=svg('svg',{width,height,'aria-label':'Model relationships'}),defs=svg('defs'),prefix='region-'+(++serial)+'-';
@@ -44,7 +46,7 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
     const {path,fill,adornments=[],...attrs}=markerDefinition(name),marker=svg('marker',{...attrs,id:prefix+name,markerUnits:'userSpaceOnUse'});
     for(const shape of [{path,fill},...adornments])marker.append(svg('path',{d:shape.path,fill:shape.fill==='line'?'#426869':shape.fill==='background'?'#fff':'none',stroke:'#426869'}));defs.append(marker);
   }
-  drawing.append(defs);world.append(drawing);const targets=[],edgeTargets=[],notices=[...(renderingMode==='focused'?focusedNotationNotices(renderedView,graph):[]),...(view.notices??[]),...(layout.diagnostics??[]).map(d=>d.message||d.reason),...endpoints.omissions];
+  drawing.append(defs);world.append(drawing);const targets=[],edgeTargets=[],notices=[...(renderingMode==='focused'?focusedNotationNotices(renderedView,graph):[]),...(view.notices??[]),...(layout.diagnostics??[]).map(d=>d.message||d.reason),...endpoints.omissions,...portPlacement.omissions];
   for(const edge of fitted.edges){
     const appearance=(renderingMode==='focused'?focusedEdgeAppearance:edgeAppearance)(edge,{viewKind:view.kind,graph,view:renderedView}),a=fitted.nodes.find(n=>n.id===edge.source),b=fitted.nodes.find(n=>n.id===edge.target);
     if(appearance.notice&&!notices.some(item=>(typeof item==='string'?item:item.message)===appearance.notice))notices.push(appearance.notice);
@@ -64,8 +66,10 @@ export async function mountGraphRegion(host,view,{onSelect,onExplore,selectedId,
   for(const n of fitted.nodes){
     const node=doc.createElement('button');node.className=`node ${n.kind}${n.container?' container':''}`;node.dataset.semanticId=n.semanticId??'';
     const scale=fitted.scale||1;node.style.cssText=`left:${n.x}px;top:${n.y}px;width:${n.width/scale}px;height:${n.height/scale}px;transform:scale(${scale});z-index:${n.container?1:3}`;
-    const face=renderingMode==='focused'?focusedFace(doc,n,graph):behaviorFace(doc,n);
+    let face=renderingMode==='focused'?focusedFace(doc,n,graph,{view:renderedView}):behaviorFace(doc,n);
+    if(n.kind==='port'){node.title=n.portLabelText??n.label??n.name??'';node.setAttribute('aria-label',node.title+': select port');if(!face){face=doc.createElement('span');face.className='node-face';const label=doc.createElement('span');label.className='port-name';label.textContent=n.portLabelText??n.label??n.name??'';face.append(label);}if(n.portLabelOmitted)face.querySelector('.port-name')?.remove();}
     if(face)node.append(face);else{for(const [cls,text]of [['kind',`«${n.kind}»`],['name',n.name],['detail',n.displayDetail]])if(text){const span=doc.createElement('span');span.className=cls;span.textContent=text;node.append(span);}}
+    const pinLabel=node.querySelector('.port-name'),pinBox=n.portLabelBox;if(pinLabel&&pinBox){pinLabel.style.left=(pinBox.x-n.x)/scale+'px';pinLabel.style.top=(pinBox.y-n.y)/scale+'px';pinLabel.style.width=pinBox.width/scale+'px';pinLabel.style.height=pinBox.height/scale+'px';}
     node.onclick=e=>{e.stopPropagation();select(n.semanticId);changed();onSelect?.({semanticId:n.semanticId,name:n.name,label:n.name,kind:'element'});};world.append(node);targets.push({node,n});
   }
   host.replaceChildren(viewport);if(notices.length){const details=doc.createElement('details');details.className='region-notices';const summary=doc.createElement('summary');summary.textContent=`View notices (${notices.length})`;details.append(summary);for(const notice of notices){const p=doc.createElement('p');p.textContent=typeof notice==='string'?notice:JSON.stringify(notice);details.append(p);}host.append(details);}let camera=createCamera(state.camera),selected=selectedId,selectedIds=sharedIds??state.selectedIds??[selectedId].filter(Boolean);
