@@ -274,6 +274,288 @@ var require_elk_api = __commonJS({
   }
 });
 
+// src/canvas-prototype/loading-progress.mjs
+function createLoadingProgress(document2, {
+  delayMs = 150,
+  longRunningMs = 1e4,
+  clock = () => document2.defaultView.performance?.now?.() ?? Date.now(),
+  schedule = (callback, delay) => document2.defaultView.setTimeout(callback, delay),
+  unschedule = (id) => document2.defaultView.clearTimeout(id)
+} = {}) {
+  const element2 = (id) => document2.getElementById(id);
+  const host = element2("loading"), title = element2("loading-title"), phase = element2("loading-phase");
+  const bar = element2("loading-progress"), detail = element2("loading-detail"), count = element2("loading-count");
+  const elapsed = element2("loading-elapsed"), errorText = element2("loading-error");
+  const retry = element2("loading-retry"), cancelButton = element2("loading-cancel");
+  if ([host, title, phase, bar, detail, count, elapsed, errorText, retry, cancelButton].some((item) => !item)) throw Error("Loading feedback markup is incomplete");
+  const placeholder = document2.createComment("loading feedback home");
+  host.before(placeholder);
+  let current = null, showTimer, elapsedTimer, disposed = false;
+  const accepts2 = (token) => !disposed && current !== null && Object.is(current.token, token);
+  const clearTimers = () => {
+    if (showTimer !== void 0) unschedule(showTimer);
+    if (elapsedTimer !== void 0) unschedule(elapsedTimer);
+    showTimer = elapsedTimer = void 0;
+  };
+  const restoreHome = () => {
+    if (placeholder.parentNode && host.previousSibling !== placeholder) placeholder.after(host);
+  };
+  const place = () => {
+    if (!current) return restoreHome();
+    const dialogs = [...document2.querySelectorAll("dialog[open]")];
+    const target = dialogs.at(-1);
+    if (target && !host.contains(target)) {
+      if (host.parentNode !== target) target.append(host);
+    } else restoreHome();
+  };
+  const observer = document2.defaultView.MutationObserver ? new document2.defaultView.MutationObserver(place) : null;
+  for (const dialog of document2.querySelectorAll("dialog")) observer?.observe(dialog, { attributes: true, attributeFilter: ["open"] });
+  const closed = () => place();
+  document2.addEventListener("close", closed, true);
+  const reveal = (token) => {
+    if (accepts2(token)) {
+      place();
+      host.hidden = false;
+    }
+  };
+  function scheduleElapsed(token) {
+    if (elapsedTimer !== void 0) unschedule(elapsedTimer);
+    if (!accepts2(token) || current.state !== "loading") return;
+    const elapsedMs = Math.max(0, clock() - current.stageStarted);
+    if (elapsedMs >= longRunningMs) {
+      elapsed.textContent = `This stage is still running (${Math.floor(elapsedMs / 1e3)} seconds).`;
+      elapsed.hidden = false;
+    } else {
+      elapsed.hidden = true;
+      elapsed.textContent = "";
+    }
+    elapsedTimer = schedule(() => scheduleElapsed(token), elapsedMs < longRunningMs ? Math.max(1, longRunningMs - elapsedMs) : 1e3);
+  }
+  function stageProgress(event) {
+    bar.hidden = false;
+    const measured = Number.isFinite(event.completed) && event.completed >= 0 && Number.isFinite(event.total) && event.total > 0 && event.completed <= event.total;
+    if (measured) {
+      bar.max = event.total;
+      bar.value = event.completed;
+      const unit = event.unit || "items";
+      const format = (value) => unit === "bytes" ? formatBytes(value) : String(value);
+      count.textContent = unit === "bytes" ? `${format(event.completed)} of ${format(event.total)}` : `${format(event.completed)} of ${format(event.total)} ${unit}`;
+      count.hidden = false;
+      bar.setAttribute("aria-valuetext", count.textContent);
+    } else {
+      bar.removeAttribute("value");
+      bar.removeAttribute("aria-valuetext");
+      count.hidden = true;
+      count.textContent = "";
+      if (Number.isFinite(event.completed) && event.completed >= 0) {
+        count.textContent = event.unit === "bytes" ? `${formatBytes(event.completed)} received; total size unavailable` : `${event.completed} ${event.unit || "items"} completed; total work unavailable`;
+        count.hidden = false;
+      }
+    }
+    bar.setAttribute("aria-label", `${phase.textContent || "Loading"} \u2014 current stage`);
+  }
+  function begin(token, options = {}) {
+    if (disposed) return false;
+    clearTimers();
+    current = { token, state: "loading", stage: options.stage || "opening", stageStarted: clock(), started: clock(), options, retrying: false };
+    host.hidden = true;
+    host.dataset.state = "loading";
+    host.setAttribute("aria-busy", "true");
+    title.textContent = "Opening model";
+    phase.textContent = options.label || "Preparing the model\u2026";
+    detail.textContent = options.detail || "";
+    detail.hidden = !detail.textContent;
+    elapsed.hidden = true;
+    errorText.hidden = true;
+    errorText.textContent = "";
+    retry.hidden = true;
+    retry.disabled = false;
+    cancelButton.hidden = typeof options.onCancel !== "function";
+    cancelButton.disabled = false;
+    cancelButton.textContent = "Cancel loading";
+    stageProgress({});
+    place();
+    showTimer = schedule(() => reveal(token), Math.max(0, delayMs));
+    scheduleElapsed(token);
+    return true;
+  }
+  function update(token, event = {}) {
+    if (!accepts2(token) || current.state !== "loading") return false;
+    if (event.stage && event.stage !== current.stage) {
+      current.stage = event.stage;
+      current.stageStarted = clock();
+    }
+    if (event.label) phase.textContent = event.label;
+    detail.textContent = event.detail || "";
+    detail.hidden = !detail.textContent;
+    stageProgress(event);
+    scheduleElapsed(token);
+    if (clock() - current.started >= delayMs) reveal(token);
+    return true;
+  }
+  function finish(token) {
+    if (!accepts2(token)) return false;
+    clearTimers();
+    current = null;
+    host.hidden = true;
+    host.dataset.state = "idle";
+    host.setAttribute("aria-busy", "false");
+    bar.removeAttribute("value");
+    bar.removeAttribute("aria-valuetext");
+    restoreHome();
+    return true;
+  }
+  function fail2(token, error) {
+    if (!accepts2(token)) return false;
+    clearTimers();
+    current.state = "error";
+    current.retrying = false;
+    host.dataset.state = "error";
+    host.setAttribute("aria-busy", "false");
+    title.textContent = "Model could not be opened";
+    phase.textContent = "Loading stopped";
+    bar.hidden = true;
+    bar.removeAttribute("value");
+    bar.removeAttribute("aria-valuetext");
+    count.hidden = detail.hidden = elapsed.hidden = true;
+    errorText.textContent = error?.message || String(error || "The model could not be loaded.");
+    errorText.hidden = false;
+    retry.hidden = typeof current.options.onRetry !== "function";
+    retry.disabled = false;
+    cancelButton.hidden = typeof current.options.onCancel !== "function";
+    cancelButton.disabled = false;
+    cancelButton.textContent = "Close loading message";
+    reveal(token);
+    return true;
+  }
+  const retryClicked = () => {
+    const operation = current;
+    if (!operation || operation.state !== "error" || operation.retrying || typeof operation.options.onRetry !== "function") return;
+    operation.retrying = true;
+    retry.disabled = true;
+    Promise.resolve().then(() => current === operation ? operation.options.onRetry(operation.token) : void 0).catch((error) => {
+      if (current === operation) fail2(operation.token, error);
+    });
+  };
+  const cancelClicked = () => {
+    const operation = current;
+    if (!operation || cancelButton.disabled || typeof operation.options.onCancel !== "function") return;
+    cancelButton.disabled = true;
+    finish(operation.token);
+    operation.options.onCancel(operation.token);
+  };
+  retry.addEventListener("click", retryClicked);
+  cancelButton.addEventListener("click", cancelClicked);
+  return {
+    begin,
+    update,
+    finish,
+    fail: fail2,
+    cancel: finish,
+    get token() {
+      return current?.token;
+    },
+    dispose() {
+      if (disposed) return;
+      if (current) finish(current.token);
+      disposed = true;
+      clearTimers();
+      observer?.disconnect();
+      document2.removeEventListener("close", closed, true);
+      retry.removeEventListener("click", retryClicked);
+      cancelButton.removeEventListener("click", cancelClicked);
+      restoreHome();
+      placeholder.remove();
+    }
+  };
+}
+function formatBytes(value) {
+  if (value < 1024) return `${Math.floor(value)} B`;
+  const divisor = value < 1024 * 1024 ? 1024 : 1024 * 1024;
+  return `${(value / divisor).toFixed(1)} ${divisor === 1024 ? "KiB" : "MiB"}`;
+}
+function yieldLoadingPaint({ window: window2 = globalThis.window || globalThis } = {}) {
+  return new Promise((resolve2) => {
+    if (typeof window2.requestAnimationFrame !== "function") return window2.setTimeout(resolve2, 0);
+    let done = false, firstFrame, secondFrame;
+    const complete = () => {
+      if (done) return;
+      done = true;
+      window2.clearTimeout(fallback);
+      if (firstFrame !== void 0) window2.cancelAnimationFrame?.(firstFrame);
+      if (secondFrame !== void 0) window2.cancelAnimationFrame?.(secondFrame);
+      resolve2();
+    };
+    const fallback = window2.setTimeout(complete, 100);
+    firstFrame = window2.requestAnimationFrame(() => {
+      secondFrame = window2.requestAnimationFrame(complete);
+    });
+  });
+}
+
+// src/canvas-prototype/loading-fetch.mjs
+async function readLoadingBytes(response, { signal, onProgress = () => {
+}, stage = "project-download", label: label2 = "Downloading project\u2026" } = {}) {
+  if (!response.ok) throw Error("Project download failed (HTTP " + response.status + "). Retry or open a local project ZIP.");
+  const canceled = () => {
+    if (signal?.aborted) throw Object.assign(Error("Loading canceled"), { name: "AbortError" });
+  };
+  const length2 = Number(response.headers?.get?.("content-length")), encoding = response.headers?.get?.("content-encoding");
+  let total = (!encoding || encoding.toLowerCase() === "identity") && Number.isSafeInteger(length2) && length2 > 0 ? length2 : void 0;
+  let completed = 0, last = 0;
+  const emit = () => onProgress({ stage, label: label2, completed, ...total === void 0 ? {} : { total }, unit: "bytes" });
+  canceled();
+  emit();
+  if (!response.body?.getReader) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    canceled();
+    completed = bytes.byteLength;
+    if (total !== void 0 && completed !== total) total = void 0;
+    emit();
+    return bytes;
+  }
+  const reader = response.body.getReader(), chunks = [];
+  const abort = () => {
+    reader.cancel().catch(() => {
+    });
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    while (true) {
+      canceled();
+      const { done, value } = await reader.read();
+      canceled();
+      if (done) break;
+      chunks.push(value);
+      completed += value.byteLength;
+      if (total !== void 0 && completed > total) total = void 0;
+      const now = Date.now();
+      if (now - last >= 100) {
+        last = now;
+        emit();
+      }
+    }
+    if (total !== void 0 && completed !== total) total = void 0;
+    emit();
+    const bytes = new Uint8Array(completed);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes;
+  } catch (error) {
+    try {
+      await reader.cancel();
+    } catch {
+    }
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    reader.releaseLock?.();
+  }
+}
+
 // src/canvas-prototype/engine/model-session.mjs
 function createModelSession(native) {
   let tail = Promise.resolve();
@@ -285,11 +567,14 @@ function createModelSession(native) {
     return result;
   };
   const release = async (hash) => {
-    if (owners.has(hash)) return;
+    if (owners.has(hash) || native.closed === true) return;
     await native.call("ReleaseModel", { modelHash: hash });
   };
   const engine = {
     ready: native.ready,
+    get closed() {
+      return native.closed === true;
+    },
     call(method, params = {}) {
       if (method === "ParseSources") return Promise.reject(Error("ParseSources requires a model lease"));
       return enqueue(() => native.call(method, params));
@@ -311,6 +596,9 @@ function createModelSession(native) {
     return {
       engine: {
         ready: native.ready,
+        get closed() {
+          return native.closed === true;
+        },
         call(method, params = {}) {
           if (closed) return Promise.reject(Error("The native model lease has ended"));
           return enqueue(async () => {
@@ -398,17 +686,49 @@ function routeOrthogonal(start2, end, obstacles, { bendPenalty = 14, segmentCost
       }
     }
   }
-  const queue = [{ id: first, cost: 0, axis: "", path: [first] }], best = /* @__PURE__ */ new Map();
+  const queue = [], best = /* @__PURE__ */ new Map();
+  let sequence = 0;
+  const priority = (a, b) => a.cost - b.cost || a.order - b.order;
+  const push = (item) => {
+    let i = queue.length;
+    queue.push(item);
+    while (i) {
+      const parent = i - 1 >> 1;
+      if (priority(queue[parent], item) <= 0) break;
+      queue[i] = queue[parent];
+      i = parent;
+    }
+    queue[i] = item;
+  };
+  const pop = () => {
+    const first2 = queue[0], last2 = queue.pop();
+    if (queue.length) {
+      let i = 0;
+      while (i * 2 + 1 < queue.length) {
+        let child = i * 2 + 1;
+        if (child + 1 < queue.length && priority(queue[child + 1], queue[child]) < 0) child++;
+        if (priority(last2, queue[child]) <= 0) break;
+        queue[i] = queue[child];
+        i = child;
+      }
+      queue[i] = last2;
+    }
+    return first2;
+  };
+  push({ id: first, cost: 0, axis: "", previous: null, order: sequence++ });
   while (queue.length) {
-    queue.sort((a, b) => a.cost - b.cost);
-    const current = queue.shift(), key3 = current.id + current.axis;
+    const current = pop(), key3 = current.id + current.axis;
     if (best.has(key3) && best.get(key3) < current.cost) continue;
-    if (current.id === last) return current.path.map((i) => points[i]);
+    if (current.id === last) {
+      const path = [];
+      for (let step = current; step; step = step.previous) path.push(points[step.id]);
+      return path.reverse();
+    }
     for (const [id, length2, axis] of links[current.id]) {
       const cost = current.cost + length2 + (current.axis && current.axis !== axis ? bendPenalty : 0) + Math.max(0, Number(segmentCost(points[current.id], points[id])) || 0), key4 = id + axis;
       if (best.has(key4) && best.get(key4) <= cost) continue;
       best.set(key4, cost);
-      queue.push({ id, cost, axis, path: [...current.path, id] });
+      push({ id, cost, axis, previous: current, order: sequence++ });
     }
   }
   return null;
@@ -545,15 +865,21 @@ function fitDiagram(layout, area) {
   const point3 = (p) => ({ x: p.x * scale + dx, y: p.y * scale + dy }), box = (n) => ({ ...n, ...point3(n), width: n.width * scale, height: n.height * scale });
   return { ...layout, scale, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point3), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point3(p) })) };
 }
-function routeIsClear(points, edge, nodes, { orthogonalOnly = false } = {}) {
+function clearOfRouteObstacles(points, obstacles, orthogonalOnly) {
   if (points.length < 2 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
-  const obstacles = connectionObstacles(edge, nodes);
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i];
     if (orthogonalOnly && Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01) return false;
-    if (obstacles.some((n) => lineCrossesRect(a, b, { x: n.x + 0.05, y: n.y + 0.05, width: Math.max(0, n.width - 0.1), height: Math.max(0, n.height - 0.1) }))) return false;
+    if (obstacles.some((n) => lineCrossesRect(a, b, n))) return false;
   }
   return true;
+}
+function createRouteValidator(edge, nodes, { orthogonalOnly = false } = {}) {
+  const obstacles = connectionObstacles(edge, nodes).map((n) => ({ x: n.x + 0.05, y: n.y + 0.05, width: Math.max(0, n.width - 0.1), height: Math.max(0, n.height - 0.1) }));
+  return (points) => clearOfRouteObstacles(points, obstacles, orthogonalOnly);
+}
+function routeIsClear(points, edge, nodes, options = {}) {
+  return createRouteValidator(edge, nodes, options)(points);
 }
 function routeConnectsEndpoints(points, edge, nodes, tolerance = 0.7) {
   const byID = new Map(nodes.map((n) => [n.id, n]));
@@ -2456,34 +2782,62 @@ async function sourceDigest(documents) {
   const bytes = new TextEncoder().encode(JSON.stringify(documents));
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-async function verifiedRuntimeCache(project, { trustedHash, engineVersion, engineFingerprint, documents, modelHash }) {
-  const filename = project.manifest.runtimeCache;
-  if (!filename || !trustedHash) return null;
-  const value = project.files[filename], bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
-  if (!bytes) return null;
-  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  if (hash !== trustedHash) return null;
-  const cache = JSON.parse(fileText(project, filename));
-  if (cache.schemaVersion !== "syspresent.native-cache.v1" || cache.engineVersion !== engineVersion || cache.engineFingerprint !== engineFingerprint || cache.modelHash !== modelHash || cache.sourceDigest !== await sourceDigest(documents)) return null;
-  return cache;
-}
-async function verifiedRuntimeIndex(project, { trustedHash, engineVersion, engineFingerprint, documents }) {
-  const filename = project.manifest.runtimeCache;
-  if (!filename || !trustedHash) return null;
-  const value = project.files[filename], bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
-  if (!bytes) return null;
-  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  if (hash !== trustedHash) return null;
-  let cache;
-  try {
-    cache = JSON.parse(fileText(project, filename));
-  } catch {
-    return null;
+function createRuntimeCacheReader(project, { trustedHash, engineVersion, engineFingerprint } = {}) {
+  let parsed, queue = Promise.resolve();
+  const serial3 = (operation) => {
+    const result = queue.then(operation);
+    queue = result.then(() => {
+    }, () => {
+    });
+    return result;
+  };
+  async function read() {
+    const filename = project.manifest.runtimeCache;
+    if (!filename || !trustedHash) {
+      parsed = void 0;
+      return null;
+    }
+    const value = project.files[filename];
+    if (value === void 0 || value === null) {
+      parsed = void 0;
+      return null;
+    }
+    const bytes = typeof value === "string" ? new TextEncoder().encode(value) : parsed ? value : new Uint8Array(value);
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    if (hash !== trustedHash) {
+      parsed = void 0;
+      return null;
+    }
+    parsed ??= JSON.parse(typeof value === "string" ? value : strFromU8(bytes));
+    if (!parsed || typeof parsed !== "object" || parsed.schemaVersion !== "syspresent.native-cache.v1" || parsed.engineVersion !== engineVersion || parsed.engineFingerprint !== engineFingerprint) return null;
+    return parsed;
   }
-  if (cache.schemaVersion !== "syspresent.native-cache.v1" || cache.engineVersion !== engineVersion || cache.engineFingerprint !== engineFingerprint || cache.inputDigest !== await sourceDigest(documents)) return null;
-  if (!Array.isArray(cache.modelRoots) || !cache.modelRoots.length || !cache.modelRoots.every((x) => typeof x === "string" && x) || !Array.isArray(cache.requirementSeeds) || !cache.requirementSeeds.every((x) => typeof x === "string" && x)) return null;
-  if (cache.runtimePackage !== void 0 && (typeof cache.runtimePackage !== "string" || !/^[A-Za-z][A-Za-z0-9_]*$/.test(cache.runtimePackage))) return null;
-  return { modelRoots: [...cache.modelRoots], requirementSeeds: [...cache.requirementSeeds], ...cache.runtimePackage !== void 0 ? { runtimePackage: cache.runtimePackage } : {} };
+  return {
+    // An index can prepare native inputs, but never authorizes cached semantics.
+    index({ documents }) {
+      return serial3(async () => {
+        let cache;
+        try {
+          cache = await read();
+        } catch (error) {
+          if (error instanceof SyntaxError) return null;
+          throw error;
+        }
+        if (!cache || cache.inputDigest !== await sourceDigest(documents)) return null;
+        if (!Array.isArray(cache.modelRoots) || !cache.modelRoots.length || !cache.modelRoots.every((x) => typeof x === "string" && x) || !Array.isArray(cache.requirementSeeds) || !cache.requirementSeeds.every((x) => typeof x === "string" && x)) return null;
+        if (cache.runtimePackage !== void 0 && (typeof cache.runtimePackage !== "string" || !/^[A-Za-z][A-Za-z0-9_]*$/.test(cache.runtimePackage))) return null;
+        return { modelRoots: [...cache.modelRoots], requirementSeeds: [...cache.requirementSeeds], ...cache.runtimePackage !== void 0 ? { runtimePackage: cache.runtimePackage } : {} };
+      });
+    },
+    cache({ documents, modelHash }) {
+      return serial3(async () => {
+        const cache = await read();
+        if (!cache || cache.modelHash !== modelHash || cache.sourceDigest !== await sourceDigest(documents)) return null;
+        parsed = void 0;
+        return cache;
+      });
+    }
+  };
 }
 
 // src/canvas-prototype/documentation.mjs
@@ -6062,7 +6416,8 @@ async function mountGraphRegion(host, view, { onSelect, onExplore, selectedId, s
 }
 
 // src/canvas-prototype/browser-project.mjs
-async function projectFromSelection(selection, { folder = false } = {}) {
+async function projectFromSelection(selection, { folder = false, onProgress = () => {
+}, signal } = {}) {
   const selected = Array.from(selection ?? []);
   if (!selected.length) throw Error("Choose at least one model file.");
   let total = 0;
@@ -6072,10 +6427,14 @@ async function projectFromSelection(selection, { folder = false } = {}) {
   const paths = selected.map((file) => file.webkitRelativePath || file.name);
   const common = folder && paths.every((path) => path.includes("/") && path.split("/")[0] === paths[0].split("/")[0]) ? paths[0].split("/")[0] + "/" : "";
   const files = /* @__PURE__ */ Object.create(null);
+  onProgress({ stage: "project-files", label: "Reading selected files\u2026", completed: 0, total: selected.length, unit: "files" });
   for (let i = 0; i < selected.length; i++) {
+    if (signal?.aborted) throw Object.assign(Error("Loading canceled"), { name: "AbortError" });
     const path = projectPath(paths[i].slice(common.length));
     if (Object.hasOwn(files, path)) throw Error("Duplicate selected path: " + path + ". Choose a folder to retain distinct paths.");
     files[path] = new Uint8Array(await selected[i].arrayBuffer());
+    if (signal?.aborted) throw Object.assign(Error("Loading canceled"), { name: "AbortError" });
+    onProgress({ stage: "project-files", label: "Reading " + path + "\u2026", completed: i + 1, total: selected.length, unit: "files" });
   }
   let manifest;
   if (files["project.json"]) {
@@ -7227,6 +7586,7 @@ function routePeripheralEdges(edges2, nodes, area, { activeEdges = [], obstacles
         results.push({ ...edge, points: [], d: "", routingBlocked: true });
         continue;
       }
+      const validate = createRouteValidator(edge, nodes);
       const paths = [...activePaths, ...results.map((e) => e.points)], hard = [...cardObstacles(edge, nodes).map((n) => ({ x: n.x - 4, y: n.y - 4, width: n.width + 8, height: n.height + 8 })), ...labels.map((r) => ({ x: r.x - 2, y: r.y - 2, width: r.width + 4, height: r.height + 4 }))];
       const laneXs = [area.x + 2, area.x + area.width - 2, ...hard.flatMap((r) => [r.x, r.x + r.width]), ...paths.flatMap((points) => points.flatMap((p) => [p.x - 7, p.x + 7]))], laneYs = [area.y + 2, area.y + area.height - 2, ...hard.flatMap((r) => [r.y, r.y + r.height]), ...paths.flatMap((points) => points.flatMap((p) => [p.y - 7, p.y + 7]))];
       const uniqueLanes = (values, mid, min, max2) => [...new Set(values)].filter((v) => v >= min && v <= max2).sort((a2, b3) => Math.abs(a2 - mid) - Math.abs(b3 - mid)).slice(0, candidateBudget <= 4 ? 4 : 12);
@@ -7234,7 +7594,7 @@ function routePeripheralEdges(edges2, nodes, area, { activeEdges = [], obstacles
       let best = null;
       const inspect = (from, to, middle) => {
         const points = simplify3([from.point, ...middle, to.point]);
-        if (points.some((p) => p.x < area.x || p.y < area.y || p.x > area.x + area.width || p.y > area.y + area.height) || !routeIsClear(points, edge, nodes)) return;
+        if (points.some((p) => p.x < area.x || p.y < area.y || p.x > area.x + area.width || p.y > area.y + area.height) || !validate(points)) return;
         if (segments(points).some(([p, q]) => labels.some((r) => segmentHitsRect(p, q, r)))) return;
         if (segments(middle).some(([p, q]) => hard.some((r) => segmentHitsRect(p, q, r)))) return;
         const metric = peripheralRoutingMetrics([{ points }], paths.map((points2) => ({ points: points2 }))), score = peripheralRouteScore(metric);
@@ -7296,7 +7656,7 @@ var pathBoxes = (edges2) => edges2.flatMap((e) => (e.points ?? []).slice(1).map(
   const a = e.points[i];
   return { x: Math.min(a.x, b.x) - 5, y: Math.min(a.y, b.y) - 5, width: Math.abs(a.x - b.x) + 10, height: Math.abs(a.y - b.y) + 10 };
 }));
-function prepareNeighborhood(context, activeNodes, area, options = {}) {
+function* neighborhoodSteps(context, activeNodes, area, options = {}) {
   const { width = 156, height = 70, gap = 72, activeEdges = [], labelObstacles = [], obstacles = [], measureLabel } = options;
   if (![area?.x, area?.y, area?.width, area?.height, width, height, gap].every(Number.isFinite) || area.width <= 0 || area.height <= 0 || width <= 0 || height <= 0 || gap < 0) throw new Error("Invalid neighborhood geometry");
   const active2 = activeNodes ?? [], known = new Map(active2.map((n) => [n.id, n])), drafts = [...context.view.nodes].sort((a, b) => compare7(a.name, b.name) || compare7(a.id, b.id));
@@ -7308,6 +7668,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   const nodeHeight = (id) => known.get(id)?.height ?? byID.get(id)?.height ?? height;
   const rankGap = (id) => Math.max(gap, orders.filter((o) => o.above === id || o.below === id).length * 10 + 24);
   for (let i = 0; i < drafts.length + 1; i++) {
+    yield;
     let changed = false;
     for (const { above, below } of orders) {
       const lo = limits2.get(below), hi = limits2.get(above), nextMin = lower(above) + nodeHeight(above) + rankGap(above), nextMax = upper(below) - nodeHeight(above) - rankGap(above);
@@ -7324,6 +7685,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   }
   const remaining = new Set(drafts.map((n) => n.id)), ordered = [];
   while (remaining.size) {
+    yield;
     const ready = [...remaining].filter((id) => !orders.some((o) => o.below === id && remaining.has(o.above))).sort(compare7);
     if (!ready.length) {
       notices.push({ reason: "context-rank-conflict", targets: [...remaining] });
@@ -7336,6 +7698,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
     }
   }
   for (const id of ordered) {
+    yield;
     const node = byID.get(id), width2 = node.width, height2 = node.height, links = edges2.filter((e) => e.source === id || e.target === id), linked = links.map((e) => known.get(e.source === id ? e.target : e.source)).filter(Boolean), activeAnchors = linked.filter((n) => active2.some((a) => a.id === n.id)), anchors = activeAnchors.length ? activeAnchors : linked, anchor = anchors.length ? { x: anchors.reduce((s, n) => s + center(n).x, 0) / anchors.length, y: anchors.reduce((s, n) => s + center(n).y, 0) / anchors.length } : center(hull);
     let { min, max: max2 } = limits2.get(id);
     for (const { above, below } of orders) {
@@ -7350,6 +7713,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
     const idealY = clamp3(anchor.y - height2 / 2, min, max2), idealX = anchor.x - width2 / 2, dx = width2 + gap, dy = height2 + gap;
     let placed = null;
     for (let ring = 0; ring < drafts.length + blocked.length + 8 && !placed; ring++) {
+      yield;
       const candidates2 = [];
       const ranked = orders.some((o) => o.above === id || o.below === id);
       for (let row = ranked ? 0 : -ring; row <= (ranked ? 0 : ring); row++) for (let col = -ring; col <= ring; col++) {
@@ -7383,6 +7747,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
     return Math.abs(bc.y - ac.y) > Math.abs(bc.x - ac.x) * 0.65 ? bc.y >= ac.y ? "SOUTH" : "NORTH" : bc.x >= ac.x ? "EAST" : "WEST";
   };
   for (const node of allNodes) {
+    yield;
     const incident = edges2.filter((e) => e.source === node.id || e.target === node.id);
     for (const side of ["NORTH", "SOUTH", "EAST", "WEST"]) {
       const neighbors = incident.map((e) => ({ edge: e, other: known.get(e.source === node.id ? e.target : e.source) })).filter(({ other }) => other && sideFor(node, other) === side);
@@ -7401,6 +7766,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   const fanCandidates = /* @__PURE__ */ new Map();
   const sorted = [...edges2].sort((a, b) => compare7(a.id, b.id));
   for (const edge of sorted) {
+    yield;
     const endpoints2 = /* @__PURE__ */ new Set([edge.source, edge.target]), proxyNodes = allNodes.flatMap((node) => {
       if (!endpoints2.has(node.id)) return [node];
       const point3 = attachments.get(`${edge.id}:${node.id}`);
@@ -7411,6 +7777,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
     const routingOptions = { activeEdges: [...activeEdges, ...routed.filter((e) => !e.routingBlocked)], obstacles: [...obstacles, ...labelObstacles], measureLabel, candidateBudget: 4, reverse: false, visibilitySearches: 0 };
     const routingEdge = { ...edge, label: "" };
     let result = routePeripheralEdges([routingEdge], proxyNodes, worldBounds, routingOptions).edges[0];
+    yield;
     const order = decisionOrder(edge);
     if (order) {
       const above = known.get(order.above), below = known.get(order.below), top = attachments.get(`${edge.id}:${order.above}`), bottom = attachments.get(`${edge.id}:${order.below}`);
@@ -7428,15 +7795,20 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
         if (avoids && routeIsClear(points, edge, allNodes, { orthogonalOnly: true }) && peripheralRouteScore(peripheralRoutingMetrics([candidate], routingOptions.activeEdges)) < peripheralRouteScore(peripheralRoutingMetrics([result], routingOptions.activeEdges))) result = candidate;
       }
     }
-    if (result.routingBlocked) result = routePeripheralEdges([routingEdge], proxyNodes, worldBounds, { ...routingOptions, candidateBudget: 8, visibilitySearches: 1 }).edges[0];
+    if (result.routingBlocked) {
+      result = routePeripheralEdges([routingEdge], proxyNodes, worldBounds, { ...routingOptions, candidateBudget: 8, visibilitySearches: 1 }).edges[0];
+      yield;
+    }
     result = { ...result, label: edge.label };
     if (!result.routingBlocked && (!routeIsClear(result.points, edge, allNodes, { orthogonalOnly: true }) || !routeConnectsEndpoints(result.points, edge, allNodes))) result = { ...result, points: [], d: "", routingBlocked: true };
     if (result.routingBlocked) {
       const fallback = routePeripheralEdges([routingEdge], allNodes, worldBounds, { ...routingOptions, candidateBudget: 16, visibilitySearches: 2 }).edges[0];
+      yield;
       if (!fallback.routingBlocked && routeIsClear(fallback.points, edge, allNodes, { orthogonalOnly: true }) && routeConnectsEndpoints(fallback.points, edge, allNodes)) result = { ...fallback, label: edge.label };
     }
     routed.push(result);
   }
+  yield;
   const allFans = routed.map((edge) => fanCandidates.get(edge.id) ?? edge);
   if (peripheralRouteScore(peripheralRoutingMetrics(allFans, activeEdges)) < peripheralRouteScore(peripheralRoutingMetrics(routed, activeEdges))) routed = allFans;
   const protectedRects = [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])];
@@ -7462,12 +7834,14 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   for (let pass = 0; pass < 3; pass++) {
     let improved = false;
     for (let index5 = 0; index5 < routed.length; index5++) {
+      yield;
       const current = routed[index5];
       if (current.routingBlocked) continue;
       const other = [...activeEdges, ...routed.filter((_, i) => i !== index5)], metric = peripheralRoutingMetrics([current], other);
       if (metric.overlapLength < 0.05 && !metric.crossings) continue;
       let best = current, bestScore = laneScore(metric, current, other);
       for (let segment = 0; segment < current.points.length - 1; segment++) for (const offset of [-7, 7, -14, 14, -28, 28, -49, 49, -98, 98, -196, 196]) {
+        yield;
         const points = current.points.map((p) => ({ ...p })), a = points[segment], b = points[segment + 1];
         if (Math.abs(a.x - b.x) < 0.01) {
           a.x += offset;
@@ -7493,6 +7867,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   }
   const reserved = [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])], corridors = pathBoxes([...activeEdges, ...routed]);
   for (const edge of routed) {
+    yield;
     if (!edge.label || edge.routingBlocked) continue;
     const measured = measureLabel?.(edge.label) ?? { width: String(edge.label).length * 6.5 + 4, height: 14 }, size = { width: Math.max(1, measured.width), height: Math.max(1, measured.height) }, slots = [];
     for (let i = 1; i < edge.points.length; i++) {
@@ -7511,6 +7886,7 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
       reserved.push(box);
     } else edge.labelOmitted = true;
   }
+  yield;
   const routing = { edges: routed, metrics: peripheralRoutingMetrics(routed, activeEdges) };
   const omissions = [...context.omissions ?? []], routedEdges = routing.edges.filter((e) => !e.routingBlocked);
   for (const edge of routing.edges.filter((e) => e.routingBlocked)) omissions.push({ relationshipId: edge.semanticId ?? edge.id, source: edge.semanticSource, target: edge.semanticTarget, reason: "context-route-unavailable" });
@@ -7522,6 +7898,39 @@ function prepareNeighborhood(context, activeNodes, area, options = {}) {
   for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
   const finalBounds = bounds([worldBounds, ...routedEdges.flatMap((e) => [...(e.points ?? []).map((p) => ({ ...p, width: 0, height: 0 })), ...e.labelBox ? [e.labelBox] : []])]);
   return { ...context.view, nodes, edges: edges2, routedEdges, stubEdges: [], boundaryMarkers: [], worldBounds: finalBounds, routingMetrics: routing.metrics, notices, omissions, boundary: { ...context.boundary, cards: nodes.length, markers: 0, omitted: omissions.length, byReason } };
+}
+var taskYield = () => typeof globalThis.scheduler?.yield === "function" ? globalThis.scheduler.yield() : new Promise((resolve2) => setTimeout(resolve2, 0));
+var monotonicNow = () => globalThis.performance?.now?.() ?? Date.now();
+function canceledNeighborhood() {
+  const error = new Error("Neighborhood layout was superseded or canceled.");
+  error.name = "AbortError";
+  error.code = "LAYOUT_CANCELED";
+  return error;
+}
+async function prepareNeighborhoodAsync(context, activeNodes, area, {
+  yieldControl = taskYield,
+  isCurrent = () => true,
+  budgetMs = 16,
+  clock = monotonicNow,
+  ...options
+} = {}) {
+  if (!Number.isFinite(budgetMs) || budgetMs < 0 || typeof yieldControl !== "function" || typeof isCurrent !== "function" || typeof clock !== "function") throw new TypeError("Invalid cooperative neighborhood scheduling options");
+  const steps = neighborhoodSteps(context, activeNodes, area, options);
+  let sliceStarted = clock();
+  try {
+    while (true) {
+      if (!isCurrent()) throw canceledNeighborhood();
+      const step = steps.next();
+      if (step.done) return step.value;
+      if (clock() - sliceStarted >= budgetMs) {
+        await yieldControl();
+        if (!isCurrent()) throw canceledNeighborhood();
+        sliceStarted = clock();
+      }
+    }
+  } finally {
+    steps.return();
+  }
 }
 
 // src/canvas-prototype/motion.mjs
@@ -7666,57 +8075,84 @@ function journeyCameraTrack(frames, { initialCamera = createCamera(), finalCamer
 }
 
 // src/canvas-prototype/engine/client.mjs
-function createSemanticEngine({ assetBase, assetVersion, workerURL = new URL("./worker.js", import.meta.url), WorkerClass = globalThis.Worker } = {}) {
+function createSemanticEngine({ assetBase, assetVersion, expectedDecodedBytes, workerURL = new URL("./worker.js", import.meta.url), WorkerClass = globalThis.Worker, onProgress } = {}) {
   if (!assetBase) throw new TypeError("assetBase must locate the pinned Go/WASM engine assets");
-  const worker = new WorkerClass(workerURL);
+  let worker, startError;
+  try {
+    worker = new WorkerClass(workerURL);
+  } catch (error) {
+    startError = new Error("Cannot start semantic engine worker: " + error.message);
+  }
   const pending = /* @__PURE__ */ new Map();
   let sequence = 0;
-  let closed = false;
+  let closed = Boolean(startError);
   function request(method, params) {
     if (closed) return Promise.reject(new Error("Semantic engine has been terminated"));
     const id = ++sequence;
     return new Promise((resolve2, reject) => {
-      pending.set(id, { resolve: resolve2, reject });
-      worker.postMessage({ id, method, params });
+      pending.set(id, { resolve: resolve2, reject, method });
+      try {
+        worker.postMessage({ id, method, params });
+      } catch (error) {
+        pending.delete(id);
+        reject(error);
+        if (method === "Initialize") close(error);
+      }
     });
   }
   function rejectAll(error) {
     for (const job of pending.values()) job.reject(error);
     pending.clear();
   }
-  worker.onmessage = ({ data }) => {
+  function close(error) {
+    if (closed) return;
+    closed = true;
+    rejectAll(error);
+    worker.terminate();
+  }
+  if (worker) worker.onmessage = ({ data }) => {
+    if (closed) return;
     const job = pending.get(data.id);
     if (!job) return;
+    if (data.progress) {
+      try {
+        onProgress?.({ ...data.progress, requestId: data.id, method: job.method });
+      } catch {
+      }
+      return;
+    }
     pending.delete(data.id);
     if (data.error) {
       const error = new Error(data.error.message);
       error.code = data.error.code;
       job.reject(error);
+      if (job.method === "Initialize" || error.code === "NATIVE_NO_RESPONSE") close(error);
     } else job.resolve(data.result);
   };
-  worker.onerror = (event) => {
-    closed = true;
-    rejectAll(new Error(event.message || "Semantic engine worker failed"));
-    worker.terminate();
-  };
+  if (worker) worker.onerror = (event) => close(new Error(event.message || "Semantic engine worker failed"));
+  if (worker) worker.onmessageerror = () => close(new Error("Cannot read a response from the semantic engine worker. Retry loading the project."));
   const base = new URL(assetBase, globalThis.location?.href || import.meta.url).href;
-  const ready = request("Initialize", { assetBase: base, assetVersion });
+  const boundSize = typeof assetVersion === "string" && assetVersion.trim() && Number.isSafeInteger(expectedDecodedBytes) && expectedDecodedBytes > 0;
+  const ready = startError ? Promise.reject(startError) : request("Initialize", { assetBase: base, assetVersion, ...boundSize ? { expectedDecodedBytes } : {} });
   return {
     ready,
+    get closed() {
+      return closed;
+    },
     async call(method, params = {}) {
       await ready;
       return request(method, params);
     },
     terminate() {
-      closed = true;
-      worker.terminate();
-      rejectAll(new Error("Semantic engine has been terminated"));
+      close(new Error("Semantic engine has been terminated"));
     }
   };
 }
 
 // src/canvas-prototype/app.mjs
 var buildVersion = document.querySelector('meta[name="syspresent-build"]')?.content || "development";
+var engineAssetVersion = document.querySelector('meta[name="syspresent-engine"]')?.content || buildVersion;
+var expectedEngineBytes = Number(document.querySelector('meta[name="syspresent-engine-bytes"]')?.content);
 var $ = (id) => document.getElementById(id);
 var el2 = (name, text4, cls) => {
   const e = document.createElement(name);
@@ -7747,6 +8183,7 @@ state.selectedIds = [];
 state.comparison = null;
 state.activeRegion = "primary";
 var report = (error) => {
+  if (state.loadOperation?.pending) failLoading(state.loadRevision, error);
   const message = error.message || String(error);
   $("status").textContent = message;
   $("editor-error").textContent = message;
@@ -7759,22 +8196,31 @@ var report = (error) => {
   console.error(error);
 };
 var elementIndexes = /* @__PURE__ */ new WeakMap();
-function element(id) {
-  if (!state.graph) return;
-  let index5 = elementIndexes.get(state.graph);
-  if (!index5) {
-    index5 = new Map(state.graph.elements.map((e) => [e.id, e]));
-    elementIndexes.set(state.graph, index5);
+function graphIndex(graph) {
+  let index5 = elementIndexes.get(graph);
+  if (index5) return index5;
+  const byID = /* @__PURE__ */ new Map(), byName = /* @__PURE__ */ new Map();
+  for (const item of graph.elements) {
+    if (!byID.has(item.id)) byID.set(item.id, item);
+    const prior = byName.get(item.qualifiedName);
+    if (prior) prior.ambiguous = true;
+    else byName.set(item.qualifiedName, { item, ambiguous: false });
   }
-  return index5.get(id);
+  index5 = { byID, byName };
+  elementIndexes.set(graph, index5);
+  return index5;
+}
+function element(id) {
+  return state.graph ? graphIndex(state.graph).byID.get(id) : void 0;
 }
 var label = (id) => element(id)?.name || id;
 function resolveInGraph(graph, value) {
-  const exact = graph?.elements.find((e) => e.id === value);
+  if (!graph) return;
+  const index5 = graphIndex(graph), exact = index5.byID.get(value);
   if (exact) return exact.id;
-  const matches = graph?.elements.filter((e) => e.qualifiedName === value) ?? [];
-  if (matches.length > 1) throw Error("Ambiguous native qualified reference: " + value);
-  return matches[0]?.id;
+  const match = index5.byName.get(value);
+  if (match?.ambiguous) throw Error("Ambiguous native qualified reference: " + value);
+  return match?.item.id;
 }
 var resolve = (value) => resolveInGraph(state.graph, value);
 var qname = (id) => element(id)?.qualifiedName;
@@ -7792,25 +8238,71 @@ function assertInScope(view, scopeId = state.packageScope) {
 }
 function status(text4) {
   $("status").textContent = text4;
-  $("loading-phase").textContent = text4;
   if (!$("landing").hidden) $("landing-status").textContent = text4;
+}
+var loadingProgress = createLoadingProgress(document);
+function loadEvent(token, event) {
+  const operation = state.loadOperation;
+  if (token !== state.loadRevision || operation?.id !== token || !operation.pending) return;
+  const progress = typeof event === "string" ? { stage: "model-prepare", label: event } : event;
+  operation.stage = progress.stage;
+  status(progress.label);
+  loadingProgress.update(token, progress);
+}
+function failLoading(token, error) {
+  if (token !== state.loadRevision || state.loadOperation?.id !== token) return;
+  state.loadOperation.pending = false;
+  busy(false);
+  loadingProgress.fail(token, error);
+}
+function beginLoading(label2, retry) {
+  state.loadOperation?.abort.abort();
+  const id = ++state.loadRevision;
+  ++state.revision;
+  discardLoadingModel();
+  const operation = { id, abort: new AbortController(), pending: true, retry };
+  state.loadOperation = operation;
+  busy(true);
+  $("landing-error").hidden = true;
+  status(label2);
+  loadingProgress.begin(id, { label: label2, onRetry: () => Promise.resolve(retry()).catch(report), onCancel: () => home() });
+  return operation;
+}
+function assertLoading(token) {
+  if (token !== state.loadRevision || state.loadOperation?.abort.signal.aborted) throw Object.assign(Error("Loading canceled"), { name: "AbortError" });
+}
+function finishLoading(token) {
+  if (token !== state.loadRevision || state.loadOperation?.id !== token) return;
+  loadingProgress.finish(token);
+  state.loadOperation = null;
 }
 var engineReady;
 var demoCatalog;
 async function ensureEngine() {
-  if (engineReady) return engineReady;
-  status("Starting the model engine\u2026");
+  if (engineReady && !state.engine?.closed) return engineReady;
+  state.engineProgress = { stage: "engine-start", label: "Starting the model engine\u2026" };
   state.layoutEngine ??= createLayoutEngine({ workerUrl: new URL("./layout/elk-worker.js?v=" + buildVersion, location.href).href });
-  state.models = createModelSession(createSemanticEngine({ assetBase: new URL("./engine/", location.href), assetVersion: buildVersion, workerURL: new URL("./engine/worker.js?v=" + buildVersion, location.href) }));
-  state.engine = state.models.engine;
+  const models = createModelSession(createSemanticEngine({ assetBase: new URL("./engine/", location.href), assetVersion: engineAssetVersion, expectedDecodedBytes: expectedEngineBytes, workerURL: new URL("./engine/worker.js?v=" + buildVersion, location.href), onProgress: (event) => {
+    state.engineProgress = event;
+    const operation = state.loadOperation;
+    if (operation?.waitingEngine) loadEvent(operation.id, event);
+  } }));
+  state.models = models;
+  state.engine = models.engine;
   engineReady = (async () => {
-    state.engineInfo = await state.engine.ready;
-    const response = await fetch("./engine/provenance.json?v=" + buildVersion);
-    if (!response.ok) throw Error("Model engine provenance is unavailable.");
-    state.provenance = await response.json();
+    const provenance = fetch("./engine/provenance.json?v=" + buildVersion).then(async (response) => {
+      if (!response.ok) throw Error("Model engine provenance is unavailable. Retry loading.");
+      return response.json();
+    });
+    provenance.catch(() => {
+    });
+    const info = await models.engine.ready, value = await provenance;
+    if (state.models !== models) throw Object.assign(Error("Loading canceled"), { name: "AbortError" });
+    state.engineInfo = info;
+    state.provenance = value;
   })().catch((error) => {
-    state.engine?.terminate();
-    engineReady = null;
+    models.engine.terminate();
+    if (state.models === models) engineReady = null;
     throw error;
   });
   return engineReady;
@@ -7831,26 +8323,95 @@ async function demos() {
   return demoCatalog;
 }
 async function openDemo(id, { readURL = false } = {}) {
-  const request = ++state.loadRevision;
-  ++state.revision;
-  discardLoadingModel();
-  busy(true);
-  $("landing-error").hidden = true;
-  status("Opening demo\u2026");
+  const operation = beginLoading("Opening demo\u2026", () => openDemo(id, { readURL })), request = operation.id;
   try {
+    await yieldLoadingPaint();
+    assertLoading(request);
     const demo = (await demos()).find((item) => item.id === id);
     if (!demo) throw Error("Demo not found: " + id);
-    const response = await fetch("./" + demo.project + "?v=" + buildVersion);
-    if (!response.ok) throw Error("Demo files are unavailable.");
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    assertLoading(request);
+    operation.enginePromise = ensureEngine();
+    operation.enginePromise.catch(() => {
+    });
+    const response = await fetch("./" + demo.project + "?v=" + buildVersion, { signal: operation.abort.signal });
+    const bytes = await readLoadingBytes(response, { signal: operation.abort.signal, onProgress: (event) => loadEvent(request, event) });
+    assertLoading(request);
+    loadEvent(request, { stage: "project-check", label: "Checking project integrity\u2026" });
+    await yieldLoadingPaint();
+    assertLoading(request);
     if (demo.publication) {
       const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
       if (digest !== demo.publication) throw Error("Published project bytes do not match the catalog snapshot. Reload the publication.");
     }
-    if (request !== state.loadRevision) return;
+    assertLoading(request);
+    loadEvent(request, { stage: "project-unpack", label: "Opening project files\u2026" });
+    await yieldLoadingPaint();
+    assertLoading(request);
     await loadProject(unpackProject(bytes), { cacheHash: demo.runtimeCacheHash, loadToken: request, publication: demo.publication, demo: id, readURL });
   } catch (error) {
-    if (request === state.loadRevision) throw error;
+    if (request === state.loadRevision) {
+      failLoading(request, error);
+      throw error;
+    }
+  } finally {
+    if (request === state.loadRevision) busy(false);
+  }
+}
+async function openSelectedFiles(selected, { folder = false } = {}) {
+  const files = Array.from(selected ?? []);
+  if (!files.length) return;
+  const operation = beginLoading("Reading selected files\u2026", () => openSelectedFiles(files, { folder })), request = operation.id;
+  try {
+    await yieldLoadingPaint();
+    assertLoading(request);
+    const project = await projectFromSelection(files, { folder, onProgress: (event) => loadEvent(request, event), signal: operation.abort.signal });
+    assertLoading(request);
+    await loadProject(project, { cacheHash: null, loadToken: request });
+  } catch (error) {
+    if (request === state.loadRevision) {
+      failLoading(request, error);
+      report(error);
+    }
+  } finally {
+    if (request === state.loadRevision) busy(false);
+  }
+}
+async function openProjectFile(file) {
+  if (!file) return;
+  const operation = beginLoading("Reading project ZIP\u2026", () => openProjectFile(file)), request = operation.id;
+  try {
+    await yieldLoadingPaint();
+    assertLoading(request);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    assertLoading(request);
+    loadEvent(request, { stage: "project-unpack", label: "Opening project files\u2026", completed: bytes.byteLength, total: file.size, unit: "bytes" });
+    await yieldLoadingPaint();
+    assertLoading(request);
+    await loadProject(unpackProject(bytes), { cacheHash: null, loadToken: request });
+  } catch (error) {
+    if (request === state.loadRevision) {
+      failLoading(request, error);
+      report(error);
+    }
+  } finally {
+    if (request === state.loadRevision) busy(false);
+  }
+}
+async function openMarkdownFile(file) {
+  if (!file || !state.project) return;
+  const sourceProject = state.project, operation = beginLoading("Reading presentation\u2026", () => openMarkdownFile(file)), request = operation.id;
+  try {
+    await yieldLoadingPaint();
+    assertLoading(request);
+    const project = structuredClone(sourceProject);
+    project.files[project.manifest.story] = await file.text();
+    assertLoading(request);
+    await loadProject(project, { loadToken: request });
+  } catch (error) {
+    if (request === state.loadRevision) {
+      failLoading(request, error);
+      report(error);
+    }
   } finally {
     if (request === state.loadRevision) busy(false);
   }
@@ -7860,6 +8421,15 @@ function discardLoadingModel() {
   state.loadingLease = null;
 }
 function home() {
+  const operation = state.loadOperation;
+  operation?.abort.abort();
+  if (operation) loadingProgress.cancel(operation.id);
+  state.loadOperation = null;
+  const hasCurrent = state.projectDisplay ? !!state.projectDisplay.previousLease : !!state.modelLease;
+  if (!hasCurrent) {
+    state.engine?.terminate();
+    engineReady = null;
+  }
   ++state.loadRevision;
   ++state.revision;
   discardLoadingModel();
@@ -7875,7 +8445,8 @@ function home() {
   $("resume-model").hidden = !state.view;
   document.title = "Syspresent";
 }
-async function compile(project, { cacheHash = state.trustedCacheHash, progress = status, lease } = {}) {
+async function compile(project, { cacheHash = state.trustedCacheHash, progress = (event) => status(event.label ?? event), lease, active: active2 = () => {
+} } = {}) {
   loadPresentationLayouts(project);
   const engine = lease.engine, documents = documentsFor(project), scenes = parseStory(fileText(project, project.manifest.story));
   const m = project.manifest;
@@ -7885,16 +8456,25 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
     if (errors.length) throw Error(errors.map((d) => `${d.message} (${d.span?.file ?? "source"}:${d.span?.startLine ?? "?"})`).join("\n"));
     if (!result.modelHash) throw Error("Native engine returned no model identity");
   };
-  const index5 = await verifiedRuntimeIndex(project, { trustedHash: cacheHash, engineVersion: state.engineInfo?.version, engineFingerprint: state.provenance?.assets?.["sysml-wasm.wasm"]?.sha256, documents });
+  const cacheReader = createRuntimeCacheReader(project, { trustedHash: cacheHash, engineVersion: state.engineInfo?.version, engineFingerprint: state.provenance?.assets?.["sysml-wasm.wasm"]?.sha256 });
+  progress({ stage: "cache-check", label: "Checking project sources and prepared model data\u2026" });
+  await yieldLoadingPaint();
+  active2();
+  const index5 = await cacheReader.index({ documents });
+  active2();
   if (index5) {
     roots = index5.modelRoots;
     seeds = index5.requirementSeeds;
     runtimePackage = index5.runtimePackage;
   }
   if (!roots?.length || seeds === void 0 || !runtimePackage) {
+    progress({ stage: "model-discovery", label: "Discovering native model declarations\u2026" });
     parsed = await engine.call("ParseSources", { documents });
+    active2();
     check(parsed);
+    progress({ stage: "declarations", label: "Indexing native declarations\u2026" });
     exported = await engine.call("ExportModel", { modelHash: parsed.modelHash, projection: "declarations" });
+    active2();
     const discovered = discoverNativeIndex(parsed, exported, { modelDocumentCount: m.modelSources.length });
     roots = roots?.length ? roots : discovered.modelRoots;
     seeds ??= discovered.requirementSeeds;
@@ -7903,37 +8483,66 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
     while (names.has(runtimePackage)) runtimePackage += "X";
   }
   if (!roots.length) throw Error("No named model declarations were found in the supplied files.");
-  progress("Resolving the complete project with OpenSysML WASM\u2026");
+  progress({ stage: "model-parse", label: "Resolving the complete project with OpenSysML WASM\u2026", detail: "Native parsing and resolution have no measurable completion percentage." });
   const allDocuments = [...documents, { name: "__syspresent_runtime_context.sysml", content: requirementCoverageSource(roots, runtimePackage, seeds) }];
   parsed = await engine.call("ParseSources", { documents: allDocuments });
+  active2();
   check(parsed);
   await lease.retainOnly(parsed.modelHash);
-  const cache = await verifiedRuntimeCache(project, { trustedHash: cacheHash, engineVersion: state.engineInfo?.version, engineFingerprint: state.provenance?.assets?.["sysml-wasm.wasm"]?.sha256, documents: allDocuments, modelHash: parsed.modelHash });
-  progress("Loading model declarations and requirement relationships\u2026");
-  exported = structuredClone(cache?.exported ?? await engine.call("ExportModel", { modelHash: parsed.modelHash, projection: "declarations" }));
+  active2();
+  const cache = await cacheReader.cache({ documents: allDocuments, modelHash: parsed.modelHash });
+  active2();
+  progress({ stage: "declarations", label: "Loading model declarations and requirement relationships\u2026" });
+  exported = cache?.exported ?? await engine.call("ExportModel", { modelHash: parsed.modelHash, projection: "declarations" });
+  active2();
   if (!Array.isArray(exported.elements)) throw Error("Native model export has no element array");
   if (m.modelRoots?.length) {
     const modelRootIDs = parsed.roots.slice(0, m.modelSources.length).flatMap((r) => r.childIds ?? []), actual = exported.elements.filter((e) => modelRootIDs.includes(e["@id"]) && e.qualifiedName).map((e) => e.qualifiedName);
     const missing = actual.filter((name) => !roots.includes(name));
     if (missing.length) throw Error("Native model roots need rebuilding: " + missing.join(", "));
   }
+  progress({ stage: "requirements", label: "Resolving native requirement relationships\u2026" });
+  active2();
   const coverage = requireNativeIdentity(adaptNativeView(seeds.length ? cache?.coverage ?? await engine.call("RenderView", { modelHash: parsed.modelHash, view: runtimePackage + "::coverage", includeSemanticIdentity: true }) : { kind: "definition", nodes: [], edges: [] }, runtimePackage + "::coverage"));
   exported.elements = exported.elements.filter((e) => e.qualifiedName !== runtimePackage && !e.qualifiedName?.startsWith(runtimePackage + "::"));
   const availableViews = exported.elements.filter((e) => e["@type"] === "ViewUsage" && e.qualifiedName && e["sysx:sourceLine"]).map((e) => e.qualifiedName);
   const needed = /* @__PURE__ */ new Set([...authoringReferencedViews(scenes), ...scenes.flatMap((s) => [s.view, ...(s.regions ?? []).map((r) => r.view)]), ...m.entryView ? [m.entryView] : []]), views = /* @__PURE__ */ new Map();
+  let preparedViews = 0;
   for (const name of needed) {
+    active2();
     if (!availableViews.includes(name)) throw Error("Native view does not resolve: " + name);
-    progress("Preparing " + (scenes.find((s) => s.view === name)?.title || "model view") + "\u2026");
+    progress({ stage: "views", label: "Preparing " + (scenes.find((s) => s.view === name)?.title || "model view") + "\u2026", completed: preparedViews, total: needed.size, unit: "views" });
     const raw = cache?.views?.[name] ?? await engine.call("RenderView", { modelHash: parsed.modelHash, view: name, includeSemanticIdentity: true });
     const view = requireNativeIdentity(adaptNativeView(raw, name));
     if (!supportsView(view)) throw Error("Unsupported native view kind: " + view.kind);
     views.set(name, view);
+    preparedViews++;
+    if (preparedViews % 8 === 0) {
+      await yieldLoadingPaint();
+      active2();
+    }
   }
   if (!m.systemOfInterest.length) m.systemOfInterest = [...roots];
+  progress({ stage: "graph-index", label: "Building model navigation\u2026" });
+  await yieldLoadingPaint();
+  active2();
   const graph = modelGraph(exported.elements, [...views.values(), coverage]);
   for (const root of project.manifest.systemOfInterest) if (!resolveInGraph(graph, root)) throw Error("System of interest does not resolve: " + root);
   const byName = (value) => resolveInGraph(graph, value);
+  let validationYield = performance.now();
+  const checkpoint = async () => {
+    active2();
+    if (performance.now() - validationYield >= 16) {
+      await new Promise((resolve2) => setTimeout(resolve2, 0));
+      active2();
+      validationYield = performance.now();
+    }
+  };
+  progress({ stage: "story-validation", label: "Checking scene references and native relationships\u2026" });
+  await yieldLoadingPaint();
+  active2();
   for (const [sceneIndex, item] of scenes.entries()) {
+    await checkpoint();
     resolvePresentation(item.presentation, { resolve: byName });
     if (item.journey?.length && (byName(item.journey.at(-1)) !== byName(item.focus) || sceneIndex > 0 && byName(item.journey[0]) !== byName(scenes[sceneIndex - 1].focus))) throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);
     if (!views.has(item.view)) throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);
@@ -7946,12 +8555,16 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
   const scoped = graph.elements.filter((e) => project.manifest.systemOfInterest.some((root) => e.qualifiedName === root || e.qualifiedName?.startsWith(root + "::"))).map((e) => e.id);
   for (const item of scenes) for (const region of item.regions ?? []) if (region.focus && !byName(region.focus)) throw Error(`Scene ${item.id}: region ${region.id} focus does not resolve`);
   for (let i = 1; i < scenes.length; i++) {
+    await checkpoint();
     const a = scenes[i - 1], b = scenes[i], plan = planTransition({ view: views.get(a.view), focus: byName(a.focus) }, { view: views.get(b.view), focus: byName(b.focus) }, { graph, scopeIds: scoped, journey: b.journey?.map(byName) });
     if (b.journey?.length && !plan.route.found) throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);
     if (plan.mode === "cross-kind" && !plan.route.found && !b.allowDisconnected) throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);
   }
   if (m.entryFocus && !byName(m.entryFocus)) throw Error("Starting element does not resolve: " + m.entryFocus);
-  for (let i = 0; i < scenes.length; i++) scenes[i] = await resolveAuthoredScene(scenes[i], { engine, modelHash: parsed.modelHash, graph });
+  for (let i = 0; i < scenes.length; i++) {
+    await checkpoint();
+    scenes[i] = await resolveAuthoredScene(scenes[i], { engine, modelHash: parsed.modelHash, graph });
+  }
   validateStoryContent(scenes, { files: project.files, pathFor: projectPath, resolve: byName });
   return { project, modelHash: parsed.modelHash, exported, graph, views, scenes, coverage, availableViews };
 }
@@ -7965,11 +8578,11 @@ function prominenceScope() {
 function busy(value) {
   $("landing").setAttribute("aria-busy", String(value));
   for (const control of $("landing").querySelectorAll("button:not(#resume-model)")) control.disabled = value;
-  $("loading").hidden = !value;
   for (const id of ["previous", "next", "scenes", "standalone", "return", "system-overview", "choose-package", "workspace-overview", "scope-up", "scope-clear", "view-navigation", "view-catalog", "fit", "show-neighborhood", "zoom-in", "zoom-out", "find-toggle", "edit"]) $(id).disabled = value;
 }
-async function loadProject(project, { cacheHash = state.trustedCacheHash, loadToken, demo = null, publication = null, readURL = false } = {}) {
-  const revision = loadToken ?? ++state.loadRevision;
+async function loadProject(project, { cacheHash = state.trustedCacheHash, loadToken, demo = null, publication = null, readURL = false, targetScene = 0, onReady } = {}) {
+  const operation = loadToken === void 0 ? beginLoading("Opening model\u2026", () => loadProject(project, { cacheHash, demo, publication, readURL, targetScene, onReady })) : state.loadOperation;
+  const revision = operation?.id ?? loadToken;
   if (revision !== state.loadRevision) return;
   ++state.revision;
   invalidateAuthoring();
@@ -7977,22 +8590,25 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
   $("landing-error").hidden = true;
   $("landing-error").textContent = "";
   busy(true);
-  status("Parsing project with OpenSysML WASM\u2026");
   $("selection").hidden = true;
   let compiled, lease;
   try {
+    operation.waitingEngine = true;
+    loadEvent(revision, state.engineProgress ?? { stage: "engine-start", label: "Starting the model engine\u2026" });
+    await yieldLoadingPaint();
+    assertLoading(revision);
     await state.projectDisplay?.finished;
-    await ensureEngine();
+    await (operation.enginePromise ?? ensureEngine());
+    operation.waitingEngine = false;
     if (revision !== state.loadRevision) return;
     lease = state.models.createLease();
     state.loadingLease = lease;
-    compiled = await compile(validateProject(project), { cacheHash, lease, progress: (text4) => {
-      if (revision === state.loadRevision) status(text4);
-    } });
+    compiled = await compile(validateProject(project), { cacheHash, lease, progress: (event) => loadEvent(revision, event), active: () => assertLoading(revision) });
   } catch (error) {
     await lease?.dispose();
     if (state.loadingLease === lease) state.loadingLease = null;
     if (revision !== state.loadRevision) return;
+    failLoading(revision, error);
     busy(false);
     $("previous").disabled = state.sceneIndex === 0;
     $("next").disabled = state.sceneIndex === state.scenes.length - 1;
@@ -8003,23 +8619,25 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
     return;
   }
   if (state.loadingLease === lease) state.loadingLease = null;
-  let initialScene = 0;
+  let initialScene = targetScene;
   try {
+    if (compiled.scenes.length && (!Number.isInteger(initialScene) || initialScene < 0 || initialScene >= compiled.scenes.length)) throw Error("The requested scene is not in this project.");
     if (readURL) {
       checkSharedModel(location.href, compiled.modelHash, publication);
       initialScene = sceneFromURL(location.href, compiled.scenes);
     }
   } catch (error) {
     await lease.dispose();
+    failLoading(revision, error);
     busy(false);
     throw error;
   }
   saveSurfaces();
   const previousLease = state.modelLease, savedURL = location.href, savedTitle = document.title;
-  const infrastructure = /* @__PURE__ */ new Set(["revision", "loadRevision", "loadingLease", "modelLease", "models", "engine", "engineInfo", "provenance", "layoutEngine", "authoringRequest", "authoringLease", "authoringCandidate", "authoringPreview", "authoringFocus", "projectDisplay"]);
+  const infrastructure = /* @__PURE__ */ new Set(["revision", "loadRevision", "loadingLease", "modelLease", "models", "engine", "engineInfo", "provenance", "layoutEngine", "authoringRequest", "authoringLease", "authoringCandidate", "authoringPreview", "authoringFocus", "projectDisplay", "loadOperation", "engineProgress"]);
   const previous = Object.fromEntries(Object.entries(state).filter(([key3]) => !infrastructure.has(key3)));
-  let finishDisplay, candidateAssets, accepted = false;
-  const display = { lease, finished: new Promise((resolve2) => {
+  let finishDisplay, candidateAssets, readyMessage, accepted = false;
+  const display = { lease, previousLease, finished: new Promise((resolve2) => {
     finishDisplay = resolve2;
   }) };
   state.projectDisplay = display;
@@ -8047,6 +8665,9 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
     if (revision !== state.loadRevision) showLanding(document, landingVisible);
   };
   try {
+    loadEvent(revision, { stage: "layout", label: "Laying out the first native view\u2026", detail: "Drawing routes and labels; completion time is unknown." });
+    await yieldLoadingPaint();
+    assertLoading(revision);
     state.modelLease = lease;
     disposeSurfaces();
     $("narrative").removeAttribute("data-scene-id");
@@ -8079,16 +8700,26 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
       return;
     }
     if (!state.view || expectedView && state.view.id !== expectedView || state.transitioning || state.displayed?.id !== state.view.id) throw Error("The initial native view did not become active; the preceding project has been retained.");
+    if (onReady) readyMessage = await onReady(() => assertLoading(revision));
+    if (revision !== state.loadRevision) {
+      await rollback();
+      return;
+    }
     accepted = true;
     previous.assetURLs?.destroy();
     await previousLease?.dispose();
     if (revision !== state.loadRevision) return;
     busy(false);
-    status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
+    finishLoading(revision);
+    status(readyMessage ?? `OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
     $("boundary").textContent = project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 traversal stays within supplied model" : "Complete project \xB7 standalone exploration available";
   } catch (error) {
     if (!accepted) await rollback();
-    if (revision === state.loadRevision) busy(false);
+    if (revision === state.loadRevision) {
+      busy(false);
+      failLoading(revision, error);
+    }
+    if (revision !== state.loadRevision) return;
     throw error;
   } finally {
     try {
@@ -8205,7 +8836,7 @@ function labelSize(text4) {
   span.remove();
   return { width: Math.ceil(rect3.width) + 4, height: 16 };
 }
-async function prepareFrame(view, focus, panels, { journey = false } = {}) {
+async function prepareFrame(view, focus, panels, { journey = false, revision = state.revision } = {}) {
   const stage = $("stage"), area = primaryArea(view, panels, journey);
   const overlay = !journey && state.renderingMode === "exploratory" && state.rollupsEnabled ? rollupDrawing(view) : { view, omissions: [], rollups: [] };
   const layoutFor = (compact) => layoutDiagram(sizeView(overlay.view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize, grouping: displayPreferences().grouping });
@@ -8222,7 +8853,7 @@ async function prepareFrame(view, focus, panels, { journey = false } = {}) {
   const routeObstacles = routed.flatMap((e) => e.points.slice(1).map((p, i) => ({ id: "route:" + e.id + ":" + i, x: Math.min(p.x, e.points[i].x) - 3, y: Math.min(p.y, e.points[i].y) - 3, width: Math.max(6, Math.abs(p.x - e.points[i].x) + 6), height: Math.max(6, Math.abs(p.y - e.points[i].y) + 6) })));
   const budget = view.traceRequest?.mode === "effective" ? 0 : renderingPolicy(state.renderingMode).contextBudget ?? state.neighborhoodBudget ?? displayPreferences().contextBudget, context = view.overview && !journey ? { view: { nodes: [], edges: [] }, elements: [], omissions: [] } : surroundingContext(state.graph, layout, { budget: journey ? Math.min(8, budget) : budget, focus, scopeIds: explorationScope(), prominenceScopeIds: prominenceScope() });
   context.view.nodes = context.view.nodes.map((node) => ({ ...node, ...measureCard(document, node, "") }));
-  const fringe = prepareNeighborhood(context, active2, area, { width: 160, height: 80, gap: 72, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize });
+  const fringe = await prepareNeighborhoodAsync(context, active2, area, { width: 160, height: 80, gap: 72, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize, isCurrent: () => revision === state.revision });
   const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.3, context: true, displayDetail: "", displayID: "" }));
   const markers = fringe.boundaryMarkers.map((n) => ({ ...n, scale: 1, opacity: 0.22, context: true, interactive: false }));
   const nodes = [...active2, ...ghosts, ...markers], counts = /* @__PURE__ */ new Map(), byID = /* @__PURE__ */ new Map();
@@ -8601,20 +9232,25 @@ async function frame(view, caption = "", duration = 0, focus = state.focus) {
     return transitionTo(pending.view, pending.focus, { animate: false, allowDisconnected: true, journey: pending.journey, camera: pending.cameraRevision === state.cameraRevision ? pending.camera : state.camera });
   }
   const revision = ++state.revision;
-  view = state.renderingMode === "focused" ? await displayNativeView(view) : view;
-  if (revision !== state.revision) return;
-  saveSurfaces();
-  disposeSurfaces();
-  const panels = panelGeometry(view);
-  if (rendererFamily(view) !== "graph") {
-    await renderSurfaces(view, focus, panels, revision);
-    return;
+  try {
+    view = state.renderingMode === "focused" ? await displayNativeView(view) : view;
+    if (revision !== state.revision) return;
+    saveSurfaces();
+    disposeSurfaces();
+    const panels = panelGeometry(view);
+    if (rendererFamily(view) !== "graph") {
+      await renderSurfaces(view, focus, panels, revision);
+      return;
+    }
+    const destination = await prepareFrame(view, focus, panels, { revision }), previous = state.visualSnapshot;
+    if (revision !== state.revision) return;
+    const result = await paintFrames(duration && previous ? [previous, destination] : [destination], { duration, caption });
+    if (!result?.cancelled && revision === state.revision) await renderSurfaces(view, focus, panels, revision);
+    return result;
+  } catch (error) {
+    if (error.code === "LAYOUT_CANCELED" && revision !== state.revision) return;
+    throw error;
   }
-  const destination = await prepareFrame(view, focus, panels), previous = state.visualSnapshot;
-  if (revision !== state.revision) return;
-  const result = await paintFrames(duration && previous ? [previous, destination] : [destination], { duration, caption });
-  if (!result?.cancelled && revision === state.revision) await renderSurfaces(view, focus, panels, revision);
-  return result;
 }
 async function displayNativeView(view, { mode = state.renderingMode, resolver: resolver2 = state.focusedViews } = {}) {
   if (mode !== "focused" || !resolver2) return view;
@@ -8834,7 +9470,7 @@ async function performTransition(view, focus, { animate = true, journey, allowDi
       oldPanel.setAttribute("aria-hidden", "true");
       $("stage").append(oldPanel);
     }
-    const panels = panelGeometry(view), projection2 = rendererFamily(view) === "graph" ? displayedView : gather(representedIdentities(view).filter((id) => element(id)).slice(0, 24)), target = await prepareFrame(projection2, focus, panels), frames = [];
+    const panels = panelGeometry(view), projection2 = rendererFamily(view) === "graph" ? displayedView : gather(representedIdentities(view).filter((id) => element(id)).slice(0, 24)), target = await prepareFrame(projection2, focus, panels, { revision }), frames = [];
     if (revision !== state.revision) {
       oldPanel?.remove();
       return;
@@ -8843,7 +9479,7 @@ async function performTransition(view, focus, { animate = true, journey, allowDi
       frames.push(state.visualSnapshot);
       if (plan?.journeyRequired && !disconnected) {
         for (const step of plan.stages.filter((step2) => step2.viewKind === "gv")) {
-          frames.push(await prepareFrame(gather(step.semanticIds, step.route), step.focusId ?? focus, panels, { journey: true }));
+          frames.push(await prepareFrame(gather(step.semanticIds, step.route), step.focusId ?? focus, panels, { journey: true, revision }));
           if (revision !== state.revision) {
             oldPanel?.remove();
             return;
@@ -8870,6 +9506,9 @@ async function performTransition(view, focus, { animate = true, journey, allowDi
     if (!state.exploring) status(`OpenSysML WASM \xB7 ${state.graph.elements.length} native elements \xB7 ${state.availableViews.length} views`);
     else status(state.traceInfo?.summary.message ?? "Explore this native view \xB7 select an element for contextual actions");
     $("boundary").textContent = state.exploring && state.packageScope ? `Package scope \xB7 ${qname(state.packageScope)} \xB7 external links disclosed in Context` : !scopeIds().includes(focus) ? "Outside presentation boundary \xB7 loaded model context" : state.project.manifest.publication.scope === "scoped" ? "Scoped publication \xB7 supplied model context only" : "Complete project \xB7 standalone exploration available";
+  } catch (error) {
+    if (error.code === "LAYOUT_CANCELED" && revision !== state.revision) return;
+    throw error;
   } finally {
     oldPanel?.remove();
     if (revision === state.revision) {
@@ -9391,11 +10030,12 @@ async function capture() {
     await lease.dispose();
   }
   if (revision !== state.revision || modelHash !== state.modelHash) return;
-  await loadProject(savePresentationLayouts(result.project, state.presentationLayouts));
-  await showScene(result.sceneIndex, false);
-  await retainCapturedLayout(sourceView, { targetViewId: result.viewName });
-  $("editor").close();
-  status("Native view captured. Export the project ZIP to retain its definition and slide.");
+  await loadProject(savePresentationLayouts(result.project, state.presentationLayouts), { targetScene: result.sceneIndex, onReady: async (active2) => {
+    await retainCapturedLayout(sourceView, { targetViewId: result.viewName });
+    active2();
+    $("editor").close();
+    return "Native view captured. Export the project ZIP to retain its definition and slide.";
+  } });
 }
 function renderHierarchy() {
   const request = state.hierarchyRequest ?? {}, result = hierarchyPage(state.graph, { ...request, query: $("hierarchy-search").value, scopeIds: explorationScope() });
@@ -9481,11 +10121,12 @@ async function submitQuestion() {
       await lease.dispose();
     }
     if (revision !== state.revision || modelHash !== state.modelHash) return;
-    await loadProject(savePresentationLayouts(result.project, state.presentationLayouts));
-    await showScene(result.sceneIndex, false);
-    await retainCapturedLayout(view, { targetViewId: result.viewName });
-    $("question-dialog").close();
-    status("Question appended as a native slide in this story. Export project ZIP to keep the conversation.");
+    await loadProject(savePresentationLayouts(result.project, state.presentationLayouts), { targetScene: result.sceneIndex, onReady: async (active2) => {
+      await retainCapturedLayout(view, { targetViewId: result.viewName });
+      active2();
+      $("question-dialog").close();
+      return "Question appended as a native slide in this story. Export project ZIP to keep the conversation.";
+    } });
   } finally {
     $("submit-question").disabled = false;
   }
@@ -9657,13 +10298,14 @@ async function appendAuthoring() {
   const sourceView = state.view, project = savePresentationLayouts(candidate.project, state.presentationLayouts);
   invalidateAuthoring();
   $("authoring-append").disabled = true;
-  await loadProject(project);
-  await showScene(candidate.sceneIndex, false);
-  await retainCapturedLayout(sourceView, { targetViewId: candidate.viewName });
-  invalidateAuthoring();
-  $("authoring-dialog").close();
-  $("editor").close();
-  status("Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.");
+  await loadProject(project, { targetScene: candidate.sceneIndex, onReady: async (active2) => {
+    await retainCapturedLayout(sourceView, { targetViewId: candidate.viewName });
+    active2();
+    invalidateAuthoring();
+    $("authoring-dialog").close();
+    $("editor").close();
+    return "Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.";
+  } });
 }
 function rollupDrawing(view) {
   if (!["definition", "interconnection", "tree", "mixed"].includes(view.kind)) return { view, omissions: [{ reason: "rollup-unsupported-view", message: "Typed rollups apply to structural graph projections; native behavioral and grid views remain intact." }], rollups: [] };
@@ -9741,6 +10383,7 @@ async function retainCapturedLayout(sourceView, { targetViewId = scene()?.view }
     state.project = savePresentationLayouts(state.project, state.presentationLayouts);
     await frame(state.view);
   }
+  if (loadRevision !== state.loadRevision) return;
   if (result.omissions.length) status(result.omissions.map((o) => o.message).join(" "));
 }
 function contextNotice(notice2) {
@@ -9999,9 +10642,10 @@ function bind() {
       const presentation = editorPresentation(), regions = updateRegionReferences(scene().regions ?? [], $("scene-regions").value.split("\n").map((s) => s.trim()).filter(Boolean)), index5 = state.sceneIndex, project = structuredClone(state.project), scenes = structuredClone(state.scenes);
       Object.assign(scenes[index5], { ...scenes[index5].narrative ? { narrative: { ...scenes[index5].narrative, template: $("scene-prose").value } } : {}, ...editorStoryContent(), presentation, regions, title: $("scene-title").value, markdown: $("scene-prose").value, panel: { placement: $("panel-placement").value } });
       project.files[project.manifest.story] = writeStory(project.manifest.title, scenes);
-      await loadProject(project);
-      $("editor").close();
-      await showScene(index5, false);
+      await loadProject(project, { targetScene: index5, onReady: (active2) => {
+        active2();
+        $("editor").close();
+      } });
     } catch (e) {
       report(e);
     }
@@ -10011,8 +10655,10 @@ function bind() {
     try {
       const project = structuredClone(state.project);
       project.files[$("view-file").value] = $("view-source").value;
-      await loadProject(project);
-      $("editor").close();
+      await loadProject(project, { onReady: (active2) => {
+        active2();
+        $("editor").close();
+      } });
     } catch (e) {
       report(e);
     }
@@ -10021,81 +10667,50 @@ function bind() {
   $("open-folder").onclick = () => $("folder-files").click();
   $("landing-project").onclick = () => $("project-file").click();
   for (const [id, folder] of [["sysml-files", false], ["folder-files", true]]) $(id).onchange = async () => {
-    const request = ++state.loadRevision;
-    ++state.revision;
-    discardLoadingModel();
-    try {
-      if ($(id).files.length) {
-        busy(true);
-        $("landing-error").hidden = true;
-        const project = await projectFromSelection($(id).files, { folder });
-        if (request !== state.loadRevision) return;
-        await loadProject(project, { cacheHash: null, loadToken: request });
-      }
-    } catch (error) {
-      if (request === state.loadRevision) report(error);
-    } finally {
-      if (request === state.loadRevision) busy(false);
-      $(id).value = "";
-    }
+    const files = Array.from($(id).files ?? []);
+    $(id).value = "";
+    await openSelectedFiles(files, { folder });
   };
   for (const demo of document.querySelectorAll("[data-demo]")) demo.onclick = () => openDemo(demo.dataset.demo).catch(report);
   $("home").onclick = home;
   $("resume-model").onclick = async () => {
-    const revision = ++state.loadRevision;
-    ++state.revision;
-    discardLoadingModel();
-    if (state.projectDisplay) await state.projectDisplay.finished;
-    if (revision !== state.loadRevision) return;
-    busy(false);
-    showLanding(document, false);
-    document.title = state.project.manifest.title + " \xB7 Syspresent";
-    await frame(state.view).catch(report);
+    try {
+      state.loadOperation?.abort.abort();
+      if (state.loadOperation) loadingProgress.cancel(state.loadOperation.id);
+      state.loadOperation = null;
+      const revision = ++state.loadRevision;
+      ++state.revision;
+      discardLoadingModel();
+      if (state.projectDisplay) await state.projectDisplay.finished;
+      if (revision !== state.loadRevision) return;
+      if (state.engine?.closed || state.modelLease?.engine.closed) {
+        await loadProject(state.project, { cacheHash: state.trustedCacheHash, demo: state.demo, publication: state.publication, targetScene: state.sceneIndex });
+        return;
+      }
+      busy(false);
+      showLanding(document, false);
+      document.title = state.project.manifest.title + " \xB7 Syspresent";
+      await frame(state.view);
+      if (revision === state.loadRevision) status("OpenSysML WASM \xB7 " + state.graph.elements.length + " native elements \xB7 " + state.availableViews.length + " views");
+    } catch (error) {
+      report(error);
+    }
   };
   $("import-project").onclick = () => {
     $("project-file").click();
   };
   $("project-file").onchange = async () => {
-    const request = ++state.loadRevision;
-    ++state.revision;
-    discardLoadingModel();
-    try {
-      const file = $("project-file").files[0];
-      if (file) {
-        busy(true);
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        if (request !== state.loadRevision) return;
-        await loadProject(unpackProject(bytes), { cacheHash: null, loadToken: request });
-      }
-    } catch (e) {
-      if (request === state.loadRevision) report(e);
-    } finally {
-      if (request === state.loadRevision) busy(false);
-      $("project-file").value = "";
-    }
+    const file = $("project-file").files[0];
+    $("project-file").value = "";
+    await openProjectFile(file);
   };
   $("import-markdown").onclick = () => {
     $("markdown-file").click();
   };
   $("markdown-file").onchange = async () => {
-    const request = ++state.loadRevision;
-    ++state.revision;
-    discardLoadingModel();
-    try {
-      const file = $("markdown-file").files[0];
-      if (file) {
-        busy(true);
-        const project = structuredClone(state.project);
-        project.files[project.manifest.story] = await file.text();
-        if (request !== state.loadRevision) return;
-        await loadProject(project, { loadToken: request });
-      }
-    } catch (e) {
-      if (request === state.loadRevision) report(e);
-    } finally {
-      if (request === state.loadRevision) busy(false);
-      $("markdown-file").value = "";
-    }
+    const file = $("markdown-file").files[0];
+    $("markdown-file").value = "";
+    await openMarkdownFile(file);
   };
   $("export-project").onclick = () => {
     try {

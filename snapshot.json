@@ -1,17 +1,17 @@
 {
   "schemaVersion": "syspresent.canvas-prototype.v1",
-  "revision": "3692c3a4d3a7a6072658276164dc62ca19b32cdf",
+  "revision": "0a3f5c3489010d3ad61d5a1da02fb4f55adf0c4e",
   "dirty": false,
   "assets": {
-    "app.js": "45c70f22196816a0ccd6c3833a9dfda5a06fd3b8c13418f4e94dc08937cb5922",
-    "app.js.map": "dc3a35b2f2115400431152dc676c04e99e52ab3f5b16f5077319b80367bab896",
+    "app.js": "2c7a4a53213b8cf2c07ead34e8cc3214075e61b7f2434aa3105ee7ed598c1805",
+    "app.js.map": "f3f31b8567e70d3b300d118da185b23545b8399f709d468a56272b707ea2d587",
     "grid-view.css": "278f10af64cc69113a410661a36c6525e5babf2c56b39d73186ac98f69e3d5e9",
     "sequence-view.css": "8b9dd777f5d82e329bb7711c001987311c086e39def966498634c6755cca6c6d",
     "behavior-view.css": "6494406e52d093e6846eb55c5f2906cddba2936d00b2c44947d794aef56488ac",
     "scene-regions.css": "84b487e209b0d8eccb65f4137e9c41373b4b29fc9920504ebd76cb279b1bc9eb",
     "focused-notation.css": "1dcfa4dd754595fbbeaa82f48d04aa1049448483c0aefd7b8ff5df6804ceb1c4",
-    "index.html": "7755c6b6f951a1989af5b6467f52c03a6ec16de3133ededab581aa407cce19b2",
-    "canvas.css": "9239bdcbfa93dbd79e72e0b04c21e4e9bca59f448133c3c096530a29e50424b2",
+    "index.html": "71ff9e395d25ac344e80fb1556cf869e8be464a47cea45bd804f2176fe069d41",
+    "canvas.css": "e8fd3d07f6a5a7a9dc7a51d721fac42cae122d99633132120c6564a4ecd9466c",
     "LICENSE": "ddd8327daa7878abe8284332d97059ff64738ef747356c8d8997c77533f968e4",
     "THIRD_PARTY_NOTICES": "b04bdd38ab0060463d56f4a56ba705e6d68677b72f1583603bc427575687cca0",
     "engine/sysml-wasm.wasm": "08d0dba488d71551e897b6128ce7f79ad3af10a0a2e0671443916c5af2356c24",
@@ -19,7 +19,7 @@
     "engine/provenance.json": "0eba3b8974a7e1c0538e63f8d71edb43ac00adaee0fc8b242dadca7a64f5c576",
     "engine/OPENSYSML-LICENSE": "88bb6635d016ec5c3fd1e00f55930f5b710cc092e7503e7f356188ecd2526bd6",
     "engine/GO-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
-    "engine/worker.js": "b29c65798e662a75368b752194968e6b4556be932efa53d69e855620447ae9c3",
+    "engine/worker.js": "f21717d16bbd45af857fb4c007abd66ff811b91ebb93de8c12c6565c23099606",
     "notices/fflate-LICENSE": "805f6cb28bb8b6d3a0badd83c93bccd9671fa01a3b4b92b7042b0743325ac243",
     "notices/elkjs-LICENSE": "637e81f4a1b6b4079535c499fca05e238cf7605c1ff5b76d60d7da7ce96700c9",
     "layout/elk-worker.js": "e4f5c51c6f2fd564bb64e52e81c4a85a316ef2f24f8b90e1db5eb886c765b030",
@@ -137,7 +137,7 @@
     "demos/flashlight.zip": "3061b5e2180a1ffa17c8b47c7f2e09a00cdf35693766a5238277d6fbbba2d11a",
     "demos/views.zip": "c10ea62a1ed522f350dc982bf4194ab81eebbf81f097213b632ce15e592278a2",
     "demos.json": "9e571bf5e9ce1d3a9f4728b0bbff742ad685e9d17af954b5eb18e33686619692",
-    "build-inputs.json": "48df8c51d83d40e82af6f38900859449cc288645cb33723629ba1bbb8960e01f"
+    "build-inputs.json": "8f0ae062920fdbbebfb486acedcf5f56921a78f9c38a38b0bce160f279cca717"
   },
   "engine": {
     "schemaVersion": 1,
