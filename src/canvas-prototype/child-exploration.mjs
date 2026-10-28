@@ -95,6 +95,17 @@ export function completeChildContext(graph,options={}){
   if(edge.kind==='containment'&&edge.nativeRole!=='owner')continue;
   selected.set(edgeKey(edge),edge);
  }
+ // Genuine one-hop relationship context stays disclosed without becoming child membership.
+ const relationshipContext={total:0,outsideScope:0,unavailable:0,notOpened:0,kindCounts:{}};
+ for(const edge of edges){
+  const sourceShown=wanted.has(edge.source),targetShown=wanted.has(edge.target);
+  if(sourceShown===targetShown)continue;
+  const other=sourceShown?edge.target:edge.source,anchor=sourceShown?edge.source:edge.target;
+  const reason=!elements.has(other)?'unavailable':scope&&!scope.has(other)?'outside-scope':'not-opened';
+  omissions.push({relationshipId:edge.id??null,nativeRelationship:edge.nativeRelationship??null,kind:edge.kind,source:edge.source,target:edge.target,semanticSource:edge.source,semanticTarget:edge.target,otherEndpoint:other,anchor,reason,contextOnly:true,message:'Native relationship context: '+reason+' · '+edge.kind+' · '+edge.source+' → '+edge.target+' · relationship '+(edge.id??'(unavailable)')+' · native identity '+(edge.nativeRelationship??'(not projected)')+'. Endpoints are not added; child membership is unchanged.',...(edge.nativeRole?{nativeRole:edge.nativeRole}:{}),...(edge.occurrences?{occurrences:edge.occurrences}:{})});
+  relationshipContext.total++;relationshipContext[reason==='outside-scope'?'outsideScope':reason==='not-opened'?'notOpened':'unavailable']++;
+  relationshipContext.kindCounts[edge.kind]=(relationshipContext.kindCounts[edge.kind]??0)+1;
+ }
  const declarationOwners=Object.fromEntries(childIds.map(id=>[id,[...children.get(id)].sort(compare)]));
  const declaredOn=Object.fromEntries(childIds.map(id=>[id,declarationOwners[id].length===1?declarationOwners[id][0]:null]));
  const kindCounts={};for(const id of childIds){const kind=elements.get(id).kind;kindCounts[kind]=(kindCounts[kind]??0)+1;}
@@ -108,13 +119,14 @@ export function completeChildContext(graph,options={}){
  if(outside.size)message+=` ${outside.size} native target${outside.size===1?' is':'s are'} outside the isolated scope.`;
  if(unavailable.size)message+=` ${unavailable.size} referenced target${unavailable.size===1?' is':'s are'} unavailable in this projection.`;
  if(filtered.size-outside.size)message+=` ${filtered.size-outside.size} target${filtered.size-outside.size===1?' is':'s are'} excluded by explicit policy or unavailable declaration data.`;
+ if(relationshipContext.total)message+=' '+relationshipContext.total+' actual native relationship context links are not opened ('+relationshipContext.outsideScope+' outside scope, '+relationshipContext.unavailable+' unavailable, '+relationshipContext.notOpened+' available but not opened); exact identities and direction are disclosed separately without adding endpoints or changing child counts.';
  message+=' Only immediate native owners and one direct typing hop are opened; drill into a child to continue. Counts describe the loaded projection, not proof that omitted model content is absent.';
  if(!roots.length)message='The selected native declaration is unavailable or outside this scope.';
  const childProjection={rootIds:roots,childIds,ownChildIds:[...own].sort(compare),definitionChildIds:[...defined].sort(compare),typeIds,declaredOn,declarationOwners,ownership,complete:true,kindCounts};
  return structuredClone({
   elements:[...wanted].map(id=>elements.get(id)),relationships:[...selected.values()].sort((a,b)=>compareText(edgeKey(a),edgeKey(b))),omissions,
   mode:'contents',focus,rootIds:roots,page:0,pages:1,total:count,shown:count,targets:childIds,budget:null,typingBridges:[...bridgeEdges.values()].map(edge=>edge.id),childProjection,
-  summary:{status:roots.length?(count?'shown':unavailable.size?'unavailable':'no-known-children'):'missing-focus',message,shown:count,total:count,unavailable:unavailable.size,filtered:filtered.size,outsideScope:outside.size,ownChildren:own.size,definitionChildren:defined.size,complete:true,kindCounts}
+  summary:{status:roots.length?(count?'shown':unavailable.size?'unavailable':'no-known-children'):'missing-focus',message,shown:count,total:count,unavailable:unavailable.size,filtered:filtered.size,outsideScope:outside.size,ownChildren:own.size,definitionChildren:defined.size,complete:true,kindCounts,relationshipContext}
  });
 }
 

@@ -15,7 +15,7 @@ const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfIn
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
 async function pickPackage(h,name){const d=h.document;d.getElementById('choose-package').click();const search=d.getElementById('package-search');search.value=name;search.dispatchEvent(new h.window.Event('input'));const choice=[...d.querySelectorAll('#package-list button')].find(b=>b.textContent===name);assert.ok(choice,'native package is offered');choice.click();await until(()=>!d.getElementById('package-dialog').open&&sceneSettled(d));}
-async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,rollupFixture=false,nativeCaptureFixture=false,sequenceCaptureFixture=false,authoringFixture=false,lifecycleFixture=false,focusedFixture=false,behaviorFixture=false,parameterFixture=false,initialCount=2,size={width:1000,height:700}}={}){
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,extraRootCount=0,rollupFixture=false,nativeCaptureFixture=false,sequenceCaptureFixture=false,authoringFixture=false,lifecycleFixture=false,focusedFixture=false,behaviorFixture=false,parameterFixture=false,initialCount=2,size={width:1000,height:700}}={}){
  let workerCount=0,resizeCallback;const nativeModels=new Set(),sourceHashes=new Map();const nativeRequests=[],nativeCalls=[],fetchCalls=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
  if(storyContent){const block=JSON.parse(fixtureFiles['story.md'].split('```syspresent\n')[1].split('\n```')[0]);Object.assign(block,{chapter:{id:'challenge',title:'Challenge'},figures:[{id:'course',title:'Course map',asset:'assets/course.svg',alt:'Course map',caption:'Illustrative course.',provenance:{source:'Model',context:'Fixture'},modelRefs:['Model::req']}],context:[{kind:'candidate',title:'Candidate',text:'Proposed boat.',modelRefs:['Model::part']}]});fixtureFiles['story.md']='```syspresent\n'+JSON.stringify(block)+'\n```\n\nRead [the requirement](model:Model::req) and [hidden context](model:Model::orphan).';fixtureFiles['assets/course.svg']='<svg xmlns="http://www.w3.org/2000/svg"/>';}
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
@@ -32,10 +32,12 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
  const fixtureManifest={...manifest,...(entryView?{entryView}:{}),...(entryFocus?{entryFocus}:{})};
  if(noStory)fixtureFiles['story.md']='# Explore the supplied model\n\nNo authored scenes.';
  if(overviewFixture)structuralRaw.push({'@id':'outside','@type':'PartDefinition',qualifiedName:'Foreign::outside',declaredName:'outside','sysx:sourceLine':14},{'@id':'outside-dependency','@type':'Dependency',client:[{'@id':'definition'}],supplier:[{'@id':'outside'}]});
+ if(extraRootCount)structuralRaw.push(...Array.from({length:extraRootCount},(_,i)=>({'@id':'extra-root-'+i,'@type':'PartDefinition',qualifiedName:'ExtraRoot'+i,declaredName:'ExtraRoot'+i,'sysx:sourceLine':140+i})));
  if(overviewPort)structuralRaw.push({'@id':'control-port','@type':'PortUsage',qualifiedName:'Model::controlPort',declaredName:'controlPort',owner:{'@id':'Model'},'sysx:sourceLine':15});
  let renderOverride;let authoredViews=[],holdNextParse=false,capturedNative=false,pendingRender,holdLayout=false,holdCountdown=null;const heldLayouts=[],heldParses=[];
  const massValue={numerator:'1',denominator:'4'};const window=new JSDOM(html,{url,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole()}).window;
  if(storedSettings)window.localStorage.setItem('syspresent.reader.v1',JSON.stringify(storedSettings));
+ let holdNextYield=false;const heldYields=[],nativeSetTimeout=window.setTimeout.bind(window);window.setTimeout=(callback,delay,...args)=>holdNextYield&&delay===0?(holdNextYield=false,heldYields.push(()=>nativeSetTimeout(callback,0,...args)),0):nativeSetTimeout(callback,delay,...args);
  const blobs=new Map(),downloads=[];window.Blob=Blob;window.TextDecoder=TextDecoder;window.TextEncoder=class{encode(value){return new window.Uint8Array(new TextEncoder().encode(value));}};window.URL.createObjectURL=blob=>{const url='blob:fixture-'+blobs.size;blobs.set(url,blob);return url;};window.URL.revokeObjectURL=()=>{};const anchorClick=window.HTMLAnchorElement.prototype.click;window.HTMLAnchorElement.prototype.click=function(){if(this.download)downloads.push({name:this.download,blob:blobs.get(this.href)});else anchorClick.call(this);};
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};const ownRealm=value=>{if(value===null||typeof value!=='object')return value;if(ArrayBuffer.isView(value))return new window.Uint8Array(value);if(Array.isArray(value))return window.Array.from(value,ownRealm);if(value instanceof Set)return new window.Set([...value].map(ownRealm));if(value instanceof Map)return new window.Map([...value].map(([k,v])=>[ownRealm(k),ownRealm(v)]));return window.Object.fromEntries(Object.entries(value).map(([k,v])=>[k,ownRealm(v)]));};window.structuredClone=value=>ownRealm(structuredClone(value));window.ResizeObserver=class{constructor(fn){resizeCallback=fn;}observe(){}};
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
@@ -56,7 +58,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(fixtureNative));
  }terminate(){}};
  window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,nativeCalls,fetchCalls,setFetch:handler=>{fetchOverride=handler;},workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===initialCount)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,nativeRequests,nativeCalls,nativeModels,fetchCalls,downloads,failWorker:()=>semanticWorkers.at(-1).onerror({message:'Native worker lost'}),setNativeRender:handler=>{renderOverride=handler;},setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,layoutPendingCount:()=>heldLayouts.length,releaseNextLayout:error=>heldLayouts.shift()?.(error),releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ return {window,nativeRequests,nativeCalls,nativeModels,fetchCalls,downloads,holdYield:()=>{holdNextYield=true;},yieldPending:()=>heldYields.length>0,releaseYield:()=>heldYields.splice(0).forEach(reply=>reply()),failWorker:()=>semanticWorkers.at(-1).onerror({message:'Native worker lost'}),setNativeRender:handler=>{renderOverride=handler;},setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,layoutPendingCount:()=>heldLayouts.length,releaseNextLayout:error=>heldLayouts.shift()?.(error),releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('package workspace scopes search and traversal, offers native view switching and restores scene handoff',async()=>{
  const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
@@ -70,7 +72,7 @@ test('package workspace scopes search and traversal, offers native view switchin
   assert.ok(d.querySelectorAll('#search-results button').length);assert.ok([...d.querySelectorAll('#search-results button')].every(b=>['Model::Nested','Model::req','Model::Nested::Run'].includes(b.textContent)));
   d.getElementById('find-toggle').click();d.querySelector('[data-semantic-id="req"]').click();action(d,'Focus').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.includes('req'));
   assert.deepEqual(activeIDs(d),['req']);assert.equal(d.querySelector('[data-semantic-id="part"]'),null);
-  d.getElementById('context-details').click();assert.match(d.getElementById('information-text').textContent,/outside-scope/);d.getElementById('information').close();
+  d.getElementById('context-details').click();assert.match(d.getElementById('information-text').textContent,/All 0 loaded immediate source declarations shown/);assert.match(d.getElementById('information-text').textContent,/outside-scope/,'actual native links crossing the isolated scope remain disclosed separately from children');d.getElementById('information').close();
   d.getElementById('view-navigation').value='authored:Views::requirements';d.getElementById('view-navigation').dispatchEvent(new h.window.Event('change'));
   await until(()=>d.getElementById('status').textContent.includes('outside Nested'));
   assert.deepEqual(activeIDs(d),['req']);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
@@ -79,7 +81,7 @@ test('package workspace scopes search and traversal, offers native view switchin
   const chooser=d.getElementById('view-navigation');chooser.value='native:action';chooser.dispatchEvent(new h.window.Event('change'));await until(h.pending);h.release();
   await until(()=>sceneSettled(d)&&chooser.value==='native:action'&&d.querySelector('[data-semantic-id="run"] .name')?.textContent==='Native run activity');assert.equal(h.nativeRequests.at(-1),'#action:Model::Nested::Run');assert.deepEqual(activeIDs(d),['run']);
   assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
-  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&chooser.value==='context').catch(error=>{throw Error(error.message+': '+chooser.value+' / '+d.getElementById('exploration-label').textContent+' / '+d.getElementById('status').textContent);});assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.deepEqual(activeIDs(d),['run']);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&chooser.value==='contents').catch(error=>{throw Error(error.message+': '+chooser.value+' / '+d.getElementById('exploration-label').textContent+' / '+d.getElementById('status').textContent);});assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.deepEqual(activeIDs(d),['run']);
   d.getElementById('return').click();await until(()=>sceneSettled(d)&&!d.getElementById('narrative').hidden);assert.equal(d.getElementById('workspace-controls').hidden,true);
   d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
  }finally{h.window.close();}
@@ -189,9 +191,14 @@ test('cancelled explicit-jump animation cannot commit over a newer restored scen
  assert.equal(d.querySelectorAll('.node').length,2);assert.equal(d.getElementById('return').hidden,true);h.window.close();
 });
 
-test('exploring a scene keeps its native diagram and gives the canvas the prose space',async()=>{
- const h=await harness(),d=h.document;const identities=[...d.querySelectorAll('.node')].map(e=>e.dataset.semanticId);d.getElementById('standalone').click();await until(()=>d.getElementById('narrative').hidden);
- assert.deepEqual([...d.querySelectorAll('.node')].map(e=>e.dataset.semanticId),identities);await until(()=>d.getElementById('status').textContent.includes('Explore this native view'));h.window.close();
+test('Explore opens all source ownership roots and gives the canvas the prose space',async()=>{
+ const h=await harness(),d=h.document;
+ try{
+  d.getElementById('standalone').click();await until(()=>d.getElementById('narrative').hidden&&sceneSettled(d));
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','part','req','view']));
+  assert.match(d.getElementById('status').textContent,/All 5 roots of the loaded source ownership projection shown/);
+  assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
+ }finally{h.window.close();}
 });
 
 test('Fit during a journey completes the current destination instead of restoring the previous diagram',async()=>{
@@ -331,10 +338,10 @@ test('part and package actions expose structural context on the canvas and histo
  const active=()=>[...d.querySelectorAll('.node[data-context="false"]')];
  const clickAction=text=>{const control=[...d.querySelectorAll('#selection button')].find(b=>b.textContent===text);assert.ok(control,text);control.click();};
  d.querySelector('[data-semantic-id="part"]').click();clickAction('Focus');
- await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Effective requirements'));
- assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['part','req']));
- assert.equal(d.querySelector('.node[data-context="true"]'),null,'effective requirements keep collapsed inheritance out of peripheral context');
- assert.equal(d.querySelectorAll('#connections g[data-kind="typing"][data-context="false"]').length,0);
+ await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Parts / contents'));
+ assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['part','definition','sensor','processor']));
+ assert.equal(d.querySelector('.node[data-context="true"]'),null,'complete contents do not add engineering neighbors');
+ assert.equal(d.querySelectorAll('#connections g[data-kind="typing"][data-context="false"]').length,1);
  d.querySelector('.node[data-context="false"][data-semantic-id="part"]').click();
  const local=[...d.querySelectorAll('#selection button')].find(b=>b.textContent.startsWith('Local understanding'));assert.ok(local);local.click();
  await until(()=>active().length===5&&d.getElementById('status').textContent.includes('matching structural'));
@@ -354,8 +361,8 @@ test('part and package actions expose structural context on the canvas and histo
  d.querySelector('.node[data-context="false"][data-semantic-id="Model"]').click();clickAction('Parts / contents (3)');
  await until(()=>d.getElementById('exploration-label').textContent.startsWith('Parts / contents · Model')&&active().length===4&&active().some(n=>n.dataset.semanticId==='nested'));
  assert.deepEqual(new Set(active().map(n=>n.dataset.semanticId)),new Set(['Model','part','definition','nested']));
- const owned=[...d.querySelectorAll('#connections g[data-kind="containment"][data-context="false"]')];assert.equal(owned.length,3);assert.ok(owned.every(g=>g.dataset.source==='Model'));
- assert.ok(d.getElementById('status').textContent.includes('Package ownership is location context'));h.window.close();
+ const framed=[...d.querySelectorAll('.node[data-context="false"]')].filter(n=>n.dataset.semanticId!=='Model');assert.equal(framed.length,3);assert.equal(d.querySelectorAll('#connections g[data-kind="containment"][data-context="false"]').length,0,'native owner links are containing frames, not invented engineering edges');
+ assert.match(d.getElementById('status').textContent,/All 3 loaded immediate source declarations shown/);h.window.close();
 });
 
 
@@ -444,21 +451,20 @@ test('a plain SysML selection opens exploration without a manifest or authored s
  assert.equal(d.getElementById('editor-error').textContent,'');h.window.close();
 });
 
-test('a storyless project opens a bounded system overview with metrics and no automatic peripheral neighborhood',async()=>{
+test('a storyless project opens every native ownership projection root without recursive expansion or neighbors',async()=>{
  const h=await harness({noStory:true,structuralFixture:true,overviewFixture:true}),d=h.document;
- assert.match(d.getElementById('exploration-label').textContent,/^System overview/);
- assert.equal(d.getElementById('narrative').hidden,true);assert.equal(d.getElementById('return').hidden,true);
- const ids=activeIDs(d);assert.ok(ids.length>1&&ids.length<=9);assert.ok(ids.includes('definition'));
- assert.ok(!ids.includes('outside'),'a linked declaration outside native roots is not an overview candidate');
- assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0,'overview budget does not gain the default 48 neighbors');
- const metric=d.querySelector('.node[data-semantic-id="definition"] .prominence');
- assert.ok(metric,'the overview explains each selected component');assert.match(metric.textContent,/2 children.*\d+ neighbors/);
- assert.ok(d.getElementById('more-neighbors').hidden||d.getElementById('more-neighbors').disabled);
- assert.equal(d.getElementById('context-details').hidden,false);d.getElementById('context-details').click();
- assert.equal(d.getElementById('information-title').textContent,'Overview selection');
- assert.match(d.getElementById('information-text').textContent,/children|neighbors|rank|importance|prominen/i);
- assert.ok(d.getElementById('information-text').textContent.length>60,'ranking and scoped-selection details remain available');
- h.window.close();
+ try{
+  assert.match(d.getElementById('exploration-label').textContent,/^Whole project roots · 5 of 5/);
+  assert.equal(d.getElementById('narrative').hidden,true);assert.equal(d.getElementById('return').hidden,true);
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','req','view','outside']));
+  assert.ok(!activeIDs(d).includes('definition'),'owned declarations wait for intentional package drilldown');
+  assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
+  assert.equal(d.getElementById('more-neighbors').hidden,true);
+  assert.equal(d.getElementById('context-details').hidden,false);d.getElementById('context-details').click();
+  assert.equal(d.getElementById('information-title').textContent,'Complete contents and native ownership');
+  assert.match(d.getElementById('information-text').textContent,/loaded source ownership projection/);
+  assert.match(d.getElementById('information-text').textContent,/No recursive model expansion/);
+ }finally{h.window.close();}
 });
 
 test('authored scenes and explicit standalone entry overrides take precedence over automatic overview',async()=>{
@@ -469,8 +475,8 @@ test('authored scenes and explicit standalone entry overrides take precedence ov
   {noStory:true,entryView:'Views::requirements',entryFocus:'Model::part'}
  ]){
   const h=await harness({...options,structuralFixture:true,overviewFixture:true}),d=h.document;
-  assert.doesNotMatch(d.getElementById('exploration-label').textContent,/^System overview/,JSON.stringify(options));
-  assert.equal(d.querySelectorAll('.prominence').length,0,'overview metadata must not bleed into authored or focused views');
+  assert.doesNotMatch(d.getElementById('exploration-label').textContent,/^Whole project roots/,JSON.stringify(options));
+  if(options.entryView||!options.noStory)assert.equal(d.querySelectorAll('.prominence').length,0,'complete contents metadata must not bleed into authored views');
   if(options.entryView||!options.noStory)assert.deepEqual(activeIDs(d).sort(),['part','req']);
   else assert.ok(activeIDs(d).includes('part'));
   assert.equal(d.getElementById('narrative').hidden,options.noStory);
@@ -478,68 +484,84 @@ test('authored scenes and explicit standalone entry overrides take precedence ov
  }
 });
 
-test('overview ports show metrics as readable cards while retaining native port identity',async()=>{
+test('package contents show native ports as readable declaration cards with exact sibling membership',async()=>{
  const h=await harness({noStory:true,structuralFixture:true,overviewPort:true}),d=h.document;
  try{
+  assert.equal(d.querySelector('.node[data-context="false"][data-semantic-id="control-port"]'),null,'owned port is behind its explicit owner at project root level');
+  await pickPackage(h,'Model');
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','definition','nested','part','control-port']));
   const port=d.querySelector('.node[data-context="false"][data-semantic-id="control-port"]');
-  assert.ok(port);assert.ok(port.classList.contains('port'));assert.ok(port.classList.contains('overview-card'));
-  assert.match(port.querySelector('.prominence').textContent,/0 children.*0 neighbors/);
-  assert.match(port.getAttribute('aria-label'),/controlPort: select port/);
+  assert.ok(port);assert.ok(port.classList.contains('PortUsage'));assert.ok(!port.classList.contains('port'));
+  assert.match(port.getAttribute('aria-label'),/controlPort: select PortUsage/);
   assert.ok(parseFloat(port.style.width)>=160);assert.ok(parseFloat(port.style.height)>=76);
-  port.click();assert.equal(port.classList.contains('selected'),true);
-  assert.match(d.getElementById('selection').textContent,/0 direct children.*0 distinct connected elements/);
+  const before=port.style.transform;port.click();assert.equal(port.classList.contains('selected'),true);assert.equal(port.style.transform,before);
+  assert.ok([...d.querySelectorAll('#selection button')].some(button=>button.textContent==='Focus'));
  }finally{h.window.close();}
 });
 
-test('a resize restarting pending overview layout commits its overview heading and ignores the older layout',async()=>{
- const h=await harness({structuralFixture:true,reducedMotion:false}),d=h.document;
+test('a resize restarting pending complete-root layout commits current membership and ignores an older yield',async()=>{
+ const h=await harness({structuralFixture:true,extraRootCount:40,reducedMotion:false}),d=h.document;
  try{
-  h.holdLayout();d.getElementById('system-overview').click();await until(h.layoutPending);
+  h.holdYield();d.getElementById('system-overview').click();await until(h.yieldPending);
   h.resize(1000,650);
-  await until(()=>d.querySelectorAll('.prominence').length>0&&sceneSettled(d));
-  assert.match(d.getElementById('exploration-label').textContent,/^System overview/);
+  await until(()=>d.getElementById('exploration-label').textContent.startsWith('Whole project roots · 44 of 44')&&sceneSettled(d));
   assert.equal(d.getElementById('narrative').hidden,true);
-  const ids=activeIDs(d);h.releaseLayout();await new Promise(resolve=>setTimeout(resolve,40));
-  assert.match(d.getElementById('exploration-label').textContent,/^System overview/);
+  const expected=new Set(['Model','orphan','req','view',...Array.from({length:40},(_,i)=>'extra-root-'+i)]);
+  assert.deepEqual(new Set(activeIDs(d)),expected);
+  const ids=activeIDs(d);h.releaseYield();await new Promise(resolve=>setTimeout(resolve,40));
+  assert.match(d.getElementById('exploration-label').textContent,/^Whole project roots · 44 of 44/);
   assert.deepEqual(activeIDs(d),ids);assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
- }finally{h.releaseLayout();h.window.close();}
+ }finally{h.releaseYield();h.window.close();}
 });
 
-test('overview selection stays stationary and explicit contents exploration restores metrics, camera and zero neighbors through Back',async()=>{
+test('complete-root selection stays stationary and child drilldown restores exact geometry and camera through history',async()=>{
  const h=await harness({noStory:true,structuralFixture:true,overviewFixture:true}),d=h.document;
- const geometry=()=>[...d.querySelectorAll('.node[data-context="false"]')].map(n=>[n.dataset.semanticId,n.style.transform]);
- const original=geometry(),metrics=[...d.querySelectorAll('.prominence')].map(n=>n.textContent);
- d.getElementById('graph-viewport').dispatchEvent(new h.window.WheelEvent('wheel',{deltaY:120,clientX:180,clientY:170,bubbles:true,cancelable:true}));
- const camera=d.getElementById('graph-world').style.transform;
- d.querySelector('.node[data-context="false"][data-semantic-id="definition"]').click();
- assert.deepEqual(geometry(),original);assert.deepEqual([...d.querySelectorAll('.prominence')].map(n=>n.textContent),metrics);
- assert.equal(d.getElementById('graph-world').style.transform,camera);
- const expand=[...d.querySelectorAll('#selection button')].find(b=>b.textContent==='Expand contents');assert.ok(expand);expand.click();
- await until(()=>d.getElementById('exploration-label').textContent.startsWith('Parts / contents')&&activeIDs(d).includes('sensor'));
- assert.ok(activeIDs(d).includes('processor'));assert.ok(activeIDs(d).length<=7);
- assert.equal(d.querySelectorAll('.prominence').length,0,'ordinary contents context does not retain overview badges');
- d.getElementById('explore-back').click();
- await until(()=>d.getElementById('exploration-label').textContent.startsWith('System overview')&&d.querySelectorAll('.prominence').length===metrics.length);
- assert.deepEqual(geometry(),original);assert.deepEqual([...d.querySelectorAll('.prominence')].map(n=>n.textContent),metrics);
- assert.equal(d.getElementById('graph-world').style.transform,camera);
- assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
- d.getElementById('context-details').click();assert.equal(d.getElementById('information-title').textContent,'Overview selection');d.getElementById('information').close();
- d.getElementById('explore-forward').click();await until(()=>d.getElementById('exploration-label').textContent.startsWith('Parts / contents'));
- assert.equal(d.querySelectorAll('.prominence').length,0);h.window.close();
+ try{
+  const geometry=()=>[...d.querySelectorAll('.node[data-context="false"]')].map(n=>[n.dataset.semanticId,n.style.transform]);
+  const original=geometry();
+  d.getElementById('graph-viewport').dispatchEvent(new h.window.WheelEvent('wheel',{deltaY:120,clientX:180,clientY:170,bubbles:true,cancelable:true}));
+  const camera=d.getElementById('graph-world').style.transform;
+  d.querySelector('.node[data-context="false"][data-semantic-id="Model"]').click();
+  assert.deepEqual(geometry(),original);assert.equal(d.getElementById('graph-world').style.transform,camera);
+  action(d,'Focus').click();
+  await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Package contents'));
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','part','definition','nested']));
+  d.querySelector('.node[data-context="false"][data-semantic-id="definition"]').click();action(d,'Focus').click();
+  await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Parts / contents'));
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['definition','sensor','processor']));
+  const contents=geometry(),contentsCamera=d.getElementById('graph-world').style.transform;
+  d.getElementById('context-details').click();
+  assert.equal(d.getElementById('information-title').textContent,'Complete contents and native ownership');
+  const provenance=d.getElementById('information-text').textContent;
+  assert.match(provenance,/definition.*sensor/);assert.match(provenance,/definition.*processor/);assert.match(provenance,/owner:definition:sensor/);assert.match(provenance,/containing frame/i);d.getElementById('information').close();
+  const mode=d.getElementById('rendering-mode');mode.value='focused';mode.dispatchEvent(new h.window.Event('change'));
+  await until(()=>d.getElementById('status').textContent.includes('Complete child exploration uses readable declaration cards'));
+  assert.equal(mode.value,'exploratory');assert.deepEqual(geometry(),contents);assert.equal(d.getElementById('graph-world').style.transform,contentsCamera);
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Package contents'));
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','part','definition','nested']));
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Whole project roots'));
+  assert.deepEqual(geometry(),original);assert.equal(d.getElementById('graph-world').style.transform,camera);
+  assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
+  d.getElementById('context-details').click();assert.equal(d.getElementById('information-title').textContent,'Complete contents and native ownership');d.getElementById('information').close();
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Package contents'));
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Parts / contents'));
+  assert.deepEqual(geometry(),contents);assert.equal(d.getElementById('graph-world').style.transform,contentsCamera);
+ }finally{h.window.close();}
 });
 
-test('explicit overview from a guided scene is reversible and Home Resume preserves the bounded overview',async()=>{
+test('explicit project roots from a guided scene are reversible and Home Resume preserves all entries',async()=>{
  const h=await harness({structuralFixture:true,overviewFixture:true}),d=h.document;
- d.getElementById('system-overview').click();
- await until(()=>d.getElementById('exploration-label').textContent.startsWith('System overview')&&d.querySelectorAll('.prominence').length>0);
- const ids=activeIDs(d),metrics=[...d.querySelectorAll('.prominence')].map(n=>n.textContent);
- d.getElementById('home').click();d.getElementById('resume-model').click();
- await until(()=>!d.getElementById('stage').hidden&&d.querySelectorAll('.prominence').length===metrics.length);
- assert.deepEqual(activeIDs(d),ids);assert.deepEqual([...d.querySelectorAll('.prominence')].map(n=>n.textContent),metrics);
- assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
- d.getElementById('explore-back').click();
- await until(()=>!d.getElementById('narrative').hidden&&activeIDs(d).sort().join(',')==='part,req');
- assert.equal(d.querySelectorAll('.prominence').length,0);h.window.close();
+ try{
+  d.getElementById('system-overview').click();
+  await until(()=>d.getElementById('exploration-label').textContent.startsWith('Whole project roots')&&sceneSettled(d));
+  const ids=activeIDs(d);assert.deepEqual(new Set(ids),new Set(['Model','orphan','req','view','outside']));
+  d.getElementById('home').click();d.getElementById('resume-model').click();
+  await until(()=>!d.getElementById('stage').hidden&&sceneSettled(d));
+  assert.deepEqual(activeIDs(d),ids);assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
+  d.getElementById('explore-back').click();
+  await until(()=>!d.getElementById('narrative').hidden&&activeIDs(d).sort().join(',')==='part,req'&&sceneSettled(d));
+  assert.equal(d.querySelectorAll('.prominence').length,0);
+ }finally{h.window.close();}
 });
 
 
@@ -665,10 +687,10 @@ test('opening overview from a narrow comparison shows the overview and Back rest
   const scroll=d.querySelector('.canvas-grid-scroll');scroll.scrollTop=120;scroll.scrollLeft=55;scroll.dispatchEvent(new h.window.Event('scroll'));
   gridCell(d,0,1).click();
   d.getElementById('system-overview').click();
-  await until(()=>d.getElementById('exploration-label').textContent.startsWith('System overview')&&d.querySelectorAll('.prominence').length>0&&sceneSettled(d));
+  await until(()=>d.getElementById('exploration-label').textContent.startsWith('Whole project roots')&&sceneSettled(d));
   assert.equal(d.querySelector('.canvas-grid-view'),null);
   assert.equal(d.getElementById('graph-viewport').hidden,false);
-  assert.ok(activeIDs(d).length<=6,'the phone overview retains its tile budget');
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','req','view','view2']),'phone width preserves every native root rather than imposing a tile budget');
   assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
   d.getElementById('explore-back').click();
   await until(()=>d.querySelector('.canvas-grid-view')&&sceneSettled(d));
@@ -787,13 +809,14 @@ test('voice UI explicit questions append ordered slides while manual browsing ke
  const h=await harness(),d=h.document;
  try{
   const count=()=>d.querySelectorAll('#scenes option').length;
-  assert.equal(count(),1);d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);
+  const openAuthored=async()=>{const chooser=d.getElementById('view-navigation');chooser.value='authored:Views::requirements';chooser.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&activeIDs(d).sort().join(',')==='part,req');};
+  assert.equal(count(),1);d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','part','req','view']));await openAuthored();assert.equal(count(),1);
   d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Ask as a new slide').click();
   assert.equal(d.getElementById('question-dialog').open,true);d.getElementById('question-text').value='Which requirement does this part satisfy?';d.getElementById('submit-question').click();
   await until(()=>!d.getElementById('question-dialog').open&&sceneSettled(d)&&count()===2);
   assert.equal(d.querySelector('#narrative h2').textContent,'Which requirement does this part satisfy?');
   d.getElementById('previous').click();await until(()=>sceneSettled(d)&&d.querySelector('#narrative h2').textContent==='Control the part');assert.equal(count(),2);
-  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Ask as a new slide').click();d.getElementById('question-text').value='Show the same native view again';d.getElementById('submit-question').click();
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&d.getElementById('narrative').hidden);await openAuthored();d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Ask as a new slide').click();d.getElementById('question-text').value='Show the same native view again';d.getElementById('submit-question').click();
   await until(()=>sceneSettled(d)&&count()===3&&!d.getElementById('question-dialog').open);assert.equal(d.querySelector('#narrative h2').textContent,'Show the same native view again');
   assert.match(d.getElementById('status').textContent,/Question appended/);
  }finally{h.window.close();}
@@ -803,6 +826,7 @@ test('voice UI external trace context is explicit and history restores isolated 
  const h=await harness({structuralFixture:true,packageFixture:true}),d=h.document;
  try{
   await pickPackage(h,'Model::Nested');d.querySelector('.node[data-semantic-id="req"]').click();action(d,'Focus').click();await until(()=>sceneSettled(d)&&activeIDs(d).length===1);
+  const chooser=d.getElementById('view-navigation');chooser.value='context';chooser.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Context'));
   const toggle=d.getElementById('scope-context-toggle');assert.equal(toggle.checked,false);
   toggle.checked=true;toggle.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&activeIDs(d).includes('part')).catch(error=>{throw Error(error.message+': '+toggle.checked+' / '+activeIDs(d)+' / '+d.getElementById('status').textContent);});
   assert.equal(d.getElementById('scope-label').textContent,'Model::Nested + external context');assert.equal(toggle.checked,true);
@@ -852,7 +876,9 @@ test('remaining UI typed rollups drill into exact native links and preserve scop
   d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&aggregate());assert.equal(toggle.checked,true);
   d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='hidden-a,hidden-b');
   d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&aggregate());
-  await pickPackage(h,'Model::A');assert.equal(aggregate(),null);assert.equal(d.getElementById('scope-label').textContent,'Model::A');
+  await pickPackage(h,'Model::A');assert.equal(aggregate(),null);assert.equal(d.getElementById('scope-label').textContent,'Model::A');assert.deepEqual(new Set(activeIDs(d)),new Set(['a','hidden-a']));
+  d.getElementById('context-details').click();assert.match(d.getElementById('information-text').textContent,/owner:a:hidden-a/);assert.match(d.getElementById('information-text').textContent,/outside-scope/,'complete contents disclose genuine external engineering links without adding their endpoints');d.getElementById('information').close();
+  const chooser=d.getElementById('view-navigation');chooser.value='context';chooser.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Context'));
   d.getElementById('context-details').click();assert.match(d.getElementById('information-text').textContent,/outside-scope/);
   assert.equal(d.querySelectorAll('#scenes option').length,1,'rollup inspection and browsing do not append slides');
  }finally{h.window.close();}

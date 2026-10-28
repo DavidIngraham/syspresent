@@ -134,3 +134,28 @@ test('deep ownership chains do not recurse the JS stack or expand into the proje
  const count=10000,graph={elements:Array.from({length:count},(_,i)=>item(String(i),'Package')),containment:Array.from({length:count-1},(_,i)=>owner(String(i),String(i+1))),relationships:[]};
  const context=completeRootContext(graph);assert.deepEqual(context.targets,['0']);assert.equal(context.summary.sourceDeclarations,count);assert.equal(context.elements.length,1);
 });
+
+test('complete contents disclose typed one-hop native relationship context separately from child counts',()=>{
+ const graph={elements:[item('root','PartUsage'),item('child'),item('external','RequirementUsage'),item('available','PartDefinition')],containment:[owner('root','child')],relationships:[edge('outgoing','child','external','satisfy'),edge('incoming','external','root','verify'),edge('missing','child','unloaded','dependency'),edge('unopened','available','child','typing'),edge('parallel','child','external','satisfy')]};
+ const result=completeChildContext(graph,{focus:'root',scopeIds:['root','child','available','unloaded']});
+ assert.deepEqual(new Set(ids(result)),new Set(['root','child']));
+ assert.equal(result.total,1);assert.equal(result.summary.ownChildren,1);assert.equal(result.summary.filtered,0);assert.equal(result.summary.unavailable,0);
+ assert.deepEqual(result.summary.relationshipContext,{total:5,outsideScope:3,unavailable:1,notOpened:1,kindCounts:{satisfy:2,verify:1,dependency:1,typing:1}});
+ const context=result.omissions.filter(o=>o.contextOnly);
+ assert.equal(context.length,5);assert.deepEqual(new Set(context.map(o=>o.relationshipId)),new Set(graph.relationships.map(r=>r.id)));
+ for(const native of graph.relationships){const omission=context.find(o=>o.relationshipId===native.id);assert.equal(omission.kind,native.kind);assert.equal(omission.nativeRelationship,native.nativeRelationship);assert.equal(omission.source,native.source);assert.equal(omission.target,native.target);assert.equal(omission.semanticSource,native.source);assert.equal(omission.semanticTarget,native.target);}
+ assert.equal(context.find(o=>o.relationshipId==='incoming').otherEndpoint,'external');
+ assert.equal(context.find(o=>o.relationshipId==='missing').reason,'unavailable');
+ assert.equal(context.find(o=>o.relationshipId==='unopened').reason,'not-opened');
+ assert.match(result.summary.message,/without adding endpoints or changing child counts/);
+ assert.equal(result.relationships.filter(r=>r.kind==='satisfy').length,0);
+});
+
+test('relationship context diagnostics preserve multiple native occurrences without becoming sibling omissions',()=>{
+ const graph=fixture(0),outside=item('outside');graph.elements.push(outside);
+ const native={...edge('dependency','outside','root','dependency'),occurrences:[{id:'view-occurrence-1'},{id:'view-occurrence-2'}]};graph.relationships.push(native);
+ const result=completeChildContext(graph,{focus:'root'}),omission=result.omissions.find(o=>o.contextOnly);
+ assert.equal(result.total,0);assert.equal(result.summary.status,'no-known-children');
+ assert.equal(result.summary.relationshipContext.notOpened,1);
+ assert.deepEqual(omission.occurrences,native.occurrences);omission.occurrences[0].id='edited';assert.equal(native.occurrences[0].id,'view-occurrence-1');
+});
