@@ -32,7 +32,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/graph.mjs": {
-      "bytes": 7128,
+      "bytes": 7213,
       "imports": [],
       "format": "esm"
     },
@@ -440,13 +440,23 @@
       ],
       "format": "esm"
     },
+    "src/canvas-prototype/metadata-context.mjs": {
+      "bytes": 12011,
+      "imports": [],
+      "format": "esm"
+    },
     "src/canvas-prototype/child-exploration.mjs": {
-      "bytes": 17447,
+      "bytes": 17655,
       "imports": [
         {
           "path": "src/canvas-prototype/graph.mjs",
           "kind": "import-statement",
           "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/metadata-context.mjs",
+          "kind": "import-statement",
+          "original": "./metadata-context.mjs"
         }
       ],
       "format": "esm"
@@ -463,7 +473,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/package-explorer.mjs": {
-      "bytes": 7554,
+      "bytes": 7504,
       "imports": [
         {
           "path": "src/canvas-prototype/view-contract.mjs",
@@ -474,6 +484,16 @@
           "path": "src/canvas-prototype/graph.mjs",
           "kind": "import-statement",
           "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/metadata-context.mjs",
+          "kind": "import-statement",
+          "original": "./metadata-context.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/child-exploration.mjs",
+          "kind": "import-statement",
+          "original": "./child-exploration.mjs"
         }
       ],
       "format": "esm"
@@ -604,7 +624,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 143057,
+      "bytes": 148878,
       "imports": [
         {
           "path": "src/canvas-prototype/loading-progress.mjs",
@@ -752,6 +772,11 @@
           "original": "./child-exploration.mjs"
         },
         {
+          "path": "src/canvas-prototype/metadata-context.mjs",
+          "kind": "import-statement",
+          "original": "./metadata-context.mjs"
+        },
+        {
           "path": "src/canvas-prototype/child-layout.mjs",
           "kind": "import-statement",
           "original": "./child-layout.mjs"
@@ -855,7 +880,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 1253920
+      "bytes": 1286664
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -881,10 +906,10 @@
           "bytesInOutput": 6203
         },
         "src/canvas-prototype/graph.mjs": {
-          "bytesInOutput": 6301
+          "bytesInOutput": 6416
         },
         "src/canvas-prototype/view-contract.mjs": {
-          "bytesInOutput": 3072
+          "bytesInOutput": 3083
         },
         "src/canvas-prototype/focused-native-view.mjs": {
           "bytesInOutput": 2140
@@ -899,7 +924,7 @@
           "bytesInOutput": 11920
         },
         "node_modules/fflate/esm/browser.js": {
-          "bytesInOutput": 24695
+          "bytesInOutput": 24698
         },
         "src/canvas-prototype/project.mjs": {
           "bytesInOutput": 14737
@@ -908,22 +933,22 @@
           "bytesInOutput": 1672
         },
         "src/canvas-prototype/conversation.mjs": {
-          "bytesInOutput": 6488
+          "bytesInOutput": 6502
         },
         "src/canvas-prototype/authoring.mjs": {
-          "bytesInOutput": 25856
+          "bytesInOutput": 25880
         },
         "src/canvas-prototype/notation.mjs": {
-          "bytesInOutput": 16910
+          "bytesInOutput": 16918
         },
         "src/canvas-prototype/focused-notation.mjs": {
-          "bytesInOutput": 28060
+          "bytesInOutput": 28063
         },
         "src/canvas-prototype/core/index.mjs": {
           "bytesInOutput": 15851
         },
         "src/canvas-prototype/rollups.mjs": {
-          "bytesInOutput": 12122
+          "bytesInOutput": 12135
         },
         "src/canvas-prototype/sequence-view.mjs": {
           "bytesInOutput": 27983
@@ -935,7 +960,7 @@
           "bytesInOutput": 17895
         },
         "src/canvas-prototype/presentation-layout.mjs": {
-          "bytesInOutput": 13909
+          "bytesInOutput": 13913
         },
         "src/canvas-prototype/element-compartments.mjs": {
           "bytesInOutput": 4399
@@ -947,7 +972,7 @@
           "bytesInOutput": 414
         },
         "src/canvas-prototype/figure-view.mjs": {
-          "bytesInOutput": 2320
+          "bytesInOutput": 2323
         },
         "src/canvas-prototype/reader-settings.mjs": {
           "bytesInOutput": 1072
@@ -959,10 +984,10 @@
           "bytesInOutput": 4251
         },
         "src/canvas-prototype/elk-layout.mjs": {
-          "bytesInOutput": 27558
+          "bytesInOutput": 27562
         },
         "src/canvas-prototype/camera.mjs": {
-          "bytesInOutput": 8777
+          "bytesInOutput": 8806
         },
         "src/canvas-prototype/scene-regions.mjs": {
           "bytesInOutput": 11360
@@ -974,19 +999,22 @@
           "bytesInOutput": 653
         },
         "src/canvas-prototype/prominence.mjs": {
-          "bytesInOutput": 7352
+          "bytesInOutput": 7355
         },
         "src/canvas-prototype/child-view.mjs": {
           "bytesInOutput": 1019
         },
+        "src/canvas-prototype/metadata-context.mjs": {
+          "bytesInOutput": 12576
+        },
         "src/canvas-prototype/child-exploration.mjs": {
-          "bytesInOutput": 18683
+          "bytesInOutput": 19046
         },
         "src/canvas-prototype/child-layout.mjs": {
-          "bytesInOutput": 13631
+          "bytesInOutput": 13638
         },
         "src/canvas-prototype/package-explorer.mjs": {
-          "bytesInOutput": 7988
+          "bytesInOutput": 7753
         },
         "src/canvas-prototype/departures.mjs": {
           "bytesInOutput": 7914
@@ -1010,16 +1038,16 @@
           "bytesInOutput": 3257
         },
         "src/canvas-prototype/journey-camera.mjs": {
-          "bytesInOutput": 5168
+          "bytesInOutput": 5185
         },
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 2790
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 160107
+          "bytesInOutput": 166493
         }
       },
-      "bytes": 675829
+      "bytes": 695223
     }
   }
 }

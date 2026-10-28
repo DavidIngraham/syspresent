@@ -149,5 +149,6 @@
       "upstreamPath": "reviews/namespace-restructure/namespace-map.json",
       "sha256": "1e220c8dadd06afa7a9f702f8eb239af693d31dd7f309cd65a25f98944a2d9a8"
     }
-  ]
+  ],
+  "publishedRevision": "556cd79e266394cae9e9b371a86941f50295cffc"
 }

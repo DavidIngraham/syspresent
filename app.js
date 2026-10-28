@@ -981,27 +981,27 @@ function adaptNativeView(raw, name) {
   return { ...v, id: name, title: name, nodes: v.nodes ?? [], edges: v.edges ?? [], notices: v.notices ?? [] };
 }
 var isDeclarationKind = (kind) => /^(Package|Namespace|[A-Za-z]+(?:Usage|Definition))$/.test(kind ?? "");
-function modelGraph(raw, views = []) {
+function modelGraph(raw, views = [], { nativeRootIds } = {}) {
   const elements = raw.map((e) => ({ id: e["@id"], kind: e["@type"], name: e.declaredName || e.qualifiedName || e["@id"], qualifiedName: e.qualifiedName, description: e.body || "", native: e, layer: e["sysx:sourceLine"] ? "project" : "library" }));
   const index5 = new Map(elements.map((e) => [e.id, e])), relationships = [], containment = [];
   const declaration2 = (e) => e?.layer === "project" && isDeclarationKind(e.kind);
-  const add = (source, target, kind, id, nativeRelationship) => {
-    if (!source || !target) return;
-    relationships.push({ id, source, target, kind, label: kind, authority: "native-api", nativeRelationship });
+  const add2 = (source2, target, kind, id, nativeRelationship) => {
+    if (!source2 || !target) return;
+    relationships.push({ id, source: source2, target, kind, label: kind, authority: "native-api", nativeRelationship });
   };
   for (const item of raw) {
     const id = item["@id"];
     if (declaration2(index5.get(id))) {
       for (const owner of refs(item.owner)) if (declaration2(index5.get(owner))) containment.push({ id: `owner:${owner}:${id}`, source: owner, target: id, kind: "containment", label: "owns", authority: "native-api", nativeRelationship: refs(item.owningMembership)[0] ?? refs(item.owningRelationship)[0] ?? null, nativeRole: "owner", navigationOnly: true });
     }
-    if (item["@type"] === "Dependency") for (const client of refs(item.client)) for (const supplier of refs(item.supplier)) add(client, supplier, "dependency", "api:" + id + ":" + client + ":" + supplier, id);
+    if (item["@type"] === "Dependency") for (const client of refs(item.client)) for (const supplier of refs(item.supplier)) add2(client, supplier, "dependency", "api:" + id + ":" + client + ":" + supplier, id);
     if (["PartUsage", "PartDefinition"].includes(item["@type"])) {
-      for (const child of refs(item.ownedMember)) if (index5.get(child)?.kind === "PartUsage") add(id, child, "composition", `part:${id}:${child}`);
+      for (const child of refs(item.ownedMember)) if (index5.get(child)?.kind === "PartUsage") add2(id, child, "composition", `part:${id}:${child}`);
     }
-    if (item["@type"]?.endsWith("Usage")) for (const type of refs(item.type)) add(id, type, "typing", `typing:${id}:${type}`);
+    if (item["@type"]?.endsWith("Usage")) for (const type of refs(item.type)) add2(id, type, "typing", `typing:${id}:${type}`);
     if (item["@type"]?.endsWith("Definition")) {
       const generals = refs(item.specializes), nativeIds = refs(item.ownedSubclassification);
-      for (const general of generals) add(id, general, "specialization", `specialization:${id}:${general}`, generals.length === 1 && nativeIds.length === 1 ? nativeIds[0] : void 0);
+      for (const general of generals) add2(id, general, "specialization", `specialization:${id}:${general}`, generals.length === 1 && nativeIds.length === 1 ? nativeIds[0] : void 0);
     }
     if (item["@type"] === "Documentation") for (const owner of refs(item.owner)) {
       const target = index5.get(owner);
@@ -1012,14 +1012,14 @@ function modelGraph(raw, views = []) {
     const nodes = new Map(view.nodes.map((n) => [n.id, n.semanticId]));
     for (const [i, edge] of view.edges.entries()) {
       if (edge.presentationOnly === true || edge.aggregate === true) continue;
-      const source = nodes.get(edge.fromId ?? edge.from ?? edge.source), target = nodes.get(edge.toId ?? edge.to ?? edge.target);
+      const source2 = nodes.get(edge.fromId ?? edge.from ?? edge.source), target = nodes.get(edge.toId ?? edge.to ?? edge.target);
       const semantic = index5.get(edge.semanticId);
       const satisfaction2 = ["satisfy", "satisfaction"].includes(edge.kind) && semantic?.kind === "SatisfyRequirementUsage";
       const connection = edge.notation?.declarationKind === semantic?.kind && ["ConnectionUsage", "FlowUsage", "SuccessionFlowUsage", "Message"].includes(semantic?.kind) && ["derivation", "flow", "succession-flow", "message"].includes(edge.notation?.production);
       const nativeRelationship = edge.semanticId && (edge.identityStatus === "native" || satisfaction2 || connection || semantic && !isDeclarationKind(semantic.kind)) ? edge.semanticId : void 0;
       const occurrence = { id: `view:${view.id}:${i}`, viewId: view.id, index: i, representationId: edge.id ?? null, semanticId: edge.semanticId ?? null, identityStatus: edge.identityStatus ?? "unknown", qualifiedName: edge.qualifiedName ?? null, nativeEdge: structuredClone(edge) };
       const previous = relationships.length;
-      add(source, target, edge.kind, occurrence.id, nativeRelationship);
+      add2(source2, target, edge.kind, occurrence.id, nativeRelationship);
       if (relationships.length > previous) {
         const record = relationships.at(-1);
         record.occurrences = [occurrence];
@@ -1041,7 +1041,7 @@ function modelGraph(raw, views = []) {
       if (JSON.stringify(prior.notation) !== JSON.stringify(edge.notation)) delete prior.notation;
     }
   }
-  return { elements, containment, relationships: [...records.values()] };
+  return { elements, containment, relationships: [...records.values()], ...nativeRootIds ? { nativeRootIds: [...new Set(nativeRootIds)] } : {} };
 }
 function graphView(graph, context, name = "Focused General View") {
   const known = new Map(graph.elements.map((e) => [e.id, e]));
@@ -1079,15 +1079,15 @@ function rendererFamily(view) {
 var identity = (value) => typeof value === "string" && value.length ? value : void 0;
 function representations(view) {
   const result = [];
-  const add = (record, item) => result.push({
+  const add2 = (record, item) => result.push({
     ...record,
     semanticId: identity(item?.semanticId),
     identityStatus: item?.identityStatus ?? (identity(item?.semanticId) ? "native" : "unknown"),
     label: item?.name ?? item?.label ?? "",
     qualifiedName: item?.qualifiedName
   });
-  for (const [index5, node] of (view?.nodes ?? []).entries()) add({ role: "node", index: index5, representationId: node.id }, node);
-  for (const [index5, edge] of (view?.edges ?? []).entries()) add({
+  for (const [index5, node] of (view?.nodes ?? []).entries()) add2({ role: "node", index: index5, representationId: node.id }, node);
+  for (const [index5, edge] of (view?.edges ?? []).entries()) add2({
     role: "edge",
     index: index5,
     representationId: edge.id,
@@ -1095,18 +1095,18 @@ function representations(view) {
     targetSemanticId: edge.targetSemanticId ?? edge.semanticTarget,
     kind: edge.kind
   }, edge);
-  for (const [row, item] of (view?.rows ?? []).entries()) add({
+  for (const [row, item] of (view?.rows ?? []).entries()) add2({
     role: "row",
     row,
     representationId: `row:${row}`
   }, { ...item, name: item.name ?? item.cells?.[0] });
-  for (const item of view?.columnElements ?? []) add({
+  for (const item of view?.columnElements ?? []) add2({
     role: "column",
     column: item.index,
     representationId: `column:${item.index}`
   }, { ...item, name: item.name ?? view.columns?.[item.index] });
   for (const cell of view?.relationshipCells ?? []) {
-    for (const [index5, relationship] of (cell.relationships ?? []).entries()) add({
+    for (const [index5, relationship] of (cell.relationships ?? []).entries()) add2({
       role: "cell",
       row: cell.row,
       column: cell.column,
@@ -1122,15 +1122,15 @@ function representations(view) {
 var representedIdentities = (view) => [...new Set(representations(view).map((r) => r.semanticId).filter(Boolean))];
 function nativeViewContextIdentities(view) {
   const result = /* @__PURE__ */ new Set();
-  const add = (record) => {
+  const add2 = (record) => {
     if (identity(record?.semanticId)) result.add(record.semanticId);
   };
   for (const node of view?.nodes ?? []) {
-    for (const port of node.ports ?? []) add(port);
-    for (const behavior of node.state?.behaviors ?? []) add(behavior);
+    for (const port of node.ports ?? []) add2(port);
+    for (const behavior of node.state?.behaviors ?? []) add2(behavior);
   }
-  for (const edge of view?.edges ?? []) for (const event of [edge.notation?.sourceEvent, edge.notation?.targetEvent]) add(event);
-  for (const order of view?.sequenceOrders ?? []) for (const event of [order.sourceEvent, order.targetEvent]) add(event);
+  for (const edge of view?.edges ?? []) for (const event of [edge.notation?.sourceEvent, edge.notation?.targetEvent]) add2(event);
+  for (const order of view?.sequenceOrders ?? []) for (const event of [order.sourceEvent, order.targetEvent]) add2(event);
   return [...result];
 }
 
@@ -1404,9 +1404,9 @@ function assetType(path) {
   const ext = path.split(".").at(-1).toLowerCase();
   return { svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" }[ext];
 }
-function references(refs4, label2, required = false) {
-  if (refs4 === void 0 && !required) return;
-  if (!Array.isArray(refs4) || required && !refs4.length || !refs4.every((r) => typeof r === "string" && r.trim())) throw Error(label2 + " requires modelRefs");
+function references(refs5, label2, required = false) {
+  if (refs5 === void 0 && !required) return;
+  if (!Array.isArray(refs5) || required && !refs5.length || !refs5.every((r) => typeof r === "string" && r.trim())) throw Error(label2 + " requires modelRefs");
 }
 function evidence(value, label2) {
   if (!value) return;
@@ -1463,9 +1463,9 @@ function validateStoryContent(scenes, { files, pathFor, resolve: resolve2 } = {}
       references(card.modelRefs, label2, true);
       evidence(card.evidence, label2);
     }
-    const refs4 = [...markdownModelReferences(scene2.markdown ?? ""), ...(scene2.figures ?? []).flatMap((f) => f.modelRefs ?? []), ...(scene2.context ?? []).flatMap((c) => c.modelRefs)];
+    const refs5 = [...markdownModelReferences(scene2.markdown ?? ""), ...(scene2.figures ?? []).flatMap((f) => f.modelRefs ?? []), ...(scene2.context ?? []).flatMap((c) => c.modelRefs)];
     if (resolve2) {
-      for (const ref of refs4) if (!resolve2(ref)) throw Error(label2 + ": model reference does not resolve: " + ref);
+      for (const ref of refs5) if (!resolve2(ref)) throw Error(label2 + ": model reference does not resolve: " + ref);
     }
   }
 }
@@ -1583,9 +1583,9 @@ var el = (doc, tag, value, cls) => {
   if (cls) node.className = cls;
   return node;
 };
-function appendModelReferences(host, refs4, { resolve: resolve2, onSelect, labelFor: labelFor2 }) {
+function appendModelReferences(host, refs5, { resolve: resolve2, onSelect, labelFor: labelFor2 }) {
   const doc = host.ownerDocument;
-  for (const ref of refs4 ?? []) {
+  for (const ref of refs5 ?? []) {
     const id = resolve2(ref), b = el(doc, "button", labelFor2?.(id) ?? ref, "model-link");
     b.type = "button";
     b.dataset.modelId = id;
@@ -1608,9 +1608,9 @@ function renderContext(doc, cards, options) {
   for (const card of cards ?? []) {
     const box = el(doc, "details", void 0, "context-card");
     box.append(el(doc, "summary", contextKinds[card.kind] + " \xB7 " + card.title), el(doc, "p", card.text));
-    const refs4 = el(doc, "div", void 0, "model-references");
-    appendModelReferences(refs4, card.modelRefs, options);
-    box.append(refs4);
+    const refs5 = el(doc, "div", void 0, "model-references");
+    appendModelReferences(refs5, card.modelRefs, options);
+    box.append(refs5);
     if (card.evidence) box.append(renderEvidence(doc, card.evidence));
     host.append(box);
   }
@@ -1962,10 +1962,10 @@ var inflt = function(dat, st, buf, dict) {
         lpos = pos, lm = null;
         break;
       } else {
-        var add = sym - 254;
+        var add2 = sym - 254;
         if (sym > 264) {
           var i = sym - 257, b = fleb[i];
-          add = bits(dat, pos, (1 << b) - 1) + fl[i];
+          add2 = bits(dat, pos, (1 << b) - 1) + fl[i];
           pos += b;
         }
         var d = dm[bits16(dat, pos) & dms], dsym = d >> 4;
@@ -1984,7 +1984,7 @@ var inflt = function(dat, st, buf, dict) {
         }
         if (resize)
           cbuf(bt + 131072);
-        var end = bt + add;
+        var end = bt + add2;
         if (bt < dt) {
           var shift = dl - dt, dend = Math.min(dt, end);
           if (shift + bt < 0)
@@ -2885,8 +2885,8 @@ var reference = (value) => {
 function nativeViewDefinitionSource({ packageName, name = "slide", definition = "GeneralView", qualifiedNames, kinds: kinds2 = [] }) {
   for (const value of [packageName, name]) if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(value ?? "")) throw Error("Invalid captured declaration name");
   if (!DEFINITIONS.has(definition)) throw Error("Unsupported captured native notation: " + definition);
-  const refs4 = [...new Set(qualifiedNames ?? [])];
-  if (!refs4.length) throw Error("Capture requires native-qualified model elements");
+  const refs5 = [...new Set(qualifiedNames ?? [])];
+  if (!refs5.length) throw Error("Capture requires native-qualified model elements");
   const filters = [...new Set(kinds2)];
   if (filters.some((kind) => !/^\w+(Usage|Definition)$/.test(kind))) throw Error("Unsupported native capture filter");
   const requirement = filters.some((kind) => /^Requirement(Usage|Definition)$/.test(kind));
@@ -2894,7 +2894,7 @@ function nativeViewDefinitionSource({ packageName, name = "slide", definition = 
     private import StandardViewDefinitions::*;
     view def Definition :> ${definition}${filters.length ? " {\n        filter " + filters.map((kind) => "@SysML::" + kind).join(" or ") + ";\n    }" : ";"}
     view ${name} : Definition {
-${requirement ? "        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }\n" : ""}${refs4.map((q) => "        expose " + reference(q) + ";").join("\n")}
+${requirement ? "        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }\n" : ""}${refs5.map((q) => "        expose " + reference(q) + ";").join("\n")}
     }
 }
 `;
@@ -2905,9 +2905,9 @@ function identities(view) {
 function edges(view) {
   const nodes = new Map((view.nodes ?? []).map((node) => [node.id, node.semanticId]));
   return (view.edges ?? []).map((edge) => {
-    const source = edge.semanticSource ?? edge.sourceSemanticId ?? nodes.get(edge.fromId ?? edge.from ?? edge.source);
+    const source2 = edge.semanticSource ?? edge.sourceSemanticId ?? nodes.get(edge.fromId ?? edge.from ?? edge.source);
     const target = edge.semanticTarget ?? edge.targetSemanticId ?? nodes.get(edge.toId ?? edge.to ?? edge.target);
-    return JSON.stringify([source, target, edge.kind]);
+    return JSON.stringify([source2, target, edge.kind]);
   }).sort();
 }
 function assertExactNativeProjection(expected, actual) {
@@ -2928,16 +2928,16 @@ async function prepareNativeCapture(project, { view, graph, views, focus, title 
   const focusName = focusElement?.qualifiedName;
   if (!focusName) throw Error("Captured focus needs a native qualified identity");
   const candidate = structuredClone(project), identity5 = nextIdentity(candidate, graph);
-  let viewName = view.id, source;
+  let viewName = view.id, source2;
   const declared = views?.has?.(viewName);
   if (!declared) {
     const selected = identities(view), byId = new Map((graph?.elements ?? []).map((element2) => [element2.id, element2]));
     const names = view.capture ? [view.capture.root] : selected.map((id) => byId.get(id)?.qualifiedName);
     if (names.some((name) => !name)) throw Error("A selected element has no native qualified identity; capture is unavailable");
     const kinds2 = view.capture ? [] : selected.map((id) => byId.get(id)?.kind).filter(Boolean);
-    source = nativeViewDefinitionSource({ packageName: identity5.packageName, qualifiedNames: names, definition: view.capture?.definition ?? "GeneralView", kinds: kinds2 });
+    source2 = nativeViewDefinitionSource({ packageName: identity5.packageName, qualifiedNames: names, definition: view.capture?.definition ?? "GeneralView", kinds: kinds2 });
     const filename = "views/captured-views.sysml";
-    candidate.files[filename] = (Object.hasOwn(candidate.files, filename) ? fileText(candidate, filename) + "\n" : "") + source;
+    candidate.files[filename] = (Object.hasOwn(candidate.files, filename) ? fileText(candidate, filename) + "\n" : "") + source2;
     if (!candidate.manifest.viewSources.includes(filename)) candidate.manifest.viewSources.push(filename);
     viewName = identity5.packageName + "::slide";
   }
@@ -2951,7 +2951,7 @@ async function prepareNativeCapture(project, { view, graph, views, focus, title 
   const scene2 = { type: "scene", id: identity5.id, title, view: viewName, focus: focusName, panel, allowDisconnected: true, ...presentation ? { presentation: structuredClone(presentation) } : {}, ...question ? { question } : {}, markdown };
   const scenes = appendScene(candidate, scene2);
   validateProject(candidate);
-  return { project: candidate, scene: scene2, sceneIndex: scenes.length - 1, viewName, source, nativeView };
+  return { project: candidate, scene: scene2, sceneIndex: scenes.length - 1, viewName, source: source2, nativeView };
 }
 function prepareQuestionSlide(project, { question, ...options } = {}) {
   if (typeof question !== "string" || !question.trim()) throw Error("Enter an explicit question before appending a slide");
@@ -3145,10 +3145,10 @@ async function resolveNarrative(record, { engine, modelHash, graph, scopeIds: sc
 }
 function groundClaims(proposal, graph, resolve2, scopeIds2) {
   return (proposal.relationshipClaims ?? []).map((claim) => {
-    const source = allowed(resolve2(claim.source), scopeIds2), target = allowed(resolve2(claim.target), scopeIds2);
-    const edges2 = (graph.relationships ?? []).filter((edge) => !edge.presentationOnly && (edge.id === claim.id || edge.nativeRelationship === claim.id) && edge.source === source.id && edge.target === target.id && edge.kind === claim.kind);
+    const source2 = allowed(resolve2(claim.source), scopeIds2), target = allowed(resolve2(claim.target), scopeIds2);
+    const edges2 = (graph.relationships ?? []).filter((edge) => !edge.presentationOnly && (edge.id === claim.id || edge.nativeRelationship === claim.id) && edge.source === source2.id && edge.target === target.id && edge.kind === claim.kind);
     if (edges2.length !== 1) throw Error("Relationship claim is not grounded in one actual native directed relationship: " + claim.id);
-    return structuredClone({ ...claim, source: source.id, target: target.id, nativeRelationship: edges2[0].nativeRelationship ?? null, occurrences: edges2[0].occurrences ?? [] });
+    return structuredClone({ ...claim, source: source2.id, target: target.id, nativeRelationship: edges2[0].nativeRelationship ?? null, occurrences: edges2[0].occurrences ?? [] });
   });
 }
 async function prepareAuthoringProposal(project, { proposal, graph, engine, scopeIds: scopeIds2 } = {}) {
@@ -3162,12 +3162,12 @@ async function prepareAuthoringProposal(project, { proposal, graph, engine, scop
   const candidate = structuredClone(project), scenes = parseStory(fileText(candidate, candidate.manifest.story)), names = new Set(graph.elements.map((element2) => element2.qualifiedName));
   let number = scenes.length + 1;
   while (scenes.some((scene3) => scene3.id === "authored-" + number) || names.has("CanvasAuthored" + number)) number++;
-  const packageName = "CanvasAuthored" + number, source = nativeViewDefinitionSource({ packageName, qualifiedNames: selected.map((element2) => element2.qualifiedName), definition: proposal.view.definition, kinds: proposal.view.kinds ?? [] }), filename = "views/authored-proposals.sysml", viewName = packageName + "::slide";
+  const packageName = "CanvasAuthored" + number, source2 = nativeViewDefinitionSource({ packageName, qualifiedNames: selected.map((element2) => element2.qualifiedName), definition: proposal.view.definition, kinds: proposal.view.kinds ?? [] }), filename = "views/authored-proposals.sysml", viewName = packageName + "::slide";
   if (Object.hasOwn(candidate.files, filename) && !candidate.manifest.viewSources.includes(filename)) throw Error("Authoring output must be a new or already presentation-owned view file");
-  candidate.files[filename] = (Object.hasOwn(candidate.files, filename) ? fileText(candidate, filename) + "\n" : "") + source;
+  candidate.files[filename] = (Object.hasOwn(candidate.files, filename) ? fileText(candidate, filename) + "\n" : "") + source2;
   if (!candidate.manifest.viewSources.includes(filename)) candidate.manifest.viewSources.push(filename);
   const expectedViews = originalViewSources.includes(filename) ? originalViewSources : [...originalViewSources, filename];
-  const unchangedModel = () => JSON.stringify(candidate.manifest.modelSources) === JSON.stringify(sourceModelDocuments.map((document2) => document2.name)) && JSON.stringify(project.manifest.modelSources) === JSON.stringify(sourceModelDocuments.map((document2) => document2.name)) && JSON.stringify(candidate.manifest.viewSources) === JSON.stringify(expectedViews) && JSON.stringify(project.manifest.viewSources) === JSON.stringify(originalViewSources) && sourceDocuments.every((document2) => fileText(project, document2.name) === document2.content && fileText(candidate, document2.name) === (document2.name === filename ? document2.content + "\n" + source : document2.content));
+  const unchangedModel = () => JSON.stringify(candidate.manifest.modelSources) === JSON.stringify(sourceModelDocuments.map((document2) => document2.name)) && JSON.stringify(project.manifest.modelSources) === JSON.stringify(sourceModelDocuments.map((document2) => document2.name)) && JSON.stringify(candidate.manifest.viewSources) === JSON.stringify(expectedViews) && JSON.stringify(project.manifest.viewSources) === JSON.stringify(originalViewSources) && sourceDocuments.every((document2) => fileText(project, document2.name) === document2.content && fileText(candidate, document2.name) === (document2.name === filename ? document2.content + "\n" + source2 : document2.content));
   if (!unchangedModel()) throw Error("Closed view authoring cannot alter model sources");
   const parsed = await engine.call("ParseSources", { documents: documentsFor(candidate) }), diagnostics = parsed.diagnostics ?? [];
   if (diagnostics.some((d) => String(d.severity).toLowerCase().includes("error") || d.code === "nonstandard-notation")) throw Error("Native authored view is invalid: " + diagnostics.map((d) => d.message).join("; "));
@@ -3197,8 +3197,8 @@ async function prepareAuthoringProposal(project, { proposal, graph, engine, scop
       return void 0;
     }
   } });
-  const review = { source, viewName, sourceGraphReuse, selected: wanted, represented, added: represented.filter((id) => !wanted.includes(id)), omitted: wanted.filter((id) => !represented.includes(id)), values: narrative.values, references: references2, relationshipClaims: claims, notices: nativeView.notices ?? [], narrativeStatus: "Unverified author draft. Native references, typed values and structured relationship claims are checked; prose truth and engineering acceptance are not established." };
-  return { project: candidate, scene: scene2, sceneIndex: scenes.length, nativeView, source, viewName, proposal, review, modelHash: parsed.modelHash, sourceGraphReuse };
+  const review = { source: source2, viewName, sourceGraphReuse, selected: wanted, represented, added: represented.filter((id) => !wanted.includes(id)), omitted: wanted.filter((id) => !represented.includes(id)), values: narrative.values, references: references2, relationshipClaims: claims, notices: nativeView.notices ?? [], narrativeStatus: "Unverified author draft. Native references, typed values and structured relationship claims are checked; prose truth and engineering acceptance are not established." };
+  return { project: candidate, scene: scene2, sceneIndex: scenes.length, nativeView, source: source2, viewName, proposal, review, modelHash: parsed.modelHash, sourceGraphReuse };
 }
 function authoringReferencedViews(scenes) {
   return [...new Set(scenes.flatMap((scene2) => (scene2.authoring?.relationshipClaims ?? []).filter((claim) => !claim.nativeRelationship).flatMap((claim) => (claim.occurrences ?? []).map((item) => item.viewId))).filter((view) => view && !view.startsWith("#")))];
@@ -3386,9 +3386,9 @@ function focusedEdgeAppearance(edge, { viewKind = edge.viewKind, graph, view } =
   if (!edge.nativeRelationship && nativeIds.size > 1) return focusedUnsupported(edge, "this presentation edge combines distinct native relationship identities; open an individual native occurrence", ["one native relationship identity"]);
   if (edge.aggregate || edge.presentationOnly) return focusedUnsupported(edge, "presentation aggregates are exploratory artifacts, not native relationships");
   if (edge.kind === "refine" || production === "refinement") {
-    const [source, target] = semanticEnds(edge, view, graph), native = record?.native;
+    const [source2, target] = semanticEnds(edge, view, graph), native = record?.native;
     const classified = production === "refinement" && facts.sourceRole === "client" && facts.targetRole === "supplier";
-    const exported = record?.kind === "Dependency" && source && target && nativeRefs(native.client).includes(source) && nativeRefs(native.supplier).includes(target);
+    const exported = record?.kind === "Dependency" && source2 && target && nativeRefs(native.client).includes(source2) && nativeRefs(native.supplier).includes(target);
     if (!classified && !exported) return focusedUnsupported(edge, "refinement requires native Dependency client/supplier roles or explicit native refinement facts", ["Dependency.client", "Dependency.supplier"]);
     return { line: "dashed", sourceMarker: "none", targetMarker: "open-arrow", directed: true, label: faithfulName(edge, record), supported: true, family: "dependency", coverage: "native-base", section: "8.2.3.3", notice: "Refinement is rendered with the verified native Dependency base symbol. Its refinement metadata classification remains native; this is not a SysML v1 refine stereotype." };
   }
@@ -3406,19 +3406,19 @@ function focusedEdgeAppearance(edge, { viewKind = edge.viewKind, graph, view } =
   if (production === "action-succession") return { line: "dashed", sourceMarker: "none", targetMarker: "open-arrow", directed: true, label: edge.label ?? "", supported: true, family: "behavior", section: "8.2.3.17", notice: "" };
   if (production === "state-transition") return { line: "solid", sourceMarker: "none", targetMarker: "open-arrow", directed: true, label: edge.label ?? "", supported: true, family: "behavior", section: "8.2.3.18", notice: "" };
   if (edge.kind === "specialization") {
-    const [source, target] = semanticEnds(edge, view, graph), element2 = focusedIndex(graph).get(source), native = element2?.native ?? {};
+    const [source2, target] = semanticEnds(edge, view, graph), element2 = focusedIndex(graph).get(source2), native = element2?.native ?? {};
     const verified = nativeRefs(native.specializes).includes(target) ? "subclassification" : nativeRefs(native.redefines).includes(target) ? "redefinition" : nativeRefs(native.subsets).includes(target) ? nativeRefs(native.ownedReferenceSubsetting).length ? "reference-subsetting" : "subsetting" : null;
     if (!verified) return focusedUnsupported(edge, "the native specialization kind conflates subclassification, subsetting and redefinition; explicit native role targets are required", ["specializes|subsets|redefines"]);
     return { line: "solid", sourceMarker: "none", targetMarker: verified === "redefinition" ? "redefinition" : verified === "reference-subsetting" ? "reference-subsetting" : "hollow-triangle", directed: true, label: edge.label === edge.kind ? "" : edge.label ?? "", supported: true, family: "classifier", section: "8.2.3.6", production: verified, notice: "" };
   }
   if (["case", "mixed"].includes(viewKind) && ["typing", "reference"].includes(edge.kind)) {
-    const [source, target] = semanticEnds(edge, view, graph), data = focusedIndex(graph), element2 = data.get(source), native = element2?.native ?? {};
+    const [source2, target] = semanticEnds(edge, view, graph), data = focusedIndex(graph), element2 = data.get(source2), native = element2?.native ?? {};
     if (edge.kind === "typing" && nativeRefs(native.type).includes(target)) return { line: "solid", sourceMarker: "none", targetMarker: "definition-two-dot", directed: true, label: "", supported: true, family: "classifier", section: "8.2.3.6", notice: "" };
     if (edge.kind === "reference") {
       const verb = element2?.kind === "PerformActionUsage" ? "perform" : element2?.kind === "ExhibitStateUsage" ? "exhibit" : null;
       if (verb && nativeRefs(native.subsets).includes(target)) return { line: "solid", sourceMarker: "none", targetMarker: "open-arrow", directed: true, label: "\xAB" + verb + "\xBB", supported: true, family: "behavior", section: verb === "perform" ? "8.2.3.17" : "8.2.3.18", notice: "" };
       const child = data.get(target);
-      if (child && nativeRefs(child.native?.owner).includes(source) && child.native?.isReference === true) return { line: "solid", sourceMarker: "hollow-diamond", targetMarker: "none", directed: true, label: "", supported: true, family: "ownership", section: "8.2.3.6", notice: "" };
+      if (child && nativeRefs(child.native?.owner).includes(source2) && child.native?.isReference === true) return { line: "solid", sourceMarker: "hollow-diamond", targetMarker: "none", directed: true, label: "", supported: true, family: "ownership", section: "8.2.3.6", notice: "" };
     }
     return focusedUnsupported(edge, "the mixed/case native relationship kind requires an explicit native type, ownership, perform or exhibit target role", ["native.type|native.owner|native.subsets"]);
   }
@@ -3515,8 +3515,8 @@ function focusedNodeDescriptor(node, graph, { expanded = true, pageSize = 12, vi
     const direction = node.nativePort?.direction ?? node.direction ?? native.direction, parameter = node.parameter ?? node.nativePort?.parameter ?? false;
     return { ...base, shape: "port-glyph", portSide: node.portSide ?? node.side ?? "EAST", parameter, direction, supported: ["in", "out", "inout"].includes(direction), section: parameter ? "8.2.3.17" : "8.2.3.12", name: node.label || base.name, type: node.label ? "" : node.type || "", notices: ["in", "out", "inout"].includes(direction) ? [] : [notice(kind ?? "port", node.semanticId ?? node.id, "Port direction is unavailable in the native projection; its neutral attachment is retained without an invented arrow.")] };
   }
-  const resolvedTypes = typeReferences(element2, data, { node, view }), metadata = kind === "MetadataUsage" && resolvedTypes.names.length === 1 && (resolvedTypes.ids.length === 1 || resolvedTypes.nativeLabel);
-  const profile = metadata ? ["metadata", "note", "8.2.3.27"] : ["actor", "subject", "stakeholder"].includes(node.kind) && element2 ? ["" + node.kind, "rounded", "8.2.3.21"] : profiles2.get(kind);
+  const resolvedTypes = typeReferences(element2, data, { node, view }), metadata2 = kind === "MetadataUsage" && resolvedTypes.names.length === 1 && (resolvedTypes.ids.length === 1 || resolvedTypes.nativeLabel);
+  const profile = metadata2 ? ["metadata", "note", "8.2.3.27"] : ["actor", "subject", "stakeholder"].includes(node.kind) && element2 ? ["" + node.kind, "rounded", "8.2.3.21"] : profiles2.get(kind);
   if (!profile) {
     const reason = kind === "ReferenceUsage" ? "A standalone ReferenceUsage has no single graphical node production: its native parameter, subject, end or metadata-value role and owning frame must be supplied. Directed parameters and connector ends are rendered in their actual owner compartments." : kind === "MetadataUsage" ? "A metadata annotation requires its resolved native metadata definition and expression argument text; those fields are not supplied by this declaration-only projection." : kind === "Dependency" ? "A native Dependency is an edge, not a standalone graphical node. Open a native view that represents its client and supplier." : `Focused graphical notation for ${kind ?? node.kind ?? "unknown kind"} requires a native graphical role not provided by this projection.`;
     base.notices.push(notice(kind ?? node.kind, node.semanticId ?? node.id, reason + " Native content is retained in a neutral box."));
@@ -3524,7 +3524,7 @@ function focusedNodeDescriptor(node, graph, { expanded = true, pageSize = 12, vi
   }
   const [keyword, shape, section] = profile, types = resolvedTypes;
   Object.assign(base, { keyword, shape, section, supported: true, type: types.names.join(", "), typeIds: types.ids, unresolvedTypeIds: types.unresolvedIds, typeLabelAuthority: types.labelAuthority, reference: referenceShapes.has(kind) && (native.isReference === true || native.isComposite === false) });
-  if (metadata) {
+  if (metadata2) {
     base.metadataUsageName = base.name;
     base.name = types.names[0];
     base.type = "";
@@ -4139,22 +4139,22 @@ function relationshipRollups(graph, options = {}) {
       omit(edge, "missing-relationship-identity");
       continue;
     }
-    const source = represent(edge.source), target = represent(edge.target);
-    if (source.reason || target.reason) {
-      for (const [side, value] of [["source", source], ["target", target]]) if (value.reason) omit(edge, value.reason, { endpoint: side, elementId: value.target, candidates: value.candidates });
+    const source2 = represent(edge.source), target = represent(edge.target);
+    if (source2.reason || target.reason) {
+      for (const [side, value] of [["source", source2], ["target", target]]) if (value.reason) omit(edge, value.reason, { endpoint: side, elementId: value.target, candidates: value.candidates });
       continue;
     }
-    if (source.id === edge.source && target.id === edge.target) {
+    if (source2.id === edge.source && target.id === edge.target) {
       directRelationships.push(edge);
       continue;
     }
-    if (source.id === target.id && !options.includeInternal) {
-      omit(edge, "internal-to-visible-container", { container: source.id });
+    if (source2.id === target.id && !options.includeInternal) {
+      omit(edge, "internal-to-visible-container", { container: source2.id });
       continue;
     }
-    const id = "presentation-rollup:" + JSON.stringify([source.id, target.id, edge.kind]);
-    if (!groups.has(id)) groups.set(id, { id, presentationOnly: true, aggregate: true, source: source.id, target: target.id, kind: edge.kind, scopeIds: policy.scope ? [...policy.scope].sort(compare) : null, maxOwnerHops: policy.maxOwnerHops, records: [] });
-    groups.get(id).records.push({ relationship: edge, sourcePath: source.path, targetPath: target.path });
+    const id = "presentation-rollup:" + JSON.stringify([source2.id, target.id, edge.kind]);
+    if (!groups.has(id)) groups.set(id, { id, presentationOnly: true, aggregate: true, source: source2.id, target: target.id, kind: edge.kind, scopeIds: policy.scope ? [...policy.scope].sort(compare) : null, maxOwnerHops: policy.maxOwnerHops, records: [] });
+    groups.get(id).records.push({ relationship: edge, sourcePath: source2.path, targetPath: target.path });
   }
   const ordered = [...groups.values()].sort((a, b) => compare(a.source, b.source) || compare(a.target, b.target) || compare(a.kind, b.kind)), selected = ordered.slice(0, policy.budget);
   for (const group of ordered.slice(policy.budget)) for (const { relationship } of group.records) omit(relationship, "rollup-budget", { rollupId: group.id });
@@ -4186,12 +4186,12 @@ function rollupDrilldown(graph, rollup, { page = 0, pageSize = 10, scopeIds: sco
       continue;
     }
     const policy = { visible: /* @__PURE__ */ new Set([rollup.source, rollup.target]), scope, maxOwnerHops: rollup.maxOwnerHops ?? 64 };
-    const source = representative(data, edge.source, policy), target = representative(data, edge.target, policy);
-    if (source.reason || target.reason || source.id !== rollup.source || target.id !== rollup.target) {
+    const source2 = representative(data, edge.source, policy), target = representative(data, edge.target, policy);
+    if (source2.reason || target.reason || source2.id !== rollup.source || target.id !== rollup.target) {
       omissions.push({ relationshipId: edge.id, reason: "stale-owner-projection" });
       continue;
     }
-    valid.push({ relationship: edge, sourcePath: source.path, targetPath: target.path });
+    valid.push({ relationship: edge, sourcePath: source2.path, targetPath: target.path });
   }
   const pages = Math.max(1, Math.ceil(valid.length / pageSize)), actualPage = Math.min(page, pages - 1), records = valid.slice(actualPage * pageSize, (actualPage + 1) * pageSize), relationships = records.map((r) => r.relationship), wanted = new Set(relationships.flatMap((e) => [e.source, e.target]));
   const paths = records.map((record) => ({ relationshipId: record.relationship.id, source: record.sourcePath, target: record.targetPath }));
@@ -5347,12 +5347,12 @@ function createPresentationLayouts(initial = { schemaVersion: PRESENTATION_LAYOU
         store.setRegion(targetView, region.layout);
         return { omissions, retained: region.layout.columns.length };
       }
-      const source = views.get(presentationViewKey(sourceView));
-      if (!source) return { omissions, retained: 0 };
+      const source2 = views.get(presentationViewKey(sourceView));
+      if (!source2) return { omissions, retained: 0 };
       const placements = [];
-      for (const saved of source.placements) {
+      for (const saved of source2.placements) {
         const matches = targetLayout.nodes.filter((node2) => node2.semanticId === saved.semanticId && parentIdentity(targetLayout, node2).parentSemanticId === saved.parentSemanticId);
-        const sourcePeers = source.placements.filter((item) => item.semanticId === saved.semanticId && item.parentSemanticId === saved.parentSemanticId);
+        const sourcePeers = source2.placements.filter((item) => item.semanticId === saved.semanticId && item.parentSemanticId === saved.parentSemanticId);
         if (matches.length !== 1 || sourcePeers.length !== 1) {
           omissions.push({ reason: "layout-ambiguous-capture", target: saved.semanticId, message: "Captured view has no unique native representation correspondence for this placement." });
           continue;
@@ -5507,13 +5507,13 @@ function mountFigure(host, figure, { assetURL, resolve: resolve2, onSelect, labe
   image.decoding = "async";
   const caption = el3("figcaption");
   caption.append(el3("p", figure.caption));
-  const refs4 = el3("div");
-  refs4.className = "model-references";
-  appendModelReferences(refs4, figure.modelRefs, { resolve: resolve2, onSelect, labelFor: labelFor2 });
-  caption.append(refs4);
-  const source = el3("details");
-  source.append(el3("summary", "Figure source"), el3("p", figure.provenance.source), el3("p", figure.provenance.context));
-  caption.append(source);
+  const refs5 = el3("div");
+  refs5.className = "model-references";
+  appendModelReferences(refs5, figure.modelRefs, { resolve: resolve2, onSelect, labelFor: labelFor2 });
+  caption.append(refs5);
+  const source2 = el3("details");
+  source2.append(el3("summary", "Figure source"), el3("p", figure.provenance.source), el3("p", figure.provenance.context));
+  caption.append(source2);
   if (figure.evidence) caption.append(renderEvidence(doc, figure.evidence));
   if (onEnlarge) {
     const b = el3("button", "Enlarge figure");
@@ -5816,9 +5816,9 @@ function makeGraph(view, options, profile) {
     return portId;
   }
   for (const [i, edge] of [...view.edges].sort((a, b) => a.id.localeCompare(b.id)).entries()) {
-    const [source, target, reversed] = orientation(edge, behavioral, view.kind), id = `syspresent-edge:${i}`, label2 = edge.label ? options.measureLabel?.(edge.label) ?? { width: String(edge.label).length * 7.2 + 4, height: 16 } : null;
+    const [source2, target, reversed] = orientation(edge, behavioral, view.kind), id = `syspresent-edge:${i}`, label2 = edge.label ? options.measureLabel?.(edge.label) ?? { width: String(edge.label).length * 7.2 + 4, height: 16 } : null;
     const sourcePin = reversed ? edge.targetAttachment : edge.sourceAttachment, targetPin = reversed ? edge.sourceAttachment : edge.targetAttachment, sides = profile.anchorSides?.get(edge.id);
-    graph.edges.push({ id, sources: [anchor(sourcePin ?? source, id, "source", sides?.[0])], targets: [anchor(targetPin ?? target, id, "target", sides?.[1])], ...label2 ? { labels: [{ id: id + ":label", text: edge.label, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {} });
+    graph.edges.push({ id, sources: [anchor(sourcePin ?? source2, id, "source", sides?.[0])], targets: [anchor(targetPin ?? target, id, "target", sides?.[1])], ...label2 ? { labels: [{ id: id + ":label", text: edge.label, width: num(label2.width, 1), height: num(label2.height, 16) }] } : {} });
     edgeMap.set(id, { edge, reversed });
   }
   return { graph, nodes, children, actualPorts, anchors, edgeMap };
@@ -5928,7 +5928,7 @@ async function layoutDiagram(nativeView, options = {}) {
 function requirementFanout(view) {
   if (!["requirement", "definition", "general"].includes(view.kind) || view.nodes.some((n) => n.parentId) || view.edges.length !== view.nodes.length - 1) return false;
   const oriented = view.edges.map((edge) => edgeLayoutHints(edge, { viewKind: view.kind }).rank === "target-above-source" ? orientation(edge, false, view.kind) : null);
-  return oriented.every(Boolean) && oriented.every(([source]) => source === oriented[0][0]) && new Set(oriented.map(([, target]) => target)).size === view.nodes.length - 1;
+  return oriented.every(Boolean) && oriented.every(([source2]) => source2 === oriented[0][0]) && new Set(oriented.map(([, target]) => target)).size === view.nodes.length - 1;
 }
 function facingSides(view) {
   const nodes = new Map(view.nodes.map((n) => [n.id, n])), sides = /* @__PURE__ */ new Map();
@@ -6088,11 +6088,11 @@ function bindCameraControls({ element: element2, getCamera, setCamera, onChange,
     host.addEventListener(type, fn, options2);
     listeners.push(() => host.removeEventListener(type, fn, options2));
   };
-  const emit = (camera, source) => {
+  const emit = (camera, source2) => {
     const next = createCamera(camera, options), current = createCamera(getCamera(), options);
     if (next.x === current.x && next.y === current.y && next.scale === current.scale) return;
-    setCamera(next, { source });
-    onChange?.(next, { source });
+    setCamera(next, { source: source2 });
+    onChange?.(next, { source: source2 });
   };
   const rebase = () => {
     gesture = { camera: createCamera(getCamera(), options), points: [...points.values()].map((p) => ({ ...p })) };
@@ -6106,11 +6106,11 @@ function bindCameraControls({ element: element2, getCamera, setCamera, onChange,
       }
     }
   };
-  const begin = (source) => {
+  const begin = (source2) => {
     if (!moved) {
       moved = true;
       suppressClick = true;
-      onGestureStart?.({ source });
+      onGestureStart?.({ source: source2 });
       if (gesture) gesture.camera = createCamera(getCamera(), options);
     }
     capture2();
@@ -6469,15 +6469,15 @@ var named = (element2) => idText(element2.native?.declaredName) || idText(elemen
 var eligible = (element2) => element2?.layer === "project" && named(element2) && engineeringCategory.test(element2.kind ?? "");
 function nativeStructure(graph) {
   const children = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map();
-  const add = (edge) => {
+  const add2 = (edge) => {
     if (!idText(edge.source) || !idText(edge.target) || edge.source === edge.target) return;
     if (!children.has(edge.source)) children.set(edge.source, /* @__PURE__ */ new Set());
     if (!parents.has(edge.target)) parents.set(edge.target, /* @__PURE__ */ new Set());
     children.get(edge.source).add(edge.target);
     parents.get(edge.target).add(edge.source);
   };
-  for (const edge of graph.containment ?? []) if (edge.nativeRole === "owner") add(edge);
-  for (const edge of graph.relationships ?? []) if (edge.kind === "composition") add(edge);
+  for (const edge of graph.containment ?? []) if (edge.nativeRole === "owner") add2(edge);
+  for (const edge of graph.relationships ?? []) if (edge.kind === "composition") add2(edge);
   return { children, parents };
 }
 function descendantClosure(children, rootIds) {
@@ -6589,11 +6589,11 @@ function createProminenceIndex(graph, { scopeIds: scopeIds2 } = {}) {
     const score = 3 * Math.log2(1 + children) + Math.log2(1 + descendants.descendants) + 2 * Math.log2(1 + connections) + 2 * Math.log2(1 + crossBranchConnections);
     metrics.set(id, { children, ...descendants, connections, crossBranchConnections, score });
   }
-  const compare8 = (a, b) => {
+  const compare9 = (a, b) => {
     const am = metrics.get(a), bm = metrics.get(b);
     return Number(!!bm) - Number(!!am) || (bm?.score ?? 0) - (am?.score ?? 0) || data.compareNames(a, b);
   };
-  const result = { metrics, compare: compare8 };
+  const result = { metrics, compare: compare9 };
   if (scopeIds2 === void 0) defaultIndexes.set(graph, result);
   else if (cacheableScope) {
     if (!scopedIndexes.has(graph)) scopedIndexes.set(graph, /* @__PURE__ */ new WeakMap());
@@ -6627,13 +6627,189 @@ function completeChildView(graph, context, title = "Complete contents") {
   return view;
 }
 
+// src/canvas-prototype/metadata-context.mjs
+var refs4 = (value) => Array.isArray(value) ? value.flatMap(refs4) : value && typeof value === "object" && typeof value["@id"] === "string" ? [value["@id"]] : [];
+var unique = (values) => [...new Set(values)].sort();
+var compare3 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var source = (element2) => element2.layer === "project" || !!element2.native?.["sysx:sourceLine"];
+var metadata = (element2) => element2?.kind === "MetadataUsage";
+var add = (map, key3, value) => {
+  if (!map.has(key3)) map.set(key3, /* @__PURE__ */ new Set());
+  map.get(key3).add(value);
+};
+var indexes3 = /* @__PURE__ */ new WeakMap();
+var isIndex = (value) => value?.byId instanceof Map && value?.ownerIds instanceof Map;
+function nativeOwnershipIndex(graph) {
+  if (isIndex(graph)) return graph;
+  const prior = indexes3.get(graph);
+  if (prior && prior.elements === graph.elements && prior.elementCount === (graph.elements ?? []).length && prior.containment === graph.containment && prior.containmentCount === (graph.containment ?? []).length && prior.relationships === graph.relationships && prior.relationshipCount === (graph.relationships ?? []).length) return prior.index;
+  const byId = new Map((graph.elements ?? []).map((element2) => [element2.id, element2])), owners = /* @__PURE__ */ new Map(), children = /* @__PURE__ */ new Map(), sourceIds = /* @__PURE__ */ new Set();
+  for (const element2 of byId.values()) {
+    if (source(element2)) sourceIds.add(element2.id);
+    for (const owner of refs4(element2.native?.owner)) {
+      add(owners, element2.id, owner);
+      add(children, owner, element2.id);
+    }
+  }
+  for (const edge of [...graph.containment ?? [], ...graph.relationships ?? []]) if (edge.kind === "containment" && edge.nativeRole === "owner") {
+    const parent = edge.source, child = edge.target;
+    if (typeof parent !== "string" || typeof child !== "string") continue;
+    add(owners, child, parent);
+    add(children, parent, child);
+  }
+  const ownerIds = new Map([...owners].map(([id, ids]) => [id, unique(ids)])), childIds = new Map([...children].map(([id, ids]) => [id, unique(ids)]));
+  const annotations = /* @__PURE__ */ new Map(), ensure = (id) => {
+    if (!annotations.has(id)) annotations.set(id, { annotationId: id, recordedOnIds: /* @__PURE__ */ new Set(), metadataIds: /* @__PURE__ */ new Set(), annotatedElementIds: /* @__PURE__ */ new Set(), provenance: [] });
+    return annotations.get(id);
+  };
+  for (const element2 of byId.values()) {
+    for (const id of refs4(element2.native?.ownedAnnotation)) {
+      const link = ensure(id);
+      link.recordedOnIds.add(element2.id);
+      link.provenance.push({ elementId: element2.id, property: "ownedAnnotation", referencedId: id });
+    }
+    if (element2.kind === "Annotation") {
+      const link = ensure(element2.id);
+      for (const id of refs4(element2.native?.annotatedElement)) link.annotatedElementIds.add(id);
+      for (const id of refs4(element2.native?.annotatingElement)) link.metadataIds.add(id);
+      for (const property of ["annotatedElement", "annotatingElement"]) for (const id of refs4(element2.native?.[property])) link.provenance.push({ elementId: element2.id, property, referencedId: id });
+    }
+  }
+  for (const element2 of byId.values()) if (metadata(element2)) for (const id of refs4(element2.native?.owningRelationship)) {
+    const link = annotations.get(id);
+    if (!link) continue;
+    link.metadataIds.add(element2.id);
+    link.provenance.push({ elementId: element2.id, property: "owningRelationship", referencedId: id });
+  }
+  const annotationLinks = [...annotations.values()].map((link) => ({
+    annotationId: link.annotationId,
+    available: byId.has(link.annotationId),
+    recordedOnIds: unique(link.recordedOnIds),
+    metadataIds: unique(link.metadataIds),
+    annotatedElementIds: unique(link.annotatedElementIds),
+    provenance: link.provenance.sort((a, b) => compare3(JSON.stringify(a), JSON.stringify(b))),
+    presentationOnly: true,
+    authority: "native-api",
+    role: "annotation-record-provenance"
+  })).sort((a, b) => compare3(a.annotationId, b.annotationId));
+  const annotationLinksByMetadata = /* @__PURE__ */ new Map(), annotationLinksByElement = /* @__PURE__ */ new Map(), metadataByAnnotatedElement = /* @__PURE__ */ new Map();
+  for (const link of annotationLinks) {
+    for (const id of link.metadataIds) {
+      if (!annotationLinksByMetadata.has(id)) annotationLinksByMetadata.set(id, []);
+      annotationLinksByMetadata.get(id).push(link);
+      for (const target of link.annotatedElementIds) add(metadataByAnnotatedElement, target, id);
+    }
+    for (const id of unique([...link.recordedOnIds, ...link.annotatedElementIds, ...link.metadataIds])) {
+      if (!annotationLinksByElement.has(id)) annotationLinksByElement.set(id, []);
+      annotationLinksByElement.get(id).push(link);
+    }
+  }
+  const metadataIds = [...byId.values()].filter((element2) => metadata(element2) && sourceIds.has(element2.id)).sort((a, b) => compare3(a.qualifiedName ?? a.name ?? a.id, b.qualifiedName ?? b.name ?? b.id) || compare3(a.id, b.id)).map((element2) => element2.id);
+  for (const id of metadataIds) for (const target of refs4(byId.get(id).native?.annotatedElement)) add(metadataByAnnotatedElement, target, id);
+  const index5 = { byId, ownerIds, childIds, sourceIds, annotationLinks, annotationLinksByMetadata, annotationLinksByElement, metadataByAnnotatedElement, metadataIds };
+  indexes3.set(graph, { elements: graph.elements, elementCount: (graph.elements ?? []).length, containment: graph.containment, containmentCount: (graph.containment ?? []).length, relationships: graph.relationships, relationshipCount: (graph.relationships ?? []).length, index: index5 });
+  return index5;
+}
+function inspectNativeOwnership(graph, id, { scopeIds: scopeIds2 } = {}) {
+  const index5 = nativeOwnershipIndex(graph), scope = scopeIds2 ? new Set(scopeIds2) : null, seen = /* @__PURE__ */ new Set(), queue = [id], steps = [], boundaries = [], ambiguous = [];
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    const current = queue[cursor];
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const element2 = index5.byId.get(current);
+    if (!element2) {
+      boundaries.push({ id: current, reason: "missing-owner" });
+      continue;
+    }
+    if (scope && !scope.has(current)) {
+      boundaries.push({ id: current, reason: "outside-scope" });
+      continue;
+    }
+    const ownerIds = index5.ownerIds.get(current) ?? [];
+    steps.push({ id: current, kind: element2.kind, source: index5.sourceIds.has(current), ownerIds });
+    if (!ownerIds.length) boundaries.push({ id: current, reason: "native-root" });
+    if (ownerIds.length > 1) {
+      const entry = { id: current, reason: "ambiguous-owner", ownerIds };
+      ambiguous.push(entry);
+      boundaries.push(entry);
+    }
+    for (const owner of ownerIds) if (!seen.has(owner)) queue.push(owner);
+  }
+  const visited = /* @__PURE__ */ new Set(), active2 = /* @__PURE__ */ new Map(), cycles = [], cycleKeys = /* @__PURE__ */ new Set(), allowed2 = new Set(steps.map((step) => step.id));
+  for (const start2 of allowed2) {
+    if (visited.has(start2)) continue;
+    const stack = [{ id: start2, cursor: 0 }];
+    active2.set(start2, 0);
+    while (stack.length) {
+      const frame2 = stack.at(-1), parents = (index5.ownerIds.get(frame2.id) ?? []).filter((owner) => allowed2.has(owner));
+      if (frame2.cursor >= parents.length) {
+        visited.add(frame2.id);
+        active2.delete(frame2.id);
+        stack.pop();
+        continue;
+      }
+      const parent = parents[frame2.cursor++];
+      if (active2.has(parent)) {
+        const members = stack.slice(active2.get(parent)).map((item) => item.id), key3 = JSON.stringify([...members].sort());
+        if (!cycleKeys.has(key3)) {
+          cycleKeys.add(key3);
+          cycles.push({ id: parent, reason: "ownership-cycle", ids: members });
+        }
+      } else if (!visited.has(parent)) {
+        active2.set(parent, stack.length);
+        stack.push({ id: parent, cursor: 0 });
+      }
+    }
+  }
+  boundaries.push(...cycles);
+  return structuredClone({ id, found: index5.byId.has(id), ownerIds: index5.ownerIds.get(id) ?? [], steps, boundaries, reachableOwnerIds: [...seen].filter((owner) => owner !== id), ambiguous, cycles, missingOwnerIds: unique(boundaries.filter((item) => item.reason === "missing-owner").map((item) => item.id)), outsideScopeIds: unique(boundaries.filter((item) => item.reason === "outside-scope").map((item) => item.id)) });
+}
+function metadataRecord(index5, element2) {
+  const owningRelationshipIds = unique(refs4(element2.native?.owningRelationship));
+  const matches = index5.annotationLinksByMetadata.get(element2.id) ?? [];
+  return {
+    id: element2.id,
+    kind: element2.kind,
+    name: element2.name,
+    qualifiedName: element2.qualifiedName,
+    ownerIds: index5.ownerIds.get(element2.id) ?? [],
+    annotatedElementIds: unique(refs4(element2.native?.annotatedElement)),
+    owningRelationshipIds,
+    typeIds: unique(refs4(element2.native?.type)),
+    matchingOwnedAnnotationIds: unique(matches.filter((link) => link.recordedOnIds.length).map((link) => link.annotationId)),
+    recordedOnIds: unique(matches.flatMap((link) => link.recordedOnIds)),
+    ownedElementIds: index5.childIds.get(element2.id) ?? [],
+    source: { line: element2.native?.["sysx:sourceLine"] ?? null, column: element2.native?.["sysx:sourceColumn"] ?? null, text: element2.native?.["sysx:sourceText"] ?? null },
+    authority: "native-api"
+  };
+}
+function metadataContext(graph, id, { scopeIds: scopeIds2 } = {}) {
+  const index5 = nativeOwnershipIndex(graph), scope = scopeIds2 ? new Set(scopeIds2) : null;
+  const sourceRecord = (key3) => metadata(index5.byId.get(key3)) && index5.sourceIds.has(key3), recordsFor = (ids) => unique(ids).filter(sourceRecord).map((key3) => metadataRecord(index5, index5.byId.get(key3)));
+  const owned = recordsFor(index5.childIds.get(id) ?? []), annotating = recordsFor(index5.metadataByAnnotatedElement.get(id) ?? []);
+  const annotationLinks = index5.annotationLinksByElement.get(id) ?? [];
+  const classify = (record) => ({ ...record, outsideScope: !!scope && !scope.has(record.id), unavailableOwnerIds: record.ownerIds.filter((owner) => !index5.byId.has(owner)), unavailableAnnotatedElementIds: record.annotatedElementIds.filter((target) => !index5.byId.has(target)) });
+  const recordIds = unique([...owned, ...annotating].map((record) => record.id));
+  const unknownAnnotations = annotationLinks.filter((link) => !link.available).map((link) => link.annotationId);
+  return structuredClone({ id, found: index5.byId.has(id), metadata: metadata(index5.byId.get(id)) ? classify(metadataRecord(index5, index5.byId.get(id))) : null, ownedMetadata: owned.map(classify), annotatingMetadata: annotating.map(classify), annotationLinks, unavailableAnnotationIds: unique(unknownAnnotations), total: recordIds.length, summary: { owned: owned.length, annotating: annotating.length, uniqueMetadata: recordIds.length, annotationRecords: annotationLinks.length, unavailableAnnotations: unique(unknownAnnotations).length } });
+}
+function sourceMetadata(graph, { ownerId, query = "", page = 0, pageSize = 40 } = {}) {
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1) throw Error("Metadata pageSize must be a positive integer");
+  if (!Number.isSafeInteger(page) || page < 0) throw Error("Metadata page must be a nonnegative integer");
+  const index5 = nativeOwnershipIndex(graph), needle = String(query).trim().toLowerCase();
+  const all = index5.metadataIds.map((id) => index5.byId.get(id));
+  const selected = all.filter((element2) => (ownerId === void 0 || (index5.ownerIds.get(element2.id) ?? []).includes(ownerId)) && (!needle || [element2.id, element2.name, element2.qualifiedName, element2.native?.["sysx:sourceText"]].filter(Boolean).some((value) => String(value).toLowerCase().includes(needle)))).sort((a, b) => compare3(a.qualifiedName ?? a.name ?? a.id, b.qualifiedName ?? b.name ?? b.id) || compare3(a.id, b.id));
+  const pages = Math.max(1, Math.ceil(selected.length / pageSize)), actualPage = Math.min(page, pages - 1), items = selected.slice(actualPage * pageSize, (actualPage + 1) * pageSize).map((element2) => metadataRecord(index5, element2));
+  return structuredClone({ items, rows: items, total: selected.length, totalSourceMetadata: all.length, shown: items.length, page: actualPage, pageSize, pages, hasPrevious: actualPage > 0, hasNext: actualPage + 1 < pages, ownerId: ownerId ?? null, query: String(query), scope: "all-loaded-source-metadata" });
+}
+
 // src/canvas-prototype/child-exploration.mjs
 var compareText2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var endpoint3 = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
 var edgeKey2 = (edge) => JSON.stringify([edge.id ?? null, edge.source, edge.target, edge.kind]);
-var indexes3 = /* @__PURE__ */ new WeakMap();
+var indexes4 = /* @__PURE__ */ new WeakMap();
 function prepare2(graph) {
-  const prior = indexes3.get(graph);
+  const prior = indexes4.get(graph);
   if (prior && prior.elementSource === graph.elements && prior.relationshipSource === graph.relationships && prior.containmentSource === graph.containment && prior.elementCount === (graph.elements ?? []).length && prior.relationshipCount === (graph.relationships ?? []).length && prior.containmentCount === (graph.containment ?? []).length) return prior;
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
   const edges2 = [...new Map([...graph.relationships ?? [], ...graph.containment ?? []].map((edge) => {
@@ -6652,7 +6828,7 @@ function prepare2(graph) {
     }
   }
   const result = { elements, edges: edges2, owners, types, elementSource: graph.elements, relationshipSource: graph.relationships, containmentSource: graph.containment, elementCount: (graph.elements ?? []).length, relationshipCount: (graph.relationships ?? []).length, containmentCount: (graph.containment ?? []).length };
-  indexes3.set(graph, result);
+  indexes4.set(graph, result);
   return result;
 }
 function completeChildContext(graph, options = {}) {
@@ -6673,24 +6849,24 @@ function completeChildContext(graph, options = {}) {
     else filtered.add(target);
     if (reason === "outside-scope") outside.add(target);
   };
-  const excluded = (id, { source = false } = {}) => {
+  const excluded = (id, { source: source2 = false } = {}) => {
     const element2 = elements.get(id);
     if (!element2) return "unavailable";
     if (element2.metamodel === true || element2.layer === "metamodel") return "metamodel-boundary";
     if (scope && !scope.has(id)) return "outside-scope";
     if (!isDeclarationKind(element2.kind)) return "element-policy";
-    if (source && element2.layer !== "project") return "source-projection";
+    if (source2 && element2.layer !== "project") return "source-projection";
     if (kinds2 && !kinds2.has(element2.kind)) return "element-filter";
     return null;
   };
-  const compare8 = (a, b) => compareText2(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compareText2(a, b);
+  const compare9 = (a, b) => compareText2(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compareText2(a, b);
   const roots = [];
   for (const id of requested) {
     const reason = excluded(id);
     if (reason) omit(null, id, reason, null);
     else roots.push(id);
   }
-  roots.sort(compare8);
+  roots.sort(compare9);
   const anchors = new Map(roots.map((id) => [id, { root: true, bridges: [] }]));
   if (options.includeDirectTypes !== false) for (const root of roots) {
     if (!elements.get(root)?.kind?.endsWith("Usage")) continue;
@@ -6731,7 +6907,7 @@ function completeChildContext(graph, options = {}) {
       for (const bridge of context.bridges) bridgeEdges.set(edgeKey2(bridge), bridge);
     }
   }
-  const childIds = [...children.keys()].sort(compare8), typeIds = [...neededTypes].sort(compare8);
+  const childIds = [...children.keys()].sort(compare9), typeIds = [...neededTypes].sort(compare9);
   const wanted = new Set(roots);
   for (const id of typeIds) wanted.add(id);
   for (const id of childIds) wanted.add(id);
@@ -6752,7 +6928,7 @@ function completeChildContext(graph, options = {}) {
     relationshipContext[reason === "outside-scope" ? "outsideScope" : reason === "not-opened" ? "notOpened" : "unavailable"]++;
     relationshipContext.kindCounts[edge.kind] = (relationshipContext.kindCounts[edge.kind] ?? 0) + 1;
   }
-  const declarationOwners = Object.fromEntries(childIds.map((id) => [id, [...children.get(id)].sort(compare8)]));
+  const declarationOwners = Object.fromEntries(childIds.map((id) => [id, [...children.get(id)].sort(compare9)]));
   const declaredOn = Object.fromEntries(childIds.map((id) => [id, declarationOwners[id].length === 1 ? declarationOwners[id][0] : null]));
   const kindCounts = {};
   for (const id of childIds) {
@@ -6772,7 +6948,7 @@ function completeChildContext(graph, options = {}) {
   if (relationshipContext.total) message += " " + relationshipContext.total + " actual native relationship context links are not opened (" + relationshipContext.outsideScope + " outside scope, " + relationshipContext.unavailable + " unavailable, " + relationshipContext.notOpened + " available but not opened); exact identities and direction are disclosed separately without adding endpoints or changing child counts.";
   message += " Only immediate native owners and one direct typing hop are opened; drill into a child to continue. Counts describe the loaded projection, not proof that omitted model content is absent.";
   if (!roots.length) message = "The selected native declaration is unavailable or outside this scope.";
-  const childProjection = { rootIds: roots, childIds, ownChildIds: [...own2].sort(compare8), definitionChildIds: [...defined].sort(compare8), typeIds, declaredOn, declarationOwners, ownership, complete: true, kindCounts };
+  const childProjection = { rootIds: roots, childIds, ownChildIds: [...own2].sort(compare9), definitionChildIds: [...defined].sort(compare9), typeIds, declaredOn, declarationOwners, ownership, complete: true, kindCounts };
   return structuredClone({
     elements: [...wanted].map((id) => elements.get(id)),
     relationships: [...selected.values()].sort((a, b) => compareText2(edgeKey2(a), edgeKey2(b))),
@@ -6829,23 +7005,44 @@ function closedCycleMembers(ids, children, parents) {
   return cycles;
 }
 function completeRootContext(graph, options = {}) {
-  const { elements, edges: edges2 } = prepare2(graph), scope = options.scopeIds ? new Set(options.scopeIds) : null;
-  const source = new Set([...elements.values()].filter((element2) => element2.layer === "project" && element2.metamodel !== true && isDeclarationKind(element2.kind) && (!scope || scope.has(element2.id))).map((element2) => element2.id));
-  const compare8 = (a, b) => Number(!["Package", "Namespace"].includes(elements.get(a)?.kind)) - Number(!["Package", "Namespace"].includes(elements.get(b)?.kind)) || compareText2(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compareText2(a, b);
-  const nativeOwners = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map(), children = /* @__PURE__ */ new Map();
-  const add = (parent, child) => {
-    if (typeof parent !== "string" || !source.has(child)) return;
-    if (!nativeOwners.has(child)) nativeOwners.set(child, /* @__PURE__ */ new Set());
-    nativeOwners.get(child).add(parent);
-    if (!source.has(parent)) return;
-    if (!parents.has(child)) parents.set(child, /* @__PURE__ */ new Set());
-    parents.get(child).add(parent);
+  const { elements, edges: edges2 } = prepare2(graph), index5 = nativeOwnershipIndex(graph), scope = options.scopeIds ? new Set(options.scopeIds) : null;
+  const eligible2 = new Set([...elements.values()].filter((element2) => element2.layer === "project" && element2.metamodel !== true && isDeclarationKind(element2.kind) && (!scope || scope.has(element2.id))).map((element2) => element2.id));
+  const nativeRoots = new Set(options.nativeRootIds ?? graph.nativeRootIds ?? []);
+  const compare9 = (a, b) => Number(!["Package", "Namespace"].includes(elements.get(a)?.kind)) - Number(!["Package", "Namespace"].includes(elements.get(b)?.kind)) || compareText2(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compareText2(a, b);
+  const fullSource = new Set([...index5.sourceIds].filter((id) => !scope || scope.has(id))), parents = /* @__PURE__ */ new Map(), children = /* @__PURE__ */ new Map();
+  for (const id of fullSource) for (const parent of index5.ownerIds.get(id) ?? []) if (fullSource.has(parent)) {
+    if (!parents.has(id)) parents.set(id, /* @__PURE__ */ new Set());
+    parents.get(id).add(parent);
     if (!children.has(parent)) children.set(parent, /* @__PURE__ */ new Set());
-    children.get(parent).add(child);
+    children.get(parent).add(id);
+  }
+  const roots = [], inspectionEntries = [], entryById = /* @__PURE__ */ new Map();
+  const inspect = (id, reason, extra = {}) => {
+    if (entryById.has(id)) return;
+    const entry = { id, reason, ownerIds: index5.ownerIds.get(id) ?? [], ...extra };
+    entryById.set(id, entry);
+    inspectionEntries.push(entry);
   };
-  for (const edge of edges2) if (edge.kind === "containment" && edge.nativeRole === "owner") add(edge.source, edge.target);
-  for (const id of source) for (const parent of nativeRefs2(elements.get(id).native?.owner)) add(parent, id);
-  const roots = [...source].filter((id) => !parents.get(id)?.size), reachable = /* @__PURE__ */ new Set(), walk = (starts) => {
+  for (const id of eligible2) {
+    const native = elements.get(id).native ?? {}, ownerIds = index5.ownerIds.get(id) ?? [], sourceParents = ownerIds.filter((parent) => fullSource.has(parent));
+    const targets = nativeRefs2(native.annotatedElement);
+    if (sourceParents.length) {
+      const nonStructural = sourceParents.filter((parent) => !isDeclarationKind(elements.get(parent)?.kind));
+      if (nonStructural.length) inspect(id, "native-nonstructural-owner", { ownerKinds: nonStructural.map((parent) => elements.get(parent)?.kind) });
+      continue;
+    }
+    if (elements.get(id).kind === "MetadataUsage" && targets.length) {
+      inspect(id, "annotation-context", { annotatedElementIds: targets });
+      continue;
+    }
+    if (nativeRoots.has(id) || !ownerIds.length) {
+      roots.push(id);
+      continue;
+    }
+    const outside = ownerIds.filter((owner) => index5.sourceIds.has(owner) && !fullSource.has(owner));
+    inspect(id, outside.length ? "outside-scope" : "native-owner-unavailable", { outsideOwnerIds: outside });
+  }
+  const reachable = /* @__PURE__ */ new Set(), walk = (starts) => {
     const queue = [...starts];
     for (let cursor = 0; cursor < queue.length; cursor++) {
       const id = queue[cursor];
@@ -6855,52 +7052,20 @@ function completeRootContext(graph, options = {}) {
     }
   };
   walk(roots);
-  const cycleIds = closedCycleMembers([...source].filter((id) => !reachable.has(id)), children, parents), cycles = new Set(cycleIds);
-  roots.push(...cycleIds);
-  walk(cycleIds);
-  const unresolved = [...source].filter((id) => !reachable.has(id)), unresolvedIds = new Set(unresolved);
-  roots.push(...unresolved);
-  const childIds = [...new Set(roots)].sort(compare8), wanted = new Set(childIds), omissions = [], projectionRoots = [];
-  const declarationOwners = Object.fromEntries(childIds.map((id) => [id, [...nativeOwners.get(id) ?? []].sort(compareText2)]));
-  for (const id of childIds) {
-    const ownerIds = declarationOwners[id];
-    const omittedOwnerIds = ownerIds.filter((owner) => !elements.has(owner) || elements.get(owner).layer !== "project" || !isDeclarationKind(elements.get(owner).kind));
-    const outsideOwnerIds = scope ? ownerIds.filter((owner) => elements.has(owner) && elements.get(owner).layer === "project" && isDeclarationKind(elements.get(owner).kind) && !scope.has(owner)) : [];
-    const reason = cycles.has(id) ? "cycle" : unresolvedIds.has(id) ? "ownership-unresolved" : !ownerIds.length ? "native-root" : !omittedOwnerIds.length && outsideOwnerIds.length ? "outside-scope" : "native-owner-omitted";
-    projectionRoots.push({ id, reason, ownerIds, omittedOwnerIds, outsideOwnerIds });
-    if (reason !== "native-root") omissions.push({ relationshipId: null, target: id, reason, anchor: null, ownerIds });
-  }
-  const relationships = edges2.filter((edge) => wanted.has(edge.source) && wanted.has(edge.target));
-  const kindCounts = {};
+  const remaining = [...fullSource].filter((id) => !reachable.has(id)), cycles = new Set(closedCycleMembers(remaining, children, parents));
+  for (const id of eligible2) if (!reachable.has(id) && !entryById.has(id)) inspect(id, cycles.has(id) ? "ownership-cycle" : "ownership-unresolved");
+  const childIds = [...new Set(roots)].sort(compare9), wanted = new Set(childIds), kindCounts = {};
   for (const id of childIds) {
     const kind = elements.get(id).kind;
     kindCounts[kind] = (kindCounts[kind] ?? 0) + 1;
   }
-  const packageCount = (kindCounts.Package ?? 0) + (kindCounts.Namespace ?? 0), metadataCount = projectionRoots.filter((entry) => ["MetadataUsage", "MetadataDefinition"].includes(elements.get(entry.id).kind) && entry.reason !== "native-root").length;
-  const boundaryCount = projectionRoots.filter((entry) => !["native-root", "cycle"].includes(entry.reason)).length;
-  let message = `All ${childIds.length} roots of the loaded source ownership projection shown: ${packageCount} packages/namespaces`;
-  if (metadataCount) message += ` and ${metadataCount} unanchored metadata declarations`;
-  message += ".";
-  if (boundaryCount) message += ` ${boundaryCount} entries appear here because their explicit native owner is outside the available source-declaration projection or scope; they are not asserted to be physical or model-wide top-level roots.`;
-  if (cycles.size) message += ` ${cycles.size} closed ownership-cycle members are exposed as inspectable entries; no containing hierarchy has been guessed.`;
-  message += ` ${source.size} source declarations remain reachable through intentional immediate-child drilldown. No recursive model expansion or modeled project root is created.`;
-  return structuredClone({
-    elements: childIds.map((id) => elements.get(id)),
-    relationships,
-    omissions,
-    mode: "contents",
-    focus: childIds[0],
-    rootIds: [],
-    page: 0,
-    pages: 1,
-    total: childIds.length,
-    shown: childIds.length,
-    targets: childIds,
-    budget: null,
-    typingBridges: [],
-    childProjection: { rootIds: [], childIds, ownChildIds: childIds, definitionChildIds: [], typeIds: [], declaredOn: {}, declarationOwners, ownership: [], projectionRoots, complete: true, kindCounts, implicitProject: true },
-    summary: { status: childIds.length ? "shown" : "no-known-children", message, total: childIds.length, shown: childIds.length, unavailable: 0, filtered: 0, complete: true, kindCounts, sourceDeclarations: source.size, packages: packageCount, unanchoredMetadata: metadataCount, projectionBoundaries: boundaryCount, cycleEntries: cycles.size }
-  });
+  inspectionEntries.sort((a, b) => compare9(a.id, b.id));
+  const projectionRoots = childIds.map((id) => ({ id, reason: nativeRoots.has(id) ? "native-document-root" : "native-root", ownerIds: index5.ownerIds.get(id) ?? [] }));
+  const packageCount = (kindCounts.Package ?? 0) + (kindCounts.Namespace ?? 0), metadataCount = [...eligible2].filter((id) => elements.get(id).kind === "MetadataUsage").length;
+  const relationshipMetadata = inspectionEntries.filter((entry) => entry.reason === "native-nonstructural-owner" && elements.get(entry.id).kind === "MetadataUsage").length;
+  const summary = { status: childIds.length ? "shown" : "no-known-roots", total: childIds.length, shown: childIds.length, unavailable: 0, filtered: 0, complete: true, kindCounts, sourceDeclarations: eligible2.size, packages: packageCount, sourceMetadata: metadataCount, relationshipMetadata, inspectionEntries: inspectionEntries.length, cycleEntries: [...eligible2].filter((id) => cycles.has(id)).length, reachableThroughNativeOwnership: [...eligible2].filter((id) => reachable.has(id)).length };
+  summary.message = "All " + childIds.length + " native source roots shown (" + packageCount + " packages/namespaces). Whole project follows native document roots and ownership through every native record kind; native ownership through relationship records is retained. " + metadataCount + " source metadata usages remain available in Metadata inspection, including " + relationshipMetadata + " owned by nonstructural native records. " + inspectionEntries.length + " source inspection entries retain exact identities and owners. Complete child exploration is unchanged; annotations are never structural containment.";
+  return structuredClone({ elements: childIds.map((id) => elements.get(id)), relationships: edges2.filter((edge) => wanted.has(edge.source) && wanted.has(edge.target)), omissions: inspectionEntries.map((entry) => ({ target: entry.id, reason: entry.reason, message: "Available through Source inspection; native owner " + entry.ownerIds.join(", ") })), mode: "contents", focus: childIds[0], rootIds: [], page: 0, pages: 1, total: childIds.length, shown: childIds.length, targets: childIds, budget: null, typingBridges: [], childProjection: { rootIds: [], childIds, ownChildIds: childIds, definitionChildIds: [], typeIds: [], declaredOn: {}, declarationOwners: Object.fromEntries(projectionRoots.map((entry) => [entry.id, entry.ownerIds])), ownership: [], projectionRoots, inspectionEntries, complete: true, kindCounts, implicitProject: true }, summary });
 }
 
 // src/canvas-prototype/child-layout.mjs
@@ -7050,7 +7215,7 @@ async function layoutChildWorkspace(view, { width = 1100, gap = 28, padding = 24
   const degree = /* @__PURE__ */ new Map();
   for (const e of view.edges ?? []) for (const id of [e.source, e.target]) degree.set(id, (degree.get(id) ?? 0) + 1);
   const terminalCount = /* @__PURE__ */ new Map();
-  const terminals2 = (node, edge, source) => {
+  const terminals2 = (node, edge, source2) => {
     const slot = terminalCount.get(node.id) ?? 0;
     terminalCount.set(node.id, slot + 1);
     const fraction = 0.2 + 0.6 * ((slot + 0.5) / (degree.get(node.id) ?? 1)), cell = cells.get(node.id);
@@ -7067,19 +7232,19 @@ async function layoutChildWorkspace(view, { width = 1100, gap = 28, padding = 24
   };
   for (const original of view.edges ?? []) {
     await checkpoint();
-    const edge = { ...original }, geometryEdge = { ...edge, source: edge.sourceAttachment ?? edge.source, target: edge.targetAttachment ?? edge.target }, source = byId.get(geometryEdge.source), target = byId.get(geometryEdge.target);
-    if (!edge.sourceAttachment && !edge.targetAttachment && source && target && edge.navigationOnly && edge.nativeRole === "owner" && target.parentId === source.id) {
-      ownershipFrames.push({ ...edge, presentation: "containing-frame", ownerId: source.id, childId: target.id });
+    const edge = { ...original }, geometryEdge = { ...edge, source: edge.sourceAttachment ?? edge.source, target: edge.targetAttachment ?? edge.target }, source2 = byId.get(geometryEdge.source), target = byId.get(geometryEdge.target);
+    if (!edge.sourceAttachment && !edge.targetAttachment && source2 && target && edge.navigationOnly && edge.nativeRole === "owner" && target.parentId === source2.id) {
+      ownershipFrames.push({ ...edge, presentation: "containing-frame", ownerId: source2.id, childId: target.id });
       continue;
     }
-    if (!source || !target) {
+    if (!source2 || !target) {
       edge.points = [];
       edge.routingBlocked = true;
       diagnostics.push({ code: "child-edge-endpoint-unavailable", edgeId: edge.id, message: edge.sourceAttachment || edge.targetAttachment ? "An exact native attachment has no card in this projection." : "A native relationship endpoint has no card in this projection." });
       edges2.push(edge);
       continue;
     }
-    const starts = terminals2(source, edge, true), ends = terminals2(target, edge, false), valid = createRouteValidator(geometryEdge, nodes, { orthogonalOnly: true });
+    const starts = terminals2(source2, edge, true), ends = terminals2(target, edge, false), valid = createRouteValidator(geometryEdge, nodes, { orthogonalOnly: true });
     let best = null, bestCost = Infinity;
     const outerLeft = cardBounds.x - gap * (1 + edges2.length % 5 / 6), outerRight = cardBounds.x + cardBounds.width + gap * (1 + edges2.length % 5 / 6);
     for (const [start2, a] of starts) for (const [end, b] of ends) {
@@ -7136,11 +7301,11 @@ function placeChildWorkspace(layout, area = { x: 0, y: 0 }) {
 }
 
 // src/canvas-prototype/package-explorer.mjs
-var indexes4 = /* @__PURE__ */ new WeakMap();
+var indexes5 = /* @__PURE__ */ new WeakMap();
 var isPackage = (element2) => ["Package", "Namespace"].includes(element2?.kind);
-var compare3 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var compare4 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 function index4(graph) {
-  if (indexes4.has(graph)) return indexes4.get(graph);
+  if (indexes5.has(graph)) return indexes5.get(graph);
   const elements = new Map(graph.elements.map((e) => [e.id, e])), children = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map();
   for (const edge of graph.containment ?? []) {
     if (edge.nativeRole !== "owner" || !elements.has(edge.source) || !elements.has(edge.target)) continue;
@@ -7149,8 +7314,15 @@ function index4(graph) {
     if (!parents.has(edge.target)) parents.set(edge.target, /* @__PURE__ */ new Set());
     parents.get(edge.target).add(edge.source);
   }
+  const native = nativeOwnershipIndex(graph);
+  for (const [child, owners] of native.ownerIds) for (const parent of owners) if (elements.has(child) && elements.has(parent)) {
+    if (!children.has(parent)) children.set(parent, /* @__PURE__ */ new Set());
+    children.get(parent).add(child);
+    if (!parents.has(child)) parents.set(child, /* @__PURE__ */ new Set());
+    parents.get(child).add(parent);
+  }
   const result = { elements, children, parents, members: /* @__PURE__ */ new Map() };
-  indexes4.set(graph, result);
+  indexes5.set(graph, result);
   return result;
 }
 function packageMembers(graph, id) {
@@ -7162,17 +7334,17 @@ function packageMembers(graph, id) {
       ids.add(child);
       queue.push(child);
     }
-    data.members.set(id, [...ids].sort(compare3));
+    data.members.set(id, [...ids].sort(compare4));
   }
   return data.members.get(id);
 }
 function packageCatalog(graph, query = "") {
   const q = query.trim().toLowerCase();
-  return graph.elements.filter((e) => isPackage(e) && e.layer === "project" && e.qualifiedName && (e.native?.declaredName || e.native?.declaredShortName) && (!q || (e.name + " " + e.qualifiedName).toLowerCase().includes(q))).sort((a, b) => compare3(a.qualifiedName, b.qualifiedName) || compare3(a.id, b.id));
+  return graph.elements.filter((e) => isPackage(e) && e.layer === "project" && e.qualifiedName && (e.native?.declaredName || e.native?.declaredShortName) && (!q || (e.name + " " + e.qualifiedName).toLowerCase().includes(q))).sort((a, b) => compare4(a.qualifiedName, b.qualifiedName) || compare4(a.id, b.id));
 }
 function containingPackage(graph, id) {
   const data = index4(graph), seen = /* @__PURE__ */ new Set([id]), queue = [id];
-  for (let i = 0; i < queue.length; i++) for (const parent of [...data.parents.get(queue[i]) ?? []].sort(compare3)) {
+  for (let i = 0; i < queue.length; i++) for (const parent of [...data.parents.get(queue[i]) ?? []].sort(compare4)) {
     if (seen.has(parent)) continue;
     seen.add(parent);
     if (isPackage(data.elements.get(parent))) return parent;
@@ -7188,7 +7360,7 @@ function outsidePackage(view, ids) {
     for (const id of [item.sourceSemanticId, item.targetSemanticId]) if (id) represented.add(id);
   }
   for (const id of nativeViewContextIdentities(view)) represented.add(id);
-  return [...represented].filter((id) => !allowed2.has(id)).sort(compare3);
+  return [...represented].filter((id) => !allowed2.has(id)).sort(compare4);
 }
 function focusViewKinds(element2) {
   const kind = element2?.kind;
@@ -7216,7 +7388,7 @@ function hierarchyPage(graph, { rootId = null, parentId = null, query = "", page
     for (const id of [...allowed2]) if (!descendants.has(id)) allowed2.delete(id);
   }
   if (parentId && !allowed2.has(parentId)) throw Error("Hierarchy parent is outside the loaded declaration scope.");
-  const sorted = (ids) => [...ids].map((id) => data.elements.get(id)).filter(Boolean).sort((a, b) => compare3(a.qualifiedName || a.name, b.qualifiedName || b.name) || compare3(a.id, b.id));
+  const sorted = (ids) => [...ids].map((id) => data.elements.get(id)).filter(Boolean).sort((a, b) => compare4(a.qualifiedName || a.name, b.qualifiedName || b.name) || compare4(a.id, b.id));
   const parents = (id) => sorted([...data.parents.get(id) ?? []].filter((p) => allowed2.has(p)));
   const path = (id) => {
     const seen = /* @__PURE__ */ new Set([id]), result = [];
@@ -7231,29 +7403,11 @@ function hierarchyPage(graph, { rootId = null, parentId = null, query = "", page
     return result;
   };
   const q = query.trim().toLowerCase();
+  const rootCandidates = scopeIds2 ? [...allowed2].filter((id) => ![...data.parents.get(id) ?? []].some((parent) => scopeIds2.includes(parent))) : completeRootContext(graph).targets;
   const candidates2 = q ? sorted([...allowed2].filter((id) => {
     const e = data.elements.get(id);
-    return [e.name, e.qualifiedName, id].some((s) => s?.toLowerCase().includes(q));
-  })) : sorted(parentId ? [...data.children.get(parentId) ?? []].filter((id) => allowed2.has(id)) : rootId ? [rootId] : [...allowed2].filter((id) => ![...data.parents.get(id) ?? []].some((parent) => allowed2.has(parent))));
-  if (!parentId && !rootId && !q) {
-    const reached = /* @__PURE__ */ new Set(), queue = candidates2.map((e) => e.id);
-    for (let i = 0; i < queue.length; i++) {
-      const id = queue[i];
-      if (reached.has(id)) continue;
-      reached.add(id);
-      for (const child of data.children.get(id) ?? []) if (allowed2.has(child)) queue.push(child);
-    }
-    for (const e of sorted(allowed2)) if (!reached.has(e.id)) {
-      candidates2.push(e);
-      queue.push(e.id);
-      for (let i = queue.length - 1; i < queue.length; i++) {
-        const id = queue[i];
-        if (reached.has(id)) continue;
-        reached.add(id);
-        for (const child of data.children.get(id) ?? []) if (allowed2.has(child)) queue.push(child);
-      }
-    }
-  }
+    return [e.name, e.qualifiedName, id].some((value) => value?.toLowerCase().includes(q));
+  })) : sorted(parentId ? [...data.children.get(parentId) ?? []].filter((id) => allowed2.has(id)) : rootId ? [rootId] : rootCandidates);
   const pages = Math.max(1, Math.ceil(candidates2.length / size)), current = Math.max(0, Math.min(pages - 1, Number.isInteger(page) ? page : 0));
   const items = candidates2.slice(current * size, (current + 1) * size).map((e) => ({ id: e.id, label: e.native?.declaredName || e.native?.declaredShortName || e.name, qualifiedName: e.qualifiedName, kind: e.kind, parentIds: parents(e.id).map((p) => p.id), pathIds: path(e.id), childCount: [...data.children.get(e.id) ?? []].filter((id) => allowed2.has(id)).length, provenance: { authority: "native-api", role: "owner", sourceLine: e.native?.["sysx:sourceLine"], sourceColumn: e.native?.["sysx:sourceColumn"] } }));
   return { items, rootId, parentId, query, page: current, pageSize: size, total: candidates2.length, loadedTotal: allowed2.size, pages, hasPrevious: current > 0, hasNext: current + 1 < pages, summary: `Showing ${items.length} of ${candidates2.length} ${q ? "matching declarations" : parentId ? "directly owned declarations" : "ownership roots"} in the loaded native declaration projection (${allowed2.size} declarations in scope). Ownership is model location, not physical composition or runtime instances.` };
@@ -7385,25 +7539,25 @@ var requirementKinds = /* @__PURE__ */ new Set(["RequirementUsage", "Requirement
 var typingKinds = /* @__PURE__ */ new Set(["typing", "type"]);
 var inheritanceKinds = /* @__PURE__ */ new Set(["specialization"]);
 var satisfactionKinds = /* @__PURE__ */ new Set(["satisfy", "satisfaction"]);
-var compare4 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var compare5 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var key2 = (e) => JSON.stringify([e.id ?? null, e.source, e.target, e.kind]);
 var endpoint4 = (e, side) => side === "source" ? e.source ?? e.fromId ?? e.from_id ?? e.from : e.target ?? e.toId ?? e.to_id ?? e.to;
-var indexes5 = /* @__PURE__ */ new WeakMap();
+var indexes6 = /* @__PURE__ */ new WeakMap();
 function prepare3(graph) {
-  const prior = indexes5.get(graph);
+  const prior = indexes6.get(graph);
   if (prior && prior.elementSource === graph.elements && prior.relationshipSource === graph.relationships && prior.containmentSource === graph.containment && prior.elementCount === (graph.elements ?? []).length && prior.relationshipCount === (graph.relationships ?? []).length && prior.containmentCount === (graph.containment ?? []).length) return prior;
   const elements = new Map((graph.elements ?? []).map((e) => [e.id, e]));
   const edges2 = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter((e) => e.kind === "containment" && e.nativeRole === "owner")].map((e) => {
     const value = { ...e, source: endpoint4(e, "source"), target: endpoint4(e, "target") };
     return [key2(value), value];
-  })).values()].sort((a, b) => compare4(key2(a), key2(b)));
+  })).values()].sort((a, b) => compare5(key2(a), key2(b)));
   const incident = /* @__PURE__ */ new Map();
   for (const edge of edges2) for (const id of /* @__PURE__ */ new Set([edge.source, edge.target])) {
     if (!incident.has(id)) incident.set(id, []);
     incident.get(id).push(edge);
   }
   const result = { elements, incident, elementSource: graph.elements, relationshipSource: graph.relationships, containmentSource: graph.containment, elementCount: (graph.elements ?? []).length, relationshipCount: (graph.relationships ?? []).length, containmentCount: (graph.containment ?? []).length };
-  indexes5.set(graph, result);
+  indexes6.set(graph, result);
   return result;
 }
 var isPartElement = (element2) => partKinds.has(element2?.kind);
@@ -7520,11 +7674,11 @@ function partContext(graph, options = {}) {
   }
   for (const target of candidates2) filtered.delete(target);
   const rank = (id) => mode === "global-impact" ? ancestors.has(id) ? 0 : partKinds.has(elements.get(id)?.kind) ? 1 : 2 : 0;
-  const targets = [...candidates2].filter((id) => id !== focus).sort((a, b) => rank(a) - rank(b) || compare4(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compare4(a, b));
+  const targets = [...candidates2].filter((id) => id !== focus).sort((a, b) => rank(a) - rank(b) || compare5(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compare5(a, b));
   const pages = Math.ceil(targets.length / (limit - 1)), actualPage = Math.min(page, Math.max(0, pages - 1)), shown = targets.slice(actualPage * (limit - 1), (actualPage + 1) * (limit - 1)), wanted = /* @__PURE__ */ new Set([focus, ...shown]);
   const relationships = [...nativeLinks.values()].filter((e) => wanted.has(e.source) && wanted.has(e.target));
   const selectedPaths = paths.filter((path) => wanted.has(path.target));
-  const collapsedContext = mode === "effective" ? [...new Set(selectedPaths.flatMap((path) => path.elementIds.slice(1, -1)))].sort(compare4) : [];
+  const collapsedContext = mode === "effective" ? [...new Set(selectedPaths.flatMap((path) => path.elementIds.slice(1, -1)))].sort(compare5) : [];
   for (const edge of nativeLinks.values()) if (!wanted.has(edge.source) || !wanted.has(edge.target)) omit(edge, !wanted.has(edge.target) ? edge.target : edge.source, mode === "effective" && selectedPaths.some((p) => p.relationships.some((e) => key2(e) === key2(edge))) ? "collapsed-context" : "budget", edge.source);
   const inherited = selectedPaths.filter((p) => p.inherited).length;
   let message = mode === "effective" ? `${shown.length} of ${targets.length} requirements declared by or linked through native satisfaction to this part and its explicit types. ${collapsedContext.length} type / inheritance declarations collapsed; ${inherited} inherited paths retain native provenance. Collapsed paths are not drawn as new relationships.` : `${shown.length} of ${targets.length} definition, inheritance, usage and requirement targets shown. Other usages are model declarations, not runtime instances. Only native links between displayed identities are drawn.`;
@@ -7549,7 +7703,7 @@ var origins = /* @__PURE__ */ new Set(["derive", "derivation", "refine", "refine
 var satisfaction = /* @__PURE__ */ new Set(["satisfy", "satisfaction"]);
 var allocation = /* @__PURE__ */ new Set(["allocate", "allocation"]);
 var verification = /* @__PURE__ */ new Set(["verify", "verification"]);
-var compare5 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var compare6 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var clone = (value) => structuredClone(value);
 var edgeKey3 = (edge) => JSON.stringify([edge.id ?? null, edge.source, edge.target, edge.kind]);
 var modes = Object.freeze({
@@ -7583,7 +7737,7 @@ function prepare4(graph) {
     const value = { ...edge, source: endpoint5(edge, "source"), target: endpoint5(edge, "target") };
     return [edgeKey3(value), value];
   }));
-  const edges2 = [...keyed].sort((a, b) => compare5(a[0], b[0])).map(([, edge]) => edge);
+  const edges2 = [...keyed].sort((a, b) => compare6(a[0], b[0])).map(([, edge]) => edge);
   const incident = /* @__PURE__ */ new Map();
   for (const edge of edges2) for (const id of /* @__PURE__ */ new Set([edge.source, edge.target])) {
     if (!incident.has(id)) incident.set(id, []);
@@ -7658,7 +7812,7 @@ function projection(graph, focus, mode, options = {}, prepared = prepare4(graph)
     candidates2.get(target).push({ edge, anchor, bridge });
   }
   for (const target of candidates2.keys()) filtered.delete(target);
-  for (const links of candidates2.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare5(a.anchor, b.anchor) || compare5(edgeKey3(a.edge), edgeKey3(b.edge)));
+  for (const links of candidates2.values()) links.sort((a, b) => Number(Boolean(a.bridge)) - Number(Boolean(b.bridge)) || compare6(a.anchor, b.anchor) || compare6(edgeKey3(a.edge), edgeKey3(b.edge)));
   return { elements, edges: edges2, anchors, candidates: candidates2, omissions, unavailable, filtered, rootReason: null, root };
 }
 function summaryFor(data, mode, shown, total) {
@@ -7745,7 +7899,7 @@ function traceContext(graph, options = {}) {
   }
   return clone({
     elements: [...wanted].map((id) => data.elements.get(id)),
-    relationships: [...relationships.values()].sort((a, b) => compare5(edgeKey3(a), edgeKey3(b))),
+    relationships: [...relationships.values()].sort((a, b) => compare6(edgeKey3(a), edgeKey3(b))),
     omissions,
     summary: summaryFor(data, mode, shown.length, targets.length),
     mode,
@@ -7779,7 +7933,7 @@ function structuralActions(graph, focus, options = {}) {
 var allowedKinds2 = new Set(ENGINEERING_RELATIONSHIPS);
 var forbiddenKinds = /* @__PURE__ */ new Set(["type", "specialization", "owner", "owningMembership", "ownedMembership", "documentation", "membership", "succession", "transition"]);
 var engineeringElement2 = /^(?:Package|Namespace)$|^(Requirement|Part|Action|State|VerificationCase|AnalysisCase|UseCase|Case|Constraint|Calculation|Interface|Connection|Port|Attribute|Item|Occurrence|Allocation)(Definition|Usage)$/;
-var compare6 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var compare7 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var edgeKey4 = (edge) => JSON.stringify([edge.id, edge.source, edge.target, edge.kind]);
 var kindOrder = new Map(["derive", "derivation", "refine", "refinement", "satisfy", "satisfaction", "verify", "verification", "allocate", "allocation", "composition", "connection", "reference", "flow", "item-flow", "control-flow", "causation", "dependency"].map((kind, index5) => [kind, index5]));
 function surroundingContext(graph, activeView, options = {}) {
@@ -7787,7 +7941,7 @@ function surroundingContext(graph, activeView, options = {}) {
   if (!Number.isInteger(budget) || budget < 0) throw new Error("Invalid surrounding context budget");
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
   const activeNodes = activeView.nodes ?? [], activeEdges = activeView.edges ?? [];
-  const activeIds = [...new Set(activeNodes.map((node) => node.semanticId).filter(Boolean))].sort(compare6);
+  const activeIds = [...new Set(activeNodes.map((node) => node.semanticId).filter(Boolean))].sort(compare7);
   const active2 = new Set(activeIds), scope = options.scopeIds ? new Set(options.scopeIds) : null;
   const kinds2 = new Set((options.relationshipKinds ?? [...allowedKinds2, "typing", "containment"]).filter((kind) => (allowedKinds2.has(kind) || ["typing", "containment"].includes(kind)) && !forbiddenKinds.has(kind)));
   const nativePackageOwner = (edge) => edge.kind === "containment" && edge.nativeRole === "owner" && /^(Package|Namespace)$/.test(elements.get(edge.source)?.kind ?? "");
@@ -7796,8 +7950,8 @@ function surroundingContext(graph, activeView, options = {}) {
   const structuralView = options.structural === true || options.relationshipKinds?.includes("containment") === true;
   const allowed2 = (edge, anchor) => kinds2.has(edge.kind) && (edge.kind !== "containment" || nativePackageOwner(edge) && (structuralView || structural(anchor ?? (active2.has(edge.source) ? edge.source : edge.target)))) && (edge.kind !== "typing" || directType(edge));
   const representations2 = /* @__PURE__ */ new Map();
-  for (const node of [...activeNodes].sort((a, b) => compare6(a.id, b.id))) if (node.semanticId && !representations2.has(node.semanticId)) representations2.set(node.semanticId, node.id);
-  const edges2 = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter(nativePackageOwner)].map((edge) => [edgeKey4(edge), edge])).values()].sort((a, b) => compare6(edgeKey4(a), edgeKey4(b)));
+  for (const node of [...activeNodes].sort((a, b) => compare7(a.id, b.id))) if (node.semanticId && !representations2.has(node.semanticId)) representations2.set(node.semanticId, node.id);
+  const edges2 = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter(nativePackageOwner)].map((edge) => [edgeKey4(edge), edge])).values()].sort((a, b) => compare7(edgeKey4(a), edgeKey4(b)));
   const omissions = [], seenOmissions = /* @__PURE__ */ new Set();
   const omit = (edge, target, reason, anchor) => {
     const key3 = JSON.stringify([edgeKey4(edge), target, reason]);
@@ -8051,7 +8205,7 @@ function routePeripheralEdges(edges2, nodes, area, { activeEdges = [], obstacles
 }
 
 // src/canvas-prototype/neighborhood.mjs
-var compare7 = (a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+var compare8 = (a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
 var overlap7 = (a, b, g = 0) => a.x < b.x + b.width + g && a.x + a.width + g > b.x && a.y < b.y + b.height + g && a.y + a.height + g > b.y;
 var center = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
 var clamp3 = (v, min, max2) => Math.max(min, Math.min(max2, v));
@@ -8066,7 +8220,7 @@ var pathBoxes = (edges2) => edges2.flatMap((e) => (e.points ?? []).slice(1).map(
 function* neighborhoodSteps(context, activeNodes, area, options = {}) {
   const { width = 156, height = 70, gap = 72, activeEdges = [], labelObstacles = [], obstacles = [], measureLabel } = options;
   if (![area?.x, area?.y, area?.width, area?.height, width, height, gap].every(Number.isFinite) || area.width <= 0 || area.height <= 0 || width <= 0 || height <= 0 || gap < 0) throw new Error("Invalid neighborhood geometry");
-  const active2 = activeNodes ?? [], known = new Map(active2.map((n) => [n.id, n])), drafts = [...context.view.nodes].sort((a, b) => compare7(a.name, b.name) || compare7(a.id, b.id));
+  const active2 = activeNodes ?? [], known = new Map(active2.map((n) => [n.id, n])), drafts = [...context.view.nodes].sort((a, b) => compare8(a.name, b.name) || compare8(a.id, b.id));
   const byID = new Map(drafts.map((n) => [n.id, { ...n, width: Number.isFinite(n.width) && n.width > 0 ? n.width : width, height: Number.isFinite(n.height) && n.height > 0 ? n.height : height }])), edges2 = context.view.edges ?? [], orders = edges2.map(decisionOrder).filter(Boolean), hull = active2.length ? bounds(active2) : area;
   const blocked = [...active2, ...obstacles, ...labelObstacles, ...pathBoxes(activeEdges)], nodes = [], notices = [];
   const limits2 = new Map(drafts.map((n) => [n.id, { min: -Infinity, max: Infinity }]));
@@ -8093,10 +8247,10 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
   const remaining = new Set(drafts.map((n) => n.id)), ordered = [];
   while (remaining.size) {
     yield;
-    const ready = [...remaining].filter((id) => !orders.some((o) => o.below === id && remaining.has(o.above))).sort(compare7);
+    const ready = [...remaining].filter((id) => !orders.some((o) => o.below === id && remaining.has(o.above))).sort(compare8);
     if (!ready.length) {
       notices.push({ reason: "context-rank-conflict", targets: [...remaining] });
-      ordered.push(...[...remaining].sort(compare7));
+      ordered.push(...[...remaining].sort(compare8));
       break;
     }
     for (const id of ready) {
@@ -8160,9 +8314,9 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
       const neighbors = incident.map((e) => ({ edge: e, other: known.get(e.source === node.id ? e.target : e.source) })).filter(({ other }) => other && sideFor(node, other) === side);
       neighbors.sort((a, b) => {
         const ac = center(a.other), bc = center(b.other);
-        return (side === "NORTH" || side === "SOUTH" ? ac.x - bc.x : ac.y - bc.y) || compare7(a.edge.id, b.edge.id);
+        return (side === "NORTH" || side === "SOUTH" ? ac.x - bc.x : ac.y - bc.y) || compare8(a.edge.id, b.edge.id);
       });
-      const byDistance = [...neighbors].sort((a, b) => Math.abs(center(b.other).x - center(node).x) - Math.abs(center(a.other).x - center(node).x) || compare7(a.edge.id, b.edge.id));
+      const byDistance = [...neighbors].sort((a, b) => Math.abs(center(b.other).x - center(node).x) - Math.abs(center(a.other).x - center(node).x) || compare8(a.edge.id, b.edge.id));
       neighbors.forEach(({ edge }, i) => {
         const fraction = (i + 1) / (neighbors.length + 1), point3 = side === "NORTH" || side === "SOUTH" ? { x: node.x + node.width * fraction, y: node.y + (side === "SOUTH" ? node.height : 0) } : { x: node.x + (side === "EAST" ? node.width : 0), y: node.y + node.height * fraction };
         attachments.set(`${edge.id}:${node.id}`, { ...point3, side, lane: (byDistance.findIndex((n) => n.edge.id === edge.id) + 1) / (neighbors.length + 1) });
@@ -8171,7 +8325,7 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
   }
   let routed = [];
   const fanCandidates = /* @__PURE__ */ new Map();
-  const sorted = [...edges2].sort((a, b) => compare7(a.id, b.id));
+  const sorted = [...edges2].sort((a, b) => compare8(a.id, b.id));
   for (const edge of sorted) {
     yield;
     const endpoints2 = /* @__PURE__ */ new Set([edge.source, edge.target]), proxyNodes = allNodes.flatMap((node) => {
@@ -8452,30 +8606,30 @@ function normalizedOffsets(frames, offsets) {
 function journeyCameraTrack(frames, { initialCamera = createCamera(), finalCamera = createCamera(), offsets } = {}) {
   if (!Array.isArray(frames) || !frames.length) throw new TypeError("Journey camera requires at least one prepared frame");
   const start2 = createCamera(initialCamera), finish = createCamera(finalCamera), times = normalizedOffsets(frames, offsets), poses = [];
-  const add = (progress, camera, phase, frameIndex) => poses.push({ progress, camera: createCamera(camera), phase, frameIndex });
+  const add2 = (progress, camera, phase, frameIndex) => poses.push({ progress, camera: createCamera(camera), phase, frameIndex });
   if (frames.length === 1) {
-    add(0, finish, "destination", 0);
-    add(1, finish, "destination", 0);
+    add2(0, finish, "destination", 0);
+    add2(1, finish, "destination", 0);
   } else {
-    add(0, start2, "source", 0);
+    add2(0, start2, "source", 0);
     if (frames.length > 2) {
       const routeIds = /* @__PURE__ */ new Set();
       for (const frame2 of frames.slice(1, -1)) for (const node of frame2.nodes ?? []) if (validNode(node) && !node.context) routeIds.add(identity4(node));
-      const source = frames[0], sourceNodes = (source.nodes ?? []).filter(validNode), focus = focusNode(source, sourceNodes);
+      const source2 = frames[0], sourceNodes = (source2.nodes ?? []).filter(validNode), focus = focusNode(source2, sourceNodes);
       const openingNodes = sourceNodes.filter((node) => routeIds.has(identity4(node)) || node === focus);
-      if (openingNodes.length) add(Math.min(0.1, times[1] * 0.5), viewpoint(source, openingNodes, { maximumScale: 0.82 }), "open-route", 0);
+      if (openingNodes.length) add2(Math.min(0.1, times[1] * 0.5), viewpoint(source2, openingNodes, { maximumScale: 0.82 }), "open-route", 0);
       for (let index5 = 1; index5 < frames.length - 1; index5++) {
         const frame2 = frames[index5], nodes = (frame2.nodes ?? []).filter((node) => validNode(node) && !node.context);
-        add(times[index5], viewpoint(frame2, nodes), "follow-route", index5);
+        add2(times[index5], viewpoint(frame2, nodes), "follow-route", index5);
       }
     } else {
-      const source = frames[0], destination = frames[1], a = focusNode(source, (source.nodes ?? []).filter(validNode)), b = focusNode(destination, (destination.nodes ?? []).filter(validNode));
-      const area = frameArea(source), travel = a && b ? Math.hypot(a.x + a.width / 2 - b.x - b.width / 2, a.y + a.height / 2 - b.y - b.height / 2) : 0;
+      const source2 = frames[0], destination = frames[1], a = focusNode(source2, (source2.nodes ?? []).filter(validNode)), b = focusNode(destination, (destination.nodes ?? []).filter(validNode));
+      const area = frameArea(source2), travel = a && b ? Math.hypot(a.x + a.width / 2 - b.x - b.width / 2, a.y + a.height / 2 - b.y - b.height / 2) : 0;
       if (travel > Math.min(area.width, area.height) * 0.35) {
-        add(0.5, viewpoint(source, [a, b], { maximumScale: 0.9 }), "reflow", 0);
+        add2(0.5, viewpoint(source2, [a, b], { maximumScale: 0.9 }), "reflow", 0);
       }
     }
-    add(1, finish, "destination", frames.length - 1);
+    add2(1, finish, "destination", frames.length - 1);
   }
   const track = poses.map((p) => p.camera), cameraOffsets = poses.map((p) => p.progress);
   return { poses, track, offsets: cameraOffsets, sample: (progress) => createCamera(sampleTrack(track, cameraOffsets, Number.isFinite(progress) ? clamp4(progress, 0, 1) : 0)) };
@@ -8933,7 +9087,7 @@ async function compile(project, { cacheHash = state.trustedCacheHash, progress =
   progress({ stage: "graph-index", label: "Building model navigation\u2026" });
   await yieldLoadingPaint();
   active2();
-  const graph = modelGraph(exported.elements, [...views.values(), coverage]);
+  const graph = modelGraph(exported.elements, [...views.values(), coverage], { nativeRootIds: (parsed.roots ?? []).flatMap((root) => root.childIds ?? []) });
   for (const root of project.manifest.systemOfInterest) if (!resolveInGraph(graph, root)) throw Error("System of interest does not resolve: " + root);
   const byName = (value) => resolveInGraph(graph, value);
   let validationYield = performance.now();
@@ -9795,8 +9949,8 @@ async function renderSurfaces(view, focus, panels, revision) {
     $("view-regions").append(host);
     const key3 = region.id + ":" + region.view.id, family = region.figure ? "figure" : rendererFamily(region.view), saved = structuredClone(state.surfaceStates[key3] ?? {});
     if (!Object.hasOwn(saved, "layout")) saved.layout = state.presentationLayouts.getRegion(region.view);
-    const options = { renderingMode: state.renderingMode, state: saved, onLayoutChange: (value, metadata) => {
-      if (revision === state.revision) rememberRegionLayout(region.view, key3, value, metadata);
+    const options = { renderingMode: state.renderingMode, state: saved, onLayoutChange: (value, metadata2) => {
+      if (revision === state.revision) rememberRegionLayout(region.view, key3, value, metadata2);
     }, selectedId: state.selected, selectedIds: [...state.selectedIds], labelFor: label, onSelect: (selection) => selectSurface(selection, key3), onExplore: (selection) => exploreSurface(selection).catch(report), onStateChange: (value) => {
       if (revision === state.revision) state.surfaceStates[key3] = structuredClone(value);
     } };
@@ -10095,23 +10249,23 @@ function updateWorkspaceControls() {
   $("search-scope").textContent = scope ? "Search within " + scopeName : "Search the loaded project";
   const select2 = $("view-navigation");
   select2.replaceChildren();
-  const add = (host, value, text4) => {
+  const add2 = (host, value, text4) => {
     const option = el2("option", text4);
     option.value = value;
     host.append(option);
     return option;
   };
-  add(select2, "overview", scope ? "Complete package contents" : "Whole project roots");
+  add2(select2, "overview", scope ? "Complete package contents" : "Whole project roots");
   const focusGroup = el2("optgroup");
   focusGroup.label = "Focused element \xB7 " + label(state.focus);
-  for (const item of [...focusViewKinds(element(state.focus)), ...["PartUsage", "PartDefinition"].includes(element(state.focus)?.kind) ? [{ id: "effective", label: "Effective requirements" }, { id: "local-understanding", label: "Local understanding" }, { id: "global-impact", label: "Global impact" }] : []]) add(focusGroup, item.id, item.label);
+  for (const item of [...focusViewKinds(element(state.focus)), ...["PartUsage", "PartDefinition"].includes(element(state.focus)?.kind) ? [{ id: "effective", label: "Effective requirements" }, { id: "local-understanding", label: "Local understanding" }, { id: "global-impact", label: "Global impact" }] : []]) add2(focusGroup, item.id, item.label);
   select2.append(focusGroup);
   const views = el2("optgroup");
   views.label = "Declared native views";
   const catalog = state.availableViews.map((name) => ({ name, short: element(resolve(name))?.native.declaredName || name, kind: state.views.get(name)?.kind })), counts = /* @__PURE__ */ new Map();
   for (const item of catalog) counts.set(item.short, (counts.get(item.short) ?? 0) + 1);
   for (const { name, short, kind } of catalog) {
-    const option = add(views, "authored:" + name, (counts.get(short) > 1 ? name : short) + (kind ? " \xB7 " + kind : ""));
+    const option = add2(views, "authored:" + name, (counts.get(short) > 1 ? name : short) + (kind ? " \xB7 " + kind : ""));
     option.title = name;
   }
   if (views.children.length) select2.append(views);
@@ -10119,7 +10273,7 @@ function updateWorkspaceControls() {
   const current = state.view?.overview ? "overview" : state.availableViews.includes(state.view?.id) ? "authored:" + state.view.id : state.view?.id?.startsWith("#") ? "native:" + state.view.id.slice(1, state.view.id.indexOf(":")) : state.traceRequest?.mode;
   if (current && [...select2.options].some((option) => option.value === current)) select2.value = current;
   else {
-    const option = add(select2, "current", state.view?.title || "Current view");
+    const option = add2(select2, "current", state.view?.title || "Current view");
     option.disabled = true;
     select2.value = "current";
   }
@@ -10145,7 +10299,7 @@ async function switchWorkspaceView(value) {
   else if (value.startsWith("native:")) await explore(state.focus, value.slice(7));
   else if (["context", "contents", "effective", "local-understanding", "global-impact"].includes(value)) await followTrace(state.focus, value);
 }
-async function openNativeView(name, { compare: compare8 = false } = {}) {
+async function openNativeView(name, { compare: compare9 = false } = {}) {
   const revision = ++state.revision, modelHash = state.modelHash;
   let view = state.views.get(name);
   if (!view) {
@@ -10159,10 +10313,10 @@ async function openNativeView(name, { compare: compare8 = false } = {}) {
   if (!identities2.length) throw Error("This native view contains no represented model elements.");
   if (!state.views.has(name)) {
     state.views.set(name, view);
-    state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
+    state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()], { nativeRootIds: state.graph.nativeRootIds });
   }
   const target = identities2.includes(state.focus) ? state.focus : identities2.find((id) => element(id)) ?? state.focus;
-  if (compare8) {
+  if (compare9) {
     remember();
     state.comparison = { view, focus: target, title: name };
     state.activeRegion = "comparison";
@@ -10251,7 +10405,7 @@ async function openExploration(view, id, { request = null, info = null, record =
 }
 async function openSystemOverview({ record = true, scopeId = state.packageScope } = {}) {
   const context = scopeId ? completeChildContext(state.graph, { focus: scopeId, scopeIds: !state.scopeContext ? packageMembers(state.graph, scopeId) : void 0 }) : completeRootContext(state.graph);
-  if (!context.elements.length) throw Error("No source declarations are available in the loaded native projection.");
+  if (!context.elements.length && !context.summary.sourceDeclarations) throw Error("No source declarations are available in the loaded native projection.");
   const view = completeChildView(state.graph, context, scopeId ? "Package contents" : "Whole project roots");
   view.id = scopeId ? "children:scope:" + scopeId : "children:project";
   view.overview = { rootIds: context.childProjection.rootIds, metrics: {}, summary: context.summary, completeChildren: true };
@@ -10280,7 +10434,7 @@ async function explore(id, kind) {
   if (definition) view.capture = { definition, root: q };
   state.extraViews ??= /* @__PURE__ */ new Map();
   state.extraViews.set(view.id, view);
-  state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()]);
+  state.graph = modelGraph(state.exported.elements, [...state.views.values(), state.coverage, ...state.extraViews.values()], { nativeRootIds: state.graph.nativeRootIds });
   await openExploration(view, id);
 }
 async function followTrace(id, mode, page = 0, { record = true } = {}) {
@@ -10312,7 +10466,7 @@ function select(id, node, origin) {
     menu.append(el2("p", `${prominence.children} direct children \xB7 ${prominence.connections} distinct connected elements. Structural prominence describes the loaded model, not engineering criticality.`));
     if (prominence.children > 0 && isStructuralElement(element(id))) menu.append(button("Expand contents", () => followTrace(id, "contents")));
   }
-  menu.append(button("Focus", () => explore(id)), button(state.expanded.has(id) || !!node?.displayDetail ? "Collapse compartment" : "Show statement / compartment", async () => {
+  menu.append(button("Inspect metadata", () => openMetadata(id)), button("Focus", () => explore(id)), button(state.expanded.has(id) || !!node?.displayDetail ? "Collapse compartment" : "Show statement / compartment", async () => {
     if (state.expanded.has(id) || !!node?.displayDetail) {
       state.expanded.delete(id);
       state.collapsed.add(id);
@@ -10414,6 +10568,9 @@ function traceEdge(edge, key3) {
   }
   const menu = $("selection");
   menu.replaceChildren(el2("strong", edge.label || edge.kind), el2("p", `${label(edge.sourceSemantic)} \u2192 ${label(edge.targetSemantic)}`));
+  const nativeRecord = element(edge.semanticId), declarationRelation = ["SatisfyRequirementUsage", "ConnectionUsage", "FlowUsage", "SuccessionFlowUsage", "AllocationUsage", "SuccessionAsUsage", "BindingConnectorAsUsage", "Message"].includes(nativeRecord?.kind);
+  const relationshipId = element(edge.nativeRelationship)?.id ?? (edge.identityStatus === "native" && nativeRecord && (!isDeclarationKind(nativeRecord.kind) || declarationRelation) ? nativeRecord.id : null);
+  if (relationshipId) menu.append(button("Inspect relationship metadata", () => openMetadata(relationshipId)));
   for (const id of [.../* @__PURE__ */ new Set([edge.sourceSemantic, edge.targetSemantic])].filter(Boolean)) menu.append(button("Focus " + label(id), () => explore(id)));
   menu.append(button("Close", () => {
     clearTrace();
@@ -10526,6 +10683,62 @@ function openDeclarations(id, page = 0) {
   $("declaration-previous").disabled = !result.hasPrevious;
   $("declaration-next").disabled = !result.hasNext;
   if (!$("declarations-dialog").open) $("declarations-dialog").showModal();
+}
+function openMetadata(subjectId = null) {
+  state.metadataRequest = { subjectId, page: 0, mode: "metadata" };
+  $("metadata-search").value = "";
+  renderMetadata();
+  if (!$("metadata-dialog").open) $("metadata-dialog").showModal();
+}
+function renderMetadata() {
+  const request = state.metadataRequest ?? { subjectId: null, page: 0, mode: "metadata" }, query = $("metadata-search").value.trim().toLowerCase(), list2 = $("metadata-list");
+  list2.replaceChildren();
+  $("metadata-detail").textContent = "";
+  const index5 = nativeOwnershipIndex(state.graph);
+  let items, total, pages, page, notice2;
+  if (request.mode === "boundaries") {
+    const entries = completeRootContext(state.graph).childProjection.inspectionEntries;
+    const selected = entries.filter((entry) => !query || [entry.id, element(entry.id)?.qualifiedName, entry.reason].some((value) => value?.toLowerCase().includes(query)));
+    total = selected.length;
+    pages = Math.max(1, Math.ceil(total / 40));
+    page = Math.min(request.page, pages - 1);
+    items = selected.slice(page * 40, (page + 1) * 40).map((entry) => ({ id: entry.id, ownerIds: entry.ownerIds, boundaryReason: entry.reason }));
+    notice2 = "Source records inspected outside the root drawing. Native ownership and annotation roles are preserved; no structural parent has been invented.";
+  } else if (request.subjectId) {
+    const context = metadataContext(index5, request.subjectId), records = new Map([...context.ownedMetadata, ...context.annotatingMetadata, ...context.metadata ? [context.metadata] : []].map((record) => [record.id, record]));
+    const selected = [...records.values()].filter((record) => !query || [record.id, record.name, record.qualifiedName].some((value) => value?.toLowerCase().includes(query)));
+    total = selected.length;
+    pages = Math.max(1, Math.ceil(total / 40));
+    page = Math.min(request.page, pages - 1);
+    items = selected.slice(page * 40, (page + 1) * 40);
+    notice2 = context.summary.owned + " directly owned metadata; " + context.summary.annotating + " explicit target annotations. Annotation targets and native owner roles are separate. Unprojected annotation records are reported as unavailable.";
+  } else {
+    const result = sourceMetadata(index5, { query, page: request.page, pageSize: 40 });
+    ({ items, total, pages, page } = result);
+    notice2 = "All loaded source metadata, independent of current canvas scope. Metadata owned by a relationship belongs to that native record; it is not a component or a top-level package.";
+  }
+  state.metadataRequest = { ...request, page };
+  $("metadata-title").textContent = request.mode === "boundaries" ? "Source inspection" : request.subjectId ? "Metadata for " + (qname(request.subjectId) || request.subjectId) : "All source metadata";
+  $("metadata-summary").textContent = "Showing " + items.length + " of " + total + " records \xB7 page " + (page + 1) + " of " + pages + ". " + notice2;
+  for (const record of items) {
+    const node = element(record.id), row = el2("div", void 0, "hierarchy-row");
+    row.dataset.metadataId = record.id;
+    row.append(el2("strong", node?.qualifiedName || node?.name || record.id), el2("small", (node?.kind ?? "Unavailable record") + " \xB7 native owner: " + (record.ownerIds.map((id) => (qname(id) || id) + " [" + (element(id)?.kind ?? "unavailable") + "]").join(", ") || "none recorded") + (record.boundaryReason ? " \xB7 " + record.boundaryReason : "")), button("Inspect", () => inspectMetadataRecord(record.id)));
+    const within = !explorationScope() || explorationScope().includes(record.id);
+    if (isDeclarationKind(node?.kind)) row.append(button(within ? "Contents" : "Contents in Whole project", async () => {
+      $("metadata-dialog").close();
+      if (within) await followTrace(record.id, "contents");
+      else await openExploration(completeChildView(state.graph, completeChildContext(state.graph, { focus: record.id }), "Inspected native declaration"), record.id, { scopeId: null, resetRegions: true });
+    }));
+    list2.append(row);
+  }
+  $("metadata-previous").disabled = page === 0;
+  $("metadata-next").disabled = page + 1 >= pages;
+}
+function inspectMetadataRecord(id) {
+  const index5 = nativeOwnershipIndex(state.graph), node = index5.byId.get(id), context = metadataContext(index5, id), ownership = inspectNativeOwnership(index5, id);
+  $("metadata-detail").dataset.metadataId = id;
+  $("metadata-detail").textContent = JSON.stringify({ id, kind: node?.kind, qualifiedName: node?.qualifiedName, metadata: context.metadata, nativeOwnership: ownership, nativeAnnotationRecords: context.annotationLinks, nativeRecord: node?.native, notice: "Native owner, annotatedElement and annotation-record provenance are distinct. Unavailable source text or targets are not reconstructed." }, null, 2);
 }
 function openQuestion(id) {
   state.questionFocus = id;
@@ -10757,12 +10970,12 @@ function rollupDrawing(view) {
   }
   const result = relationshipRollups(state.graph, { visibleIds: [...bySemantic.keys()], scopeIds: explorationScope(), budget: 80 }), edges2 = [], omissions = [...result.omissions];
   for (const rollup of result.rollups) {
-    const source = bySemantic.get(rollup.source), target = bySemantic.get(rollup.target);
-    if (source?.length !== 1 || target?.length !== 1) {
+    const source2 = bySemantic.get(rollup.source), target = bySemantic.get(rollup.target);
+    if (source2?.length !== 1 || target?.length !== 1) {
       omissions.push({ reason: "rollup-ambiguous-representation", relationshipId: rollup.id, message: "A containing element has multiple drawing representations; no aggregate attachment was guessed." });
       continue;
     }
-    edges2.push({ id: rollup.id, source: source[0], target: target[0], kind: rollup.kind, label: rollup.kind + " \xB7 " + (rollup.identityComplete ? rollup.nativeRelationshipCount + " native links" : rollup.recordCount + " connection records") + " (rollup)", aggregate: true, presentationOnly: true, rollup, semanticSource: rollup.source, semanticTarget: rollup.target });
+    edges2.push({ id: rollup.id, source: source2[0], target: target[0], kind: rollup.kind, label: rollup.kind + " \xB7 " + (rollup.identityComplete ? rollup.nativeRelationshipCount + " native links" : rollup.recordCount + " connection records") + " (rollup)", aggregate: true, presentationOnly: true, rollup, semanticSource: rollup.source, semanticTarget: rollup.target });
   }
   return { view: { ...view, edges: [...view.edges, ...edges2] }, omissions, rollups: result.rollups };
 }
@@ -10881,6 +11094,29 @@ function bind() {
   $("hierarchy-next").onclick = () => {
     state.hierarchyRequest.page++;
     renderHierarchy();
+  };
+  $("inspect-metadata").onclick = () => openMetadata();
+  $("metadata-search").oninput = () => {
+    state.metadataRequest.page = 0;
+    renderMetadata();
+  };
+  $("metadata-all").onclick = () => {
+    state.metadataRequest = { subjectId: null, page: 0, mode: "metadata" };
+    $("metadata-search").value = "";
+    renderMetadata();
+  };
+  $("metadata-boundaries").onclick = () => {
+    state.metadataRequest = { subjectId: null, page: 0, mode: "boundaries" };
+    $("metadata-search").value = "";
+    renderMetadata();
+  };
+  $("metadata-previous").onclick = () => {
+    state.metadataRequest.page--;
+    renderMetadata();
+  };
+  $("metadata-next").onclick = () => {
+    state.metadataRequest.page++;
+    renderMetadata();
   };
   $("declaration-previous").onclick = () => openDeclarations(state.declarationRequest.id, state.declarationRequest.page - 1);
   $("declaration-next").onclick = () => openDeclarations(state.declarationRequest.id, state.declarationRequest.page + 1);
