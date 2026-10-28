@@ -4012,7 +4012,7 @@ function semanticIds(scene2) {
 function planTransition(fromScene, toScene, options = {}) {
   const previous = fromScene.view ?? fromScene, next = toScene.view ?? toScene;
   const oldIds = semanticIds(previous), newIds = semanticIds(next), duration = options.reducedMotion ? 0 : 360;
-  const correspondence = oldIds.filter((id) => newIds.includes(id)).map((semanticId2) => ({ semanticId: semanticId2, fromRepresentationIds: representations(previous).filter((node) => node.semanticId === semanticId2).map((node) => node.representationId), toRepresentationIds: representations(next).filter((node) => node.semanticId === semanticId2).map((node) => node.representationId) }));
+  const correspondence = oldIds.filter((id) => newIds.includes(id)).map((semanticId3) => ({ semanticId: semanticId3, fromRepresentationIds: representations(previous).filter((node) => node.semanticId === semanticId3).map((node) => node.representationId), toRepresentationIds: representations(next).filter((node) => node.semanticId === semanticId3).map((node) => node.representationId) }));
   if (previous.kind === next.kind && correspondence.length && !options.journey?.length) return { mode: "same-kind", journeyRequired: false, correspondence, stages: [{ kind: "reflow", viewKind: next.kind, semanticIds: newIds, focusId: toScene.focus, duration }] };
   const route2 = options.graph && fromScene.focus && toScene.focus ? options.journey?.length ? options.journey[0] === fromScene.focus && options.journey.at(-1) === toScene.focus ? findExplicitRoute(options.graph, options.journey, options) : { found: false, elements: [], relationships: [], omissions: [{ reason: "explicit-route-endpoints" }] } : findHierarchyRoute(options.graph, { ...options, from: fromScene.focus, to: toScene.focus }) : { found: false, elements: [], relationships: [], omissions: [{ reason: "missing-route-context" }] };
   const bounded = (ids, focus) => [...new Set([focus, ...ids].filter(Boolean))].slice(0, 24);
@@ -4859,8 +4859,8 @@ function mountGrid(host, view, options = {}) {
       }
       const previousLayout = copy2(state2.layout);
       state2.widths[column] = width;
-      const nativeColumnId = columnElements.get(column)?.semanticId, semanticId2 = hasIdentity(nativeColumnId) ? nativeColumnId : null, record = { semanticId: semanticId2, index: column, heading: text3(label2), width }, saved = state2.layout?.columns ?? [];
-      state2.layout = gridPresentationLayout(view, { schemaVersion: GRID_LAYOUT_SCHEMA, columns: [...saved.filter((item) => semanticId2 && [...columnElements.values()].filter((value) => value.semanticId === semanticId2).length === 1 ? item.semanticId !== semanticId2 : !(item.index === column && item.semanticId === semanticId2)), record] });
+      const nativeColumnId = columnElements.get(column)?.semanticId, semanticId3 = hasIdentity(nativeColumnId) ? nativeColumnId : null, record = { semanticId: semanticId3, index: column, heading: text3(label2), width }, saved = state2.layout?.columns ?? [];
+      state2.layout = gridPresentationLayout(view, { schemaVersion: GRID_LAYOUT_SCHEMA, columns: [...saved.filter((item) => semanticId3 && [...columnElements.values()].filter((value) => value.semanticId === semanticId3).length === 1 ? item.semanticId !== semanticId3 : !(item.index === column && item.semanticId === semanticId3)), record] });
       applyWidths();
       changed();
       options.onLayoutChange?.(copy2(state2.layout), { previousLayout });
@@ -4956,8 +4956,8 @@ function mountGrid(host, view, options = {}) {
         if (rect3.width <= 0 || rect3.height <= 0 || rect3.bottom <= clip.top || rect3.top >= clip.bottom || rect3.right <= clip.left || rect3.left >= clip.right) return [];
         const left = Math.max(clip.left, rect3.left), top = Math.max(clip.top, rect3.top);
         const right = Math.min(clip.right, rect3.right), bottom = Math.min(clip.bottom, rect3.bottom);
-        return semanticIdsFor(selection).map((semanticId2, index5) => ({
-          semanticId: semanticId2,
+        return semanticIdsFor(selection).map((semanticId3, index5) => ({
+          semanticId: semanticId3,
           role: selection.kind,
           row: selection.row,
           column: selection.column,
@@ -5707,11 +5707,11 @@ function projectEmbeddedPorts(view) {
   }
   const edges2 = view.edges.map((edge) => {
     const result = { ...edge };
-    for (const [endpoint5, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
+    for (const [endpoint6, field, attachment] of [["source", "fromPort", "sourceAttachment"], ["target", "toPort", "targetAttachment"]]) {
       const pin = edge[field] ?? edge[field === "fromPort" ? "from_port" : "to_port"];
       if (!pin) continue;
-      const id = attachments.get(JSON.stringify([edge[endpoint5], pin]));
-      if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint5]);
+      const id = attachments.get(JSON.stringify([edge[endpoint6], pin]));
+      if (!id) throw Error("Native connection " + edge.id + " references unavailable port " + pin + " on " + edge[endpoint6]);
       result[attachment] = id;
     }
     return result;
@@ -6458,7 +6458,6 @@ function discoverNativeIndex(parsed, exported, { modelDocumentCount = parsed.roo
 // src/canvas-prototype/prominence.mjs
 var DESCENDANT_CAP = 256;
 var DESCENDANT_WORK_CAP = 4096;
-var MAX_OVERVIEW_TILES = 10;
 var defaultIndexes = /* @__PURE__ */ new WeakMap();
 var scopedIndexes = /* @__PURE__ */ new WeakMap();
 var packageKind = (kind) => kind === "Package";
@@ -6466,10 +6465,8 @@ var engineeringCategory = /^(?:Package|Namespace)$|^(?:Requirement|Concern|Part|
 var excludedConnections = /* @__PURE__ */ new Set(["containment", "composition", "owner", "owningMembership", "ownedMembership", "membership", "documentation", "typing", "type", "specialization"]);
 var compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var idText = (id) => typeof id === "string" && id.length > 0;
-var copy3 = (value) => structuredClone(value);
 var named = (element2) => idText(element2.native?.declaredName) || idText(element2.native?.declaredShortName);
 var eligible = (element2) => element2?.layer === "project" && named(element2) && engineeringCategory.test(element2.kind ?? "");
-var edgeKey2 = (edge) => JSON.stringify([edge.semanticId ?? edge.nativeRelationship ?? edge.id ?? null, edge.source, edge.target, edge.kind]);
 function nativeStructure(graph) {
   const children = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map();
   const add = (edge) => {
@@ -6604,141 +6601,546 @@ function createProminenceIndex(graph, { scopeIds: scopeIds2 } = {}) {
   }
   return result;
 }
-function buildSystemOverview(graph, { rootIds, budget = 9 } = {}) {
-  if (!Number.isInteger(budget) || budget < 0) throw Error("Overview budget must be a nonnegative integer");
-  const limit = Math.min(MAX_OVERVIEW_TILES, budget), all = prepare(graph), structure = nativeStructure(graph), allElements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
-  const explicit = Array.isArray(rootIds) && rootIds.length > 0;
-  let requested = [...new Set((rootIds ?? []).filter(idText))];
-  if (!explicit) {
-    requested = [...all.elements.keys()].filter((id) => !all.parents.get(id).length).sort(all.compareNames);
-    const covered = new Set(descendantClosure(structure.children, requested));
-    for (const id of [...all.elements.keys()].sort(all.compareNames)) if (!covered.has(id)) {
-      requested.push(id);
-      for (const member of descendantClosure(structure.children, [id])) covered.add(member);
+
+// src/canvas-prototype/child-view.mjs
+function completeChildView(graph, context, title = "Complete contents") {
+  const view = graphView(graph, context, title), byId = new Map(graph.elements.map((e) => [e.id, e]));
+  const projection2 = context.childProjection;
+  if (!projection2?.complete) throw Error("A complete native child projection is required");
+  view.childProjection = projection2;
+  const counts = /* @__PURE__ */ new Map();
+  for (const id of projection2.childIds) {
+    const owner = projection2.declaredOn[id];
+    counts.set(owner, (counts.get(owner) ?? 0) + 1);
+  }
+  view.nodes = view.nodes.map((node) => {
+    const native = byId.get(node.semanticId), children = counts.get(node.semanticId) ?? 0;
+    const named2 = !!native.native?.declaredName || !!native.native?.declaredShortName;
+    return {
+      ...node,
+      kind: native.kind,
+      childDeclaration: true,
+      name: named2 ? node.name : "Unnamed " + native.kind,
+      ...children ? { overviewLabel: children + " immediate declarations" } : {}
+    };
+  });
+  return view;
+}
+
+// src/canvas-prototype/child-exploration.mjs
+var compareText2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var endpoint3 = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
+var edgeKey2 = (edge) => JSON.stringify([edge.id ?? null, edge.source, edge.target, edge.kind]);
+var indexes3 = /* @__PURE__ */ new WeakMap();
+function prepare2(graph) {
+  const prior = indexes3.get(graph);
+  if (prior && prior.elementSource === graph.elements && prior.relationshipSource === graph.relationships && prior.containmentSource === graph.containment && prior.elementCount === (graph.elements ?? []).length && prior.relationshipCount === (graph.relationships ?? []).length && prior.containmentCount === (graph.containment ?? []).length) return prior;
+  const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
+  const edges2 = [...new Map([...graph.relationships ?? [], ...graph.containment ?? []].map((edge) => {
+    const value = { ...edge, source: endpoint3(edge, "source"), target: endpoint3(edge, "target") };
+    return [edgeKey2(value), value];
+  })).values()].sort((a, b) => compareText2(edgeKey2(a), edgeKey2(b)));
+  const owners = /* @__PURE__ */ new Map(), types = /* @__PURE__ */ new Map();
+  for (const edge of edges2) {
+    if (edge.kind === "containment" && edge.nativeRole === "owner") {
+      if (!owners.has(edge.source)) owners.set(edge.source, []);
+      owners.get(edge.source).push(edge);
+    }
+    if (["typing", "type"].includes(edge.kind)) {
+      if (!types.has(edge.source)) types.set(edge.source, []);
+      types.get(edge.source).push(edge);
     }
   }
-  const scopeIds2 = descendantClosure(structure.children, requested), scope = new Set(scopeIds2), data = prepare(graph, scopeIds2), index5 = createProminenceIndex(graph, { scopeIds: scopeIds2 });
-  const omissions = [], effectiveRoots = [];
-  for (const root of [...requested].sort(index5.compare)) {
-    if (!data.elements.has(root)) {
-      omissions.push({ target: root, reason: allElements.has(root) ? "element-policy" : "unavailable-root" });
+  const result = { elements, edges: edges2, owners, types, elementSource: graph.elements, relationshipSource: graph.relationships, containmentSource: graph.containment, elementCount: (graph.elements ?? []).length, relationshipCount: (graph.relationships ?? []).length, containmentCount: (graph.containment ?? []).length };
+  indexes3.set(graph, result);
+  return result;
+}
+function completeChildContext(graph, options = {}) {
+  const { elements, edges: edges2, owners, types } = prepare2(graph);
+  const requested = [...new Set(options.rootIds ?? (options.focus ? [options.focus] : []))];
+  const focus = options.focus ?? requested[0];
+  if (focus && !requested.includes(focus)) requested.unshift(focus);
+  const scope = options.scopeIds ? new Set(options.scopeIds) : null;
+  const kinds2 = options.elementKinds ? new Set(options.elementKinds) : null;
+  const relationships = options.relationshipKinds ? new Set(options.relationshipKinds) : null;
+  const omissions = [], omitted = /* @__PURE__ */ new Set(), unavailable = /* @__PURE__ */ new Set(), filtered = /* @__PURE__ */ new Set(), outside = /* @__PURE__ */ new Set();
+  const omit = (edge, target, reason, anchor) => {
+    const value = { relationshipId: edge?.id ?? null, target, reason, anchor: anchor ?? null }, key3 = JSON.stringify(value);
+    if (omitted.has(key3)) return;
+    omitted.add(key3);
+    omissions.push(value);
+    if (reason === "unavailable") unavailable.add(target);
+    else filtered.add(target);
+    if (reason === "outside-scope") outside.add(target);
+  };
+  const excluded = (id, { source = false } = {}) => {
+    const element2 = elements.get(id);
+    if (!element2) return "unavailable";
+    if (element2.metamodel === true || element2.layer === "metamodel") return "metamodel-boundary";
+    if (scope && !scope.has(id)) return "outside-scope";
+    if (!isDeclarationKind(element2.kind)) return "element-policy";
+    if (source && element2.layer !== "project") return "source-projection";
+    if (kinds2 && !kinds2.has(element2.kind)) return "element-filter";
+    return null;
+  };
+  const compare8 = (a, b) => compareText2(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compareText2(a, b);
+  const roots = [];
+  for (const id of requested) {
+    const reason = excluded(id);
+    if (reason) omit(null, id, reason, null);
+    else roots.push(id);
+  }
+  roots.sort(compare8);
+  const anchors = new Map(roots.map((id) => [id, { root: true, bridges: [] }]));
+  if (options.includeDirectTypes !== false) for (const root of roots) {
+    if (!elements.get(root)?.kind?.endsWith("Usage")) continue;
+    for (const edge of types.get(root) ?? []) {
+      const target = edge.target, reason = excluded(target);
+      if (reason) {
+        omit(edge, target, reason, root);
+        continue;
+      }
+      if (!elements.get(target)?.kind?.endsWith("Definition")) {
+        omit(edge, target, "typing-boundary", root);
+        continue;
+      }
+      if (!anchors.has(target)) anchors.set(target, { root: false, bridges: [] });
+      anchors.get(target).bridges.push(edge);
+    }
+  }
+  const children = /* @__PURE__ */ new Map(), ownership = [], own2 = /* @__PURE__ */ new Set(), defined = /* @__PURE__ */ new Set(), neededTypes = /* @__PURE__ */ new Set(), bridgeEdges = /* @__PURE__ */ new Map();
+  const compositionPairs = new Set(edges2.filter((edge) => edge.kind === "composition").map((edge) => JSON.stringify([edge.source, edge.target])));
+  for (const [anchor, context] of anchors) for (const edge of owners.get(anchor) ?? []) {
+    const target = edge.target;
+    const reason = relationships && !relationships.has(edge.kind) && !(relationships.has("composition") && compositionPairs.has(JSON.stringify([anchor, target]))) ? "relationship-filter" : excluded(target, { source: true });
+    if (reason) {
+      omit(edge, target, reason, anchor);
       continue;
     }
-    const promoted = promotedRoot(root, data);
-    if (!effectiveRoots.includes(promoted)) effectiveRoots.push(promoted);
-  }
-  effectiveRoots.sort(index5.compare);
-  const chosen = /* @__PURE__ */ new Set(), add = (id) => {
-    if (chosen.size < limit) chosen.add(id);
-  };
-  for (const root of effectiveRoots) add(root);
-  const rootQueues = effectiveRoots.filter((root) => chosen.has(root)).map((root) => ({
-    root,
-    ids: [...data.children.get(root)].sort(index5.compare),
-    offset: 0
-  }));
-  let partialRootRound = false;
-  while (chosen.size < limit) {
-    const expandable = [];
-    for (const queue of rootQueues) {
-      while (queue.offset < queue.ids.length && chosen.has(queue.ids[queue.offset])) queue.offset++;
-      if (queue.offset < queue.ids.length) expandable.push(queue);
+    if (anchor === target) {
+      omit(edge, target, "ownership-cycle", anchor);
+      continue;
     }
-    if (!expandable.length) break;
-    if (rootQueues.length > 1 && expandable.length > limit - chosen.size) {
-      partialRootRound = true;
-      break;
+    if (!children.has(target)) children.set(target, /* @__PURE__ */ new Set());
+    children.get(target).add(anchor);
+    ownership.push(edge);
+    if (context.root) own2.add(target);
+    else {
+      defined.add(target);
+      neededTypes.add(anchor);
+      for (const bridge of context.bridges) bridgeEdges.set(edgeKey2(bridge), bridge);
     }
-    for (const queue of expandable) if (chosen.size < limit) add(queue.ids[queue.offset++]);
   }
-  const branches = [];
-  for (const queue of rootQueues) for (const child of queue.ids) if (chosen.has(child)) {
-    branches.push({ ids: (data.children.get(child) ?? []).map((id) => ({ id, depth: 2 })).sort((a, b) => index5.compare(a.id, b.id)), offset: 0, queued: /* @__PURE__ */ new Set([child, ...data.children.get(child) ?? []]) });
+  const childIds = [...children.keys()].sort(compare8), typeIds = [...neededTypes].sort(compare8);
+  const wanted = new Set(roots);
+  for (const id of typeIds) wanted.add(id);
+  for (const id of childIds) wanted.add(id);
+  const selected = new Map(ownership.map((edge) => [edgeKey2(edge), edge]));
+  for (const edge of bridgeEdges.values()) selected.set(edgeKey2(edge), edge);
+  for (const edge of edges2) if (wanted.has(edge.source) && wanted.has(edge.target) && (!relationships || relationships.has(edge.kind))) {
+    if (edge.kind === "containment" && edge.nativeRole !== "owner") continue;
+    selected.set(edgeKey2(edge), edge);
   }
-  while (chosen.size < limit && !partialRootRound) {
-    for (const branch of branches) while (branch.offset < branch.ids.length && chosen.has(branch.ids[branch.offset].id)) branch.offset++;
-    const depths = branches.filter((branch) => branch.offset < branch.ids.length).map((branch) => branch.ids[branch.offset].depth);
-    if (!depths.length) break;
-    const depth = Math.min(...depths);
-    for (const branch of branches) {
-      if (chosen.size >= limit) break;
-      const next = branch.ids[branch.offset];
-      if (!next || next.depth !== depth || chosen.has(next.id)) continue;
-      branch.offset++;
-      add(next.id);
-      for (const child of [...data.children.get(next.id)].sort(index5.compare)) if (!branch.queued.has(child)) {
-        branch.queued.add(child);
-        branch.ids.push({ id: child, depth: next.depth + 1 });
+  const relationshipContext = { total: 0, outsideScope: 0, unavailable: 0, notOpened: 0, kindCounts: {} };
+  for (const edge of edges2) {
+    const sourceShown = wanted.has(edge.source), targetShown = wanted.has(edge.target);
+    if (sourceShown === targetShown) continue;
+    const other = sourceShown ? edge.target : edge.source, anchor = sourceShown ? edge.source : edge.target;
+    const reason = !elements.has(other) ? "unavailable" : scope && !scope.has(other) ? "outside-scope" : "not-opened";
+    omissions.push({ relationshipId: edge.id ?? null, nativeRelationship: edge.nativeRelationship ?? null, kind: edge.kind, source: edge.source, target: edge.target, semanticSource: edge.source, semanticTarget: edge.target, otherEndpoint: other, anchor, reason, contextOnly: true, message: "Native relationship context: " + reason + " \xB7 " + edge.kind + " \xB7 " + edge.source + " \u2192 " + edge.target + " \xB7 relationship " + (edge.id ?? "(unavailable)") + " \xB7 native identity " + (edge.nativeRelationship ?? "(not projected)") + ". Endpoints are not added; child membership is unchanged.", ...edge.nativeRole ? { nativeRole: edge.nativeRole } : {}, ...edge.occurrences ? { occurrences: edge.occurrences } : {} });
+    relationshipContext.total++;
+    relationshipContext[reason === "outside-scope" ? "outsideScope" : reason === "not-opened" ? "notOpened" : "unavailable"]++;
+    relationshipContext.kindCounts[edge.kind] = (relationshipContext.kindCounts[edge.kind] ?? 0) + 1;
+  }
+  const declarationOwners = Object.fromEntries(childIds.map((id) => [id, [...children.get(id)].sort(compare8)]));
+  const declaredOn = Object.fromEntries(childIds.map((id) => [id, declarationOwners[id].length === 1 ? declarationOwners[id][0] : null]));
+  const kindCounts = {};
+  for (const id of childIds) {
+    const kind = elements.get(id).kind;
+    kindCounts[kind] = (kindCounts[kind] ?? 0) + 1;
+  }
+  const count = childIds.length;
+  let message = `All ${count} loaded immediate source declaration${count === 1 ? "" : "s"} shown`;
+  if (roots.length > 1) message += ` across ${roots.length} selected roots`;
+  message += `: ${own2.size} owned by the selected element${roots.length === 1 ? "" : "s"}`;
+  if (defined.size) message += `, ${defined.size} declared on directly typed definitions`;
+  message += ".";
+  if (defined.size) message += " Definition declarations retain their native owners and explicit typing links; they are not runtime instances.";
+  if (outside.size) message += ` ${outside.size} native target${outside.size === 1 ? " is" : "s are"} outside the isolated scope.`;
+  if (unavailable.size) message += ` ${unavailable.size} referenced target${unavailable.size === 1 ? " is" : "s are"} unavailable in this projection.`;
+  if (filtered.size - outside.size) message += ` ${filtered.size - outside.size} target${filtered.size - outside.size === 1 ? " is" : "s are"} excluded by explicit policy or unavailable declaration data.`;
+  if (relationshipContext.total) message += " " + relationshipContext.total + " actual native relationship context links are not opened (" + relationshipContext.outsideScope + " outside scope, " + relationshipContext.unavailable + " unavailable, " + relationshipContext.notOpened + " available but not opened); exact identities and direction are disclosed separately without adding endpoints or changing child counts.";
+  message += " Only immediate native owners and one direct typing hop are opened; drill into a child to continue. Counts describe the loaded projection, not proof that omitted model content is absent.";
+  if (!roots.length) message = "The selected native declaration is unavailable or outside this scope.";
+  const childProjection = { rootIds: roots, childIds, ownChildIds: [...own2].sort(compare8), definitionChildIds: [...defined].sort(compare8), typeIds, declaredOn, declarationOwners, ownership, complete: true, kindCounts };
+  return structuredClone({
+    elements: [...wanted].map((id) => elements.get(id)),
+    relationships: [...selected.values()].sort((a, b) => compareText2(edgeKey2(a), edgeKey2(b))),
+    omissions,
+    mode: "contents",
+    focus,
+    rootIds: roots,
+    page: 0,
+    pages: 1,
+    total: count,
+    shown: count,
+    targets: childIds,
+    budget: null,
+    typingBridges: [...bridgeEdges.values()].map((edge) => edge.id),
+    childProjection,
+    summary: { status: roots.length ? count ? "shown" : unavailable.size ? "unavailable" : "no-known-children" : "missing-focus", message, shown: count, total: count, unavailable: unavailable.size, filtered: filtered.size, outsideScope: outside.size, ownChildren: own2.size, definitionChildren: defined.size, complete: true, kindCounts, relationshipContext }
+  });
+}
+var nativeRefs2 = (value) => Array.isArray(value) ? value.flatMap(nativeRefs2) : value && typeof value === "object" && typeof value["@id"] === "string" ? [value["@id"]] : [];
+function closedCycleMembers(ids, children, parents) {
+  const remaining = new Set(ids), seen = /* @__PURE__ */ new Set(), order = [];
+  for (const start2 of remaining) {
+    if (seen.has(start2)) continue;
+    const stack = [[start2, false]];
+    while (stack.length) {
+      const [id, expanded] = stack.pop();
+      if (expanded) {
+        order.push(id);
+        continue;
+      }
+      if (seen.has(id)) continue;
+      seen.add(id);
+      stack.push([id, true]);
+      const next = [...children.get(id) ?? []].filter((child) => remaining.has(child));
+      for (let i = next.length - 1; i >= 0; i--) if (!seen.has(next[i])) stack.push([next[i], false]);
+    }
+  }
+  const assigned = /* @__PURE__ */ new Set(), cycles = [];
+  for (let i = order.length - 1; i >= 0; i--) {
+    const start2 = order[i];
+    if (assigned.has(start2)) continue;
+    const component = [], queue = [start2];
+    assigned.add(start2);
+    for (let cursor = 0; cursor < queue.length; cursor++) {
+      const id = queue[cursor];
+      component.push(id);
+      for (const parent of parents.get(id) ?? []) if (remaining.has(parent) && !assigned.has(parent)) {
+        assigned.add(parent);
+        queue.push(parent);
       }
     }
+    if (component.length > 1 || children.get(start2)?.has(start2)) cycles.push(...component);
   }
-  const promotedWrappers = /* @__PURE__ */ new Set();
-  for (const root of requested) {
-    let id = root;
-    const seen = /* @__PURE__ */ new Set();
-    while (data.elements.has(id) && packageKind(data.elements.get(id).kind) && data.children.get(id)?.length === 1 && !seen.has(id)) {
-      seen.add(id);
-      if (effectiveRoots.includes(id)) break;
-      promotedWrappers.add(id);
-      id = data.children.get(id)[0];
-    }
-  }
-  const omittedTargets = new Set(omissions.map((item) => item.target));
-  for (const id of scopeIds2) if (!allElements.has(id) && !omittedTargets.has(id)) {
-    omissions.push({ target: id, reason: "unavailable" });
-    omittedTargets.add(id);
-  }
-  for (const element2 of graph.elements ?? []) {
-    if (!scope.has(element2.id)) {
-      if (eligible(element2)) omissions.push({ target: element2.id, reason: "outside-scope" });
-      continue;
-    }
-    if (!eligible(element2)) {
-      if (!omittedTargets.has(element2.id)) omissions.push({ target: element2.id, reason: element2.layer === "project" ? "element-policy" : "library" });
-      continue;
-    }
-    if (!chosen.has(element2.id)) omissions.push({ target: element2.id, reason: promotedWrappers.has(element2.id) ? "package-wrapper" : "budget" });
-  }
-  const compositionPairs = new Set((graph.relationships ?? []).filter((edge) => edge.kind === "composition").map((edge) => JSON.stringify([edge.source, edge.target])));
-  const edges2 = [...graph.relationships ?? [], ...(graph.containment ?? []).filter((edge) => edge.nativeRole === "owner" && !compositionPairs.has(JSON.stringify([edge.source, edge.target])))];
-  const seenEdges = /* @__PURE__ */ new Set(), relationships = [];
-  for (const edge of [...edges2].sort((a, b) => compareText(edgeKey2(a), edgeKey2(b)))) {
-    if (!chosen.has(edge.source) || !chosen.has(edge.target)) continue;
-    const key3 = edgeKey2(edge);
-    if (seenEdges.has(key3)) continue;
-    seenEdges.add(key3);
-    relationships.push(copy3(edge));
-  }
-  const ordered = [...chosen], focus = ordered[0] ?? null, shown = ordered.length, total = data.elements.size;
-  const descendantsCapped = [...index5.metrics.values()].some((metric) => metric.descendantsCapped);
-  const summary = {
-    message: `${shown} of ${total} named model elements in the loaded native scope. Ranked by structural size and distinct connections; omitted content remains available through exploration.${descendantsCapped ? ` Descendant ranking counts stop at ${DESCENDANT_CAP} identities or ${DESCENDANT_WORK_CAP} inspected links; capped counts are lower bounds. Ranking is a reading aid, not engineering criticality.` : ""}`,
-    shown,
-    total,
-    roots: effectiveRoots.length,
-    shownRoots: effectiveRoots.filter((id) => chosen.has(id)).length,
-    descendantsCapped
+  return cycles;
+}
+function completeRootContext(graph, options = {}) {
+  const { elements, edges: edges2 } = prepare2(graph), scope = options.scopeIds ? new Set(options.scopeIds) : null;
+  const source = new Set([...elements.values()].filter((element2) => element2.layer === "project" && element2.metamodel !== true && isDeclarationKind(element2.kind) && (!scope || scope.has(element2.id))).map((element2) => element2.id));
+  const compare8 = (a, b) => Number(!["Package", "Namespace"].includes(elements.get(a)?.kind)) - Number(!["Package", "Namespace"].includes(elements.get(b)?.kind)) || compareText2(elements.get(a)?.qualifiedName ?? elements.get(a)?.name ?? a, elements.get(b)?.qualifiedName ?? elements.get(b)?.name ?? b) || compareText2(a, b);
+  const nativeOwners = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map(), children = /* @__PURE__ */ new Map();
+  const add = (parent, child) => {
+    if (typeof parent !== "string" || !source.has(child)) return;
+    if (!nativeOwners.has(child)) nativeOwners.set(child, /* @__PURE__ */ new Set());
+    nativeOwners.get(child).add(parent);
+    if (!source.has(parent)) return;
+    if (!parents.has(child)) parents.set(child, /* @__PURE__ */ new Set());
+    parents.get(child).add(parent);
+    if (!children.has(parent)) children.set(parent, /* @__PURE__ */ new Set());
+    children.get(parent).add(child);
   };
-  return {
-    elements: ordered.map((id) => copy3(data.elements.get(id))),
+  for (const edge of edges2) if (edge.kind === "containment" && edge.nativeRole === "owner") add(edge.source, edge.target);
+  for (const id of source) for (const parent of nativeRefs2(elements.get(id).native?.owner)) add(parent, id);
+  const roots = [...source].filter((id) => !parents.get(id)?.size), reachable = /* @__PURE__ */ new Set(), walk = (starts) => {
+    const queue = [...starts];
+    for (let cursor = 0; cursor < queue.length; cursor++) {
+      const id = queue[cursor];
+      if (reachable.has(id)) continue;
+      reachable.add(id);
+      for (const child of children.get(id) ?? []) if (!reachable.has(child)) queue.push(child);
+    }
+  };
+  walk(roots);
+  const cycleIds = closedCycleMembers([...source].filter((id) => !reachable.has(id)), children, parents), cycles = new Set(cycleIds);
+  roots.push(...cycleIds);
+  walk(cycleIds);
+  const unresolved = [...source].filter((id) => !reachable.has(id)), unresolvedIds = new Set(unresolved);
+  roots.push(...unresolved);
+  const childIds = [...new Set(roots)].sort(compare8), wanted = new Set(childIds), omissions = [], projectionRoots = [];
+  const declarationOwners = Object.fromEntries(childIds.map((id) => [id, [...nativeOwners.get(id) ?? []].sort(compareText2)]));
+  for (const id of childIds) {
+    const ownerIds = declarationOwners[id];
+    const omittedOwnerIds = ownerIds.filter((owner) => !elements.has(owner) || elements.get(owner).layer !== "project" || !isDeclarationKind(elements.get(owner).kind));
+    const outsideOwnerIds = scope ? ownerIds.filter((owner) => elements.has(owner) && elements.get(owner).layer === "project" && isDeclarationKind(elements.get(owner).kind) && !scope.has(owner)) : [];
+    const reason = cycles.has(id) ? "cycle" : unresolvedIds.has(id) ? "ownership-unresolved" : !ownerIds.length ? "native-root" : !omittedOwnerIds.length && outsideOwnerIds.length ? "outside-scope" : "native-owner-omitted";
+    projectionRoots.push({ id, reason, ownerIds, omittedOwnerIds, outsideOwnerIds });
+    if (reason !== "native-root") omissions.push({ relationshipId: null, target: id, reason, anchor: null, ownerIds });
+  }
+  const relationships = edges2.filter((edge) => wanted.has(edge.source) && wanted.has(edge.target));
+  const kindCounts = {};
+  for (const id of childIds) {
+    const kind = elements.get(id).kind;
+    kindCounts[kind] = (kindCounts[kind] ?? 0) + 1;
+  }
+  const packageCount = (kindCounts.Package ?? 0) + (kindCounts.Namespace ?? 0), metadataCount = projectionRoots.filter((entry) => ["MetadataUsage", "MetadataDefinition"].includes(elements.get(entry.id).kind) && entry.reason !== "native-root").length;
+  const boundaryCount = projectionRoots.filter((entry) => !["native-root", "cycle"].includes(entry.reason)).length;
+  let message = `All ${childIds.length} roots of the loaded source ownership projection shown: ${packageCount} packages/namespaces`;
+  if (metadataCount) message += ` and ${metadataCount} unanchored metadata declarations`;
+  message += ".";
+  if (boundaryCount) message += ` ${boundaryCount} entries appear here because their explicit native owner is outside the available source-declaration projection or scope; they are not asserted to be physical or model-wide top-level roots.`;
+  if (cycles.size) message += ` ${cycles.size} closed ownership-cycle members are exposed as inspectable entries; no containing hierarchy has been guessed.`;
+  message += ` ${source.size} source declarations remain reachable through intentional immediate-child drilldown. No recursive model expansion or modeled project root is created.`;
+  return structuredClone({
+    elements: childIds.map((id) => elements.get(id)),
     relationships,
-    focus,
-    metrics: index5.metrics,
-    omissions: omissions.sort((a, b) => compareText(a.reason, b.reason) || all.compareNames(a.target, b.target)),
-    summary,
-    rootIds: [...requested].sort(all.compareNames),
-    promotedRootIds: effectiveRoots,
-    scopeIds: scopeIds2,
-    budget: limit
+    omissions,
+    mode: "contents",
+    focus: childIds[0],
+    rootIds: [],
+    page: 0,
+    pages: 1,
+    total: childIds.length,
+    shown: childIds.length,
+    targets: childIds,
+    budget: null,
+    typingBridges: [],
+    childProjection: { rootIds: [], childIds, ownChildIds: childIds, definitionChildIds: [], typeIds: [], declaredOn: {}, declarationOwners, ownership: [], projectionRoots, complete: true, kindCounts, implicitProject: true },
+    summary: { status: childIds.length ? "shown" : "no-known-children", message, total: childIds.length, shown: childIds.length, unavailable: 0, filtered: 0, complete: true, kindCounts, sourceDeclarations: source.size, packages: packageCount, unanchoredMetadata: metadataCount, projectionBoundaries: boundaryCount, cycleEntries: cycles.size }
+  });
+}
+
+// src/canvas-prototype/child-layout.mjs
+var finite6 = (n, fallback) => Number.isFinite(n) && n > 0 ? n : fallback;
+var semanticId2 = (n) => n.semanticId ?? n.id;
+var overlap5 = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+var simplify3 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
+var routeLength = (p) => p.slice(1).reduce((n, b, i) => n + Math.abs(b.x - p[i].x) + Math.abs(b.y - p[i].y), 0);
+var boundsOf = (items) => {
+  if (!items.length) return { x: 0, y: 0, width: 0, height: 0 };
+  const x = Math.min(...items.map((n) => n.x)), y = Math.min(...items.map((n) => n.y));
+  return { x, y, width: Math.max(...items.map((n) => n.x + (n.width ?? 0))) - x, height: Math.max(...items.map((n) => n.y + (n.height ?? 0))) - y };
+};
+async function layoutChildWorkspace(view, { width = 1100, gap = 28, padding = 24, minCardWidth = 260, measureLabel, isCurrent = () => true, yieldControl = () => new Promise((resolve2) => setTimeout(resolve2, 0)) } = {}) {
+  gap = finite6(gap, 28);
+  padding = finite6(padding, 24);
+  width = finite6(width, 1100);
+  const diagnostics = [], ownershipFrames = [], notices = [];
+  let deadline = performance.now() + 12, work = 0;
+  const checkpoint = async () => {
+    if (!isCurrent()) {
+      const error = new Error("Child workspace layout canceled");
+      error.name = "AbortError";
+      error.code = "LAYOUT_CANCELED";
+      throw error;
+    }
+    if (++work % 32 === 0 || performance.now() >= deadline) {
+      await yieldControl();
+      deadline = performance.now() + 12;
+      if (!isCurrent()) {
+        const error = new Error("Child workspace layout canceled");
+        error.name = "AbortError";
+        error.code = "LAYOUT_CANCELED";
+        throw error;
+      }
+    }
   };
+  await checkpoint();
+  const nodes = (view.nodes ?? []).map((n) => ({ ...n, width: Math.max(minCardWidth, finite6(n.width, 260)), height: finite6(n.height, 120) }));
+  const byId = new Map(nodes.map((n) => [n.id, n])), bySemantic = /* @__PURE__ */ new Map();
+  for (const n of nodes) {
+    const id = semanticId2(n);
+    if (!bySemantic.has(id)) bySemantic.set(id, []);
+    bySemantic.get(id).push(n);
+  }
+  const projection2 = view.childProjection ?? {}, roots = /* @__PURE__ */ new Set([...projection2.rootIds ?? [], ...projection2.typeIds ?? []]);
+  const parentOf = /* @__PURE__ */ new Map();
+  for (const n of nodes) {
+    await checkpoint();
+    delete n.parentId;
+    if (roots.has(semanticId2(n))) continue;
+    const owner = projection2.declaredOn?.[semanticId2(n)], candidates2 = bySemantic.get(owner) ?? [];
+    if (owner && candidates2.length === 1 && candidates2[0].id !== n.id) parentOf.set(n.id, candidates2[0].id);
+    else if (owner || projection2.declarationOwners?.[semanticId2(n)]?.length > 1) diagnostics.push({ code: "child-owner-frame-unavailable", nodeId: n.id, semanticId: semanticId2(n), ownerIds: projection2.declarationOwners?.[semanticId2(n)] ?? [owner], message: "Native ownership is retained, but no unique containing card is available." });
+  }
+  for (const n of nodes) {
+    const path = [], seen = /* @__PURE__ */ new Set();
+    let id = n.id;
+    while (parentOf.has(id)) {
+      if (seen.has(id)) {
+        const cycle = path.slice(path.indexOf(id));
+        for (const member of cycle) parentOf.delete(member);
+        diagnostics.push({ code: "child-owner-cycle", nodeIds: cycle, message: "Cyclic native ownership is shown without nested frames." });
+        break;
+      }
+      seen.add(id);
+      path.push(id);
+      id = parentOf.get(id);
+    }
+  }
+  const children = /* @__PURE__ */ new Map();
+  for (const [child, parent] of parentOf) {
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(byId.get(child));
+    byId.get(child).parentId = parent;
+  }
+  const cells = /* @__PURE__ */ new Map();
+  const measure = (node) => {
+    const owned = children.get(node.id) ?? [];
+    if (!owned.length) return;
+    for (const child of owned) measure(child);
+    const cellWidth = Math.max(minCardWidth, ...owned.map((n) => n.width));
+    const columns = Math.max(1, Math.min(owned.length, Math.floor((Math.max(width, node.width) - padding * 2 + gap) / (cellWidth + gap))));
+    const headerHeight = Math.max(72, finite6(node.headerHeight, node.height));
+    const rows = [];
+    for (let offset = 0; offset < owned.length; offset += columns) {
+      const row = owned.slice(offset, offset + columns);
+      rows.push({ nodes: row, height: Math.max(...row.map((n) => n.height)) });
+    }
+    node.headerHeight = headerHeight;
+    node.width = Math.max(node.width, padding * 2 + columns * cellWidth + (columns - 1) * gap);
+    node.height = headerHeight + padding * 2 + rows.reduce((sum, r) => sum + r.height, 0) + Math.max(0, rows.length - 1) * gap;
+    node.childGrid = { columns, rows: rows.length, complete: true };
+    let y = headerHeight + padding;
+    for (const row of rows) {
+      for (let col = 0; col < row.nodes.length; col++) {
+        const child = row.nodes[col];
+        child.x = padding + col * (cellWidth + gap);
+        child.y = y;
+        cells.set(child.id, { left: child.x - gap / 2, right: child.x + cellWidth + gap / 2, top: y - gap / 2, bottom: y + row.height + gap / 2 });
+      }
+      y += row.height + gap;
+    }
+  };
+  const top = nodes.filter((n) => !parentOf.has(n.id));
+  for (const n of top) measure(n);
+  let cursorY = 0;
+  const absolutize = (node) => {
+    for (const child of children.get(node.id) ?? []) {
+      const cell = cells.get(child.id);
+      child.x += node.x;
+      child.y += node.y;
+      cells.set(child.id, { left: cell.left + node.x, right: cell.right + node.x, top: cell.top + node.y, bottom: cell.bottom + node.y });
+      absolutize(child);
+    }
+  };
+  const rootOrder = [...projection2.rootIds ?? [], ...projection2.typeIds ?? []], rank = new Map(rootOrder.map((id, i) => [id, i]));
+  top.sort((a, b) => (rank.get(semanticId2(a)) ?? Infinity) - (rank.get(semanticId2(b)) ?? Infinity));
+  let flat = [];
+  const placeFlat = () => {
+    if (!flat.length) return;
+    const cellWidth = Math.max(minCardWidth, ...flat.map((n) => n.width)), columns = Math.max(1, Math.min(flat.length, Math.floor((width + gap) / (cellWidth + gap))));
+    for (let offset = 0; offset < flat.length; offset += columns) {
+      const row = flat.slice(offset, offset + columns), height = Math.max(...row.map((n) => n.height));
+      for (let col = 0; col < row.length; col++) {
+        const n = row[col];
+        n.x = col * (cellWidth + gap);
+        n.y = cursorY;
+        cells.set(n.id, { left: n.x - gap / 2, right: n.x + cellWidth + gap / 2, top: cursorY - gap / 2, bottom: cursorY + height + gap / 2 });
+      }
+      cursorY += height + gap;
+    }
+    flat = [];
+  };
+  for (const n of top) {
+    if (children.has(n.id)) {
+      placeFlat();
+      n.x = 0;
+      n.y = cursorY;
+      absolutize(n);
+      cursorY += n.height + gap * 2;
+    } else flat.push(n);
+    await checkpoint();
+  }
+  placeFlat();
+  const cardBounds = boundsOf(nodes), edges2 = [], labelBoxes = [];
+  const degree = /* @__PURE__ */ new Map();
+  for (const e of view.edges ?? []) for (const id of [e.source, e.target]) degree.set(id, (degree.get(id) ?? 0) + 1);
+  const terminalCount = /* @__PURE__ */ new Map();
+  const terminals2 = (node, edge, source) => {
+    const slot = terminalCount.get(node.id) ?? 0;
+    terminalCount.set(node.id, slot + 1);
+    const fraction = 0.2 + 0.6 * ((slot + 0.5) / (degree.get(node.id) ?? 1)), cell = cells.get(node.id);
+    if (node.headerHeight) return [
+      [{ x: node.x, y: node.y + Math.min(node.headerHeight, node.height) * fraction }, { x: node.x - gap / 2, y: node.y + Math.min(node.headerHeight, node.height) * fraction }],
+      [{ x: node.x + node.width, y: node.y + Math.min(node.headerHeight, node.height) * fraction }, { x: node.x + node.width + gap / 2, y: node.y + Math.min(node.headerHeight, node.height) * fraction }]
+    ];
+    return [
+      [{ x: node.x + node.width * fraction, y: node.y }, { x: node.x + node.width * fraction, y: cell?.top ?? node.y - gap / 2 }],
+      [{ x: node.x + node.width * fraction, y: node.y + node.height }, { x: node.x + node.width * fraction, y: cell?.bottom ?? node.y + node.height + gap / 2 }],
+      [{ x: node.x, y: node.y + node.height * fraction }, { x: cell?.left ?? node.x - gap / 2, y: node.y + node.height * fraction }],
+      [{ x: node.x + node.width, y: node.y + node.height * fraction }, { x: cell?.right ?? node.x + node.width + gap / 2, y: node.y + node.height * fraction }]
+    ];
+  };
+  for (const original of view.edges ?? []) {
+    await checkpoint();
+    const edge = { ...original }, geometryEdge = { ...edge, source: edge.sourceAttachment ?? edge.source, target: edge.targetAttachment ?? edge.target }, source = byId.get(geometryEdge.source), target = byId.get(geometryEdge.target);
+    if (!edge.sourceAttachment && !edge.targetAttachment && source && target && edge.navigationOnly && edge.nativeRole === "owner" && target.parentId === source.id) {
+      ownershipFrames.push({ ...edge, presentation: "containing-frame", ownerId: source.id, childId: target.id });
+      continue;
+    }
+    if (!source || !target) {
+      edge.points = [];
+      edge.routingBlocked = true;
+      diagnostics.push({ code: "child-edge-endpoint-unavailable", edgeId: edge.id, message: edge.sourceAttachment || edge.targetAttachment ? "An exact native attachment has no card in this projection." : "A native relationship endpoint has no card in this projection." });
+      edges2.push(edge);
+      continue;
+    }
+    const starts = terminals2(source, edge, true), ends = terminals2(target, edge, false), valid = createRouteValidator(geometryEdge, nodes, { orthogonalOnly: true });
+    let best = null, bestCost = Infinity;
+    const outerLeft = cardBounds.x - gap * (1 + edges2.length % 5 / 6), outerRight = cardBounds.x + cardBounds.width + gap * (1 + edges2.length % 5 / 6);
+    for (const [start2, a] of starts) for (const [end, b] of ends) {
+      const candidates2 = [
+        [start2, a, { x: b.x, y: a.y }, b, end],
+        [start2, a, { x: a.x, y: b.y }, b, end],
+        ...[outerLeft, outerRight].map((x) => [start2, a, { x, y: a.y }, { x, y: b.y }, b, end]),
+        ...[cardBounds.y - gap, cardBounds.y + cardBounds.height + gap].map((y) => [start2, a, { x: a.x, y }, { x: b.x, y }, b, end])
+      ];
+      for (const raw of candidates2) {
+        const points = simplify3(raw), cost = routeLength(points) + (points.length - 2) * 8;
+        if (cost < bestCost && valid(points) && routeConnectsEndpoints(points, geometryEdge, nodes)) {
+          best = points;
+          bestCost = cost;
+        }
+      }
+    }
+    if (!best) {
+      edge.points = [];
+      edge.routingBlocked = true;
+      diagnostics.push({ code: "child-edge-route-blocked", edgeId: edge.id, message: edge.sourceAttachment || edge.targetAttachment ? "Exact native attachment has no supported card anchor." : "No clear orthogonal route exists in the available grid gutters." });
+    } else {
+      edge.points = best;
+      if (edge.label) {
+        const measured = measureLabel?.(edge.label, edge) ?? { width: Math.max(40, String(edge.label).length * 7), height: 18 };
+        const w = finite6(measured.width, 60), h = finite6(measured.height, 18);
+        const obstacles = nodes.map((n) => n.headerHeight ? { ...n, height: n.headerHeight } : n);
+        for (let i = 1; i < best.length; i++) {
+          const a = best[i - 1], b = best[i], box = { x: (a.x + b.x - w) / 2, y: (a.y + b.y - h) / 2, width: w, height: h };
+          if (a.y === b.y && Math.abs(a.x - b.x) < w + 8 || a.x === b.x && Math.abs(a.y - b.y) < h + 8) continue;
+          if (obstacles.some((n) => overlap5(box, n)) || labelBoxes.some((n) => overlap5(box, n))) continue;
+          edge.labelBox = box;
+          edge.x = box.x;
+          edge.y = box.y + box.height * 0.78;
+          labelBoxes.push(box);
+          break;
+        }
+        if (!edge.labelBox) {
+          edge.labelOmitted = true;
+          diagnostics.push({ code: "child-edge-label-unplaced", edgeId: edge.id, message: "The native relationship label remains available in relationship details." });
+        }
+      }
+    }
+    edges2.push(edge);
+  }
+  if (ownershipFrames.length) notices.push({ code: "native-ownership-as-frames", count: ownershipFrames.length, message: ownershipFrames.length + " native ownership links are shown by containing frames; relationship identities remain available." });
+  const routePoints = edges2.flatMap((e) => (e.points ?? []).map((p) => ({ ...p, width: 0, height: 0 })));
+  return { ...view, nodes, edges: edges2, ports: [], scale: 1, bounds: boundsOf([...nodes, ...routePoints, ...labelBoxes]), layoutEngine: "complete-child-grid", ownershipFrames, diagnostics, notices, omissions: [], childWorkspace: true };
+}
+function placeChildWorkspace(layout, area = { x: 0, y: 0 }) {
+  const dx = (area.x ?? 0) - (layout.bounds?.x ?? 0), dy = (area.y ?? 0) - (layout.bounds?.y ?? 0);
+  const move = (p) => ({ ...p, x: p.x + dx, y: p.y + dy });
+  return { ...layout, scale: 1, nodes: layout.nodes.map(move), ports: (layout.ports ?? []).map(move), edges: layout.edges.map((e) => ({ ...e, points: (e.points ?? []).map(move), ...e.labelBox ? { labelBox: move(e.labelBox), x: e.x + dx, y: e.y + dy } : {} })), bounds: { ...layout.bounds, x: layout.bounds.x + dx, y: layout.bounds.y + dy }, worldBounds: { ...layout.bounds, x: layout.bounds.x + dx, y: layout.bounds.y + dy } };
 }
 
 // src/canvas-prototype/package-explorer.mjs
-var indexes3 = /* @__PURE__ */ new WeakMap();
+var indexes4 = /* @__PURE__ */ new WeakMap();
 var isPackage = (element2) => ["Package", "Namespace"].includes(element2?.kind);
 var compare3 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 function index4(graph) {
-  if (indexes3.has(graph)) return indexes3.get(graph);
+  if (indexes4.has(graph)) return indexes4.get(graph);
   const elements = new Map(graph.elements.map((e) => [e.id, e])), children = /* @__PURE__ */ new Map(), parents = /* @__PURE__ */ new Map();
   for (const edge of graph.containment ?? []) {
     if (edge.nativeRole !== "owner" || !elements.has(edge.source) || !elements.has(edge.target)) continue;
@@ -6748,7 +7150,7 @@ function index4(graph) {
     parents.get(edge.target).add(edge.source);
   }
   const result = { elements, children, parents, members: /* @__PURE__ */ new Map() };
-  indexes3.set(graph, result);
+  indexes4.set(graph, result);
   return result;
 }
 function packageMembers(graph, id) {
@@ -6791,7 +7193,7 @@ function outsidePackage(view, ids) {
 function focusViewKinds(element2) {
   const kind = element2?.kind;
   const views = [{ id: "context", label: "Connections" }];
-  if (isPackage(element2) || ["PartUsage", "PartDefinition"].includes(kind)) views.push({ id: "contents", label: "Parts / contents" });
+  if (isDeclarationKind(kind)) views.push({ id: "contents", label: "Complete contents" });
   if (["PartUsage", "PartDefinition"].includes(kind)) views.push({ id: "native:interconnection", label: "Native internal view" });
   if (isPackage(element2)) views.push({ id: "native:tree", label: "Native tree (complete)" }, { id: "native:mixed", label: "Native general view (complete)" });
   if (["ActionUsage", "ActionDefinition"].includes(kind)) views.push({ id: "native:action", label: "Native activity" }, { id: "native:sequence", label: "Native sequence" });
@@ -6985,14 +7387,14 @@ var inheritanceKinds = /* @__PURE__ */ new Set(["specialization"]);
 var satisfactionKinds = /* @__PURE__ */ new Set(["satisfy", "satisfaction"]);
 var compare4 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 var key2 = (e) => JSON.stringify([e.id ?? null, e.source, e.target, e.kind]);
-var endpoint3 = (e, side) => side === "source" ? e.source ?? e.fromId ?? e.from_id ?? e.from : e.target ?? e.toId ?? e.to_id ?? e.to;
-var indexes4 = /* @__PURE__ */ new WeakMap();
-function prepare2(graph) {
-  const prior = indexes4.get(graph);
+var endpoint4 = (e, side) => side === "source" ? e.source ?? e.fromId ?? e.from_id ?? e.from : e.target ?? e.toId ?? e.to_id ?? e.to;
+var indexes5 = /* @__PURE__ */ new WeakMap();
+function prepare3(graph) {
+  const prior = indexes5.get(graph);
   if (prior && prior.elementSource === graph.elements && prior.relationshipSource === graph.relationships && prior.containmentSource === graph.containment && prior.elementCount === (graph.elements ?? []).length && prior.relationshipCount === (graph.relationships ?? []).length && prior.containmentCount === (graph.containment ?? []).length) return prior;
   const elements = new Map((graph.elements ?? []).map((e) => [e.id, e]));
   const edges2 = [...new Map([...graph.relationships ?? [], ...(graph.containment ?? []).filter((e) => e.kind === "containment" && e.nativeRole === "owner")].map((e) => {
-    const value = { ...e, source: endpoint3(e, "source"), target: endpoint3(e, "target") };
+    const value = { ...e, source: endpoint4(e, "source"), target: endpoint4(e, "target") };
     return [key2(value), value];
   })).values()].sort((a, b) => compare4(key2(a), key2(b)));
   const incident = /* @__PURE__ */ new Map();
@@ -7001,7 +7403,7 @@ function prepare2(graph) {
     incident.get(id).push(edge);
   }
   const result = { elements, incident, elementSource: graph.elements, relationshipSource: graph.relationships, containmentSource: graph.containment, elementCount: (graph.elements ?? []).length, relationshipCount: (graph.relationships ?? []).length, containmentCount: (graph.containment ?? []).length };
-  indexes4.set(graph, result);
+  indexes5.set(graph, result);
   return result;
 }
 var isPartElement = (element2) => partKinds.has(element2?.kind);
@@ -7010,7 +7412,7 @@ function partContext(graph, options = {}) {
   if (!["effective", "global-impact"].includes(mode)) throw Error("Unknown part exploration mode: " + mode);
   if (!Number.isInteger(budget) || budget < 1) throw Error("Invalid exploration budget");
   if (!Number.isInteger(page) || page < 0) throw Error("Invalid exploration page");
-  const limit = Math.max(3, Math.min(24, budget)), { elements, incident } = prepare2(graph);
+  const limit = Math.max(3, Math.min(24, budget)), { elements, incident } = prepare3(graph);
   const scope = options.scopeIds ? new Set(options.scopeIds) : null, kinds2 = options.relationshipKinds ? new Set(options.relationshipKinds) : null, nodeKinds = options.elementKinds ? new Set(options.elementKinds) : null;
   const omissions = [], omissionKeys = /* @__PURE__ */ new Set(), unavailable = /* @__PURE__ */ new Set(), filtered = /* @__PURE__ */ new Set();
   const omit = (edge, target, reason, anchor) => {
@@ -7159,7 +7561,7 @@ var modes = Object.freeze({
   container: { label: "Containing element", empty: "No containing element is known in the loaded model." },
   context: { label: "Explore connections", empty: "No engineering neighbors are known in the loaded model." }
 });
-var endpoint4 = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
+var endpoint5 = (edge, side) => side === "source" ? edge.source ?? edge.fromId ?? edge.from_id ?? edge.from : edge.target ?? edge.toId ?? edge.to_id ?? edge.to;
 function accepts(edge, anchor, mode, { root, elements, bridge } = {}) {
   const structural = isStructuralElement(root);
   const ownership = edge.kind === "containment" && (packageKinds.has(elements?.get(edge.source)?.kind) || packageKinds.has(elements?.get(edge.target)?.kind));
@@ -7173,12 +7575,12 @@ function accepts(edge, anchor, mode, { root, elements, bridge } = {}) {
   if (mode === "verification") return verification.has(edge.kind) && edge.target === anchor;
   return engineeringKinds.has(edge.kind);
 }
-function prepare3(graph) {
+function prepare4(graph) {
   const elements = new Map((graph.elements ?? []).map((element2) => [element2.id, element2]));
-  const compositionPairs = new Set((graph.relationships ?? []).filter((e) => ["composition", "reference"].includes(e.kind)).map((e) => JSON.stringify([endpoint4(e, "source"), endpoint4(e, "target")])));
+  const compositionPairs = new Set((graph.relationships ?? []).filter((e) => ["composition", "reference"].includes(e.kind)).map((e) => JSON.stringify([endpoint5(e, "source"), endpoint5(e, "target")])));
   const ownership = (graph.containment ?? []).filter((e) => e.kind === "containment" && e.nativeRole === "owner" && !compositionPairs.has(JSON.stringify([e.source, e.target])));
   const keyed = new Map([...graph.relationships ?? [], ...ownership].map((edge) => {
-    const value = { ...edge, source: endpoint4(edge, "source"), target: endpoint4(edge, "target") };
+    const value = { ...edge, source: endpoint5(edge, "source"), target: endpoint5(edge, "target") };
     return [edgeKey3(value), value];
   }));
   const edges2 = [...keyed].sort((a, b) => compare5(a[0], b[0])).map(([, edge]) => edge);
@@ -7189,7 +7591,7 @@ function prepare3(graph) {
   }
   return { elements, edges: edges2, incident };
 }
-function projection(graph, focus, mode, options = {}, prepared = prepare3(graph)) {
+function projection(graph, focus, mode, options = {}, prepared = prepare4(graph)) {
   if (!modes[mode]) throw new Error("Unknown exploration mode: " + mode);
   const { elements, edges: edges2, incident } = prepared;
   const root = elements.get(focus), structural = isStructuralElement(root) && ["context", "contents", "container"].includes(mode);
@@ -7274,13 +7676,14 @@ function summaryFor(data, mode, shown, total) {
   return { status: status2, message, shown, total, unavailable, filtered };
 }
 function requirementActions(graph, focus, options = {}) {
-  const prepared = prepare3(graph);
+  const prepared = prepare4(graph);
   return Object.entries(modes).filter(([mode]) => !structuralModes.has(mode)).map(([mode, definition]) => {
     const data = projection(graph, focus, mode, options, prepared), count = data.candidates.size;
     return { mode, label: definition.label, count, total: count + data.unavailable.size + data.filtered.size, unavailable: data.unavailable.size, filtered: data.filtered.size, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
   });
 }
 function traceContext(graph, options = {}) {
+  if (options.mode === "contents") return completeChildContext(graph, options);
   if (["effective", "global-impact"].includes(options.mode)) return partContext(graph, options);
   if (options.mode === "local-understanding") {
     const result = traceContext(graph, { ...options, mode: "context" });
@@ -7356,8 +7759,12 @@ function traceContext(graph, options = {}) {
   });
 }
 function structuralActions(graph, focus, options = {}) {
-  const prepared = prepare3(graph);
+  const prepared = prepare4(graph);
   const actions = [...structuralModes].map((mode) => {
+    if (mode === "contents") {
+      const context = completeChildContext(graph, { ...options, focus });
+      return { mode, label: modes[mode].label, count: context.total, enabled: context.total > 0, summary: context.summary };
+    }
     const data = projection(graph, focus, mode, options, prepared), count = data.candidates.size;
     return { mode, label: modes[mode].label, count, enabled: count > 0, summary: summaryFor(data, mode, count, count) };
   });
@@ -7462,7 +7869,7 @@ function surroundingContext(graph, activeView, options = {}) {
   const contextElements = [...chosen].map((id) => elements.get(id));
   const projected2 = graphView(graph, { elements: contextElements, relationships: [] }, "Surrounding engineering context");
   const contextIDs = new Map(contextElements.map((element2) => [element2.id, `context:${activeView.id ?? "view"}:${element2.id}`]));
-  const endpoint5 = (id) => representations2.get(id) ?? contextIDs.get(id);
+  const endpoint6 = (id) => representations2.get(id) ?? contextIDs.get(id);
   const byReason = {};
   for (const omission of omissions) byReason[omission.reason] = (byReason[omission.reason] ?? 0) + 1;
   const boundary = { omitted: omissions.length, byReason, budget, depth: 1, shown: contextElements.length };
@@ -7483,7 +7890,7 @@ function surroundingContext(graph, activeView, options = {}) {
       fit: false,
       boundary,
       nodes: projected2.nodes.map((node) => ({ ...node, id: contextIDs.get(node.semanticId), detail: "", type: "", parentId: null, context: true, fit: false, notation: "general" })),
-      edges: relationships.map((edge) => ({ ...edge, id: `context:${edge.id ?? edgeKey4(edge)}`, semanticSource: edge.source, semanticTarget: edge.target, source: endpoint5(edge.source), target: endpoint5(edge.target), context: true, fit: false, notation: "general" }))
+      edges: relationships.map((edge) => ({ ...edge, id: `context:${edge.id ?? edgeKey4(edge)}`, semanticSource: edge.source, semanticTarget: edge.target, source: endpoint6(edge.source), target: endpoint6(edge.target), context: true, fit: false, notation: "general" }))
     }
   };
 }
@@ -7496,9 +7903,9 @@ function decisionOrder(edge) {
 
 // src/canvas-prototype/peripheral-routing.mjs
 var eps = 0.05;
-var overlap5 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+var overlap6 = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 var length = (points) => points.slice(1).reduce((s, p, i) => s + Math.abs(p.x - points[i].x) + Math.abs(p.y - points[i].y), 0);
-var simplify3 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
+var simplify4 = (points) => points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y).filter((p, i, a) => !i || i === a.length - 1 || !(a[i - 1].x === p.x && p.x === a[i + 1].x || a[i - 1].y === p.y && p.y === a[i + 1].y));
 var segments = (points) => (points ?? []).slice(1).map((p, i) => [points[i], p]);
 function routeConflicts(points, otherPoints) {
   const crossingPoints = /* @__PURE__ */ new Set();
@@ -7565,7 +7972,7 @@ function cardObstacles(edge, nodes) {
 }
 var segmentHitsRect = (a, b, r) => Math.abs(a.x - b.x) < eps ? a.x > r.x + eps && a.x < r.x + r.width - eps && Math.max(a.y, b.y) > r.y + eps && Math.min(a.y, b.y) < r.y + r.height - eps : a.y > r.y + eps && a.y < r.y + r.height - eps && Math.max(a.x, b.x) > r.x + eps && Math.min(a.x, b.x) < r.x + r.width - eps;
 var segmentBox = (a, b, pad = 1) => ({ x: Math.min(a.x, b.x) - pad, y: Math.min(a.y, b.y) - pad, width: Math.abs(a.x - b.x) + pad * 2, height: Math.abs(a.y - b.y) + pad * 2 });
-var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap5(box, n, 3)) && !labels.some((r) => overlap5(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap5(box, segmentBox(a, b, 1))));
+var clearLabel = (box, nodes, labels, paths, area) => box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width && box.y + box.height <= area.y + area.height && !nodes.some((n) => n.width > 0 && n.height > 0 && overlap6(box, n, 3)) && !labels.some((r) => overlap6(box, r, 3)) && !paths.some((path) => segments(path).some(([a, b]) => overlap6(box, segmentBox(a, b, 1))));
 function labelFor(edge, points, nodes, labels, paths, area, measureLabel) {
   if (!edge.label) return null;
   const measured = measureLabel?.(edge.label) ?? { width: String(edge.label).length * 6.5 + 4, height: 14 }, size = { width: Math.max(1, measured.width), height: Math.max(1, measured.height) }, slots = [];
@@ -7593,7 +8000,7 @@ function routePeripheralEdges(edges2, nodes, area, { activeEdges = [], obstacles
       const xs = uniqueLanes(laneXs, (a.x + a.width / 2 + b.x + b.width / 2) / 2, area.x, area.x + area.width), ys = uniqueLanes(laneYs, (a.y + a.height / 2 + b.y + b.height / 2) / 2, area.y, area.y + area.height);
       let best = null;
       const inspect = (from, to, middle) => {
-        const points = simplify3([from.point, ...middle, to.point]);
+        const points = simplify4([from.point, ...middle, to.point]);
         if (points.some((p) => p.x < area.x || p.y < area.y || p.x > area.x + area.width || p.y > area.y + area.height) || !validate(points)) return;
         if (segments(points).some(([p, q]) => labels.some((r) => segmentHitsRect(p, q, r)))) return;
         if (segments(middle).some(([p, q]) => hard.some((r) => segmentHitsRect(p, q, r)))) return;
@@ -7645,7 +8052,7 @@ function routePeripheralEdges(edges2, nodes, area, { activeEdges = [], obstacles
 
 // src/canvas-prototype/neighborhood.mjs
 var compare7 = (a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
-var overlap6 = (a, b, g = 0) => a.x < b.x + b.width + g && a.x + a.width + g > b.x && a.y < b.y + b.height + g && a.y + a.height + g > b.y;
+var overlap7 = (a, b, g = 0) => a.x < b.x + b.width + g && a.x + a.width + g > b.x && a.y < b.y + b.height + g && a.y + a.height + g > b.y;
 var center = (n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
 var clamp3 = (v, min, max2) => Math.max(min, Math.min(max2, v));
 var bounds = (rects) => {
@@ -7720,7 +8127,7 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
         if (Math.max(Math.abs(row), Math.abs(col)) !== ring) continue;
         for (const offset of [0, dx / 2]) {
           const candidate = { x: idealX + col * dx + offset, y: clamp3(idealY + row * dy, min, max2), width: width2, height: height2 };
-          if (blocked.some((other) => overlap6(candidate, other, gap / 2))) continue;
+          if (blocked.some((other) => overlap7(candidate, other, gap / 2))) continue;
           const stemBlocked = orders.some((order) => {
             const other = active2.find((n) => n.id === (order.above === id ? order.below : order.below === id ? order.above : null));
             if (!other) return false;
@@ -7788,7 +8195,7 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
           if (bottom.x > obstacle.x - 5 && bottom.x < obstacle.x + obstacle.width + 5 && obstacle.y + obstacle.height > top.y && obstacle.y + obstacle.height <= bottom.y - 8) laneMin = Math.max(laneMin, obstacle.y + obstacle.height + 8);
         }
         const lane = laneMin + (laneMax - laneMin) * top.lane, path = [{ x: top.x, y: top.y }, { x: top.x, y: lane }, { x: bottom.x, y: lane }, { x: bottom.x, y: bottom.y }], points = edge.source === order.above ? path : [...path].reverse(), candidate = { ...edge, points, routingBlocked: false, d: points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ") };
-        const avoids = laneMin <= laneMax && ![...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])].some((r) => pathBoxes([candidate]).some((box) => overlap6(box, r)));
+        const avoids = laneMin <= laneMax && ![...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])].some((r) => pathBoxes([candidate]).some((box) => overlap7(box, r)));
         if (avoids && routeIsClear(points, edge, allNodes, { orthogonalOnly: true })) {
           fanCandidates.set(edge.id, candidate);
         }
@@ -7812,7 +8219,7 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
   const allFans = routed.map((edge) => fanCandidates.get(edge.id) ?? edge);
   if (peripheralRouteScore(peripheralRoutingMetrics(allFans, activeEdges)) < peripheralRouteScore(peripheralRoutingMetrics(routed, activeEdges))) routed = allFans;
   const protectedRects = [...obstacles, ...labelObstacles, ...activeEdges.flatMap((e) => e.labelBox ? [e.labelBox] : [])];
-  const safe = (edge) => routeConnectsEndpoints(edge.points, edge, allNodes) && routeIsClear(edge.points, edge, allNodes, { orthogonalOnly: true }) && !pathBoxes([edge]).some((box) => protectedRects.some((r) => overlap6(box, r)));
+  const safe = (edge) => routeConnectsEndpoints(edge.points, edge, allNodes) && routeIsClear(edge.points, edge, allNodes, { orthogonalOnly: true }) && !pathBoxes([edge]).some((box) => protectedRects.some((r) => overlap7(box, r)));
   const clipPoints = (points) => {
     const paths = [];
     for (let i = 1; i < points.length; i++) {
@@ -7878,7 +8285,7 @@ function* neighborhoodSteps(context, activeNodes, area, options = {}) {
         else slots.push({ x: x + 8, y: y - size.height / 2, ...size }, { x: x - size.width - 8, y: y - size.height / 2, ...size });
       }
     }
-    const box = slots.find((box2) => box2.x >= worldBounds.x && box2.y >= worldBounds.y && box2.x + box2.width <= worldBounds.x + worldBounds.width && box2.y + box2.height <= worldBounds.y + worldBounds.height && ![...allNodes, ...reserved, ...corridors].some((r) => overlap6(box2, r, 2)));
+    const box = slots.find((box2) => box2.x >= worldBounds.x && box2.y >= worldBounds.y && box2.x + box2.width <= worldBounds.x + worldBounds.width && box2.y + box2.height <= worldBounds.y + worldBounds.height && ![...allNodes, ...reserved, ...corridors].some((r) => overlap7(box2, r, 2)));
     if (box) {
       edge.labelBox = box;
       edge.x = box.x;
@@ -8801,7 +9208,7 @@ function sizeView(view, focus, { compact = false } = {}) {
     const appearance = focusedEdgeAppearance(edge, { viewKind: view.kind, graph: state.graph, view });
     return { ...edge, label: appearance.label, endLabels: appearance.endLabels };
   }), nodes: view.nodes.map((n) => {
-    const preferences = displayPreferences(), expanded = compartmentVisible(n, { mode: state.reader.compartments, focus, expanded: state.expanded, collapsed: state.collapsed }), documentation = documentationFor(state.graph, n.semanticId);
+    const preferences = displayPreferences(), header = view.childProjection && [...view.childProjection.rootIds, ...view.childProjection.typeIds].includes(n.semanticId), expanded = (!header || state.expanded.has(n.semanticId)) && compartmentVisible(n, { mode: state.reader.compartments, focus, expanded: state.expanded, collapsed: state.collapsed }), documentation = documentationFor(state.graph, n.semanticId);
     const detail = [...new Set([behaviorNodeDetail(n), ...expanded ? [documentation.text || n.detail, compartmentText(state.graph, n.semanticId)] : []].filter(Boolean))].join("\n");
     const attribution = detail && documentation.text && documentation.source?.id !== n.semanticId ? `Statement from ${documentation.source.qualifiedName || documentation.source.name}
 ` : "";
@@ -8838,9 +9245,27 @@ function labelSize(text4) {
 }
 async function prepareFrame(view, focus, panels, { journey = false, revision = state.revision } = {}) {
   const stage = $("stage"), area = primaryArea(view, panels, journey);
-  const overlay = !journey && state.renderingMode === "exploratory" && state.rollupsEnabled ? rollupDrawing(view) : { view, omissions: [], rollups: [] };
-  const layoutFor = (compact) => layoutDiagram(sizeView(overlay.view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize, grouping: displayPreferences().grouping });
-  let layout = await layoutFor(false), fitted = fitDiagram(layout, area);
+  const overlay = !view.childProjection && !journey && state.renderingMode === "exploratory" && state.rollupsEnabled ? rollupDrawing(view) : { view, omissions: [], rollups: [] };
+  const childWorkspace = !!view.childProjection && !journey;
+  const layoutFor = async (compact) => {
+    if (!childWorkspace) return layoutDiagram(sizeView(overlay.view, focus, { compact }), { width: area.width, height: area.height, elk: state.layoutEngine, measureLabel: labelSize, grouping: displayPreferences().grouping });
+    const nodes2 = [];
+    let deadline = performance.now() + 12;
+    for (let i = 0; i < overlay.view.nodes.length; i += 12) {
+      if (revision !== state.revision) {
+        const error = Error("Child measurement canceled");
+        error.code = "LAYOUT_CANCELED";
+        throw error;
+      }
+      nodes2.push(...sizeView({ ...overlay.view, nodes: overlay.view.nodes.slice(i, i + 12) }, focus, { compact }).nodes);
+      if (performance.now() >= deadline) {
+        await new Promise((resolve2) => setTimeout(resolve2, 0));
+        deadline = performance.now() + 12;
+      }
+    }
+    return layoutChildWorkspace({ ...overlay.view, nodes: nodes2 }, { width: area.width, measureLabel: labelSize, isCurrent: () => revision === state.revision });
+  };
+  let layout = await layoutFor(false), fitted = childWorkspace ? placeChildWorkspace(layout, area) : fitDiagram(layout, area);
   const automaticFitted = fitted, placementKey = presentationViewKey(view), restored = !journey && renderingPolicy(state.renderingMode).manualLayout ? state.presentationLayouts.restore(view, automaticFitted, { area, measureLabel: labelSize }) : { positions: {}, omissions: [] };
   if (Object.keys(restored.positions).length) fitted = applyManualPositions({ ...automaticFitted, kind: view.kind }, restored.positions, { measureLabel: labelSize, area });
   const portPlacement = placePortLabels(fitted.nodes, fitted.edges, { area, scale: fitted.scale, measureLabel: labelSize });
@@ -8851,7 +9276,7 @@ async function prepareFrame(view, focus, panels, { journey = false, revision = s
   fitted = { ...fitted, edges: routed };
   const labelObstacles = [...routed.filter((e) => e.labelBox).map((e, i) => ({ ...e.labelBox, id: "label-obstacle:" + i })), ...routed.flatMap((e) => (e.endLabelBoxes ?? []).map((item, i) => ({ ...item.box, id: "end-label:" + e.id + ":" + i }))), ...active2.flatMap((n) => n.portLabelBox ? [{ ...n.portLabelBox, id: "port-label:" + n.id }] : [])];
   const routeObstacles = routed.flatMap((e) => e.points.slice(1).map((p, i) => ({ id: "route:" + e.id + ":" + i, x: Math.min(p.x, e.points[i].x) - 3, y: Math.min(p.y, e.points[i].y) - 3, width: Math.max(6, Math.abs(p.x - e.points[i].x) + 6), height: Math.max(6, Math.abs(p.y - e.points[i].y) + 6) })));
-  const budget = view.traceRequest?.mode === "effective" ? 0 : renderingPolicy(state.renderingMode).contextBudget ?? state.neighborhoodBudget ?? displayPreferences().contextBudget, context = view.overview && !journey ? { view: { nodes: [], edges: [] }, elements: [], omissions: [] } : surroundingContext(state.graph, layout, { budget: journey ? Math.min(8, budget) : budget, focus, scopeIds: explorationScope(), prominenceScopeIds: prominenceScope() });
+  const budget = view.traceRequest?.mode === "effective" ? 0 : renderingPolicy(state.renderingMode).contextBudget ?? state.neighborhoodBudget ?? displayPreferences().contextBudget, context = (view.overview || view.childProjection) && !journey ? { view: { nodes: [], edges: [] }, elements: [], omissions: [] } : surroundingContext(state.graph, layout, { budget: journey ? Math.min(8, budget) : budget, focus, scopeIds: explorationScope(), prominenceScopeIds: prominenceScope() });
   context.view.nodes = context.view.nodes.map((node) => ({ ...node, ...measureCard(document, node, "") }));
   const fringe = await prepareNeighborhoodAsync(context, active2, area, { width: 160, height: 80, gap: 72, activeEdges: routed, labelObstacles, obstacles: [...labelObstacles, ...routeObstacles], measureLabel: labelSize, isCurrent: () => revision === state.revision });
   const ghosts = fringe.nodes.map((n) => ({ ...n, scale: 1, opacity: 0.3, context: true, displayDetail: "", displayID: "" }));
@@ -8869,8 +9294,8 @@ async function prepareFrame(view, focus, panels, { journey = false, revision = s
     return { ...e, journey: journey && !e.context, sourceClipped: a?.kind === "context-boundary", targetClipped: b?.kind === "context-boundary", key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : !journey && displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: (state.renderingMode === "focused" ? focusedEdgeAppearance : edgeAppearance)(e, { viewKind: view.kind, graph: state.graph, view }) })).filter((p) => p.appearance.notice).map((p) => ({ reason: p.appearance.supported ? "native-notation-notice" : "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
-  const omissions = [...state.renderingMode === "focused" ? focusedNotationNotices(layout, state.graph) : [], ...overlay.omissions, ...restored.omissions, ...endpointPlacement.omissions, ...portPlacement.omissions, ...layout.omissions ?? view.omissions ?? [], ...(view.notices ?? []).map((message) => ({ reason: "native-view", message: typeof message === "string" ? message : JSON.stringify(message) })), ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
-  return { view, focus, journey, nodes, edges: edges2, area, fitted, automaticFitted, restoredPositions: restored.positions, placementKey, rollups: overlay.rollups, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics, worldBounds: fringe.worldBounds, neighborhood: { shown: context.elements.length, total: context.elements.length + new Set(context.omissions.filter((o) => o.reason === "budget").map((o) => o.target)).size, budget } };
+  const omissions = [...state.renderingMode === "focused" ? focusedNotationNotices(layout, state.graph) : [], ...overlay.omissions, ...restored.omissions, ...endpointPlacement.omissions, ...portPlacement.omissions, ...layout.omissions ?? [], ...view.omissions ?? [], ...(layout.notices ?? []).map((n) => ({ reason: n.code ?? "layout", message: n.message })), ...(view.notices ?? []).map((message) => ({ reason: "native-view", message: typeof message === "string" ? message : JSON.stringify(message) })), ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
+  return { view, focus, journey, nodes, edges: edges2, area, fitted, automaticFitted, restoredPositions: restored.positions, placementKey, rollups: overlay.rollups, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics, worldBounds: childWorkspace ? fitted.worldBounds : fringe.worldBounds, neighborhood: { shown: context.elements.length, total: context.elements.length + new Set(context.omissions.filter((o) => o.reason === "budget").map((o) => o.target)).size, budget } };
 }
 function face(n) {
   if (n.focusedDescriptor || state.renderingMode === "focused") {
@@ -8894,6 +9319,13 @@ function face(n) {
   if (n.displayDetail) host.append(el2("span", n.displayDetail, "detail"));
   if (n.overviewLabel) host.append(el2("span", n.overviewLabel, "prominence"));
   return host;
+}
+function childOwnershipDisclosure() {
+  const projection2 = state.view?.childProjection;
+  if (!projection2) return "";
+  const frames = state.visualSnapshot?.layout?.ownershipFrames ?? [], roots = projection2.projectionRoots ?? [];
+  const frameText = frames.map((edge) => JSON.stringify({ id: edge.id, nativeRelationship: edge.nativeRelationship ?? null, kind: edge.kind, nativeRole: edge.nativeRole, source: edge.semanticSource ?? edge.source, target: edge.semanticTarget ?? edge.target })).join("\n");
+  return (frames.length ? "Native owner links represented by containing frames:\n" + frameText + "\n\n" : "") + (roots.length ? "Ownership projection boundaries (original native IDs):\n" + roots.map((entry) => JSON.stringify(entry)).join("\n") + "\n\n" : "");
 }
 function visualNode(n) {
   if (n.kind === "context-boundary") {
@@ -9201,8 +9633,8 @@ async function paintFrames(frames, { duration = 0, caption = "", outgoingPanel, 
   $("more-neighbors").textContent = neighborhood ? `More neighbors (${neighborhood.shown} of ${neighborhood.total})` : "More neighbors";
   const omissions = destination.omissions;
   $("transition").dataset.notice = String(!!caption);
-  $("context-details").hidden = !destination.view.overview && !omissions.length && !neighborhood?.shown;
-  $("context-details").textContent = destination.view.overview ? "Overview selection" : neighborhood?.shown ? `Neighbors (${neighborhood.shown})` : "Context limits";
+  $("context-details").hidden = !destination.view.overview && !destination.view.childProjection && !omissions.length && !neighborhood?.shown;
+  $("context-details").textContent = destination.view.childProjection ? "Contents and context" : destination.view.overview ? "Overview selection" : neighborhood?.shown ? `Neighbors (${neighborhood.shown})` : "Context limits";
   $("transition").textContent = caption || `${destination.view.kind} \xB7 ${destination.view.nodes.length} active elements`;
   const motion = startTimeline({ duration: state.reduce ? 0 : duration, update: draw });
   state.motion = motion;
@@ -9254,6 +9686,7 @@ async function frame(view, caption = "", duration = 0, focus = state.focus) {
 }
 async function displayNativeView(view, { mode = state.renderingMode, resolver: resolver2 = state.focusedViews } = {}) {
   if (mode !== "focused" || !resolver2) return view;
+  if (view.childProjection) throw Error("Complete child exploration uses readable declaration cards. Focused notation is available through a supported native view; it cannot silently drop unsupported declarations.");
   const displayed = await resolver2.resolve(view);
   if (state.exploring) assertInScope(displayed);
   return displayed;
@@ -9329,7 +9762,7 @@ async function renderSurfaces(view, focus, panels, revision) {
   const area = graphArea($("stage").clientWidth, $("stage").clientHeight, panels), regions = regionAreas(area, sceneRegions(view), state.activeRegion), primary = regions[0];
   $("graph-viewport").hidden = rendererFamily(view) !== "graph" || !primary.visible;
   const grid = rendererFamily(view) !== "graph";
-  for (const id of ["fit", "show-neighborhood", "zoom-in", "zoom-out", "more-neighbors"]) $(id).disabled = grid || !primary.visible || id === "more-neighbors" && !!view.overview;
+  for (const id of ["fit", "show-neighborhood", "zoom-in", "zoom-out", "more-neighbors"]) $(id).disabled = grid || !primary.visible || id === "more-neighbors" && (!!view.overview || !!view.childProjection);
   $("region-tabs").replaceChildren();
   $("region-tabs").hidden = regions.length < 2;
   $("region-tabs").style.cssText = `left:${area.x}px;top:${area.y}px;width:${area.width}px`;
@@ -9647,8 +10080,9 @@ function updateWorkspaceControls() {
   $("workspace-controls").hidden = !state.exploring;
   if (!state.project || !state.graph) return;
   const scope = state.packageScope, scopeName = scope ? qname(scope) : "Whole project";
-  $("show-rollups").checked = state.rollupsEnabled;
-  $("show-rollups").disabled = state.renderingMode === "focused";
+  $("show-rollups").checked = state.rollupsEnabled && !state.view?.childProjection;
+  $("show-rollups").disabled = state.renderingMode === "focused" || !!state.view?.childProjection;
+  $("show-rollups").title = state.view?.childProjection ? "Complete contents preserves sibling membership and native peer links; use an explicit relationship trace for hidden-link rollups." : "";
   $("scope-context").hidden = !scope;
   $("scope-context").querySelector("input").checked = state.scopeContext;
   $("rendering-mode").value = state.renderingMode;
@@ -9667,7 +10101,7 @@ function updateWorkspaceControls() {
     host.append(option);
     return option;
   };
-  add(select2, "overview", scope ? "Package overview" : "Project overview");
+  add(select2, "overview", scope ? "Complete package contents" : "Whole project roots");
   const focusGroup = el2("optgroup");
   focusGroup.label = "Focused element \xB7 " + label(state.focus);
   for (const item of [...focusViewKinds(element(state.focus)), ...["PartUsage", "PartDefinition"].includes(element(state.focus)?.kind) ? [{ id: "effective", label: "Effective requirements" }, { id: "local-understanding", label: "Local understanding" }, { id: "global-impact", label: "Global impact" }] : []]) add(focusGroup, item.id, item.label);
@@ -9750,7 +10184,7 @@ function updateExplorationControls() {
   $("standalone").hidden = exploring;
   updateWorkspaceControls();
   const request = state.traceRequest, info = state.traceInfo;
-  $("exploration-label").textContent = exploring ? state.view?.overview ? `${state.packageScope ? "Package" : "System"} overview \xB7 ${state.view.overview.summary.shown} of ${state.view.overview.summary.total}` : request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification", contents: "Parts / contents", container: "Containing element", effective: "Effective requirements", "local-understanding": "Local understanding", "global-impact": "Global impact" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
+  $("exploration-label").textContent = exploring ? state.view?.overview ? `${state.packageScope ? "Package contents" : "Whole project roots"} \xB7 ${state.view.overview.summary.shown} of ${state.view.overview.summary.total}` : request && info ? `${info.mode === "context" ? "Context" : { origins: "Origins", derived: "Derived requirements", impact: "Design impact", verification: "Verification", contents: "Parts / contents", container: "Containing element", effective: "Effective requirements", "local-understanding": "Local understanding", "global-impact": "Global impact" }[info.mode]} \xB7 ${label(request.focus)} \xB7 ${info.shown} of ${info.total}` : label(state.focus) : "Guided scene";
   $("exploration-label").title = $("exploration-label").textContent;
   $("trace-previous").hidden = !request || !info || info.pages < 2;
   $("trace-next").hidden = !request || !info || info.pages < 2;
@@ -9786,6 +10220,7 @@ async function openExploration(view, id, { request = null, info = null, record =
   assertInScope(view, scopeId);
   const previous = snapshot(), history2 = [...state.history], future = [...state.future];
   if (record) remember();
+  if (view.childProjection) state.renderingMode = "exploratory";
   if (resetRegions) {
     state.comparison = null;
     state.activeRegion = "primary";
@@ -9815,22 +10250,21 @@ async function openExploration(view, id, { request = null, info = null, record =
   }
 }
 async function openSystemOverview({ record = true, scopeId = state.packageScope } = {}) {
-  const rootIds = scopeId ? [scopeId] : state.project.manifest.systemOfInterest.map(resolve).filter(Boolean), budget = $("stage").clientWidth < 700 ? 6 : 9;
-  const context = buildSystemOverview(state.graph, { rootIds, budget });
-  if (!context.elements.length) throw Error("No named project declarations are available for a system overview.");
-  const view = graphView(state.graph, context, scopeId ? "Package overview" : "System overview");
-  view.id = "overview:" + JSON.stringify([rootIds, budget, context.elements.map((e) => e.id)]);
-  view.overview = { rootIds, budget, metrics: Object.fromEntries(context.elements.map((e) => [e.id, context.metrics.get(e.id)])), summary: context.summary };
-  view.nodes = view.nodes.map((node) => {
-    const m = context.metrics.get(node.semanticId);
-    return { ...node, overviewLabel: m ? `${m.children} children \xB7 ${m.connections} neighbors` : void 0 };
-  });
+  const context = scopeId ? completeChildContext(state.graph, { focus: scopeId, scopeIds: !state.scopeContext ? packageMembers(state.graph, scopeId) : void 0 }) : completeRootContext(state.graph);
+  if (!context.elements.length) throw Error("No source declarations are available in the loaded native projection.");
+  const view = completeChildView(state.graph, context, scopeId ? "Package contents" : "Whole project roots");
+  view.id = scopeId ? "children:scope:" + scopeId : "children:project";
+  view.overview = { rootIds: context.childProjection.rootIds, metrics: {}, summary: context.summary, completeChildren: true };
   await openExploration(view, context.focus, { record, resetRegions: true, scopeId });
 }
 async function explore(id, kind) {
   if (!id || !element(id)) throw Error("Model target unavailable");
   if (!kind) {
-    await followTrace(id, ["PartUsage", "PartDefinition"].includes(element(id)?.kind) ? "effective" : "context");
+    if (isPackage(element(id))) {
+      await openSystemOverview({ scopeId: id });
+      return;
+    }
+    await followTrace(id, "contents");
     return;
   }
   const revision = ++state.revision, modelHash = state.modelHash, q = qname(id);
@@ -9850,7 +10284,7 @@ async function explore(id, kind) {
   await openExploration(view, id);
 }
 async function followTrace(id, mode, page = 0, { record = true } = {}) {
-  const request = { focus: id, mode, budget: $("stage").clientWidth < 700 ? 5 : 7, page }, context = traceContext(state.graph, { ...request, scopeIds: explorationScope(), prominenceScopeIds: prominenceScope() }), view = graphView(state.graph, context, mode + " of " + label(id));
+  const request = { focus: id, mode, budget: $("stage").clientWidth < 700 ? 5 : 7, page }, context = traceContext(state.graph, { ...request, scopeIds: explorationScope(), prominenceScopeIds: prominenceScope() }), view = mode === "contents" ? completeChildView(state.graph, context, "Contents of " + label(id)) : graphView(state.graph, context, mode + " of " + label(id));
   view.traceRequest = request;
   await openExploration(view, id, { request, info: context, record });
 }
@@ -9890,6 +10324,12 @@ function select(id, node, origin) {
     select(id, node);
   }));
   const e = element(id);
+  if (e?.native?.["sysx:sourceText"]) menu.append(button("Read native declaration", () => {
+    $("information").classList.add("statement");
+    $("information-title").textContent = "Native declaration";
+    $("information-text").textContent = e.id + "\n\n" + e.native["sysx:sourceText"];
+    $("information").showModal();
+  }));
   if (isPackage(e)) menu.append(button("Explore package on its own", () => openSystemOverview({ scopeId: id })));
   if (isStructuralElement(e)) {
     const actions = el2("div", void 0, "requirement-actions");
@@ -10106,7 +10546,7 @@ async function submitQuestion() {
   let view = state.view, notice2 = "";
   if (mode !== "current") {
     const context = traceContext(state.graph, { focus: id, mode, budget: $("stage").clientWidth < 700 ? 5 : 7, page: 0, scopeIds: explorationScope(), prominenceScopeIds: prominenceScope() });
-    view = graphView(state.graph, context, modeLabel);
+    view = mode === "contents" ? completeChildView(state.graph, context, modeLabel) : graphView(state.graph, context, modeLabel);
     notice2 = context.summary.message;
   }
   assertInScope(view);
@@ -10574,7 +11014,9 @@ function bind() {
   $("scenes").onchange = () => showScene(Number($("scenes").value)).catch(report);
   $("standalone").onclick = async () => {
     try {
-      await openExploration(state.view, state.focus);
+      const target = element(state.focus);
+      if (target && ["PartUsage", "PartDefinition"].includes(target.kind)) await followTrace(target.id, "contents");
+      else await openSystemOverview({ scopeId: isPackage(target) ? target.id : containingPackage(state.graph, state.focus) ?? null });
     } catch (error) {
       report(error);
     }
@@ -10624,12 +11066,12 @@ function bind() {
   $("compare-view").onclick = () => openNativeView($("views").value, { compare: true }).catch(report);
   $("context-details").onclick = () => {
     $("information").classList.remove("statement");
-    $("information-title").textContent = state.view?.overview ? "Overview selection" : "Prepared neighborhood";
+    $("information-title").textContent = state.view?.childProjection ? "Complete contents and native ownership" : state.view?.overview ? "Overview selection" : "Prepared neighborhood";
     const omissions = state.displayOmissions ?? state.displayed?.omissions ?? [], n = state.visualSnapshot?.neighborhood;
-    const summary = state.view?.overview ? state.view.overview.summary.message + "\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n" : n ? `${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.
+    const summary = state.view?.childProjection ? (state.traceInfo?.summary ?? state.view.overview?.summary)?.message + "\n\nAll sibling tiles remain accessible through pan/zoom and keyboard navigation. Native ownership is drawn as containing frames.\n\n" : state.view?.overview ? state.view.overview.summary.message + "\n\nEvery included source declaration has a readable tile; pan, zoom or Tab to reach siblings outside the viewport. Native ownership is shown by containing frames; exact native owner relationship records are retained. No display budget chooses siblings.\n\n" : n ? `${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.
 
 ` : "";
-    $("information-text").textContent = renderingPolicy(state.renderingMode).notice + "\n\n" + summary + (state.traceInfo?.paths?.length ? "Collapsed native paths:\n" + state.traceInfo.paths.map((p) => p.elementIds.map((id) => qname(id) || id).join(" \u2192 ") + " [" + p.kind + "]").join("\n") + "\n\n" : "") + omissionDisclosure(omissions, !!state.view?.overview) + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
+    $("information-text").textContent = renderingPolicy(state.renderingMode).notice + "\n\n" + summary + (state.traceInfo?.paths?.length ? "Collapsed native paths:\n" + state.traceInfo.paths.map((p) => p.elementIds.map((id) => qname(id) || id).join(" \u2192 ") + " [" + p.kind + "]").join("\n") + "\n\n" : "") + childOwnershipDisclosure() + omissionDisclosure(omissions, !!state.view?.overview) + "\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.";
     $("information").showModal();
   };
   $("edit").onclick = openEditor;
@@ -10743,7 +11185,9 @@ function bind() {
     if (!keyboardFocus || state.transitioning || !event.target.matches(".node")) return;
     const a = state.visualSnapshot?.area;
     if (!a) return;
-    const r = event.target.getBoundingClientRect(), s = $("stage").getBoundingClientRect(), x = r.x - s.x, y = r.y - s.y;
+    const r = event.target.getBoundingClientRect(), visual = state.visualSnapshot?.nodes.find((n) => n.id === event.target.dataset.representation);
+    if (visual?.container) r.height = Math.min(r.height, (visual.headerHeight ?? 90) * state.camera.scale);
+    const s = $("stage").getBoundingClientRect(), x = r.x - s.x, y = r.y - s.y;
     if (x < a.x || y < a.y || x + r.width > a.x + a.width || y + r.height > a.y + a.height) {
       takeCameraControl();
       applyCamera({ ...state.camera, x: state.camera.x + a.x + a.width / 2 - x - r.width / 2, y: state.camera.y + a.y + a.height / 2 - y - r.height / 2 });

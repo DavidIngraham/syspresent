@@ -1,16 +1,16 @@
 {
   "schemaVersion": "syspresent.canvas-prototype.v1",
-  "revision": "0a3f5c3489010d3ad61d5a1da02fb4f55adf0c4e",
+  "revision": "d075e8df8997a6673016533504daea25908e9205",
   "dirty": false,
   "assets": {
-    "app.js": "2c7a4a53213b8cf2c07ead34e8cc3214075e61b7f2434aa3105ee7ed598c1805",
-    "app.js.map": "f3f31b8567e70d3b300d118da185b23545b8399f709d468a56272b707ea2d587",
+    "app.js": "2450c795dea438c7bd4e38fdaf4df27f33d2c7b7bdf1ad3c295121a947ddfc8c",
+    "app.js.map": "2e9a09944b5d168a56a78e0c17697a0abb652c4e21bb4e1ac149fbe18dd0e59d",
     "grid-view.css": "278f10af64cc69113a410661a36c6525e5babf2c56b39d73186ac98f69e3d5e9",
     "sequence-view.css": "8b9dd777f5d82e329bb7711c001987311c086e39def966498634c6755cca6c6d",
     "behavior-view.css": "6494406e52d093e6846eb55c5f2906cddba2936d00b2c44947d794aef56488ac",
     "scene-regions.css": "84b487e209b0d8eccb65f4137e9c41373b4b29fc9920504ebd76cb279b1bc9eb",
     "focused-notation.css": "1dcfa4dd754595fbbeaa82f48d04aa1049448483c0aefd7b8ff5df6804ceb1c4",
-    "index.html": "71ff9e395d25ac344e80fb1556cf869e8be464a47cea45bd804f2176fe069d41",
+    "index.html": "8dd7b132b8ea344a938908ddca1e6c3535c10df4fcf8907e32347a8e2af38e65",
     "canvas.css": "e8fd3d07f6a5a7a9dc7a51d721fac42cae122d99633132120c6564a4ecd9466c",
     "LICENSE": "ddd8327daa7878abe8284332d97059ff64738ef747356c8d8997c77533f968e4",
     "THIRD_PARTY_NOTICES": "b04bdd38ab0060463d56f4a56ba705e6d68677b72f1583603bc427575687cca0",
@@ -137,7 +137,7 @@
     "demos/flashlight.zip": "3061b5e2180a1ffa17c8b47c7f2e09a00cdf35693766a5238277d6fbbba2d11a",
     "demos/views.zip": "c10ea62a1ed522f350dc982bf4194ab81eebbf81f097213b632ce15e592278a2",
     "demos.json": "9e571bf5e9ce1d3a9f4728b0bbff742ad685e9d17af954b5eb18e33686619692",
-    "build-inputs.json": "8f0ae062920fdbbebfb486acedcf5f56921a78f9c38a38b0bce160f279cca717"
+    "build-inputs.json": "99200a682f826d7e1d9409b6154b72512afc5ad96402c573d888700169af1bd3"
   },
   "engine": {
     "schemaVersion": 1,
