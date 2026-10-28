@@ -54,3 +54,10 @@ test('view actions follow native element categories rather than names',()=>{
  assert.ok(focusViewKinds({kind:'StateUsage'}).some(v=>v.id==='native:state'));
  assert.ok(!focusViewKinds({kind:'PartUsage',name:'Activity'}).some(v=>v.id==='native:action'));
 });
+
+test('every native declaration kind can reopen complete contents without a relationship budget',()=>{
+ for(const kind of ['Package','PartUsage','PartDefinition','CalculationDefinition','AttributeUsage','PortDefinition','SatisfyRequirementUsage','MetadataUsage']){
+  assert.deepEqual(focusViewKinds({kind}).find(view=>view.id==='contents'),{id:'contents',label:'Complete contents'});
+ }
+ assert.equal(focusViewKinds({kind:'Membership'}).some(view=>view.id==='contents'),false);
+});

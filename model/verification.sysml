@@ -236,4 +236,16 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
 
+    verification def <'SV-023'> completeDefaultContents {
+        doc /* Compare exact expected native immediate-child identities with active keyboard-accessible canvas tiles for zero, one, five, six, 90, 173 and 463 children plus all source ownership roots. Include attributes, port declarations, connections, metadata and unnamed satisfaction declarations. Directly typed definition declarations retain native owners and explicit typing. Exercise guided Explore handoff, isolated/contextual scope, repeated actions, narrow resize, pan/zoom and Back/Forward without truncation. Check readable widths, stationary selection, cancellation, frame provenance and exact peer edge identity/direction. Freeze bundled Blue Dog bytes independently of source-repository changes. Declaration cards are exploratory; reject unsupported focused rendering rather than omit declarations. */
+        objective acceptance {
+            verify SyspresentRequirements::InitialOverview::structuralProminence;
+            verify SyspresentRequirements::InitialOverview::overviewExploration;
+            verify SyspresentRequirements::ConversationalExploration::completeHierarchy;
+            verify SyspresentRequirements::ConversationalExploration::partUnderstanding;
+            verify SyspresentRequirements::PackageExploration::packageWorkspace;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }

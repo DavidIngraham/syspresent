@@ -69,7 +69,7 @@ Select a connection by touch or keyboard to emphasize its complete path, label a
 
 Selection exposes Origins, Derived requirements, Design impact and Verification on the existing diagram canvas. These are display projections over native relationship kinds and directions, not new model queries inferred from names or prose. A single explicit requirement definition/usage typing link may bridge to links recorded on the other representation; both identities and that typing edge remain visible. Definition inheritance and KerML ancestry do not become traversal shortcuts. Generic engineering context remains available for other elements, with requirement traces prioritized over generic dependencies when competing for the first bounded page.
 
-Focus plus required typing bridges and neighboring targets share a bounded active budget (five on narrow screens, seven otherwise). Stable pages replace the neighbor set rather than accumulating an unbounded diagram. The canvas discloses shown/total targets and unavailable or policy-hidden context. Verification links identify modeled cases and never imply executed tests or passed verdicts. The loaded declaration/coverage graph is a projection, even when the complete source model is loaded in WASM; a zero link count is not proof that none exists in the model.
+Explicit engineering trace focus plus required typing bridges and neighboring targets share a bounded active budget (five on narrow screens, seven otherwise). Stable pages replace the neighbor set rather than accumulating an unbounded diagram. The canvas discloses shown/total targets and unavailable or policy-hidden context. Verification links identify modeled cases and never imply executed tests or passed verdicts. The loaded declaration/coverage graph is a projection, even when the complete source model is loaded in WASM; a zero link count is not proof that none exists in the model.
 
 Exploration history restores the actual viewpoint, focus, expanded/collapsed statements, result page, story position and display preferences. Back/Forward appear only after an exploration action. Return to scene restores the authored scene and is itself reversible through history. First selection stays stationary. Slow or rejected obsolete layout responses cannot commit over newer navigation.
 
@@ -129,7 +129,7 @@ Standalone exploration has an explicit reader scope independent of the focused e
 
 Search, directional traces, action counts, route proposals and peripheral neighborhoods respect the same scope. Context reports external native targets as outside-scope, rather than absent or unavailable. The complete project stays loaded. Returning to a story clears the reader scope; exploration history can restore it. Empty packages remain inspectable without inventing children.
 
-The persistent View chooser offers bounded graph projections, applicable native target renderings and declared views without opening the presentation editor. Native activity and sequence actions target actions; native states target states; packages and parts offer structural views. Declared views provide the other native notations, including grids. Compare views opens a secondary catalog. Every complete native view is checked using represented element identities and relationship endpoints before it replaces a scoped viewpoint or comparison. A crossing view requires Whole project; native behavior and grids are never trimmed to simulate a package-local rendering. Empty and unsupported native results retain the prior viewpoint and report the limitation. Reusable authored selection remains native SysML; this adds no query language or parser.
+The persistent View chooser offers complete contents and separately bounded engineering graph projections, applicable native target renderings and declared views without opening the presentation editor. Native activity and sequence actions target actions; native states target states; packages and parts offer structural views. Declared views provide the other native notations, including grids. Compare views opens a secondary catalog. Every complete native view is checked using represented element identities and relationship endpoints before it replaces a scoped viewpoint or comparison. A crossing view requires Whole project; native behavior and grids are never trimmed to simulate a package-local rendering. Empty and unsupported native results retain the prior viewpoint and report the limitation. Reusable authored selection remains native SysML; this adds no query language or parser.
 
 Shared URLs still restore published scenes. Package reader scope is currently local navigation state and is not claimed as a portable exploration URL.
 
@@ -185,47 +185,40 @@ The View menu offers global Compartments (All, None, Focused) and Connection rou
 Square routing uses orthogonal routes. Mind-map uses native-terminal tangent curves when the enclosing control geometry is clear; otherwise it rounds safe routing corridors. Endpoint identities, native ports and notation markers remain unchanged.
 
 
-## Automatic system overview
+## Complete default exploration
 
-Without an authored scene, entry view or explicit entry focus, standalone loading
-selects an automatic system overview from the configured/discovered native roots.
-View > System overview requests it explicitly at any time. The initial budget is
-nine active tiles on wide screens and six on narrow screens. Resizing an existing
-overview preserves its selection; explicitly requesting it again uses the current
-budget. No peripheral neighborhood is added to the overview.
+Default Explore leaves the authored scene sample. It opens complete part contents
+or the nearest native containing package. Focus opens complete immediate native
+declarations for every kind, including calculations with attributes/references;
+package selection opens isolated contents. Every source-backed immediate child
+has a canvas tile. No prominence rank, named-only filter, composition-only filter,
+viewport budget or More page chooses siblings. Explicit engineering traces retain
+separate bounded paging. Effective requirements remains an explicit action.
 
-Scope follows native owner/composition edges, not qualified-name prefixes. Ranking
-uses 3*log2(1+direct children) + log2(1+descendants) +
-2*log2(1+distinct engineering neighbors) + 2*log2(1+cross-branch neighbors).
-Ownership and composition contribute only to structure; typing, metadata and
-library plumbing do not inflate connection counts. Parallel links to one neighbor
-count once. Direct child/neighbor counts are exact within the eligible loaded
-scope; descendant walks stop at 256 identities or 4096 adjacency inspections and
-explicitly disclose lower bounds. Immutable graph/scope indexes are cached.
+Whole project displays all roots of the loaded source ownership projection,
+independent of authored story roots. Omitted native owners, scope boundaries and
+closed cycles are disclosed with actual native owner IDs; unanchored metadata is
+not asserted physically a top-level package. Immediate-child drilldown preserves
+the hierarchy without drawing all descendants.
 
-Selection first represents distinct native roots within budget, then balances
-immediate branches before adding deeper content. With multiple roots, a child round
-requires room for one child from every still-expandable represented root; spare
-slots stay unused rather than showing arbitrary asymmetric detail. Eligibility
-requires a native declared name or short name; generated qualified names alone
-do not qualify. Single-child package wrappers
-may be skipped; actual part/behavior boundaries are retained. Native edges between
-selected identities remain unchanged. Automatic overview does not silently add
-aggregate links; the explicit exploratory rollup control adds separate presentation artifacts. Ties use native qualified names and semantic IDs. Disconnected
-branches remain selectable even when no engineering links join them.
+The child-exploration module uses native owner and direct typing records.
+Definition declarations remain on their classifier; no instances or semantic
+links are inferred. The child-view module uses full native declaration cards, so
+port declarations are readable rather than tiny embedded-port symbols. Unnamed
+declarations retain native IDs and a Read native declaration action.
 
-Cards show children and distinct-neighbor counts. Overview selection explains the
-policy, its loaded-projection limits and omitted-record counts; its list is bounded
-to 100 entries for large models, with Find available for other elements. Selecting
-a structural element exposes Expand contents; its bounded contents view uses the
-same prominence ordering within existing relationship priorities. Action/state
-views retain their native actions. Selection is stationary, while explicit
-expansion and Back retain normal navigation/camera history. Opening the overview
-activates the primary region; Back restores any former comparison and selected tab.
-Authored scenes keep their membership and entry precedence. Prominence is a
-presentation heuristic, never a safety, verification or engineering-criticality
-judgment. Native links absent from the loaded projection cannot influence ranking.
+The child-layout module lays out all siblings at world scale one, with containing
+owner frames and separate directly typed definition context. Native ownership
+records remain in the semantic view and frame provenance. Peer links retain
+identity/direction and use clear gutters; unavailable routes are disclosed.
+Measurement/layout yield cooperatively and discard stale revisions. Pan, zoom
+and keyboard focus reveal offscreen tiles without changing membership. Selection
+stays stationary; history/resize retains all IDs. Manual offsets remain portable
+and separate from semantic membership.
 
+Complete sibling cards are exploratory representations, not an OMG conformance
+claim. Focused rendering explicitly rejects this workspace rather than silently
+dropping unsupported kinds. Supported native views remain in the view chooser.
 
 ## Canvas story publishing
 

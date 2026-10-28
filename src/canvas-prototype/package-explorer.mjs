@@ -1,5 +1,6 @@
 /** Reader scope over native ownership. Names are labels, never membership rules. */
 import {representations,nativeViewContextIdentities} from './view-contract.mjs';
+import {isDeclarationKind} from './graph.mjs';
 
 const indexes=new WeakMap();
 export const isPackage=element=>['Package','Namespace'].includes(element?.kind);
@@ -52,7 +53,7 @@ export function outsidePackage(view,ids){
 export function focusViewKinds(element){
  const kind=element?.kind;
  const views=[{id:'context',label:'Connections'}];
- if(isPackage(element)||['PartUsage','PartDefinition'].includes(kind))views.push({id:'contents',label:'Parts / contents'});
+ if(isDeclarationKind(kind))views.push({id:'contents',label:'Complete contents'});
  if(['PartUsage','PartDefinition'].includes(kind))views.push({id:'native:interconnection',label:'Native internal view'});
  if(isPackage(element))views.push({id:'native:tree',label:'Native tree (complete)'},{id:'native:mixed',label:'Native general view (complete)'});
  if(['ActionUsage','ActionDefinition'].includes(kind))views.push({id:'native:action',label:'Native activity'},{id:'native:sequence',label:'Native sequence'});
