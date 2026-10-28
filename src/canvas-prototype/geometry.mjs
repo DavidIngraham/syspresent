@@ -34,8 +34,13 @@ export function routeOrthogonal(start,end,obstacles,{bendPenalty=14,segmentCost=
   const groups=new Map();for(const [i,p]of points.entries()){const value=p[axis];if(!groups.has(value))groups.set(value,[]);groups.get(value).push(i);}
   for(const group of groups.values()){group.sort((a,b)=>points[a][axis==='x'?'y':'x']-points[b][axis==='x'?'y':'x']);for(let j=1;j<group.length;j++){const a=group[j-1],b=group[j];if(!segmentBlocked(points[a],points[b],obstacles)){const length=Math.abs(points[a].x-points[b].x)+Math.abs(points[a].y-points[b].y);links[a].push([b,length,axis]);links[b].push([a,length,axis]);}}}
  }
- const queue=[{id:first,cost:0,axis:'',path:[first]}],best=new Map();
- while(queue.length){queue.sort((a,b)=>a.cost-b.cost);const current=queue.shift(),key=current.id+current.axis;if(best.has(key)&&best.get(key)<current.cost)continue;if(current.id===last)return current.path.map(i=>points[i]);for(const [id,length,axis]of links[current.id]){const cost=current.cost+length+(current.axis&&current.axis!==axis?bendPenalty:0)+Math.max(0,Number(segmentCost(points[current.id],points[id]))||0),key=id+axis;if(best.has(key)&&best.get(key)<=cost)continue;best.set(key,cost);queue.push({id,cost,axis,path:[...current.path,id]});}}
+ // Stable priority preserves the former sorted queue's equal-cost route choice.
+ const queue=[],best=new Map();let sequence=0;
+ const priority=(a,b)=>(a.cost-b.cost)||a.order-b.order;
+ const push=item=>{let i=queue.length;queue.push(item);while(i){const parent=(i-1)>>1;if(priority(queue[parent],item)<=0)break;queue[i]=queue[parent];i=parent;}queue[i]=item;};
+ const pop=()=>{const first=queue[0],last=queue.pop();if(queue.length){let i=0;while(i*2+1<queue.length){let child=i*2+1;if(child+1<queue.length&&priority(queue[child+1],queue[child])<0)child++;if(priority(last,queue[child])<=0)break;queue[i]=queue[child];i=child;}queue[i]=last;}return first;};
+ push({id:first,cost:0,axis:'',previous:null,order:sequence++});
+ while(queue.length){const current=pop(),key=current.id+current.axis;if(best.has(key)&&best.get(key)<current.cost)continue;if(current.id===last){const path=[];for(let step=current;step;step=step.previous)path.push(points[step.id]);return path.reverse();}for(const [id,length,axis]of links[current.id]){const cost=current.cost+length+(current.axis&&current.axis!==axis?bendPenalty:0)+Math.max(0,Number(segmentCost(points[current.id],points[id]))||0),key=id+axis;if(best.has(key)&&best.get(key)<=cost)continue;best.set(key,cost);push({id,cost,axis,previous:current,order:sequence++});}}
  return null;
 }
 function endpoints(a,b,sourceFraction=.5,targetFraction=.5){
@@ -142,14 +147,21 @@ export function fitDiagram(layout,area){
  return {...layout,scale,nodes:layout.nodes.map(n=>({...box(n),...(n.headerHeight?{headerHeight:n.headerHeight*scale}:{}),...(n.portLabelBox?{portLabelBox:box(n.portLabelBox)}:{})})),edges:layout.edges.map(e=>({...e,points:e.points.map(point),...(e.labelBox?{labelBox:box(e.labelBox),x:e.x*scale+dx,y:e.y*scale+dy}:{}),labelScale:scale})),ports:layout.ports?.map(p=>({...p,...point(p)}))};
 }
 /** Validate actual segments, including during motion; containment is identity based. */
-export function routeIsClear(points,edge,nodes,{orthogonalOnly=false}={}){
+function clearOfRouteObstacles(points,obstacles,orthogonalOnly){
  if(points.length<2||points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))return false;
- const obstacles=connectionObstacles(edge,nodes);
  for(let i=1;i<points.length;i++){
   const a=points[i-1],b=points[i];if(orthogonalOnly&&Math.abs(a.x-b.x)>.01&&Math.abs(a.y-b.y)>.01)return false;
-  if(obstacles.some(n=>lineCrossesRect(a,b,{x:n.x+.05,y:n.y+.05,width:Math.max(0,n.width-.1),height:Math.max(0,n.height-.1)})))return false;
+  if(obstacles.some(n=>lineCrossesRect(a,b,n)))return false;
  }
  return true;
+}
+/** Reuse exact containment/header obstacles while comparing fixed-geometry candidates. */
+export function createRouteValidator(edge,nodes,{orthogonalOnly=false}={}){
+ const obstacles=connectionObstacles(edge,nodes).map(n=>({x:n.x+.05,y:n.y+.05,width:Math.max(0,n.width-.1),height:Math.max(0,n.height-.1)}));
+ return points=>clearOfRouteObstacles(points,obstacles,orthogonalOnly);
+}
+export function routeIsClear(points,edge,nodes,options={}){
+ return createRouteValidator(edge,nodes,options)(points);
 }
 
 /** Each visible route must touch its own current endpoint glyphs, never a stale

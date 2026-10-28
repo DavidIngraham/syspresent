@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {layoutScene} from '../src/canvas-prototype/core/index.mjs';
-import {graphArea,fitNodes,fitDiagram,routeEdges,routeIsClear,routeConnectsEndpoints} from '../src/canvas-prototype/geometry.mjs';
+import {graphArea,fitNodes,fitDiagram,routeEdges,routeIsClear,routeConnectsEndpoints,routeOrthogonal,createRouteValidator} from '../src/canvas-prototype/geometry.mjs';
 const overlap=(a,b)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;
 const fixture=()=>({kind:'requirement',nodes:[{id:'traffic',semanticId:'native-traffic',width:280,height:185},...['tracking','assessment','command','fault'].map(id=>({id,semanticId:'native-'+id,width:160,height:76}))],edges:['tracking','assessment','command','fault'].map(id=>({id:'derive-'+id,source:id,target:'traffic',kind:'derive',label:'derive'}))});
 const segmentCrosses=(a,b,n)=>a.x===b.x?a.x>n.x+.01&&a.x<n.x+n.width-.01&&Math.max(a.y,b.y)>n.y+.01&&Math.min(a.y,b.y)<n.y+n.height-.01:a.y===b.y&&a.y>n.y+.01&&a.y<n.y+n.height-.01&&Math.max(a.x,b.x)>n.x+.01&&Math.min(a.x,b.x)<n.x+n.width-.01;
@@ -92,4 +92,29 @@ test('a route touching stale coordinates cannot impersonate a connection to a he
  assert.equal(routeConnectsEndpoints([{x:50,y:60},{x:50,y:200}],edge,nodes),true);
  assert.equal(routeConnectsEndpoints([{x:50,y:100},{x:50,y:180}],edge,nodes),false);
  const marker={id:'more',x:50,y:90,width:0,height:0};assert.equal(routeConnectsEndpoints([{x:50,y:60},{x:50,y:90}],{source:'a',target:'more'},[...nodes,marker]),true);
+});
+
+
+test('visibility routing preserves equal-cost choices and custom segment penalties',()=>{
+ const start={x:0,y:50},end={x:100,y:50},obstacles=[{x:40,y:20,width:20,height:60}];
+ const upper=[{x:0,y:50},{x:0,y:20},{x:40,y:20},{x:60,y:20},{x:100,y:20},{x:100,y:50}];
+ assert.deepEqual(routeOrthogonal(start,end,obstacles),upper,'stable ties retain the existing upper corridor');
+ assert.deepEqual(routeOrthogonal(start,end,obstacles,{segmentCost:(a,b)=>a.y===20&&b.y===20?100:0}),[{x:0,y:50},{x:0,y:80},{x:40,y:80},{x:60,y:80},{x:100,y:80},{x:100,y:50}]);
+ assert.deepEqual(routeOrthogonal(start,end,obstacles,{bendPenalty:0}),[{x:0,y:50},{x:0,y:20},{x:40,y:20},{x:60,y:20},{x:60,y:50},{x:100,y:50}]);
+ assert.deepEqual(routeOrthogonal({x:0,y:0},{x:100,y:100},[]),[{x:0,y:0},{x:0,y:100},{x:100,y:100}]);
+ assert.equal(routeOrthogonal({x:50,y:50},end,obstacles),null,'an obstructed endpoint has no fabricated fallback');
+});
+
+test('prepared candidate validation retains port owners, ancestor headers and invalid-path rejection',()=>{
+ const nodes=[{id:'assembly',x:0,y:0,width:400,height:350,headerHeight:50},{id:'owner',parentId:'assembly',x:100,y:100,width:100,height:80},{id:'pin',kind:'port',parentId:'owner',x:194,y:130,width:12,height:12},{id:'b',parentId:'assembly',x:280,y:100,width:100,height:80}];
+ const edge={source:'pin',target:'b'},validate=createRouteValidator(edge,nodes);
+ const clear=[{x:206,y:136},{x:280,y:136}];
+ assert.equal(validate(clear),true);
+ assert.equal(validate([{x:194,y:136},{x:150,y:136},{x:150,y:80},{x:300,y:80},{x:300,y:100}]),false,'leaf port owner stays solid');
+ assert.equal(validate([{x:206,y:136},{x:230,y:136},{x:230,y:20},{x:300,y:20},{x:300,y:100}]),false,'ancestor header stays solid');
+ assert.equal(validate([{x:206,y:136}]),false);
+ assert.equal(validate([{x:206,y:NaN},{x:280,y:136}]),false);
+ assert.equal(createRouteValidator(edge,nodes,{orthogonalOnly:true})([{x:206,y:136},{x:280,y:140}]),false);
+ nodes[3].x=240;
+ assert.equal(routeIsClear(clear,edge,nodes),false,'dynamic validation recomputes the latest endpoint geometry');
 });

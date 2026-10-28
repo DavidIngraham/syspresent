@@ -1,5 +1,5 @@
 /** Routing policy for translucent context. Native edges and active geometry are immutable. */
-import {routeOrthogonal,routeIsClear} from './geometry.mjs';
+import {routeOrthogonal,createRouteValidator} from './geometry.mjs';
 
 const eps=.05;
 const overlap=(a,b,gap=0)=>a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.height+gap&&a.y+a.height+gap>b.y;
@@ -75,6 +75,7 @@ export function routePeripheralEdges(edges,nodes,area,{activeEdges=[],obstacles=
   const results=[],labels=[...activeLabels];
   for(const edge of ordered){
    const a=byID.get(edge.source),b=byID.get(edge.target);if(!a||!b){results.push({...edge,points:[],d:'',routingBlocked:true});continue;}
+   const validate=createRouteValidator(edge,nodes);
    const paths=[...activePaths,...results.map(e=>e.points)],hard=[...cardObstacles(edge,nodes).map(n=>({x:n.x-4,y:n.y-4,width:n.width+8,height:n.height+8})),...labels.map(r=>({x:r.x-2,y:r.y-2,width:r.width+4,height:r.height+4}))];
    const laneXs=[area.x+2,area.x+area.width-2,...hard.flatMap(r=>[r.x,r.x+r.width]),...paths.flatMap(points=>points.flatMap(p=>[p.x-7,p.x+7]))],laneYs=[area.y+2,area.y+area.height-2,...hard.flatMap(r=>[r.y,r.y+r.height]),...paths.flatMap(points=>points.flatMap(p=>[p.y-7,p.y+7]))];
    const uniqueLanes=(values,mid,min,max)=>[...new Set(values)].filter(v=>v>=min&&v<=max).sort((a,b)=>Math.abs(a-mid)-Math.abs(b-mid)).slice(0,candidateBudget<=4?4:12);
@@ -82,7 +83,7 @@ export function routePeripheralEdges(edges,nodes,area,{activeEdges=[],obstacles=
    let best=null;
    const inspect=(from,to,middle)=>{
     const points=simplify([from.point,...middle,to.point]);
-    if(points.some(p=>p.x<area.x||p.y<area.y||p.x>area.x+area.width||p.y>area.y+area.height)||!routeIsClear(points,edge,nodes))return;
+    if(points.some(p=>p.x<area.x||p.y<area.y||p.x>area.x+area.width||p.y>area.y+area.height)||!validate(points))return;
     if(segments(points).some(([p,q])=>labels.some(r=>segmentHitsRect(p,q,r))))return;
     if(segments(middle).some(([p,q])=>hard.some(r=>segmentHitsRect(p,q,r))))return;
     const metric=peripheralRoutingMetrics([{points}],paths.map(points=>({points}))),score=peripheralRouteScore(metric);
