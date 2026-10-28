@@ -1,3 +1,4 @@
+import {nativeAssetVersion} from './wasm-prototype/asset-version.mjs';
 import {documentsFor,requirementCoverageSource,normalizeProject,packProject} from '../src/canvas-prototype/project.mjs';
 import {readProjectDirectory,documentDigest} from './canvas_project_files.mjs';
 import {retainSnapshot} from './canvas_snapshot.mjs';
@@ -70,7 +71,8 @@ const demos={schemaVersion:'syspresent.demos.v1',demos:[
 for(const demo of demos.demos)demo.publication=publications.get(demo.project);
 await writeFile(join(output,'demos.json'),JSON.stringify(demos,null,2)+'\n');files.push('demos.json');
 const buildToken=createHash('sha256');for(const name of [...files].sort()){buildToken.update(name+'\0');buildToken.update(await readFile(join(output,name)));}const version=buildToken.digest('hex').slice(0,20);
-const html=(await readFile(join(output,'index.html'),'utf8')).replace('<head>','<head>'+(runtimeCacheHash?'<meta name="syspresent-runtime-cache" content="'+runtimeCacheHash+'">':'')+'<meta name="syspresent-build" content="'+version+'">').replace('src="./app.js"','src="./app.js?v='+version+'"').replace('href="./canvas.css"','href="./canvas.css?v='+version+'"');await writeFile(join(output,'index.html'),html);
+const engineVersion=nativeAssetVersion(JSON.parse(await readFile(join(engine,'provenance.json'),'utf8')));
+const html=(await readFile(join(output,'index.html'),'utf8')).replace('<head>','<head><meta name="syspresent-engine" content="'+engineVersion+'">'+(runtimeCacheHash?'<meta name="syspresent-runtime-cache" content="'+runtimeCacheHash+'">':'')+'<meta name="syspresent-build" content="'+version+'">').replace('src="./app.js"','src="./app.js?v='+version+'"').replace('href="./canvas.css"','href="./canvas.css?v='+version+'"');await writeFile(join(output,'index.html'),html);
 await writeFile(join(output,'build-inputs.json'),JSON.stringify(inputs.metafile,null,2));files.push('build-inputs.json');
 const revision=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const dirty=!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();

@@ -17,3 +17,11 @@ test('local intake rejects ambiguous duplicate paths, unsafe paths and excessive
  await assert.rejects(projectFromSelection([file('../model.sysml','')]),/Invalid project path/);
  await assert.rejects(projectFromSelection([{name:'large.sysml',size:65*1024*1024,arrayBuffer:()=>{throw Error('must not read');}}]),/project limit/);
 });
+
+
+test('file intake reports completed reads and cancellation prevents later files or normalization',async()=>{
+ const controller=new AbortController(),events=[];let secondRead=false;
+ const second={...file('b.sysml','package B {}'),arrayBuffer:async()=>{secondRead=true;return new ArrayBuffer(0);}};
+ await assert.rejects(projectFromSelection([file('a.sysml','package A {}'),second],{signal:controller.signal,onProgress:event=>{events.push(event);if(event.completed===1)controller.abort();}}),/Loading canceled/);
+ assert.equal(secondRead,false);assert.deepEqual(events.map(e=>[e.completed,e.total,e.unit]),[[0,2,'files'],[1,2,'files']]);
+});

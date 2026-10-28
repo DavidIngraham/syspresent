@@ -40,7 +40,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
  window.matchMedia=()=>({matches:reducedMotion});window.Element.prototype.animate=function(){let done;const finished=new Promise(resolve=>done=resolve);return {finished,cancel:()=>done()};};const ownRealm=value=>{if(value===null||typeof value!=='object')return value;if(ArrayBuffer.isView(value))return new window.Uint8Array(value);if(Array.isArray(value))return window.Array.from(value,ownRealm);if(value instanceof Set)return new window.Set([...value].map(ownRealm));if(value instanceof Map)return new window.Map([...value].map(([k,v])=>[ownRealm(k),ownRealm(v)]));return window.Object.fromEntries(Object.entries(value).map(([k,v])=>[k,ownRealm(v)]));};window.structuredClone=value=>ownRealm(structuredClone(value));window.ResizeObserver=class{constructor(fn){resizeCallback=fn;}observe(){}};
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return size.width;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return size.height;}});
- window.fetch=async url=>{fetchCalls.push(String(url));return ({ok:true,arrayBuffer:async()=>packProject({manifest:fixtureManifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?fixtureManifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});};
+ let fetchOverride;window.fetch=async (url,options)=>{fetchCalls.push(String(url));if(fetchOverride){const value=await fetchOverride(String(url),options);if(value!==undefined)return value;}return ({ok:true,arrayBuffer:async()=>packProject({manifest:fixtureManifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?fixtureManifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});};
  window.Worker=class{constructor(url){workerCount++;this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(method)nativeCalls.push({method,params});if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='RenderView'&&renderOverride){const reject=error=>queueMicrotask(()=>this.onmessage({data:{id,error:{message:error.message}}}));let override;try{override=renderOverride(params);}catch(error){reject(error);return;}if(override!==undefined){Promise.resolve(override).then(respond,reject);return;}}
   if(method==='Initialize')respond({version:'test'});
@@ -55,7 +55,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
   else if(method==='RenderView'&&params.view.startsWith('#')){nativeRequests.push(params.view);pendingRender=()=>respond(sequenceCaptureFixture&&params.view.startsWith('#sequence:')?structuredClone(fixtureSequence):emptyNative?{kind:'action',nodes:[],edges:[]}:packageFixture&&params.view.startsWith('#action:')?{kind:'action',nodes:[{id:'run-native',semanticId:'run',name:'Native run activity',kind:'action',identityStatus:'mapped'}],edges:[]}:{kind:'interconnection',nodes:[native.nodes[1]],edges:[]});}
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(fixtureNative));
  }terminate(){}};
- window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===initialCount)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
+ window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,nativeCalls,fetchCalls,setFetch:handler=>{fetchOverride=handler;},workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===initialCount)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
  return {window,nativeRequests,nativeCalls,nativeModels,fetchCalls,downloads,setNativeRender:handler=>{renderOverride=handler;},setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,layoutPendingCount:()=>heldLayouts.length,releaseNextLayout:error=>heldLayouts.shift()?.(error),releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('package workspace scopes search and traversal, offers native view switching and restores scene handoff',async()=>{
@@ -1230,5 +1230,36 @@ test('resized initial layout keeps the previous native model until the replaceme
   await until(()=>d.getElementById('editor-error').textContent.includes('Rejected resized initial layout')&&h.nativeModels.size===1&&sceneSettled(d));
   assert.equal([...h.nativeModels][0],retained);assert.equal(h.window.location.href,url);assert.equal(d.querySelector('#narrative h2').textContent,'Control the part');
   assert.equal(d.getElementById('resume-model').hidden,false);
+ }finally{h.window.close();}
+});
+
+
+test('loading failure exposes a genuine single retry and never claims ready before its first view',async()=>{
+ const h=await harness({landingOnly:true}),d=h.document;let failed=false;
+ try{
+  h.setFetch(async url=>{if(url.includes('project.zip')&&!failed){failed=true;return {ok:false,status:503};}});
+  d.querySelector('[data-demo="blue-dog"]').click();
+  await until(()=>!d.getElementById('loading-error').hidden&&d.getElementById('loading-error').textContent.includes('503'));
+  assert.equal(d.getElementById('loading').hidden,false);assert.equal(d.getElementById('loading-progress').hidden,true);
+  assert.equal(d.getElementById('loading-retry').hidden,false);assert.equal(d.getElementById('landing').hidden,false);
+  const before=h.fetchCalls.filter(url=>url.includes('project.zip')).length;
+  d.getElementById('loading-retry').click();d.getElementById('loading-retry').click();
+  await until(()=>d.getElementById('status').textContent.startsWith('OpenSysML WASM')&&d.getElementById('stage').getAttribute('aria-busy')!=='true');
+  assert.equal(h.fetchCalls.filter(url=>url.includes('project.zip')).length,before+1);
+  assert.equal(d.getElementById('loading').hidden,true);assert.ok(activeIDs(d).length);
+ }finally{h.window.close();}
+});
+test('canceling a pending project download aborts it and late completion cannot replace the next demo',async()=>{
+ const h=await harness({landingOnly:true}),d=h.document;let reply,signal;
+ try{
+  h.setFetch((url,options)=>{if(url.includes('project.zip')){signal=options.signal;return new Promise(resolve=>{reply=()=>resolve({ok:true,arrayBuffer:async()=>new ArrayBuffer(0)});});}});
+  d.querySelector('[data-demo="blue-dog"]').click();await until(()=>reply&&!d.getElementById('loading').hidden);
+  d.getElementById('loading-cancel').click();assert.equal(signal.aborted,true);assert.equal(d.getElementById('loading').hidden,true);
+  d.querySelector('[data-demo="flashlight"]').click();
+  await until(()=>d.getElementById('status').textContent.startsWith('OpenSysML WASM')&&d.getElementById('stage').getAttribute('aria-busy')!=='true');
+  const ready=d.getElementById('status').textContent,ids=activeIDs(d),url=h.window.location.href;
+  reply();await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(d.getElementById('status').textContent,ready);assert.deepEqual(activeIDs(d),ids);assert.equal(h.window.location.href,url);
+  assert.match(url,/demo=flashlight/);assert.equal(d.getElementById('loading').hidden,true);
  }finally{h.window.close();}
 });

@@ -352,4 +352,13 @@ package SyspresentRequirements {
 
     }
 
+    package StartupExperience {
+        requirement <'SP-113'> truthfulLoadingFeedback {
+            doc /* Model opening shall expose accessible visible stages for project transfer, engine startup, native parsing/indexing, validation and initial layout. Determinate progress shall use measured bytes, files or completed work with a valid same-unit total; unknown work shall remain indeterminate without invented percentages or estimates. Feedback shall paint before long main-thread work, disclose a long-running stage, remain available above authoring dialogs and finish only after the intended usable view commits. Short operations shall avoid unnecessary flashes. Failed asset, worker or model loads shall expose actionable retry and cancel controls. Newer loads and cancellation shall invalidate stale feedback without replacing a usable current model or losing portable source data. */
+        }
+        requirement <'SP-114'> measuredStartupPath {
+            doc /* Startup optimization shall preserve native parsing and view semantics, exact publisher/source/engine/model cache checks, portable export and native model ownership. Engine startup and selected project transfer may overlap after explicit selection, while an untouched landing page shall remain lazy. Performance evidence shall separate cold/warm transfer, compilation, native processing, main-thread construction/layout and usable rendering under stated cache/network/CPU conditions. Desktop emulation and software checks shall not be presented as physical iOS Safari measurements or universal startup guarantees. */
+        }
+    }
+
 }

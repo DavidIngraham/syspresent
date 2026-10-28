@@ -78,3 +78,11 @@ test('unowned parses are rejected and invalid retention does not silently lose m
   await assert.rejects(lease.retainOnly('unknown'),/does not own/);assert.deepEqual([...f.models],['one']);
   await lease.dispose();
 });
+
+
+test('disposing leases after worker termination clears ownership without calls to the dead native engine',async()=>{
+ let closed=false,calls=0;
+ const native={ready:Promise.resolve({}),get closed(){return closed;},terminate(){closed=true;},async call(method){calls++;if(closed)throw Error('Native worker ended');return method==='ParseSources'?{modelHash:'current'}:{};}};
+ const session=createModelSession(native),lease=session.createLease();await lease.engine.call('ParseSources',{});session.engine.terminate();
+ assert.equal(session.engine.closed,true);await lease.dispose();await lease.dispose();assert.equal(calls,1);
+});

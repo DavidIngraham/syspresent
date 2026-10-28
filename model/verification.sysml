@@ -226,4 +226,14 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
 
+    verification def <'SV-022'> startupFeedbackAndPerformance {
+        doc /* Measure actual public cold/warm starts and a paired local before/after payload under documented network/page-CPU and cache conditions. Record compressed/decoded transfer sizes, worker initialization, native parse/export/render, main-thread long tasks and first usable render. Check visible and accessible indeterminate/native stages, trustworthy byte/file/view counts, delay and long-running notices, no completion before a settled view, modal feedback, asset/worker failures, single retry, cancellation, repeated choices and stale responses. Preserve previous-project recovery, source/ZIP bytes, cache invalidation, model leases, relationship routing and updated Blue Dog/Gorge navigation. Report physical Safari as untested unless exercised on an actual device. */
+        objective acceptance {
+            verify SyspresentRequirements::StartupExperience::truthfulLoadingFeedback;
+            verify SyspresentRequirements::StartupExperience::measuredStartupPath;
+            verify SyspresentRequirements::ConversationalExploration::nativeModelLifecycle;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }

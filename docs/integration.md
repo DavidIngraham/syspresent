@@ -414,3 +414,30 @@ versions; browser-only measured work-phase collection prevents temporary
 parse/render garbage accumulating across requests. See
 [native memory validation](native-memory-validation.md) for preserved failures,
 semantic-equivalence evidence, browser measurements and exact test limits.
+
+
+## Startup operations and loading feedback
+
+An untouched landing page stays lazy. Once a project is selected, its transfer
+may overlap engine initialization. The worker compiles the single fetched WASM
+stream while bytes arrive, with a buffered path for browsers without streaming.
+Compressed transfer lengths are not used as decoded-byte progress totals.
+
+Each load owns a revision, abort signal and locally retained retry inputs.
+Project/file/view counts describe their current stage; native parsing and layout
+remain indeterminate. The loading panel paints independently of the hidden
+landing canvas and follows an open authoring dialog. It exposes elapsed-stage
+notices and retry/cancel actions, rejects stale updates and disappears only after
+the intended initial view commits. Initial cancellation can terminate an engine
+that has no accepted previous model; replacement keeps the existing native lease
+and transactional rollback behavior. Disposing a terminated worker's leases
+does not issue calls to an already dead native heap.
+
+Trusted cache JSON is parsed once within a load, without global retention.
+Each authentication still checks current cache bytes and the exact engine,
+source and native model identity. Ownership transfers to that load, avoiding a
+redundant full export clone without mutating original project bytes. Native
+semantics, portable export and the memory lifecycle are unchanged.
+
+See [startup performance](startup-performance.md) for measured conditions and
+limits. Desktop network/page-CPU emulation is not physical iOS Safari evidence.

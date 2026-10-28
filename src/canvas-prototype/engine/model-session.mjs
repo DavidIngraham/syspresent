@@ -8,11 +8,12 @@ export function createModelSession(native) {
     return result;
   };
   const release=async hash=>{
-    if(owners.has(hash))return;
+    if(owners.has(hash)||native.closed===true)return;
     await native.call('ReleaseModel',{modelHash:hash});
   };
   const engine={
     ready:native.ready,
+    get closed(){return native.closed===true;},
     call(method,params={}){
       if(method==='ParseSources')return Promise.reject(Error('ParseSources requires a model lease'));
       return enqueue(()=>native.call(method,params));
