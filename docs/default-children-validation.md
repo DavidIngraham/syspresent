@@ -51,12 +51,22 @@ and missing IDs, on active canvas nodes. Sidebar search does not satisfy these c
 ## Browser evidence and limits
 
 The initial integrated repair pass passed 19 localhost-only Chromium flows. The
-final clean-build pass adds an explicit Forward/Back cycle and actual viewport pan;
-its final result is recorded below after completion. Existing assertions cover first
+clean-build pass at product commit
+`227f176d1f5f419fe5421b33e1da07a2c2440a7f` (`dirty: false`) passed all **24**
+localhost-only Chromium flows, including an explicit Forward/Back cycle, actual
+viewport pan, exact native ownership records and peer relationship direction.
+No page errors or external requests occurred. A documentation-only commit records
+this result; the final artifact records the exact tested build revision. Existing assertions cover first
 selection keeping the camera stationary, keyboard focus revealing the last of 463
 siblings, Back restoring full contents, scope/context navigation, resize, zoom,
 anonymous declarations, ports, direct typing and attribute tiles. No old More/page
-controls appear in these complete child views.
+controls appear in these complete child views. Context retained all 90 exact Gorge
+native owner-frame records and all 735 projection-root native owner references.
+The SVG record sets preserved all 63 Gorge and 600 BlueDogRequirements internal
+relationship IDs, kinds and source-to-target directions against the unchanged
+deployed native adapter. Record membership does not imply that every routed path
+is unobstructed; routing diagnostics remain available in Context and geometry has
+separate product tests.
 
 Cards retained 260–280px visual widths in the measured complete views; large sibling
 sets use the local viewport rather than fitting every card into unreadable pixels.
@@ -69,11 +79,17 @@ was performed.
 Ignored local evidence under `build/`:
 
 - `children-native-inventory.json`, `children-part-typing-inventory.json`,
-  `children-native-root-expected.json`: exact native expected IDs and counts.
+  `children-native-root-expected.json`, `children-native-edge-expected.json`:
+  exact native expected IDs, relationships and counts.
 - `children-public-baseline.json`, `children-baseline-projections.json`: public UI
   reproduction and old selector results.
 - `children-browser-repair.json`: initial 19-flow integrated pass.
-- `children-browser-final.json`: final clean-build result (pending at doc creation).
+- `children-browser-fixture-prefix-failure.json`: explicitly reconstructed summary
+  of an expected-fixture coverage-name qualification mismatch, corrected using the
+  frozen native runtime package; no product source changed.
+- `children-browser-pan-harness-failure.json`: retained harness failure from
+  targeting the unfocusable stage instead of the focusable graph viewport.
+- `children-browser-final.json`: final clean-build result and full native record checks.
 - `children-browser-validation.mjs`: local diagnostic harness, using this checkout's
   published site, installed Playwright/Chromium and machine-local tool paths.
 - `children-baseline-gorge-desktop.png`, `children-baseline-gorge-mobile.png`,
