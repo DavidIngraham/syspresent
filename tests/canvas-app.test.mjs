@@ -15,11 +15,22 @@ const manifest={schemaVersion:'syspresent.project.v1',title:'Fixture',systemOfIn
 const files={'model.sysml':'package Model {}','views.sysml':'package Views {}','story.md':'```syspresent\n'+JSON.stringify({type:'scene',id:'one',title:'Control the part',view:'Views::requirements',focus:'Model::req'})+'\n```\n\nReader context.'};
 const until=async predicate=>{for(let i=0;i<1000;i++){if(predicate())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');};
 async function pickPackage(h,name){const d=h.document;d.getElementById('choose-package').click();const search=d.getElementById('package-search');search.value=name;search.dispatchEvent(new h.window.Event('input'));const choice=[...d.querySelectorAll('#package-list button')].find(b=>b.textContent===name);assert.ok(choice,'native package is offered');choice.click();await until(()=>!d.getElementById('package-dialog').open&&sceneSettled(d));}
-async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,extraRootCount=0,rollupFixture=false,nativeCaptureFixture=false,sequenceCaptureFixture=false,authoringFixture=false,lifecycleFixture=false,focusedFixture=false,behaviorFixture=false,parameterFixture=false,initialCount=2,size={width:1000,height:700}}={}){
+async function harness({landingOnly=false,reducedMotion=true,secondScene=false,secondView,nativeView,compartmentFixture=false,storedSettings,contextNeighbor=false,traceFixture=false,structuralFixture=false,hierarchyFixture=false,packageFixture=false,emptyNative=false,ancestorFixture=false,foreignOwnerFixture=false,ambiguousRefs=false,presentation,storyContent=false,url='http://localhost/',noStory=false,entryView,entryFocus,overviewFixture=false,overviewPort=false,extraRootCount=0,rollupFixture=false,nativeCaptureFixture=false,sequenceCaptureFixture=false,authoringFixture=false,lifecycleFixture=false,focusedFixture=false,behaviorFixture=false,parameterFixture=false,metadataFixture=false,metadataBoundaryFixture=false,initialCount=2,size={width:1000,height:700}}={}){
  let workerCount=0,resizeCallback;const nativeModels=new Set(),sourceHashes=new Map();const nativeRequests=[],nativeCalls=[],fetchCalls=[];const fixtureNative=structuredClone(nativeView??native);if(compartmentFixture)for(const node of fixtureNative.nodes)node.detail='Native details for '+node.semanticId;const fixtureFiles={...files};if(presentation)fixtureFiles['story.md']=fixtureFiles['story.md'].replace('\"focus\":\"Model::req\"','\"focus\":\"Model::req\",\"presentation\":'+JSON.stringify(presentation));if(secondScene)fixtureFiles['story.md']+='\n\n```syspresent\n'+JSON.stringify({type:'scene',id:'two',title:'Other scene',view:'Views::other',focus:secondView?'Model::part':'Model::orphan'})+'\n```\n\nOther context.';
  if(storyContent){const block=JSON.parse(fixtureFiles['story.md'].split('```syspresent\n')[1].split('\n```')[0]);Object.assign(block,{chapter:{id:'challenge',title:'Challenge'},figures:[{id:'course',title:'Course map',asset:'assets/course.svg',alt:'Course map',caption:'Illustrative course.',provenance:{source:'Model',context:'Fixture'},modelRefs:['Model::req']}],context:[{kind:'candidate',title:'Candidate',text:'Proposed boat.',modelRefs:['Model::part']}]});fixtureFiles['story.md']='```syspresent\n'+JSON.stringify(block)+'\n```\n\nRead [the requirement](model:Model::req) and [hidden context](model:Model::orphan).';fixtureFiles['assets/course.svg']='<svg xmlns="http://www.w3.org/2000/svg"/>';}
  const extra=traceFixture?[{id:'origin',kind:'RequirementUsage'},{id:'case',kind:'VerificationCaseUsage'},...Array.from({length:8},(_,i)=>({id:'child'+i,kind:'RequirementUsage'}))]:[],fixtureCoverage=structuredClone(coverage);for(const e of extra)fixtureCoverage.nodes.push({id:e.id,semanticId:e.id,name:e.id,kind:e.kind==='VerificationCaseUsage'?'verification case':'requirement',identityStatus:'mapped'});if(traceFixture)fixtureCoverage.edges.push({from:'r',to:'origin',kind:'derive',label:'derive'},{from:'case',to:'r',kind:'verify',label:'verify'},...extra.filter(e=>e.id.startsWith('child')).map(e=>({from:e.id,to:'r',kind:'derive',label:'derive'})));
  const structuralRaw=structuralFixture?[{'@id':'definition','@type':'PartDefinition',qualifiedName:'Model::Device',declaredName:'Device',owner:{'@id':'Model'},ownedMember:[{'@id':'sensor'},{'@id':'processor'}],'sysx:sourceLine':10},...['sensor','processor'].map(id=>({'@id':id,'@type':'PartUsage',qualifiedName:'Model::Device::'+id,declaredName:id,owner:{'@id':'definition'},'sysx:sourceLine':11})),{'@id':'nested','@type':'Package',qualifiedName:'Model::Nested',declaredName:'Nested',owner:{'@id':'Model'},'sysx:sourceLine':12}]:[];
+ if(metadataFixture){
+  structuralRaw.push({'@id':'metadata-dependency','@type':'Dependency',qualifiedName:'Model::designBasis',declaredName:'designBasis',owner:{'@id':'Model'},client:[{'@id':'part'}],supplier:[{'@id':'req'}],ownedAnnotation:Array.from({length:43},(_,i)=>({'@id':'metadata-ann-'+i})),'sysx:sourceLine':140});
+  for(let i=0;i<43;i++)structuralRaw.push({'@id':'metadata-'+String(i).padStart(3,'0'),'@type':'MetadataUsage',qualifiedName:'Model::designBasis::metadata'+String(i).padStart(3,'0'),declaredName:'metadata'+i,owner:{'@id':'metadata-dependency'},owningRelationship:{'@id':'metadata-ann-'+i},...(i===2?{annotatedElement:[{'@id':'part'}]}:{}),...(i!==1?{'sysx:sourceText':'metadata metadata'+i+' { text = "Native design basis '+i+'"; }\n'}:{}),'sysx:sourceLine':141+i});
+  structuralRaw.push({'@id':'metadata-text','@type':'AttributeUsage',qualifiedName:'Model::designBasis::metadata000::text',declaredName:'text',owner:{'@id':'metadata-000'},'sysx:sourceText':'attribute text = "Native design basis 0";\n','sysx:sourceLine':190},{'@id':'node-metadata','@type':'MetadataUsage',qualifiedName:'Model::part::note',declaredName:'note',owner:{'@id':'part'},'sysx:sourceLine':191});
+  if(metadataBoundaryFixture)structuralRaw.push(
+   {'@id':'metadata-missing','@type':'MetadataUsage',qualifiedName:'Model::misleading::metadataMissing',declaredName:'metadataMissing',owner:{'@id':'unavailable-owner'},'sysx:sourceLine':192},
+   {'@id':'metadata-cycle','@type':'MetadataUsage',qualifiedName:'Model::metadataCycle',declaredName:'metadataCycle',owner:{'@id':'cycle-dependency'},'sysx:sourceLine':193},
+   {'@id':'cycle-dependency','@type':'Dependency',qualifiedName:'Model::cycleDependency',owner:{'@id':'metadata-cycle'},'sysx:sourceLine':194},
+   {'@id':'metadata-standalone','@type':'MetadataUsage',qualifiedName:'StandaloneMetadata',declaredName:'standaloneMetadata','sysx:sourceLine':195},
+   {'@id':'metadata-target-only','@type':'MetadataUsage',qualifiedName:'Model::targetOnlyMetadata',declaredName:'targetOnlyMetadata',annotatedElement:[{'@id':'part'}],'sysx:sourceLine':196});
+ }
  if(sequenceCaptureFixture)structuralRaw.push({'@id':'exchange','@type':'OccurrenceUsage',qualifiedName:'Model::exchange',declaredName:'exchange',owner:{'@id':'Model'},'sysx:sourceLine':120});
  if(parameterFixture)for(const [id,name,direction]of [['parameter-in','incoming','in'],['parameter-out','outgoing','out'],['parameter-inout','shared','inout']])structuralRaw.push({'@id':id,'@type':'ReferenceUsage',qualifiedName:'Model::part::'+name,declaredName:name,direction,owner:{'@id':'part'},'sysx:sourceLine':130});
  if(focusedFixture)structuralRaw.push({'@id':'mass-attribute','@type':'AttributeUsage',qualifiedName:'Model::Device::mass',declaredName:'mass',owner:{'@id':'definition'},'sysx:sourceLine':110});
@@ -27,6 +38,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
  if(packageFixture)structuralRaw.push({'@id':'run','@type':'ActionDefinition',qualifiedName:'Model::Nested::Run',declaredName:'Run',owner:{'@id':'nested'},'sysx:sourceLine':16});
  if(rollupFixture)structuralRaw.push(...['a','b'].map(id=>({'@id':id,'@type':'Package',qualifiedName:'Model::'+id.toUpperCase(),declaredName:id.toUpperCase(),owner:{'@id':'Model'},'sysx:sourceLine':100})),...['a','b'].map(id=>({'@id':'hidden-'+id,'@type':'PartUsage',qualifiedName:'Model::'+id.toUpperCase()+'::hidden',declaredName:'hidden',owner:{'@id':id},'sysx:sourceLine':101})),...['one','two'].map(id=>({'@id':'native-dependency-'+id,'@type':'Dependency',client:[{'@id':'hidden-a'}],supplier:[{'@id':'hidden-b'}],'sysx:sourceLine':102})));
  let fixtureRaw=raw.map(e=>packageFixture&&e['@id']==='req'?{...e,owner:{'@id':'nested'}}:structuralFixture&&e['@id']==='part'?{...e,type:[{'@id':'definition'}],owner:{'@id':'Model'}}:e);
+ if(metadataFixture)fixtureRaw=fixtureRaw.map(element=>['part','req'].includes(element['@id'])?{...element,owner:element.owner??{'@id':'Model'}}:element);
  if(behaviorFixture)fixtureRaw=fixtureRaw.map(element=>['part','req'].includes(element['@id'])?{...element,'@type':'ActionUsage'}:element);
  let fixtureSequence,capturedSequence;if(sequenceCaptureFixture){fixtureSequence=structuredClone(sequenceFixture);fixtureSequence.nodes[1].semanticId='orphan';capturedSequence=structuredClone(fixtureSequence);const capturedIds=new Map(capturedSequence.nodes.map(node=>[node.id,'captured-'+node.id]));capturedSequence.nodes=capturedSequence.nodes.map(node=>({...node,id:capturedIds.get(node.id)}));capturedSequence.edges=capturedSequence.edges.map(edge=>({...edge,from:capturedIds.get(edge.from),to:capturedIds.get(edge.to)}));}
  const fixtureManifest={...manifest,...(entryView?{entryView}:{}),...(entryFocus?{entryFocus}:{})};
@@ -196,7 +208,7 @@ test('Explore opens all source ownership roots and gives the canvas the prose sp
  try{
   d.getElementById('standalone').click();await until(()=>d.getElementById('narrative').hidden&&sceneSettled(d));
   assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','part','req','view']));
-  assert.match(d.getElementById('status').textContent,/All 5 roots of the loaded source ownership projection shown/);
+  assert.match(d.getElementById('status').textContent,/All 5 native source roots shown/);
   assert.equal(d.querySelectorAll('.node[data-context="true"]').length,0);
  }finally{h.window.close();}
 });
@@ -462,8 +474,8 @@ test('a storyless project opens every native ownership projection root without r
   assert.equal(d.getElementById('more-neighbors').hidden,true);
   assert.equal(d.getElementById('context-details').hidden,false);d.getElementById('context-details').click();
   assert.equal(d.getElementById('information-title').textContent,'Complete contents and native ownership');
-  assert.match(d.getElementById('information-text').textContent,/loaded source ownership projection/);
-  assert.match(d.getElementById('information-text').textContent,/No recursive model expansion/);
+  assert.match(d.getElementById('information-text').textContent,/native source roots shown/);
+  assert.match(d.getElementById('information-text').textContent,/ownership through every native record kind/);
  }finally{h.window.close();}
 });
 
@@ -1330,5 +1342,90 @@ test('Resume rebuilds the retained project when its own worker died even if a fa
   assert.ok(h.nativeCalls.filter(c=>c.method==='ParseSources').length>afterFailure);
   manualTarget(d,'part').click();action(d,'Internal view').click();await until(h.pending);h.release();
   await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='part');assert.equal(d.getElementById('loading').hidden,true);
+ }finally{h.window.close();}
+});
+
+const metadataNative={kind:'definition',nodes:structuredClone(native.nodes),edges:[{id:'native-dependency-edge',semanticId:'metadata-dependency',identityStatus:'native',from:'p',to:'r',kind:'dependency',label:'native design basis'}]};
+const metadataRow=(d,id)=>[...d.querySelectorAll('#metadata-list [data-metadata-id]')].find(row=>row.dataset.metadataId===id);
+const metadataButton=(row,label)=>[...row.querySelectorAll('button')].find(button=>button.textContent===label);
+const metadataSearch=(h,text)=>{const input=h.document.getElementById('metadata-search');input.value=text;input.dispatchEvent(new h.window.Event('input'));};
+test('native relationship and node metadata inspect exact owners and annotations without moving the diagram',async()=>{
+ const h=await harness({metadataFixture:true,nativeView:metadataNative}),d=h.document;
+ try{
+  const geometry=()=>[...d.querySelectorAll('.node[data-context="false"]')].map(node=>[node.dataset.semanticId,node.style.transform]),before=geometry(),camera=d.getElementById('graph-world').style.transform,scenes=d.querySelectorAll('#scenes option').length;
+  d.querySelector('.node[data-semantic-id="part"]').click();action(d,'Inspect metadata').click();
+  assert.equal(d.getElementById('metadata-dialog').open,true);assert.match(d.getElementById('metadata-summary').textContent,/1 directly owned metadata; 1 explicit target annotations/);
+  assert.deepEqual(new Set([...d.querySelectorAll('#metadata-list [data-metadata-id]')].map(row=>row.dataset.metadataId)),new Set(['node-metadata','metadata-002']));
+  metadataButton(metadataRow(d,'metadata-002'),'Inspect').click();
+  let detail=JSON.parse(d.getElementById('metadata-detail').textContent);
+  assert.deepEqual(detail.metadata.ownerIds,['metadata-dependency']);assert.deepEqual(detail.metadata.annotatedElementIds,['part']);
+  assert.deepEqual(detail.metadata.matchingOwnedAnnotationIds,['metadata-ann-2']);assert.equal(detail.nativeAnnotationRecords[0].available,false);
+  assert.deepEqual(geometry(),before);assert.equal(d.getElementById('graph-world').style.transform,camera);d.getElementById('metadata-dialog').close();
+  const relationship=d.querySelector('#connections g[data-context="false"][data-kind="dependency"]');assert.ok(relationship);relationship.dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));
+  action(d,'Inspect relationship metadata').click();assert.match(d.getElementById('metadata-title').textContent,/designBasis/);assert.match(d.getElementById('metadata-summary').textContent,/40 of 43 records/);
+  metadataSearch(h,'metadata-000');metadataButton(metadataRow(d,'metadata-000'),'Inspect').click();detail=JSON.parse(d.getElementById('metadata-detail').textContent);
+  assert.equal(detail.kind,'MetadataUsage');assert.deepEqual(detail.metadata.ownerIds,['metadata-dependency']);assert.match(detail.metadata.source.text,/Native design basis 0/);
+  assert.deepEqual(detail.metadata.recordedOnIds,['metadata-dependency']);assert.deepEqual(detail.metadata.annotatedElementIds,[]);
+  assert.deepEqual(geometry(),before);assert.equal(d.getElementById('graph-world').style.transform,camera);assert.equal(d.querySelectorAll('#scenes option').length,scenes);
+ }finally{h.window.close();}
+});
+
+test('global metadata inventory keeps every record while whole-project roots exclude Dependency-owned metadata and Contents history stays exact',async()=>{
+ const h=await harness({metadataFixture:true,nativeView:metadataNative}),d=h.document;
+ try{
+  d.getElementById('system-overview').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Whole project roots'));
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','view']));
+  assert.equal(d.querySelector('.node[data-semantic-id^="metadata-"]'),null);
+  const geometry=()=>[...d.querySelectorAll('.node[data-context="false"]')].map(node=>[node.dataset.semanticId,node.style.transform]),before=geometry();
+  d.getElementById('inspect-metadata').click();assert.match(d.getElementById('metadata-summary').textContent,/40 of 44 records.*page 1 of 2/);
+  const seen=[...d.querySelectorAll('#metadata-list [data-metadata-id]')].map(row=>row.dataset.metadataId);
+  d.getElementById('metadata-next').click();assert.match(d.getElementById('metadata-summary').textContent,/4 of 44 records.*page 2 of 2/);
+  seen.push(...[...d.querySelectorAll('#metadata-list [data-metadata-id]')].map(row=>row.dataset.metadataId));assert.equal(new Set(seen).size,44);
+  d.getElementById('metadata-previous').click();assert.match(d.getElementById('metadata-summary').textContent,/page 1 of 2/);
+  metadataSearch(h,'metadata-001');metadataButton(metadataRow(d,'metadata-001'),'Inspect').click();
+  const missingText=JSON.parse(d.getElementById('metadata-detail').textContent);assert.equal(missingText.metadata.source.text,null);assert.equal(Object.hasOwn(missingText.nativeRecord,'sysx:sourceText'),false,'missing source text is not reconstructed from labels');
+  metadataSearch(h,'metadata-000');metadataButton(metadataRow(d,'metadata-000'),'Contents').click();
+  await until(()=>sceneSettled(d)&&activeIDs(d).sort().join(',')==='metadata-000,metadata-text');assert.equal(d.getElementById('metadata-dialog').open,false);
+  assert.equal(d.querySelectorAll('#scenes option').length,1);
+  const contents=geometry();d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Whole project roots'));assert.deepEqual(geometry(),before);
+  d.getElementById('explore-forward').click();await until(()=>sceneSettled(d)&&activeIDs(d).sort().join(',')==='metadata-000,metadata-text');assert.deepEqual(geometry(),contents);
+ }finally{h.window.close();}
+});
+
+test('source boundaries preserve missing and cyclic metadata for explicit inspection while genuine standalone roots remain',async()=>{
+ const h=await harness({metadataFixture:true,metadataBoundaryFixture:true,nativeView:metadataNative}),d=h.document;
+ try{
+  d.getElementById('system-overview').click();await until(()=>sceneSettled(d)&&d.getElementById('exploration-label').textContent.startsWith('Whole project roots'));
+  assert.deepEqual(new Set(activeIDs(d)),new Set(['Model','orphan','view','metadata-standalone']));
+  d.getElementById('inspect-metadata').click();d.getElementById('metadata-boundaries').click();assert.equal(d.getElementById('metadata-title').textContent,'Source inspection');
+  metadataSearch(h,'metadata-missing');assert.ok(metadataRow(d,'metadata-missing'));metadataButton(metadataRow(d,'metadata-missing'),'Inspect').click();
+  let detail=JSON.parse(d.getElementById('metadata-detail').textContent);assert.deepEqual(detail.nativeOwnership.missingOwnerIds,['unavailable-owner']);assert.equal(detail.metadata.source.text,null);
+  metadataSearch(h,'metadata-cycle');metadataButton(metadataRow(d,'metadata-cycle'),'Inspect').click();detail=JSON.parse(d.getElementById('metadata-detail').textContent);assert.deepEqual(new Set(detail.nativeOwnership.cycles[0].ids),new Set(['metadata-cycle','cycle-dependency']));
+  metadataSearch(h,'metadata-target-only');metadataButton(metadataRow(d,'metadata-target-only'),'Inspect').click();detail=JSON.parse(d.getElementById('metadata-detail').textContent);assert.deepEqual(detail.metadata.ownerIds,[]);assert.deepEqual(detail.metadata.annotatedElementIds,['part']);
+  d.getElementById('metadata-all').click();assert.equal(d.getElementById('metadata-title').textContent,'All source metadata');assert.match(d.getElementById('metadata-summary').textContent,/48 records/);
+  metadataSearch(h,'metadata-missing');metadataButton(metadataRow(d,'metadata-missing'),'Contents').click();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='metadata-missing');
+  assert.equal(d.querySelector('.node[data-semantic-id="unavailable-owner"]'),null);
+ }finally{h.window.close();}
+});
+
+test('all-loaded metadata inspection is independent of isolated scope and explicit outside Contents restores scope through Back',async()=>{
+ const h=await harness({metadataFixture:true,structuralFixture:true,packageFixture:true,nativeView:metadataNative}),d=h.document;
+ try{
+  await pickPackage(h,'Model::Nested');assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');
+  const before=activeIDs(d),camera=d.getElementById('graph-world').style.transform;
+  d.getElementById('inspect-metadata').click();assert.match(d.getElementById('metadata-summary').textContent,/44 records/);
+  metadataSearch(h,'metadata-000');metadataButton(metadataRow(d,'metadata-000'),'Inspect').click();assert.deepEqual(activeIDs(d),before);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.equal(d.getElementById('graph-world').style.transform,camera);
+  metadataButton(metadataRow(d,'metadata-000'),'Contents').click();await until(()=>sceneSettled(d)&&activeIDs(d).sort().join(',')==='metadata-000,metadata-text');
+  assert.equal(d.getElementById('scope-label').textContent,'Whole project');
+  d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Model::Nested');assert.deepEqual(activeIDs(d),before);assert.equal(d.getElementById('graph-world').style.transform,camera);
+ }finally{h.window.close();}
+});
+
+test('relationship metadata inspection rejects a mapped declaration identity even when native dependency endpoints coincide',async()=>{
+ const invalid={...metadataNative,edges:[{...metadataNative.edges[0],semanticId:'part',identityStatus:'mapped'}]},h=await harness({metadataFixture:true,nativeView:invalid}),d=h.document;
+ try{
+  const edge=d.querySelector('#connections g[data-context="false"][data-kind="dependency"]');assert.ok(edge);edge.dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));
+  assert.equal([...d.querySelectorAll('#selection button')].some(button=>button.textContent==='Inspect relationship metadata'),false,'a PartUsage identity or coincident native endpoints are not relationship provenance');
+  assert.equal(d.getElementById('metadata-dialog').open,false);
  }finally{h.window.close();}
 });

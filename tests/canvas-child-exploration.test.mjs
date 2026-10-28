@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {completeChildContext,completeRootContext} from '../src/canvas-prototype/child-exploration.mjs';
 import {traceContext,structuralActions} from '../src/canvas-prototype/exploration.mjs';
+import {nativeOwnershipIndex,inspectNativeOwnership,sourceMetadata,metadataContext} from '../src/canvas-prototype/metadata-context.mjs';
 const item=(id,kind='PartUsage',extra={})=>({id,kind,name:id,qualifiedName:'Model::'+id,layer:'project',native:{declaredName:id,'sysx:sourceLine':1},...extra});
 const owner=(source,target,id='owner:'+source+':'+target)=>({id,source,target,kind:'containment',label:'owns',nativeRole:'owner',navigationOnly:true,authority:'native-api',nativeRelationship:'native:'+id});
 const edge=(id,source,target,kind)=>({id,source,target,kind,label:kind,authority:'native-api',nativeRelationship:'native:'+id});
@@ -99,35 +100,61 @@ test('result and input isolation, parallel native relationship identities and de
 });
 
 
-test('project opening contains all native source roots rather than a story subset or capped sample',()=>{
+test('project opening contains every genuine native root while unavailable owners remain explicit inspection entries',()=>{
  const graph={elements:[...Array.from({length:137},(_,i)=>item('package-'+String(i).padStart(3,'0'),'Package')),...Array.from({length:53},(_,i)=>item('metadata-'+i,'MetadataUsage')),item('nested'),item('deep'),item('doc','Documentation')],relationships:[],containment:[owner('package-000','nested'),owner('nested','deep')]};
  for(let i=0;i<53;i++)graph.elements[137+i].native.owner={'@id':'omitted-native-owner-'+i};
  const context=completeRootContext(graph);
- assert.equal(context.total,190);assert.equal(context.summary.sourceDeclarations,192);assert.equal(context.summary.packages,137);assert.equal(context.summary.unanchoredMetadata,53);
- assert.deepEqual(new Set(context.targets),new Set(graph.elements.filter(e=>!['nested','deep','doc'].includes(e.id)).map(e=>e.id)));
- assert.ok(context.elements.slice(0,137).every(e=>e.kind==='Package'));assert.deepEqual(context.childProjection.rootIds,[]);assert.deepEqual(context.childProjection.declaredOn,{});
- assert.equal(context.childProjection.projectionRoots.find(e=>e.id==='metadata-0').reason,'native-owner-omitted');
- assert.deepEqual(context.childProjection.declarationOwners['metadata-0'],['omitted-native-owner-0']);assert.equal(context.relationships.length,0);
- assert.match(context.summary.message,/not asserted to be physical/);assert.ok(!context.targets.includes('nested'));assert.ok(!context.targets.includes('deep'));
+ assert.equal(context.total,137);assert.equal(context.summary.sourceDeclarations,192);assert.equal(context.summary.packages,137);assert.equal(context.summary.sourceMetadata,53);
+ assert.deepEqual(new Set(context.targets),new Set(graph.elements.slice(0,137).map(element=>element.id)));
+ assert.ok(context.elements.every(element=>element.kind==='Package'));assert.deepEqual(context.childProjection.rootIds,[]);assert.deepEqual(context.childProjection.declaredOn,{});
+ const boundary=context.childProjection.inspectionEntries.find(entry=>entry.id==='metadata-0');
+ assert.equal(boundary.reason,'native-owner-unavailable');assert.deepEqual(boundary.ownerIds,['omitted-native-owner-0']);
+ assert.equal(context.childProjection.inspectionEntries.length,53);assert.equal(sourceMetadata(graph).total,53,'inspection retains every source metadata record');
+ assert.match(context.summary.message,/not a new modeled root/);assert.ok(!context.targets.includes('nested'));assert.ok(!context.targets.includes('deep'));
 });
 
-test('project roots use native owner roles, exposing omitted-owner boundaries and not misleading QName roots',()=>{
- const graph={elements:[item('actual-root','Package'),item('child','Package',{qualifiedName:'Misleading::Other'}),item('orphan','MetadataUsage',{qualifiedName:'actual-root::orphan',native:{owner:{'@id':'absent'}}})],relationships:[],containment:[owner('actual-root','child')]};
+test('project roots require native root or absent ownership evidence, not QName or an unavailable owner',()=>{
+ const graph={elements:[item('actual-root','Package',{native:{owner:{'@id':'native-global'}}}),item('child','Package',{qualifiedName:'Misleading::Other'}),item('orphan','MetadataUsage',{qualifiedName:'actual-root::orphan',native:{owner:{'@id':'absent'}}})],nativeRootIds:['actual-root'],relationships:[],containment:[owner('actual-root','child')]};
  const context=completeRootContext(graph);
- assert.deepEqual(context.targets,['actual-root','orphan']);assert.ok(!context.targets.includes('child'));
- assert.equal(context.childProjection.projectionRoots.find(e=>e.id==='orphan').reason,'native-owner-omitted');
- const scopedOrphan=completeRootContext(graph,{scopeIds:['orphan']});assert.equal(scopedOrphan.childProjection.projectionRoots[0].reason,'native-owner-omitted');assert.deepEqual(scopedOrphan.childProjection.projectionRoots[0].omittedOwnerIds,['absent']);
- const scoped=completeRootContext(graph,{scopeIds:['child']});assert.deepEqual(scoped.targets,['child']);assert.equal(scoped.childProjection.projectionRoots[0].reason,'outside-scope');
+ assert.deepEqual(context.targets,['actual-root']);assert.equal(context.childProjection.projectionRoots[0].reason,'native-document-root');
+ assert.equal(context.childProjection.inspectionEntries.find(entry=>entry.id==='orphan').reason,'native-owner-unavailable');
+ const scopedOrphan=completeRootContext(graph,{scopeIds:['orphan']});assert.deepEqual(scopedOrphan.targets,[]);assert.deepEqual(scopedOrphan.childProjection.inspectionEntries[0].ownerIds,['absent']);
+ const scoped=completeRootContext(graph,{scopeIds:['child']});assert.deepEqual(scoped.targets,[]);assert.equal(scoped.childProjection.inspectionEntries[0].reason,'outside-scope');assert.deepEqual(scoped.childProjection.inspectionEntries[0].outsideOwnerIds,['actual-root']);
 });
 
-test('closed native owner cycles expose all cycle members while keeping their descendants behind drilldown',()=>{
+test('closed ownership cycles remain inspectable without inventing modeled root cards',()=>{
  const graph={elements:[item('root','Package'),item('normal-child'),item('a','Package'),item('b','Package'),item('cycle-child'),item('self','Package')],relationships:[],containment:[owner('root','normal-child'),owner('a','b'),owner('b','a'),owner('b','cycle-child'),owner('self','self')]};
  const context=completeRootContext(graph);
- assert.deepEqual(new Set(context.targets),new Set(['root','a','b','self']));assert.equal(context.summary.cycleEntries,3);
- assert.ok(!context.targets.includes('cycle-child'));assert.ok(!context.targets.includes('normal-child'));
- assert.ok(context.childProjection.projectionRoots.filter(e=>e.reason==='cycle').every(e=>['a','b','self'].includes(e.id)));
- assert.ok(!context.childProjection.projectionRoots.some(e=>e.reason==='ownership-unresolved'));
- assert.deepEqual(completeChildContext(graph,{focus:'b'}).targets,['a','cycle-child']);
+ assert.deepEqual(context.targets,['root']);assert.equal(context.summary.cycleEntries,3);
+ const entries=context.childProjection.inspectionEntries;
+ assert.deepEqual(new Set(entries.filter(entry=>entry.reason==='ownership-cycle').map(entry=>entry.id)),new Set(['a','b','self']));
+ assert.equal(entries.find(entry=>entry.id==='cycle-child').reason,'ownership-unresolved');
+ assert.ok(!entries.some(entry=>entry.id==='normal-child'));
+ assert.deepEqual(new Set(inspectNativeOwnership(graph,'a').cycles[0].ids),new Set(['a','b']));
+ assert.deepEqual(completeChildContext(graph,{focus:'b'}).targets,['a','cycle-child'],'explicit inspection can still open complete real children');
+});
+
+test('Dependency ownership connects metadata and its values to its real package without structural promotion',()=>{
+ const graph={elements:[item('package','Package'),item('target','PartUsage',{native:{owner:{'@id':'package'}}}),item('dependency','Dependency',{native:{owner:{'@id':'package'},ownedAnnotation:[{'@id':'ann'}]}}),item('metadata','MetadataUsage',{native:{owner:{'@id':'dependency'},owningRelationship:{'@id':'ann'}}}),item('text','AttributeUsage',{native:{owner:{'@id':'metadata'}}})],relationships:[],containment:[]};
+ const roots=completeRootContext(graph);
+ assert.deepEqual(roots.targets,['package']);assert.equal(roots.summary.relationshipMetadata,1);
+ assert.equal(roots.summary.reachableThroughNativeOwnership,4,'all declaration records are reachable through native Dependency ownership');
+ assert.equal(roots.childProjection.inspectionEntries.find(entry=>entry.id==='metadata').reason,'native-nonstructural-owner');
+ assert.deepEqual(roots.childProjection.inspectionEntries.find(entry=>entry.id==='metadata').ownerKinds,['Dependency']);
+ const inventory=sourceMetadata(graph);assert.equal(inventory.total,1);assert.deepEqual(inventory.items[0].ownerIds,['dependency']);
+ assert.deepEqual(metadataContext(graph,'dependency').ownedMetadata.map(record=>record.id),['metadata']);
+ assert.deepEqual(completeChildContext({...graph,containment:[owner('metadata','text')]},{focus:'metadata'}).targets,['text'],'explicit metadata Contents retains source text/value attributes');
+ assert.ok(!roots.relationships.some(edge=>edge.kind==='annotation'));
+});
+
+test('explicit annotation targets never create parent edges, and genuine standalone metadata roots remain visible',()=>{
+ const graph={elements:[item('package','Package'),item('standalone','MetadataUsage'),item('annotation','MetadataUsage',{native:{annotatedElement:[{'@id':'package'}]}}),item('missing','MetadataUsage',{native:{owner:{'@id':'unknown'}}})],relationships:[],containment:[]};
+ const context=completeRootContext(graph);
+ assert.deepEqual(new Set(context.targets),new Set(['package','standalone']));
+ assert.equal(context.childProjection.inspectionEntries.find(entry=>entry.id==='annotation').reason,'annotation-context');
+ assert.equal(context.childProjection.inspectionEntries.find(entry=>entry.id==='missing').reason,'native-owner-unavailable');
+ assert.equal(nativeOwnershipIndex(graph).ownerIds.has('annotation'),false);
+ assert.equal(sourceMetadata(graph).total,3,'all metadata remain inspectable regardless of structural root eligibility');
 });
 
 test('deep ownership chains do not recurse the JS stack or expand into the project-root drawing',()=>{
