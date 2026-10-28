@@ -1,235 +1,68 @@
 {
   "repository": "https://github.com/DavidIngraham/sv-blue-dog",
-  "baseRevision": "b94b6e0231587b52cb5bec800dba408456ca701d",
-  "sourceState": "working-tree",
-  "capturedAt": "2026-10-25T21:16:02.589280+00:00",
-  "sourceDigest": "0f571178c03eea5c19fd133ccb2bbe9d6d83c1570d7d9a12e6e155742770dd22",
+  "baseRevision": "8f2dd804e964fd75828ff170c8c93572c751c8f2",
+  "revision": "e8fb1601d35c5d1c8e7ec8084fe4a9391228ce30",
+  "sourceCommit": "ad26c68b7f01149cb207759cf390642c645ba514",
+  "sourceState": "committed",
+  "capturedAt": "2026-10-28T21:41:03.526311+00:00",
+  "sourceDigest": "1e3b86661c7a303ec1bed072e12f3ca6f6c1b8561d3a6edb604489752ab17998",
   "sourceDigestFormat": "SHA-256 over sorted UTF-8 path + NUL + lowercase file SHA-256 + LF records",
   "modelValidationRuntimeRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
+  "namespaceMigration": {
+    "mappingFile": "namespace-migration.json",
+    "baselineRevision": "8f2dd804e964fd75828ff170c8c93572c751c8f2",
+    "replacedProjectDocuments": 76,
+    "canonicalProject": "models/blue-dog.sysml",
+    "modelPayloadFiles": 21,
+    "libraryFiles": 20,
+    "sourceModelHashes": {
+      "models/blue-dog.sysml": "6e761cf3caf31a04e1421026d36961aeb1148ab9e41477e4cf224ae1035e964f",
+      "models/libraries/decision-records.sysml": "93102a19a7e9c69cd35544bf7f4815657164803fd1bbe9af6d6689ad613f52f3",
+      "models/libraries/energy/actuation.sysml": "b0fba9c178586b4208e50bf7e681959c96cdff4c9d71d49f243b7ff9db57838f",
+      "models/libraries/energy/budget.sysml": "6b2f8c827db736130e1f343652d7d45695a4c4b18d5b4e7ac07f3d7a444ca365",
+      "models/libraries/marine/appendages.sysml": "86cefc51f2d86bcf3cc63fbe06fc8151836cd568d8dd7d73c23c696573131a9d",
+      "models/libraries/marine/concept.sysml": "0d21f054d7cec7c54ead46154c2820787678dbcee57b433bf67d15077113f524",
+      "models/libraries/marine/course.sysml": "3f58d6c0dc668858aa0b6bdad232c26b0ac75952ad67d0f06e73f4fbd464c85c",
+      "models/libraries/marine/design.sysml": "e39ba68e330e539167b298338b5bb20a98c3edb049d9a405a06df307640ef057",
+      "models/libraries/marine/hull-resistance.sysml": "967550313effe20092525e10c1695771b8354c66478203f449ac902d8af1a5f1",
+      "models/libraries/marine/hydrostatics.sysml": "b6791576a108dee393063a15a1a359113a8c24aba793105fa7d60fa193e9d858",
+      "models/libraries/marine/propulsion.sysml": "16848c8a487a3bd087d43099c5062ec4da6dc9e8aee5447af63e50ef3a5a6fc7",
+      "models/libraries/marine/recovery.sysml": "00c8c1fcfda115116fc66bf1db5a67334e04ea893182a454a796ada62eeeaab4",
+      "models/libraries/marine/reliability.sysml": "b5e5a18d2924737f1c84df6683c8806a56a65f62e06a3acf25e2d998008aaf29",
+      "models/libraries/marine/sailing.sysml": "8281caf912a840d83d5a6d1c39fe0422419ce7fb9ccaae3d9044b0c5df33446f",
+      "models/libraries/marine/surface.sysml": "781d337d8553160eb8d3c0724ae2aef4463d51ae6bc05ef475d32884645213c8",
+      "models/libraries/marine/wave-performance.sysml": "ee1d491adb19773eb151588a5f8ccb52c8ee4364150c5783637c58ada8a07ba9",
+      "models/libraries/marine/weather.sysml": "1d2d4a98082b0daefa5bcce180d4805c1e0907de818ed69d0b68b38d6c1f96b8",
+      "models/libraries/navigation/inland-obligations.sysml": "8954be8c0904583cb977609428ed23734c59cd05aacf57ee82a8669c8e39da16",
+      "models/libraries/navigation/inland-pair.sysml": "e0bb4518cbc1063a31ae63b5f8d3dbca4c06eb864c7a745199c45e47231de326",
+      "models/libraries/structures/mass-properties.sysml": "ced6365432541c9c9ada7b683564efde12f597d46e96144fd70221f767ef5dde",
+      "models/libraries/structures/scantlings.sysml": "7ed46d886547ac779560838a5abc42c986ce3e41830b150ff0c11e3926fecd32"
+    },
+    "preservedNativeElements": 14923,
+    "addedOrganizerIds": [
+      "BlueDog::Behavior",
+      "BlueDog::Analyses",
+      "BlueDog::Decisions",
+      "BlueDog::Verification",
+      "BlueDog::Evidence",
+      "BlueDog::Configurations::Examples"
+    ],
+    "nativeTopLevelPackages": 21,
+    "omittedAuxiliaryDocuments": [
+      {
+        "path": "tools/publishing/reference.sysml",
+        "reason": "Publication-only DocumentQueries definitions are outside the approved model payload and are not referenced by the model, authored views or story."
+      }
+    ]
+  },
   "files": [
     {
       "path": "models/README.md",
-      "sha256": "3482dfac7d6383401bd51397bd9f14d28385a48f1c4d205d7fe4c744bafa11e0"
+      "sha256": "7ea593dea30407e14d020cfcf53f25b8ece4151c329dd04cc3e3d1b7892d5d45"
     },
     {
-      "path": "models/analyses/actuation.sysml",
-      "sha256": "ea0190502c8245b34d2b9b15116de1fed500e3ccc6ed3069f56c5f756bb434d1"
-    },
-    {
-      "path": "models/analyses/aerodynamic-policy.sysml",
-      "sha256": "ea5ec771f7dbf0b31863352efc991b97816e641571588eb1b423a9ec6430b02a"
-    },
-    {
-      "path": "models/analyses/avoidance-failures.sysml",
-      "sha256": "e696a0d798ca05bbcf3ef05a90c0c2b67bf3268f62238dacd691d553cb46d1f4"
-    },
-    {
-      "path": "models/analyses/candidate-energy.sysml",
-      "sha256": "f05a4a2187aabd316ac06e1968fd8e9fae00ab3ca5980d9a216ce2a5146c4241"
-    },
-    {
-      "path": "models/analyses/class-specific-detection.sysml",
-      "sha256": "9e585fb65056849ffe3827d6b489912bf6e26e4ae6d20bde7a9b005a3836a8b3"
-    },
-    {
-      "path": "models/analyses/credibility.sysml",
-      "sha256": "014d5a893aca47bf73928ab866b08a2102b80dab7bf1b545c1742f1530116ba6"
-    },
-    {
-      "path": "models/analyses/development-risks.sysml",
-      "sha256": "02215b2776e5c643d044ce4b8a47c51e8e5796e1ba5a9e451714cbe781ec2a40"
-    },
-    {
-      "path": "models/analyses/dfmea.sysml",
-      "sha256": "223b975714a8d76671a3a90a24c7ea764e383c24bc1b6ad8f7a9b5a50a31a34f"
-    },
-    {
-      "path": "models/analyses/encounter-envelope.sysml",
-      "sha256": "61654e8fe683aa4932f6c409f8fe954ebd6f3fb5c1295805ecced68b15071db5"
-    },
-    {
-      "path": "models/analyses/encounter-feasibility.sysml",
-      "sha256": "4067475ad5174a54f22fc72baad6d8ee3cc502cbc3bc6dbfd528db49277500cb"
-    },
-    {
-      "path": "models/analyses/encounter-review.sysml",
-      "sha256": "7efaf1b169a56ae75c6465fe130bb6a0c3fca2b94faa1f3584cea43a666f1bbb"
-    },
-    {
-      "path": "models/analyses/energy.sysml",
-      "sha256": "203f075b8b8470331c0a6c725bedafe467b9140bc572ccf79ba5ae14137c8c20"
-    },
-    {
-      "path": "models/analyses/environment-review.sysml",
-      "sha256": "5d74730715837b2cfb7596af73d481c5545308ec03cd9b73c6dcb807d7efa243"
-    },
-    {
-      "path": "models/analyses/integrated-candidate.sysml",
-      "sha256": "9eab58e1ce9d4d79d57b6fe7c0740fda867ac4286c687f1786673a620c5f0c7b"
-    },
-    {
-      "path": "models/analyses/location-traffic-risk.sysml",
-      "sha256": "21fcbaa999f92f7bd1b305708fea4dccd8b0bc5688b0f8d1a749e218b41483ba"
-    },
-    {
-      "path": "models/analyses/maneuver-dynamics.sysml",
-      "sha256": "065494ce5c9ff1fa96e761181c3ff40651f0858085c88894f39f50852018c750"
-    },
-    {
-      "path": "models/analyses/mission.sysml",
-      "sha256": "5d10d5dcb127b499437a7e915e0c92ad98104477762a0a3d119efc052e6a3cd6"
-    },
-    {
-      "path": "models/analyses/navigation-controller.sysml",
-      "sha256": "32d2edfcb696147b7fad2daeb682c0d2bc09a28af0e758b78904cdfde0d77b30"
-    },
-    {
-      "path": "models/analyses/passage-exposure.sysml",
-      "sha256": "72f055615ffabba4ec9377d00d2f76ade31ee68091f012b60ed56d5bb1a64f73"
-    },
-    {
-      "path": "models/analyses/polar-demand.sysml",
-      "sha256": "2ae69be8debe151f0c081cc37da56074c878a77ff50a647ab5e4364a9a866905"
-    },
-    {
-      "path": "models/analyses/recovery-propulsion.sysml",
-      "sha256": "bb79e2d030eda65bf8c2d243d62d9e51a02a9b114f7fb5659fece646a8ab6829"
-    },
-    {
-      "path": "models/analyses/recovery-risk.sysml",
-      "sha256": "91d821d597600176304c6d2dede380f409aacee8eae2769ce5b033e9eb7309f5"
-    },
-    {
-      "path": "models/analyses/recovery-site-review.sysml",
-      "sha256": "f0e8915d23aea03f4b8af834960fa8dfc4fd075ae0512188ecb97c6f4a3f051d"
-    },
-    {
-      "path": "models/analyses/recovery.sysml",
-      "sha256": "6da6703115287c71d53093ee1476a7c1b025c9f0582b3a53c89bc01e3dbdb4f3"
-    },
-    {
-      "path": "models/analyses/reliability.sysml",
-      "sha256": "6746846ce5f3f7fcd236ec7c5c83822a5963db53591ad28702dc859735517d76"
-    },
-    {
-      "path": "models/analyses/safety.sysml",
-      "sha256": "bbaaa8d52fdd9867699d14ba4efe6627e2f97e2f20001cea319e78c9b901f645"
-    },
-    {
-      "path": "models/analyses/sail-trade.sysml",
-      "sha256": "e231b51c6031a26a304a42c368a1fc2c9cf4a16d55e22dcf0e83a2231e9b08ac"
-    },
-    {
-      "path": "models/analyses/sizing/credibility.sysml",
-      "sha256": "42eca821d95eca13772ef1326b6a27b625e1f6ec0e890d2a2ad94f717455728c"
-    },
-    {
-      "path": "models/analyses/sizing/evidence.sysml",
-      "sha256": "f0d2a6d886c71d4b7adc632271ff122f7bc57b1a6302db84bf844d74f20fe801"
-    },
-    {
-      "path": "models/analyses/sizing/inputs.sysml",
-      "sha256": "934dde8fa12d41656d776b954c7a695f7979e003e629d2677ea4de51b1615925"
-    },
-    {
-      "path": "models/analyses/sizing/operating.sysml",
-      "sha256": "04e6733d21d749c8a06e141ad67b7807cb349b6b03612a0c3d2a315ee4c92ce7"
-    },
-    {
-      "path": "models/analyses/sizing/uncertainty.sysml",
-      "sha256": "78d71e2767b681561768d486ca6d6a9d4e16332fd576fe9cfe1a8e01d3dfcf3b"
-    },
-    {
-      "path": "models/analyses/structural-basis.sysml",
-      "sha256": "c85be7e177715c5586e13508ecb973ac9d9355cac58fac684c683c0da3fc6ed6"
-    },
-    {
-      "path": "models/analyses/surface-environment.sysml",
-      "sha256": "5778f163047634797e8ef65a8783a5e783676df530bc0caa0247a679c00222ea"
-    },
-    {
-      "path": "models/analyses/wave-performance.sysml",
-      "sha256": "383e94db89dfe142db9e46398de22a707c543f754d3f778aa600a695689d6b3d"
-    },
-    {
-      "path": "models/analyses/weather.sysml",
-      "sha256": "44ecf6b6d1e331fa5185398873d42e553128533c925d292dfc4287851ff1ee4c"
-    },
-    {
-      "path": "models/analyses/wing-heel.sysml",
-      "sha256": "6565df5421fa138dbb83c9317f3b3ce9c030f3589a29b70ab60f9e3ad689f6ac"
-    },
-    {
-      "path": "models/configurations/acoustic-equipment.sysml",
-      "sha256": "cf00a437976ecfd928740adf21a711da19184bd87347e1c8e6ce8126ee6b419e"
-    },
-    {
-      "path": "models/configurations/energy.sysml",
-      "sha256": "9a67f9f74fa51fb67f2749cf3b4e12615014f383b365a48043f3461999d6c7b8"
-    },
-    {
-      "path": "models/configurations/ic01.sysml",
-      "sha256": "0b953814697ff78defa9931de9c23813a23ca90eb1a2cd7121f4d755064a221f"
-    },
-    {
-      "path": "models/configurations/management.sysml",
-      "sha256": "ca0157c9c75a8fd3dfcfaf5707ff5a8fb7789cd19a36697398c19e1bfc92b488"
-    },
-    {
-      "path": "models/configurations/operating.sysml",
-      "sha256": "2f3019e2b9c4a9985d7a5eabfbd39dde694903dc378d8381c1b550f3c48c59d0"
-    },
-    {
-      "path": "models/configurations/polar-demand.sysml",
-      "sha256": "776327bf7cefc8edc26f29000d21261cc3f2d2da9da8dcd8a6e30ffa5ced121e"
-    },
-    {
-      "path": "models/configurations/reference.sysml",
-      "sha256": "409baa5254262a527b27af7fce00ffb3da35f249fe54e51f3cf024bdf86671be"
-    },
-    {
-      "path": "models/configurations/reliability.sysml",
-      "sha256": "187ebec5445dd0b29473dba64f3996e6848cc888f8c84f6e3c644d864cedc826"
-    },
-    {
-      "path": "models/configurations/sensing-equipment.sysml",
-      "sha256": "67f7f5e14071cc49cad4dc86c35477caeae217c06ecb88a30b6b7f97023f3845"
-    },
-    {
-      "path": "models/configurations/study-plan.sysml",
-      "sha256": "b4c706cbc497c3e0146bc68f409b97a4fa5a544f82237f930ff6d242283ae959"
-    },
-    {
-      "path": "models/configurations/wind-equipment.sysml",
-      "sha256": "ebb44c8c073855c60e4fbe6a6d1d3ee0b9e8dac26284f0451d89bdde67e6ff8c"
-    },
-    {
-      "path": "models/evidence/coupled-2026-10-10.sysml",
-      "sha256": "e8adc0d3df40e38312fece53d7db5415f4e5be27e42e70260bb1455eddb18c21"
-    },
-    {
-      "path": "models/evidence/current-sizing.sysml",
-      "sha256": "b6176f48be47dde61bd41ea892fec6c68258b72afdf2265ffb1bba5fb642b991"
-    },
-    {
-      "path": "models/evidence/finite-passage-sizing.sysml",
-      "sha256": "7c0cac2c4733ba43b652edc7bc547265087434656a11694670ff5347c2028f56"
-    },
-    {
-      "path": "models/evidence/gorge-wind.sysml",
-      "sha256": "2eee7571fc7ac02bcd054b0c226b5edb54ff931a31d74c508331ff1bf20ef466"
-    },
-    {
-      "path": "models/evidence/sizing-continuation.sysml",
-      "sha256": "b8825d29058049ef75538b8b40b0dceb5bbdcb9aac806457856b9b2a9ccfee2e"
-    },
-    {
-      "path": "models/evidence/srr-current.sysml",
-      "sha256": "c429f99895f703e8189f10383374e02865c78a7d5bc623478affdda1600daa33"
-    },
-    {
-      "path": "models/evidence/srr-frontier.sysml",
-      "sha256": "c153ab46f07b4fffe4e4d946bd42a81b43f5fb6f6d5f0d95ee52097d8a7333db"
+      "path": "models/blue-dog.sysml",
+      "sha256": "6e761cf3caf31a04e1421026d36961aeb1148ab9e41477e4cf224ae1035e964f"
     },
     {
       "path": "models/libraries/decision-records.sysml",
@@ -312,93 +145,9 @@
       "sha256": "7ed46d886547ac779560838a5abc42c986ce3e41830b150ff0c11e3926fecd32"
     },
     {
-      "path": "models/missions/course.sysml",
-      "sha256": "58bff9885a96ec73bcd4f0b405f9bef2f5b520bb605c0f1d8eb6ed630ed4d714"
-    },
-    {
-      "path": "models/missions/scope.sysml",
-      "sha256": "3f4058d5a9fc653f77764849708b3729f286fc52e692ec418ea5fd47aad92854"
-    },
-    {
-      "path": "models/missions/transgorge.sysml",
-      "sha256": "8db7d86e3bf70b572fe73d580384781377379c1605c1c916b4644633e8babfe3"
-    },
-    {
-      "path": "models/missions/verification.sysml",
-      "sha256": "99a624662537a2413b16b86421f2aa0e227efc3a2746046b516923ad50852677"
-    },
-    {
-      "path": "models/vehicle/architecture-contracts.sysml",
-      "sha256": "b8d38ac4fa384ea84ad7c88c8a490417d0495659836eb91744900182991b396a"
-    },
-    {
-      "path": "models/vehicle/architecture.sysml",
-      "sha256": "e4651373e288a9775b08877b812dadc5635e26f003c54d30be14ca90b027116e"
-    },
-    {
-      "path": "models/vehicle/behavior-contracts.sysml",
-      "sha256": "b67da5f4b04bb6c82ea50a1bab0e4d22b1519b65c9cae512ac52ebfb7a815669"
-    },
-    {
-      "path": "models/vehicle/decision-context.sysml",
-      "sha256": "bb41d936f18220efdb872ceceaaca5d22c34d1872ded46eabede6360ae75d9f7"
-    },
-    {
-      "path": "models/vehicle/decisions.sysml",
-      "sha256": "3353a3442c8c83d592aea0e4b9f6d8fe602e94282977307798625f022359d00f"
-    },
-    {
-      "path": "models/vehicle/interface-contracts.sysml",
-      "sha256": "e31f60940044f1645fa3772d660adbbaad7a32037a8d7463ade6ea0a4fe6d6f4"
-    },
-    {
-      "path": "models/vehicle/method.sysml",
-      "sha256": "014068f89e0edc6fb45d586432e989e657a16de5d0d21dcf340b1c842fb81fe5"
-    },
-    {
-      "path": "models/vehicle/mission-logic.sysml",
-      "sha256": "d09ddf94799d465b78daa2c8d2ecc4559735f063d36c0bf836aaa045271a663c"
-    },
-    {
-      "path": "models/vehicle/requirement-basis.sysml",
-      "sha256": "4b892b41839de24d2f6445fbae0e685535d579eede9f5824575b8f49d76df7b0"
-    },
-    {
-      "path": "models/vehicle/requirement-decisions.sysml",
-      "sha256": "29a0212cbecbbe18dfbba78ae1b121ff184f2c45fb8d358fd5bafa426fad74df"
-    },
-    {
-      "path": "models/vehicle/requirements.sysml",
-      "sha256": "7210e69406d98c468f57c1d73b3d06630d45b4fd2d20299f3c88e52e8b89682e"
-    },
-    {
-      "path": "models/vehicle/satisfaction.sysml",
-      "sha256": "1c8753ed06da6175b784f671491b38a75b81c0df0b50fb3818a4648ef57466e5"
-    },
-    {
-      "path": "models/vehicle/source-evidence.sysml",
-      "sha256": "028ba4009dc681ed1cc3205d6f6385dba8062931303645fb1347030f6b84c8f6"
-    },
-    {
-      "path": "models/vehicle/structure.sysml",
-      "sha256": "81ff62a76c486454e01e8a424152f39540a2d63cc819f9850d7f329f47e8fb95"
-    },
-    {
-      "path": "models/vehicle/use-cases.sysml",
-      "sha256": "85e937531404b30b8b5472b2ff266a99a57ba8fdc25d633a80dbd40a68e2e319"
-    },
-    {
-      "path": "models/vehicle/verification-planning.sysml",
-      "sha256": "beadeb90cce35e07fb77a6c9f5324c00c97a45aea0046dfa059ef6de2e47e64a"
-    },
-    {
-      "path": "models/vehicle/verification.sysml",
-      "sha256": "961cb9d09fdec61406585cf6956a2d66b26e2e34e7cc9658df358d3201f890e9"
-    },
-    {
-      "path": "tools/publishing/reference.sysml",
-      "sha256": "9512d63df7fb0f90d10d6c8e6b7730736dfde60a086709cf6759de80b55042df"
+      "path": "namespace-migration.json",
+      "upstreamPath": "reviews/namespace-restructure/namespace-map.json",
+      "sha256": "1e220c8dadd06afa7a9f702f8eb239af693d31dd7f309cd65a25f98944a2d9a8"
     }
-  ],
-  "notice": "Exact working-tree snapshot, including uncommitted model cleanups. baseRevision identifies ancestry, not these source bytes. The Syspresent commit and per-file hashes freeze the copied content. Publication does not imply engineering acceptance."
+  ]
 }

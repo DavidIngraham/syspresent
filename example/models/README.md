@@ -4,14 +4,27 @@ The model owns requirements, assumptions, rationale and analysis contracts. [Doc
 
 [AGENTS.md](../AGENTS.md) governs how agents work. This README defines modeling conventions and locates authoritative definitions; it does not impose additional mission rules or select designs. Read the linked SysML definitions before changing engineering behavior or applicability. Resolve conflicting definitions explicitly, with rationale, rather than treating a prose summary as a new source of policy.
 
-| Scope | Responsibility |
+The project is one native `BlueDog` package in [blue-dog.sysml](blue-dog.sysml).
+Its packages express engineering ownership; file names and publication views do
+not define another hierarchy. Reusable libraries remain independent under
+`libraries/` and do not depend on `BlueDog`.
+
+| Native scope | Responsibility |
 | --- | --- |
-| `missions/` | Independent Trans-Gorge challenge |
-| `vehicle/` | Blue Dog requirements, architecture, use cases, allocations, verification plans and decisions |
-| `libraries/` | Reusable marine, energy and structural calculations without Blue Dog dependencies |
-| `analyses/` | Project analysis cases and bindings to library calculations |
-| `configurations/` | Named reference designs, assumptions and illustrative inputs |
-| `evidence/` | Model projection of recorded evidence with explicit acceptance status |
+| `BlueDog::Mission` | Challenge, course, applicability and use cases |
+| `BlueDog::Requirements` | System obligations, allocation basis and structural requirements |
+| `BlueDog::Architecture` | System composition/context, logical and candidate physical architecture, interfaces and correspondences |
+| `BlueDog::Behavior` | Executable mission policy, navigation and behavior contracts |
+| `BlueDog::Analyses` | Project analysis cases and bindings to reusable calculations |
+| `BlueDog::Configurations` | Named candidate inputs, shared assumptions, equipment and explicitly illustrative examples |
+| `BlueDog::Decisions` | Working dispositions, open questions, context and trade criteria |
+| `BlueDog::Verification` | Verification definitions, plans and satisfaction assertions |
+| `BlueDog::Evidence` | Source evidence and generated projections of recorded results |
+| `BlueDog::Method`, `BlueDog::Goals`, `BlueDog::DesignIntent` | Method/scenario roles, goals and design intent |
+| Independent library packages in `libraries/` | Reusable marine, energy, structural and decision-information definitions |
+
+See [namespace ownership and source maintenance](../docs/reference/namespace-structure.md)
+for the hierarchy, extension rules and generated-section boundaries.
 
 ## Conventions
 
@@ -35,24 +48,24 @@ View definitions belong in the [authored Markdown](../docs/reference/authoring.m
 
 ### OOSEM
 
-Use native OOSEM roles and views for context, logical responsibilities, physical elements and scenarios. `vehicle/method.sysml` records package roles, scenario-to-use-case refinements and allocations. Keep logical sequences distinct from executable controllers and physical test evidence. Requirement package classification does not require inventing direct parent derivations for every requirement. The running OOSEM maturity assessment distinguishes model coverage from supporting virtual and physical evidence.
+Use native OOSEM roles and views for context, logical responsibilities, physical elements and scenarios. `BlueDog::Method` records package roles, scenario-to-use-case refinements and allocations. Keep logical sequences distinct from executable controllers and physical test evidence. Requirement package classification does not require inventing direct parent derivations for every requirement. The running OOSEM maturity assessment distinguishes model coverage from supporting virtual and physical evidence.
 
 ### Engineering layers and ownership
 
 | Layer | Authoritative model | Meaning |
 | --- | --- | --- |
-| Mission and external context | `missions/`, `BlueDog::Architecture::MissionContext` | Challenge rules, external actors and current/future applicability |
-| System obligations and design basis | `vehicle/requirements.sysml`, `requirement-basis.sysml`, `decisions.sysml` | Obligations, owner constraints, provisional allocations and selected strategies remain distinct |
-| Operational interactions | `BlueDogUseCases`, `BlueDogMethod::Scenarios` | Actor objectives and typed observations, commands, permissions and records |
-| Logical architecture | `BlueDogLogicalArchitecture` | Responsibilities independent of processors, products and buses |
-| Candidate physical architecture | `BlueDogPhysicalArchitecture` | Proposed realization and interfaces; separate parts do not prove fault independence |
-| Executable policy | `BlueDogMissionLogic`, `BlueDogMissionSimulation` | Explicit observations drive decisions, latches and assessment; no physical autopilot claim |
-| Configuration and analysis | `BlueDogIC01`, `analyses/`, `libraries/` | Complete named candidate inputs, project bindings and reusable domain calculations |
-| Evidence | `models/evidence/`, `evidence/runs/` | Configuration-specific recorded outcomes and immutable source provenance |
+| Mission and external context | `BlueDog::Mission`, `BlueDog::Architecture::MissionContext` | Challenge rules, external actors and current/future applicability |
+| System obligations and design basis | `BlueDog::Requirements`, `BlueDog::Decisions` | Obligations, owner constraints, provisional allocations and selected strategies remain distinct |
+| Operational interactions | `BlueDog::Mission::UseCases`, `BlueDog::Method::Scenarios` | Actor objectives and typed observations, commands, permissions and records |
+| Logical architecture | `BlueDog::Architecture::Logical` | Responsibilities independent of processors, products and buses |
+| Candidate physical architecture | `BlueDog::Architecture::Physical` | Proposed realization and interfaces; separate parts do not prove fault independence |
+| Executable policy | `BlueDog::Behavior::MissionLogic`, `BlueDog::Analyses::MissionSimulation` | Explicit observations drive decisions, latches and assessment; no physical autopilot claim |
+| Configuration and analysis | `BlueDog::Configurations::IC01`, `BlueDog::Analyses`, independent libraries | Complete named candidate inputs, project bindings and reusable domain calculations |
+| Evidence | `BlueDog::Evidence`, `evidence/runs/` | Configuration-specific recorded outcomes and immutable source provenance |
 
-The original `BlueDog::Architecture` subsystem tree remains the system responsibility/context boundary. It includes useful hardware concepts; it is not the deployed assembly. The separate logical and physical packages carry the more precise interfaces and allocations. Preserve useful names rather than break historical references merely to rename a layer.
+The subsystem tree directly in `BlueDog::Architecture` is the system responsibility/context boundary. It includes useful hardware concepts; it is not the deployed assembly. Its `Logical` and `Physical` packages carry the more precise interfaces and allocations. Package containment does not replace component composition or an allocation relationship.
 
-Keep abstraction, component decomposition and configuration separate. A logical responsibility may span several candidate elements; several responsibilities may share a controller. [Architecture correspondences](vehicle/architecture-contracts.sysml) map the context responsibilities into logical responsibilities and record each IC-01 implementation contribution, path and named configuration. Primary/recovery labels distinguish implementation paths; they do not select a mode, settle conflicting authority or demonstrate fault independence.
+Keep abstraction, component decomposition and configuration separate. A logical responsibility may span several candidate elements; several responsibilities may share a controller. [Architecture correspondences](blue-dog.sysml) map the context responsibilities into logical responsibilities and record each IC-01 implementation contribution, path and named configuration. Primary/recovery labels distinguish implementation paths; they do not select a mode, settle conflicting authority or demonstrate fault independence.
 
 Logical flows have stable names so candidate exchange allocations can identify their implementation transfers. Use a scoped internal-exchange allocation when coallocated responsibilities interact inside one controller; this records an implementation obligation without asserting an executed software call or measured latency. Preserve payload meaning through any transformation and identify unresolved timing, encoding, freshness, supply and fault contracts. Recovery management plans and commands; recovery actuation executes permitted propulsion. Physical shore capture and human pickup remain separate obligations.
 
@@ -62,9 +75,9 @@ For an engineering change, follow the affected path from mission need and operat
 
 ### Configuration, execution and evidence
 
-Named configurations own design values and capability assumptions. For the IC-01 candidate, [BlueDogIC01](configurations/ic01.sysml) defines `design` and `integration`; [design decisions](vehicle/decisions.sysml) record candidate and trade status. Project analyses bind a named subject and its assumptions to reusable calculations. An analysis must identify its subject, applicability and input provenance, and reject unsupported subjects rather than silently mixing configurations. Archived solutions can supply numerical initial guesses, but cannot silently supply current design values. Preserve exact recorded design values when establishing a baseline; extra decimal places do not imply measurement precision.
+Named configurations own design values and capability assumptions. For the IC-01 candidate, [BlueDog::Configurations::IC01](blue-dog.sysml) defines `design` and `integration`; [design decisions](blue-dog.sysml) record candidate and trade status. Project analyses bind a named subject and its assumptions to reusable calculations. An analysis must identify its subject, applicability and input provenance, and reject unsupported subjects rather than silently mixing configurations. Archived solutions can supply numerical initial guesses, but cannot silently supply current design values. Preserve exact recorded design values when establishing a baseline; extra decimal places do not imply measurement precision.
 
-Maintain the distinction between descriptive scenarios, executed supervisory decisions, conditional numerical feasibility and accepted physical evidence. Required observations that are missing must not silently become confirmed capability. Qualification and recovery obligations belong in the [mission](missions/transgorge.sysml) and [vehicle requirements](vehicle/requirements.sysml); [mission logic](vehicle/mission-logic.sysml) implements supervisory policy. State transitions, persistence and reset conditions must agree with those obligations. Test both fault entry and restoration, including interacting faults and event ordering where relevant, rather than inferring policy from a successful nominal run.
+Maintain the distinction between descriptive scenarios, executed supervisory decisions, conditional numerical feasibility and accepted physical evidence. Required observations that are missing must not silently become confirmed capability. Qualification and recovery obligations belong in the [mission](blue-dog.sysml) and [vehicle requirements](blue-dog.sysml); [mission logic](blue-dog.sysml) implements supervisory policy. State transitions, persistence and reset conditions must agree with those obligations. Test both fault entry and restoration, including interacting faults and event ordering where relevant, rather than inferring policy from a successful nominal run.
 
 Report native pass, fail, inconclusive and error outcomes without collapsing missing input into success. Not-applicable is a separate scope decision (for example, future ocean requirements during a Gorge review), not a fabricated fifth native verdict. Analysis completion with a `reserveFits=false` output means the calculation ran; it does not mean the recovery route passed.
 
@@ -82,13 +95,13 @@ Keep OpenSysML pinned at the revision in the installer, lockfile and README. Its
 
 Before relying on an MCP result, confirm the server's workspace and runtime revision match the checkout under review. Use the matching pinned CLI/client if they differ, and record the mismatch with the validation result. A successful check against a different checkout or runtime is not a regression result for this model.
 
-Candidate interface payload context and parameterized applicability predicates live in `vehicle/interface-contracts.sysml`. They preserve the distinction between producer validity, consumer freshness, configuration/frame applicability and current command authority. No default freshness bound, synchronized clock or controller arbitration is implied. IF-01 through IF-05 record the outstanding engineering decisions; schema completion is not transport implementation or integration acceptance.
+Candidate interface payload context and parameterized applicability predicates live in `BlueDog::Architecture::Interfaces`. They preserve the distinction between producer validity, consumer freshness, configuration/frame applicability and current command authority. No default freshness bound, synchronized clock or controller arbitration is implied. IF-01 through IF-05 record the outstanding engineering decisions; schema completion is not transport implementation or integration acceptance.
 
-`vehicle/behavior-contracts.sysml` holds partial executable consumer and qualification-restoration actions. Keep producer validity separate from consumer usability, and command applicability separate from current operational permission. Recovery enable respects known nonqualifying state and a durable disqualification acknowledgment; the outcome record follows actual actuation disposition. Required timing, storage atomicity, scheduling and physical implementation remain explicit open issues, not consequences of an allocation. New-attempt initialization and watchdog restoration are different operations.
+`BlueDog::Behavior::Contracts` holds partial executable consumer and qualification-restoration actions. Keep producer validity separate from consumer usability, and command applicability separate from current operational permission. Recovery enable respects known nonqualifying state and a durable disqualification acknowledgment; the outcome record follows actual actuation disposition. Required timing, storage atomicity, scheduling and physical implementation remain explicit open issues, not consequences of an allocation. New-attempt initialization and watchdog restoration are different operations.
 
-Verification methods use native `VerificationCases::VerificationMethod` metadata. They describe planned assessment work; they do not execute it or accept evidence. `vehicle/verification-planning.sysml` separates intended IC-01 test configuration from actual article/procedure/instrument identity and records interface/durability integration plus recovery-use validation. Eligibility for an affirmative evidence claim is distinct from an acceptance decision. Numerical verification definitions require bound subjects and retain their native verdict logic; do not invent default inputs to populate a report.
+Verification methods use native `VerificationCases::VerificationMethod` metadata. They describe planned assessment work; they do not execute it or accept evidence. `BlueDog::Verification::Planning` separates intended IC-01 test configuration from actual article/procedure/instrument identity and records interface/durability integration plus recovery-use validation. Eligibility for an affirmative evidence claim is distinct from an acceptance decision. Numerical verification definitions require bound subjects and retain their native verdict logic; do not invent default inputs to populate a report.
 
-`analyses/safety.sysml` owns the initial Gorge hazard/control argument. Hazard
+`BlueDog::Analyses::Safety` owns the initial Gorge hazard/control argument. Hazard
 records identify configuration, modes, mishap, ownership and proposed controls;
 native dependencies identify contributors, controlling requirements and planned
 verification. Closure requires implementation/effectiveness and residual-risk
@@ -98,7 +111,7 @@ explicit and do not import a military risk matrix as project policy. Reliability
 rate aggregation also requires an explicit function partition, dependence treatment
 and common-cause coverage basis.
 
-`configurations/management.sysml` identifies study/input contexts, the intended
+`BlueDog::Configurations::Management` identifies study/input contexts, the intended
 IC-01 installation and resource-accounting scopes. Native references preserve the
 difference between current candidate, archived projection, numerical bracket,
 shared assumptions and synthetic example. Source/model hashes identify a run;
@@ -108,7 +121,7 @@ Do not add parents and children, replaced equipment, capacity states or main/rec
 accounts without their declared aggregation rules. Missing quantities stay unset,
 and required peaks/identity records cannot be replaced with zero or review flags.
 
-`analyses/credibility.sysml` attaches intended-use/domain/limitation metadata to
+`BlueDog::Analyses::AnalysisCredibility` attaches intended-use/domain/limitation metadata to
 analysis definitions and configured/nested usages without changing archived results.
 Its proposed-use precondition accepts supplied review assertions only. Review effort
 and validation adequacy depend on the intended use; an infeasible design can be the
@@ -118,7 +131,8 @@ Engineering decision information uses the project-defined
 `EngineeringDecisions::DecisionRecord` item definition in
 `libraries/decision-records.sysml`, following SysML 2.0 Part 1 §7.10. A record is
 information acted on over time, not a physical component or an executable decision
-node. Existing qualified names and U01–U06 identifiers remain stable. Record state
+node. The U01–U06 identifiers identify the retained open questions under
+`BlueDog::Decisions::OpenQuestions`. Record state
 distinguishes retained working dispositions from open questions; it does not assert
 formal approval, implementation or evidence acceptance. Preserve mixed constraints,
 assumptions and strategy statements until their content is separately reviewed.
@@ -126,16 +140,16 @@ The native register includes eight design dispositions, six requirement-basis
 records and six open questions.
 
 Requirement-value and procedure-choice reviews remain metadata attached to their
-subjects. `BlueDogRequirementBasis::AllocationDecision` specializes the shared
+subjects. `BlueDog::Requirements::Basis::AllocationDecision` specializes the shared
 `EngineeringDecisions::AllocationReview` metadata definition; its 80 existing
 annotations retain their content, subject identities and acceptance flags. They
 are review obligations, not 80 newly accepted decisions or executable branches.
 
-`vehicle/decision-context.sysml` adds scope, decision kind, responsibility,
+`BlueDog::Decisions::Context` adds scope, decision kind, responsibility,
 criterion/comparison basis and reopening conditions to existing dispositions and
 open questions. Actual record/authority/date/implementation identities stay absent
 until known. Preserve the original question and owner on open-question items;
-metadata context does not accept evidence. `BlueDogTradeCriteria` distinguishes
+metadata context does not accept evidence. `BlueDog::Decisions::TradeCriteria` distinguishes
 six declared mandatory rig evidence groups from the provisional reliability study.
 These groups are not exhaustive system acceptance. Native trade selection, an
 engineering recommendation and an authorized actual decision are different records.

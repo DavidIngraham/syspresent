@@ -4,255 +4,255 @@ package BlueDogCanvasViews {
     view challengeOverview : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose GorgeChallenge::transGorgeChallenge;
-        expose GorgeChallenge::courseCompletion;
-        expose GorgeChallenge::unassistedAttempt;
-        expose GorgeChallenge::sailingPropulsion;
+        expose BlueDog::Mission::Challenge::transGorgeChallenge;
+        expose BlueDog::Mission::Challenge::courseCompletion;
+        expose BlueDog::Mission::Challenge::unassistedAttempt;
+        expose BlueDog::Mission::Challenge::sailingPropulsion;
     }
     view rigAlternatives : GeneralView {
         filter @SysML::PartUsage or @SysML::ItemUsage or @SysML::Dependency;
-        expose BlueDogDesignDecisions::sizingBaseline;
-        expose BlueDogSailTrade::softSail;
-        expose BlueDogSailTrade::tailWing;
-        expose BlueDogSailTrade::camberedWing;
-        expose BlueDogDesignDecisions::baselineCandidate;
-        expose BlueDogDesignDecisions::retainedAlternative;
-        expose BlueDogDesignDecisions::softSailAlternative;
+        expose BlueDog::Decisions::Design::sizingBaseline;
+        expose BlueDog::Analyses::SailTrade::softSail;
+        expose BlueDog::Analyses::SailTrade::tailWing;
+        expose BlueDog::Analyses::SailTrade::camberedWing;
+        expose BlueDog::Decisions::Design::baselineCandidate;
+        expose BlueDog::Decisions::Design::retainedAlternative;
+        expose BlueDog::Decisions::Design::softSailAlternative;
     }
     view candidateDefinition : GeneralView {
         filter @SysML::PartUsage;
-        expose BlueDogIC01::design;
-        expose BlueDogIC01::integration;
-        expose BlueDogPhysicalArchitecture::ic01;
+        expose BlueDog::Configurations::IC01::design;
+        expose BlueDog::Configurations::IC01::integration;
+        expose BlueDog::Architecture::Physical::ic01;
     }
 
     view challengeTraffic : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose GorgeChallenge::trafficCoexistence;
-        expose BlueDogRequirements::trafficSafety;
+        expose BlueDog::Mission::Challenge::trafficCoexistence;
+        expose BlueDog::Requirements::trafficSafety;
     }
     view trafficDerivation : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose BlueDogRequirements::trafficSafety;
-        expose BlueDogRequirements::trafficTracking;
-        expose BlueDogRequirements::collisionAssessmentCadence;
-        expose BlueDogRequirements::avoidanceCommandDeadline;
-        expose BlueDogRequirements::trafficAwarenessFault;
+        expose BlueDog::Requirements::trafficSafety;
+        expose BlueDog::Requirements::trafficTracking;
+        expose BlueDog::Requirements::collisionAssessmentCadence;
+        expose BlueDog::Requirements::avoidanceCommandDeadline;
+        expose BlueDog::Requirements::trafficAwarenessFault;
     }
     view recoveryBasis : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose BlueDogRequirements::recoveryPropulsion;
-        expose BlueDogRequirements::recoveryEnergy;
+        expose BlueDog::Requirements::recoveryPropulsion;
+        expose BlueDog::Requirements::recoveryEnergy;
     }
     view capsizeQualification : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose BlueDogRequirements::capsizeControlRecovery;
-        expose BlueDogRequirements::capsizeQualificationRetention;
+        expose BlueDog::Requirements::capsizeControlRecovery;
+        expose BlueDog::Requirements::capsizeQualificationRetention;
     }
     view capsizeDecision : ActionFlowView {
-        expose BlueDogMissionLogic::CapsizeDisposition;
+        expose BlueDog::Behavior::MissionLogic::CapsizeDisposition;
     }
     view supervisorDecision : ActionFlowView {
-        expose BlueDogMissionLogic::SupervisoryCycle;
+        expose BlueDog::Behavior::MissionLogic::SupervisoryCycle;
     }
 
     // Curated views for the complete newcomer story. Native identities and relationships only.
     view story_qualifying_attempt : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose GorgeChallenge::unassistedAttempt;
-        expose GorgeChallenge::sailingPropulsion;
-        expose GorgeChallenge::unattachedPassage;
-        expose GorgeChallenge::safetyCapabilityAbort;
-        expose GorgeChallenge::communicationOutageAutonomy;
+        expose BlueDog::Mission::Challenge::unassistedAttempt;
+        expose BlueDog::Mission::Challenge::sailingPropulsion;
+        expose BlueDog::Mission::Challenge::unattachedPassage;
+        expose BlueDog::Mission::Challenge::safetyCapabilityAbort;
+        expose BlueDog::Mission::Challenge::communicationOutageAutonomy;
     }
 
     view story_gorge_environment : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::gorgeEnvironment;
-        expose BlueDogRequirements::gorgeWind;
-        expose BlueDogRequirements::gorgeWaves;
-        expose BlueDogRequirements::gorgeCurrent;
-        expose BlueDogRequirements::gorgeSurvivalWind;
+        expose BlueDog::Requirements::gorgeEnvironment;
+        expose BlueDog::Requirements::gorgeWind;
+        expose BlueDog::Requirements::gorgeWaves;
+        expose BlueDog::Requirements::gorgeCurrent;
+        expose BlueDog::Requirements::gorgeSurvivalWind;
     }
 
     view story_owner_constraints : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::desktopManufacture;
-        expose BlueDogRequirements::transportability;
-        expose BlueDogRequirements::serviceability;
-        expose BlueDogStructure::hybridConstruction;
+        expose BlueDog::Requirements::desktopManufacture;
+        expose BlueDog::Requirements::transportability;
+        expose BlueDog::Requirements::serviceability;
+        expose BlueDog::Requirements::Structure::hybridConstruction;
     }
 
     view story_system_obligations : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::roundTrip;
-        expose BlueDogRequirements::navigationAndControl;
-        expose BlueDogRequirements::energyAwareness;
-        expose BlueDogRequirements::missionEvidence;
-        expose BlueDogRequirements::marineDurability;
+        expose BlueDog::Requirements::roundTrip;
+        expose BlueDog::Requirements::navigationAndControl;
+        expose BlueDog::Requirements::energyAwareness;
+        expose BlueDog::Requirements::missionEvidence;
+        expose BlueDog::Requirements::marineDurability;
     }
 
     view story_normal_sailing : ActionFlowView {
-        expose BlueDogMethod::Scenarios::NormalSailing;
+        expose BlueDog::Method::Scenarios::NormalSailing;
     }
 
     view story_prepare_launch : ActionFlowView {
-        expose BlueDogMethod::Scenarios::PrepareAndLaunch;
+        expose BlueDog::Method::Scenarios::PrepareAndLaunch;
     }
 
     view story_logical_sailing : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose BlueDogLogicalArchitecture::LogicalVessel;
-        expose BlueDogLogicalArchitecture::LogicalVessel::navigation;
-        expose BlueDogLogicalArchitecture::LogicalVessel::wind;
-        expose BlueDogLogicalArchitecture::LogicalVessel::supervision;
-        expose BlueDogLogicalArchitecture::LogicalVessel::guidance;
-        expose BlueDogLogicalArchitecture::LogicalVessel::actuation;
+        expose BlueDog::Architecture::Logical::LogicalVessel;
+        expose BlueDog::Architecture::Logical::LogicalVessel::navigation;
+        expose BlueDog::Architecture::Logical::LogicalVessel::wind;
+        expose BlueDog::Architecture::Logical::LogicalVessel::supervision;
+        expose BlueDog::Architecture::Logical::LogicalVessel::guidance;
+        expose BlueDog::Architecture::Logical::LogicalVessel::actuation;
     }
 
     view story_logical_safety : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose BlueDogLogicalArchitecture::LogicalVessel;
-        expose BlueDogLogicalArchitecture::LogicalVessel::safety;
-        expose BlueDogLogicalArchitecture::LogicalVessel::energy;
-        expose BlueDogLogicalArchitecture::LogicalVessel::collision;
-        expose BlueDogLogicalArchitecture::LogicalVessel::recovery;
-        expose BlueDogLogicalArchitecture::LogicalVessel::recording;
+        expose BlueDog::Architecture::Logical::LogicalVessel;
+        expose BlueDog::Architecture::Logical::LogicalVessel::safety;
+        expose BlueDog::Architecture::Logical::LogicalVessel::energy;
+        expose BlueDog::Architecture::Logical::LogicalVessel::collision;
+        expose BlueDog::Architecture::Logical::LogicalVessel::recovery;
+        expose BlueDog::Architecture::Logical::LogicalVessel::recording;
     }
 
     view story_drive_and_aerodynamics : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose BlueDogDesignDecisions::holdingDrive;
-        expose BlueDogDesignDecisions::aerodynamicScope;
-        expose BlueDogSailTrade::camberedWing;
+        expose BlueDog::Decisions::Design::holdingDrive;
+        expose BlueDog::Decisions::Design::aerodynamicScope;
+        expose BlueDog::Analyses::SailTrade::camberedWing;
     }
 
     view story_coupled_sizing : GeneralView {
         filter @SysML::PartUsage;
-        expose BlueDogIC01::design;
-        expose BlueDogConceptCredibility::passagePolicy;
-        expose BlueDogDesignDecisions::uncertaintyPolicy;
-        expose BlueDogDesignDecisions::structuralScope;
+        expose BlueDog::Configurations::IC01::design;
+        expose BlueDog::Analyses::Sizing::Credibility::passagePolicy;
+        expose BlueDog::Decisions::Design::uncertaintyPolicy;
+        expose BlueDog::Decisions::Design::structuralScope;
     }
 
     view story_glass_and_print : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogStructure::hybridConstruction;
-        expose BlueDogStructure::structuralIntegrity;
-        expose BlueDogStructure::bendingStrength;
-        expose BlueDogStructure::bondProof;
-        expose BlueDogStructure::wetCouponStiffness;
+        expose BlueDog::Requirements::Structure::hybridConstruction;
+        expose BlueDog::Requirements::Structure::structuralIntegrity;
+        expose BlueDog::Requirements::Structure::bendingStrength;
+        expose BlueDog::Requirements::Structure::bondProof;
+        expose BlueDog::Requirements::Structure::wetCouponStiffness;
     }
 
     view story_water_weeds_service : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::enclosureSealing;
-        expose BlueDogRequirements::wetMechanicalIntegrity;
-        expose BlueDogRequirements::submergedWeedPassage;
-        expose BlueDogRequirements::weedBlockageResponse;
-        expose BlueDogRequirements::serviceability;
+        expose BlueDog::Requirements::enclosureSealing;
+        expose BlueDog::Requirements::wetMechanicalIntegrity;
+        expose BlueDog::Requirements::submergedWeedPassage;
+        expose BlueDog::Requirements::weedBlockageResponse;
+        expose BlueDog::Requirements::serviceability;
     }
 
     view story_finite_energy : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::multiDayEndurance;
-        expose BlueDogRequirements::energyAwareness;
-        expose BlueDogRequirements::conservativeEnergyEstimate;
-        expose BlueDogRequirements::recoveryEnergy;
-        expose BlueDogRequirements::lowEnergyRecovery;
+        expose BlueDog::Requirements::multiDayEndurance;
+        expose BlueDog::Requirements::energyAwareness;
+        expose BlueDog::Requirements::conservativeEnergyEstimate;
+        expose BlueDog::Requirements::recoveryEnergy;
+        expose BlueDog::Requirements::lowEnergyRecovery;
     }
 
     view story_repeat_energy : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::sustainedEnergyFeasibility;
-        expose BlueDogRequirements::sustainedReserveProtection;
-        expose BlueDogRequirements::repeatableCycleBalance;
-        expose BlueDogRequirements::peakSupplyCapability;
-        expose BlueDogRequirements::energyEvidenceReadiness;
+        expose BlueDog::Requirements::sustainedEnergyFeasibility;
+        expose BlueDog::Requirements::sustainedReserveProtection;
+        expose BlueDog::Requirements::repeatableCycleBalance;
+        expose BlueDog::Requirements::peakSupplyCapability;
+        expose BlueDog::Requirements::energyEvidenceReadiness;
     }
 
     view story_primary_hardware : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose BlueDogPhysicalArchitecture::IC01Candidate;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::mainBattery;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::primaryNavigation;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::windSensor;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::primaryController;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::sailingActuators;
+        expose BlueDog::Architecture::Physical::IC01Candidate;
+        expose BlueDog::Architecture::Physical::IC01Candidate::mainBattery;
+        expose BlueDog::Architecture::Physical::IC01Candidate::primaryNavigation;
+        expose BlueDog::Architecture::Physical::IC01Candidate::windSensor;
+        expose BlueDog::Architecture::Physical::IC01Candidate::primaryController;
+        expose BlueDog::Architecture::Physical::IC01Candidate::sailingActuators;
     }
 
     view story_recovery_hardware : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose BlueDogPhysicalArchitecture::IC01Candidate;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::recoveryBattery;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::recoveryNavigation;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::recoveryObservation;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::recoveryController;
-        expose BlueDogPhysicalArchitecture::IC01Candidate::recoveryPropulsor;
+        expose BlueDog::Architecture::Physical::IC01Candidate;
+        expose BlueDog::Architecture::Physical::IC01Candidate::recoveryBattery;
+        expose BlueDog::Architecture::Physical::IC01Candidate::recoveryNavigation;
+        expose BlueDog::Architecture::Physical::IC01Candidate::recoveryObservation;
+        expose BlueDog::Architecture::Physical::IC01Candidate::recoveryController;
+        expose BlueDog::Architecture::Physical::IC01Candidate::recoveryPropulsor;
     }
 
     view story_reset_and_records : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::resetRecovery;
-        expose BlueDogRequirements::resetRestrictionPreservation;
-        expose BlueDogRequirements::qualificationRestoration;
-        expose BlueDogRequirements::gateProgressRestoration;
-        expose BlueDogRequirements::missionEvidence;
+        expose BlueDog::Requirements::resetRecovery;
+        expose BlueDog::Requirements::resetRestrictionPreservation;
+        expose BlueDog::Requirements::qualificationRestoration;
+        expose BlueDog::Requirements::gateProgressRestoration;
+        expose BlueDog::Requirements::missionEvidence;
     }
 
     view story_evidence_scope : GeneralView {
         filter @SysML::PartUsage;
-        expose BlueDogIC01::design;
-        expose BlueDogRisks::mission;
-        expose BlueDogCurrentSizing::searchAssessment;
-        expose BlueDogDesignDecisions::uncertaintyPolicy;
+        expose BlueDog::Configurations::IC01::design;
+        expose BlueDog::Analyses::DevelopmentRisks::mission;
+        expose BlueDog::Evidence::CurrentSizing::searchAssessment;
+        expose BlueDog::Decisions::Design::uncertaintyPolicy;
     }
 
     view story_failure_risk : GeneralView {
         filter @SysML::PartUsage or @SysML::PartDefinition;
-        expose BlueDogRisks::traffic;
-        expose BlueDogRisks::recovery;
-        expose BlueDogRisks::structure;
-        expose BlueDogRisks::wing;
-        expose BlueDogRisks::energy;
+        expose BlueDog::Analyses::DevelopmentRisks::traffic;
+        expose BlueDog::Analyses::DevelopmentRisks::recovery;
+        expose BlueDog::Analyses::DevelopmentRisks::structure;
+        expose BlueDog::Analyses::DevelopmentRisks::wing;
+        expose BlueDog::Analyses::DevelopmentRisks::energy;
     }
 
     view story_verification_status : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDogRequirements::cruiseEvidence;
-        expose BlueDogRequirements::reliabilityEvidence;
-        expose BlueDogRequirements::criticalFailureDisposition;
-        expose BlueDogRequirements::missionSuccessProbability;
+        expose BlueDog::Requirements::cruiseEvidence;
+        expose BlueDog::Requirements::reliabilityEvidence;
+        expose BlueDog::Requirements::criticalFailureDisposition;
+        expose BlueDog::Requirements::missionSuccessProbability;
     }
 
     view story_qualification_campaign : GeneralView {
         filter @SysML::VerificationCaseDefinition;
-        expose BlueDogRequirementVerification::StructuralMaterialEvidence;
-        expose BlueDogRequirementVerification::TrafficSafetyVerification;
-        expose GorgeChallengeVerification::AutonomousShoreRecoveryVerification;
-        expose GorgeChallengeVerification::PassageQualificationVerification;
+        expose BlueDog::Verification::Requirements::StructuralMaterialEvidence;
+        expose BlueDog::Verification::Requirements::TrafficSafetyVerification;
+        expose BlueDog::Verification::Challenge::AutonomousShoreRecoveryVerification;
+        expose BlueDog::Verification::Challenge::PassageQualificationVerification;
     }
 
     view story_blue_dog_next : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose GorgeChallenge::transGorgeChallenge;
-        expose BlueDogRequirements::cruiseEvidence;
-        expose BlueDogRequirements::criticalFailureDisposition;
-        expose BlueDogRequirements::oceanEnvironment;
+        expose BlueDog::Mission::Challenge::transGorgeChallenge;
+        expose BlueDog::Requirements::cruiseEvidence;
+        expose BlueDog::Requirements::criticalFailureDisposition;
+        expose BlueDog::Requirements::oceanEnvironment;
     }
 }
