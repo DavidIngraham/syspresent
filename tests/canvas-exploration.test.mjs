@@ -124,7 +124,7 @@ test('default context prioritizes requirement traces over incidental dependencie
 const owns=(source,target)=>edge('owns:'+source+':'+target,source,target,'containment',{nativeRole:'owner',navigationOnly:true});
 const structureFixture=()=>({
  elements:[element('package','Package'),element('nested','Package'),element('assembly','PartDefinition'),element('part','PartUsage'),element('type','PartDefinition'),element('subpart','PartUsage'),element('peer','PartUsage'),element('other-instance','PartUsage'),element('base','PartDefinition'),element('deep','PartUsage'),...Array.from({length:6},(_,i)=>element('requirement'+i))],
- containment:[owns('package','nested'),owns('package','assembly'),owns('package','type'),owns('assembly','part'),owns('type','subpart')],
+ containment:[owns('package','nested'),owns('package','assembly'),owns('package','type'),owns('assembly','part'),owns('type','subpart'),owns('type','peer')],
  relationships:[edge('composition','assembly','part','composition'),edge('typing','part','type','typing'),edge('declared-child','type','subpart','composition'),edge('declared-peer','type','peer','composition'),edge('wire','subpart','peer','connection'),edge('other-type','other-instance','type','typing'),edge('base-type','type','base','typing'),edge('deeper','base','deep','composition'),...Array.from({length:6},(_,i)=>edge('satisfy'+i,'part','requirement'+i,'satisfy'))]
 });
 test('part focus prioritizes its whole, explicit classifier and declared parts ahead of requirements',()=>{
@@ -149,16 +149,17 @@ test('package focus exposes native containing package and declaration contents w
  assert.deepEqual(root.targets,['type','assembly','nested']);assert.ok(root.relationships.every(e=>e.kind==='containment'&&e.navigationOnly&&e.nativeRole==='owner'));
  assert.ok(!ids(root).includes('doc'));assert.ok(!ids(root).includes('fake'));
  assert.deepEqual(traceContext(g,{focus:'nested',mode:'container'}).targets,['package']);
- assert.deepEqual(traceContext(g,{focus:'package',mode:'contents'}).targets,['type','assembly','nested']);
+ assert.deepEqual(traceContext(g,{focus:'package',mode:'contents'}).targets,['assembly','nested','type']);
  const definition=traceContext(g,{focus:'assembly'});assert.deepEqual(definition.targets,['package','part']);
  assert.match(root.summary.message,/Package ownership is location context/);
 });
-test('structural pages bound every type bridge and expose remaining children deterministically',()=>{
- const g=structureFixture();for(let i=0;i<6;i++){g.elements.push(element('child'+i,'PartUsage'));g.relationships.push(edge('child-link'+i,'type','child'+i,'composition'));}
- const pages=[];for(let page=0;page<6;page++){const result=traceContext(g,{focus:'part',mode:'contents',budget:3,page});pages.push(result);assert.equal(result.elements.length,3);assert.ok(result.relationships.some(e=>e.id==='typing'));}
- assert.equal(new Set(pages.flatMap(p=>p.targets)).size,6);assert.equal(pages[0].total,8);assert.equal(pages[0].pages,8);
+test('structural contents retain every sibling and type bridge without paging or viewport budgets',()=>{
+ const g=structureFixture();for(let i=0;i<60;i++){g.elements.push(element('child'+i,'PartUsage'));g.relationships.push(edge('child-link'+i,'type','child'+i,'composition'));g.containment.push(owns('type','child'+i));}
+ const result=traceContext(g,{focus:'part',mode:'contents',budget:3,page:99});
+ assert.equal(result.elements.length,64);assert.equal(result.total,62);assert.equal(result.pages,1);assert.equal(result.page,0);assert.equal(result.budget,null);assert.ok(result.relationships.some(e=>e.id==='typing'));
+ assert.equal(result.omissions.filter(o=>o.reason==='budget').length,0);
  const reversed={elements:[...g.elements].reverse(),relationships:[...g.relationships].reverse(),containment:[...g.containment].reverse()};
- assert.deepEqual(traceContext(reversed,{focus:'part',mode:'contents',budget:3}),pages[0]);
+ assert.deepEqual(traceContext(reversed,{focus:'part',mode:'contents',budget:3}),result);
 });
 test('structural filters and unavailable contents are disclosed without type or namespace shortcuts',()=>{
  const g=structureFixture();g.containment.push(owns('package','missing'));g.elements.push(element('meta','Package',{metamodel:true}));g.containment.push(owns('package','meta'));

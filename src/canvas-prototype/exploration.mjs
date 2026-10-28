@@ -1,3 +1,4 @@
+import {completeChildContext} from './child-exploration.mjs';
 /** Focused display projections over native engineering relationships.
  * No relationship or identity is inferred from labels, documentation or ancestry.
  * Definition/usage bridges are explicit typing, at most one hop.
@@ -139,6 +140,7 @@ export function requirementActions(graph,focus,options={}){
  * selected. Native source/target direction, IDs and relationship kinds survive.
  */
 export function traceContext(graph,options={}){
+ if(options.mode==='contents')return completeChildContext(graph,options);
  if(['effective','global-impact'].includes(options.mode))return partContext(graph,options);
  if(options.mode==='local-understanding'){const result=traceContext(graph,{...options,mode:'context'});result.mode='local-understanding';result.summary.message+=' Local understanding exposes direct native type and contents; inherited definitions and other usages remain behind Global impact.';return result;}
  const {focus,mode='context',budget=7,page=0}=options;
@@ -184,10 +186,10 @@ export function traceContext(graph,options={}){
   summary:summaryFor(data,mode,shown.length,targets.length),mode,page:actualPage,total:targets.length,pages:pages.length,shown:shown.length,targets:shown,typingBridges:[...bridges.values()].map(edge=>edge.id),budget:effectiveBudget});
 }
 
-/** Structural actions share exactly the same bounded projection as Focus. */
+/** Structural contents use the complete child projection; relationship actions remain bounded. */
 export function structuralActions(graph,focus,options={}){
  const prepared=prepare(graph);
- const actions=[...structuralModes].map(mode=>{const data=projection(graph,focus,mode,options,prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
+ const actions=[...structuralModes].map(mode=>{if(mode==='contents'){const context=completeChildContext(graph,{...options,focus});return {mode,label:modes[mode].label,count:context.total,enabled:context.total>0,summary:context.summary};}const data=projection(graph,focus,mode,options,prepared),count=data.candidates.size;return {mode,label:modes[mode].label,count,enabled:count>0,summary:summaryFor(data,mode,count,count)};});
  if(isPartElement(prepared.elements.get(focus)))for(const [mode,label]of [['effective','Effective requirements'],['local-understanding','Local understanding'],['global-impact','Global impact']]){const context=traceContext(graph,{...options,focus,mode});actions.push({mode,label,count:context.total,enabled:true,summary:context.summary});}
  return actions;
 }
