@@ -449,3 +449,28 @@ presentation-layout rebinding. Cancellation cannot run a caller continuation
 against the restored or newer model. Resume checks the retained lease's own
 worker, rebuilding retained local source data when that owner has died rather
 than treating a different healthy engine as proof the old model is usable.
+
+
+## Blue Dog canonical namespace import
+
+The bundled Blue Dog model is a committed source import, with exact upstream
+revision and per-file hashes in source.json. The namespace-migration.json file
+retains the upstream qualified-prefix/source-path mapping. Import replaces all
+76 prior project documents with the single canonical models/blue-dog.sysml
+document and retains the 20 byte-identical reusable library documents. The pinned
+native runtime cannot merge independently reopened project fragments. Keeping old
+fragments beside the canonical document would create duplicate declarations.
+
+The 21 model payload roots are one BlueDog project and 20 reusable libraries.
+The old unreferenced publication-document helper is excluded from the bundle;
+its 29 document roots are not part of the approved model payload. The authored
+viewer-view package and declaration-projection boundaries are counted separately. UI grouping is not a substitute for actual
+native ownership. Authored views, live model links, narrative bindings and
+diagnostic tools use the migrated native qualified IDs. Historical figure/run
+provenance retains its original source revision and source paths; current model
+reference buttons resolve the corresponding canonical identities.
+
+Native compilation, mapped identity/owner/type checks, complete package-child
+inventories, ZIP source-byte roundtrip and browser history/phone flows supply
+separate software evidence. This import does not rerun or accept the physical
+analyses, configure a provider or establish full SysML notation conformance.

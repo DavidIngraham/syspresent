@@ -46,7 +46,7 @@ if(!args.includes('--skip-export')){
  projected=call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});
  sample('declarations-exported',performance.now()-begin,{elementCount:projected.elementCount,omittedElementCount:projected.omittedElementCount,jsonBytes:Buffer.byteLength(JSON.stringify(projected)),projection:projected.projection});
 }
-const proof=projected?.elements.find(element=>element.qualifiedName==='BlueDogRequirements::trafficSafety')||{qualifiedName:'BlueDogRequirements::trafficSafety'};
+const proof=projected?.elements.find(element=>element.qualifiedName==='BlueDog::Requirements::trafficSafety')||{qualifiedName:'BlueDog::Requirements::trafficSafety'};
 begin=performance.now();const symbol=call('GetSymbol',{modelHash:parsed.modelHash,symbolId:proof.qualifiedName});sample('native-symbol-after-parse',performance.now()-begin,{qualifiedName:proof.qualifiedName,returned:!!symbol.symbol});
 const viewNames=option('--view','').split(',').filter(Boolean);
 for(const viewName of viewNames){begin=performance.now();const drawing=call('RenderView',{modelHash:parsed.modelHash,view:viewName,includeSemanticIdentity:true});sample('native-view-after-parse',performance.now()-begin,{view:viewName,kind:drawing.kind,nodes:drawing.nodes.length,edges:drawing.edges.length,mappedNodes:drawing.nodes.filter(node=>node.identityStatus==='mapped').length,unmappedNodes:drawing.nodes.filter(node=>node.identityStatus==='unmapped').length});}

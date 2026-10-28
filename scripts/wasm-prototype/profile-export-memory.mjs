@@ -54,8 +54,10 @@ try{
   const cache=JSON.parse(await readFile(cachePath,'utf8'));
   const runtime=call('ParseSources',{documents:[...documents,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(cache.modelRoots,cache.runtimePackage,cache.requirementSeeds)}]});
   evidence.runtimeModelHash=runtime.modelHash;
-  const graph=modelGraph(cache.exported.elements),proposal=createOfflineAuthoringProposal({graph,focus:'BlueDogIC01__integration',question:'Inspect battery density'});
-  proposal.narrative={schemaVersion:'syspresent.narrative.v1',template:'Battery density: {{battery}}',bindings:[{name:'battery',symbol:'BlueDogIC01__integration',attribute:'batteryWhKg',unit:''}]};
+  const graph=modelGraph(cache.exported.elements),integration=graph.elements.find(element=>element.qualifiedName==='BlueDog::Configurations::IC01::integration');
+  if(!integration)throw Error('The current native model does not expose the integration configuration');
+  const proposal=createOfflineAuthoringProposal({graph,focus:integration.id,question:'Inspect battery density'});
+  proposal.narrative={schemaVersion:'syspresent.narrative.v1',template:'Battery density: {{battery}}',bindings:[{name:'battery',symbol:integration.id,attribute:'batteryWhKg',unit:''}]};
   const prepared=await prepareAuthoringProposal(project,{proposal,graph,engine:{call:async(method,params)=>call(method,params)}});
   evidence.candidateView=prepared.viewName;evidence.candidateModelHash=prepared.modelHash;exportHash=prepared.modelHash;
  }

@@ -34,7 +34,7 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin='http://127.0.0.1:'+server.address().port,playwright=option('--playwright',null),executablePath=option('--chromium',undefined);
 const {chromium}=await import(playwright?pathToFileURL(resolve(playwright)):'playwright');
 const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
-let page;
+let page,integrationId;
 async function makePage(){
  const result=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
  result.on('worker',worker=>{if(worker.url().includes('/engine/worker.js')){evidence.semanticWorkerInstances++;save();if(stressPlateau&&evidence.semanticWorkerInstances>1)failSafety('Semantic worker restarted during uninterrupted stability stress');}});
@@ -65,9 +65,9 @@ async function ready(){await page.waitForFunction(()=>document.querySelector('#s
 async function settled(){await page.waitForFunction(()=>document.querySelector('#stage')?.getAttribute('aria-busy')!=='true'&&(document.querySelector('.node[data-context="false"]')||document.querySelector('.sequence-participant')||document.querySelector('.canvas-grid-table')),undefined,{timeout:stepTimeout});await page.waitForTimeout(150);}
 async function findIntegration(){
  if(await page.locator('#find').isHidden())await page.locator('#find-toggle').click();
- await page.locator('#search').fill('BlueDogIC01::integration');
- await page.locator('#search-results').getByRole('button',{name:'BlueDogIC01::integration',exact:true}).click();await settled();
- const node=page.locator('.node[data-context="false"][data-semantic-id="BlueDogIC01__integration"]');await node.locator('.name').first().click();
+ await page.locator('#search').fill('BlueDog::Configurations::IC01::integration');
+ await page.locator('#search-results').getByRole('button',{name:'BlueDog::Configurations::IC01::integration',exact:true}).click();await settled();
+ const node=page.locator('.node[data-context="false"]').filter({has:page.getByText('integration',{exact:true})});integrationId=await node.getAttribute('data-semantic-id');if(!integrationId)throw Error('Native integration identity is unavailable');await node.locator('.name').first().click();
 }
 async function exportZip(cycle){
  if(!await page.locator('#project-menu').evaluate(e=>e.open))await page.locator('#project-menu>summary').click();
@@ -93,7 +93,7 @@ async function exercise(){
   await page.locator('#edit').click();await page.locator('#author-native-slide').click();await page.locator('#authoring-values-button').click();await page.locator('#authoring-values').getByRole('button',{name:'Bind batteryWhKg = resolve natively during validation',exact:true}).click();
   const proposal=JSON.parse(await page.locator('#authoring-proposal').inputValue());
   proposal.title='Memory regression '+cycle;
-  proposal.narrative={schemaVersion:'syspresent.narrative.v1',template:'Battery density: {{battery}}',bindings:[{name:'battery',symbol:'BlueDogIC01__integration',attribute:'batteryWhKg',unit:''}]};
+  proposal.narrative={schemaVersion:'syspresent.narrative.v1',template:'Battery density: {{battery}}',bindings:[{name:'battery',symbol:integrationId,attribute:'batteryWhKg',unit:''}]};
   await page.locator('#authoring-proposal').fill(JSON.stringify(proposal,null,2));await page.locator('#authoring-validate').click();
   await page.waitForFunction(()=>!document.querySelector('#authoring-validate').disabled,undefined,{timeout:stepTimeout});
   if(await page.locator('#authoring-append').isDisabled())throw Error('Candidate validation failed: '+await page.locator('#authoring-review').textContent());

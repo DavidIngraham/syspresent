@@ -35,7 +35,7 @@ Narrow layouts use the existing explicit tabs. Enlarge figure opens the same ima
 caption and provenance without changing the scene or graph camera.
 
 ```syspresent
-{"type":"scene","id":"gorge-challenge","title":"The Gorge challenge","view":"BlueDogCanvasViews::challengeOverview","focus":"GorgeChallenge::transGorgeChallenge","chapter":{"id":"gorge","title":"The Gorge challenge"},"figures":[{"id":"course-map","title":"The course","asset":"assets/gorge-course.svg","alt":"Outbound from Bingen to the Stevenson rounding, then back to Bingen.","caption":"Schematic gate order; geographic geometry is omitted.","provenance":{"source":"TransGorgeCourse; models/missions/course.sysml","context":"Identified Blue Dog source revision; schematic"},"modelRefs":["GorgeChallenge::courseCompletion"]}]}
+{"type":"scene","id":"gorge-challenge","title":"The Gorge challenge","view":"BlueDogCanvasViews::challengeOverview","focus":"BlueDog::Mission::Challenge::transGorgeChallenge","chapter":{"id":"gorge","title":"The Gorge challenge"},"figures":[{"id":"course-map","title":"The course","asset":"assets/gorge-course.svg","alt":"Outbound from Bingen to the Stevenson rounding, then back to Bingen.","caption":"Schematic gate order; geographic geometry is omitted.","provenance":{"source":"BlueDog::Mission::Course; models/missions/course.sysml","context":"Identified Blue Dog source revision; schematic"},"modelRefs":["BlueDog::Mission::Challenge::courseCompletion"]}]}
 ```
 
 Supported images are SVG, PNG, JPEG, WebP and GIF. Assets must exist inside the
@@ -46,7 +46,7 @@ asset bytes. Import a folder or ZIP containing images to author new figures.
 
 ## Model references in prose
 
-Write `[the protected reserve](model:BlueDogRequirements::recoveryEnergy)`.
+Write `[the protected reserve](model:BlueDog::Requirements::recoveryEnergy)`.
 References resolve by exact native identity or qualified name; labels are not
 lookup keys. Percent encoding is supported. Clicking selects without relayout.
 A loaded target outside the current views is disclosed with an explicit Focus
@@ -71,7 +71,7 @@ categories, not statuses inferred by the renderer.
   "kind": "decision",
   "title": "A numerical sizing baseline",
   "text": "The rotating wing supplies the initial sizing representation; the rig trade remains open.",
-  "modelRefs": ["BlueDogDesignDecisions::sizingBaseline"]
+  "modelRefs": ["BlueDog::Decisions::Design::sizingBaseline"]
 }
 ```
 

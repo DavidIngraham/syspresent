@@ -43,7 +43,7 @@ function sources(dir){return readdirSync(dir,{withFileTypes:true}).flatMap(item=
 test('actual Blue Dog Actuation native ten-pin view keeps fixed ELK geometry and safely places or discloses every label',{skip:!existsSync(binary)&&'Build native engine first',timeout:60000},async()=>{
  const native=client();try{
   const parsed=await native.call('ParseSources',{documents:sources(resolve('examples/canvas-blue-dog'))});
-  const dto=await native.call('RenderView',{modelHash:parsed.modelHash,view:'#action:BlueDogBehaviorContracts::SailingActuationGate',includeSemanticIdentity:true,show:['parameter-symbols','port-symbols','typings','edge-labels']});
+  const dto=await native.call('RenderView',{modelHash:parsed.modelHash,view:'#action:BlueDog::Behavior::Contracts::SailingActuationGate',includeSemanticIdentity:true,show:['parameter-symbols','port-symbols','typings','edge-labels']});
   const view=adaptNativeView(dto,'actuation-labels'),doc=new JSDOM('<body></body>').window.document;
   const measured={...view,nodes:view.nodes.map(n=>({...n,...measureFocusedNode(doc,n,null,{view})}))};
   const layout=await layoutDiagram(measured,{elk:new ELK(),width:1100,height:760,measureLabel}),fitted=fitDiagram(layout,{x:0,y:0,width:1100,height:760}),before=structuredClone(fitted);

@@ -3,18 +3,18 @@
   "title": "Blue Dog: from the Gorge challenge to a defined boat",
   "navigation": {
     "roots": [
-      "GorgeChallenge",
-      "BlueDogRequirements",
+      "BlueDog::Mission::Challenge",
+      "BlueDog::Requirements",
       "BlueDog",
-      "BlueDogMissionLogic",
-      "BlueDogRequirementVerification",
-      "BlueDogMethod",
-      "BlueDogSatisfaction",
-      "BlueDogLogicalArchitecture",
-      "BlueDogPhysicalArchitecture",
-      "BlueDogIC01",
-      "BlueDogSailTrade",
-      "BlueDogDesignDecisions"
+      "BlueDog::Behavior::MissionLogic",
+      "BlueDog::Verification::Requirements",
+      "BlueDog::Method",
+      "BlueDog::Verification::Satisfaction",
+      "BlueDog::Architecture::Logical",
+      "BlueDog::Architecture::Physical",
+      "BlueDog::Configurations::IC01",
+      "BlueDog::Analyses::SailTrade",
+      "BlueDog::Decisions::Design"
     ]
   }
 }

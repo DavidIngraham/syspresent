@@ -248,4 +248,16 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
 
+    verification def <'SV-024'> canonicalNamespaceImport {
+        doc /* Verify committed upstream identity and all 21 model payload hashes before replacing the 76 obsolete project documents. Compare before/after native declarations with the same compiler, applying the authoritative namespace map to identities, kinds, owners, types and generalizations. Report projection exclusions and source-import plumbing separately. Validate 21 payload roots and 111 payload packages independently of viewer packages and unanchored metadata. Resolve every authored view, current model link and narrative binding; retain historical figure/run provenance. Check exact complete immediate-child sets through hierarchy, scopes, native views, Back/Forward and phone widths. Capture a real native view, export/import ZIP and compare all source bytes. Run product/publication tests, native contracts/specification/parity and verify successful CI, deployed commit and public asset hashes. These are software/model-import checks, not physical analysis acceptance or physical Safari evidence. */
+        objective acceptance {
+            verify SyspresentRequirements::Authoring::strictBuild;
+            verify SyspresentRequirements::Snapshots::frozenSnapshot;
+            verify SyspresentRequirements::ConversationalExploration::completeHierarchy;
+            verify SyspresentRequirements::PackageExploration::packageWorkspace;
+            verify SyspresentRequirements::PackageExploration::standaloneViewNavigation;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }
