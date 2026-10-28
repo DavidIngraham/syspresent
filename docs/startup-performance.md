@@ -6,6 +6,8 @@ are separate from the public site and have not been deployed. These records
 separate public-network observations, diagnostic instrumentation and controlled
 local comparisons.
 Desktop Chromium and CPU/network emulation are not physical iOS or Safari evidence.
+The measured toolchain was Node 22.14.0, Playwright 1.56.0 and Google Chrome
+for Testing 156.0.8078.4 on Linux/WSL. Chromium reported 16 logical processors.
 
 ## Public startup before the changes
 
@@ -105,46 +107,75 @@ build/startup-public-instrumented.json and
 build/startup-public-instrumented.json.cpuprofile. The worker probe records only
 method names, durations and request character counts, not model payloads.
 
-## First controlled local comparison at ccb487c
+## Final controlled local comparison
 
 The before and after sites used byte-identical WASM, Go runtime, engine
 provenance, Blue Dog project ZIP and Flashlight ZIP. The baseline was the frozen
 bef37f3 site: its app/worker behavior matches deployed 3692c3a, whose additional
-change only repaired a native test. The candidate site was built at ccb487c.
-Each scenario used a fresh persistent browser profile, then a warm reload,
-through the same gzip-level-6 localhost server and requested CDP conditions.
+change only repaired a native test. The final candidate site was the clean build
+8413525755029c12b9c8d845ccf3f6a4a9c3b0ba. Each scenario used a fresh persistent
+browser profile, then a warm reload, through the same gzip-level-6 localhost
+server and requested CDP conditions.
 
 | Model / condition | Cold before → after | Warm before → after |
 | --- | ---: | ---: |
-| Flashlight, normal | 2.40 → 2.43 s | 1.53 → 1.74 s |
-| Blue Dog, normal | 23.10 → 20.91 s | 22.78 → 20.12 s |
-| Blue Dog, constrained page | 75.73 → 64.94 s | 44.26 → 31.82 s |
+| Flashlight, normal | 2.401 → 2.468 s | 1.533 → 1.732 s |
+| Blue Dog, normal | 23.100 → 19.139 s | 22.781 → 18.988 s |
+| Blue Dog, constrained page | 75.731 → 60.195 s | 44.262 → 27.198 s |
 
-The observed Blue Dog improvements were 9.5%/11.7% cold/warm under normal
-conditions and 14.2%/28.1% under the constrained page condition. No small-model
-speedup was observed; its warm observation was about 0.21 s slower. These single
+The observed Blue Dog improvements were 17.2%/16.6% cold/warm under normal
+conditions and 20.5%/38.6% under the constrained page condition. No small-model
+speedup was observed; its cold observation was about 0.07 s slower and its
+warm observation about 0.20 s slower. These single
 paired observations are not a universal latency guarantee or a public-mobile
 speedup claim.
 
 | Blue Dog blocking measurement | Before → after |
 | --- | ---: |
-| Normal cold main long-task total | 5.70 → 3.21 s |
-| Normal warm main long-task total | 5.81 → 2.91 s |
-| Constrained cold main long-task total | 26.06 → 15.36 s |
-| Constrained warm main long-task total | 26.15 → 14.13 s |
-| Normal cold largest single task | 2.32 → 1.26 s |
-| Constrained cold largest single task | 10.25 → 4.98 s |
+| Normal cold main long-task total | 5.70 → 0.62 s |
+| Normal warm main long-task total | 5.81 → 0.50 s |
+| Constrained cold main long-task total | 26.06 → 8.69 s |
+| Constrained warm main long-task total | 26.15 → 7.57 s |
+| Normal cold largest single task | 2.32 s → 175 ms |
+| Normal warm largest single task | 2.33 s → 202 ms |
+| Constrained cold largest single task | 10.25 s → 658 ms |
+| Constrained warm largest single task | 10.15 s → 546 ms |
 
-Complete native parsing remains material; the changes preserve that native
-semantics/freshness check. The candidate still has multi-second main-thread work
-under CPU emulation, so a progress label alone does not establish continuously
-responsive cancellation during every layout computation. The measurement
-separates that remaining limit from the responsive native-worker parse phase.
+Long-task totals count only tasks of at least 50 ms; splitting work can reduce
+that metric without removing all its CPU cost. Cooperative routing and scene
+validation yielded between bounded work batches while retaining checks and
+geometry. The observed longest tasks were below one second even under the
+requested page CPU emulation; this is not a hard real-time bound for every
+model, device or atomic route.
 
-All twelve paired loads passed with unchanged native element/view counts and no
-page errors or unexpected external requests. Raw evidence is
-build/startup-local-baseline.json, build/startup-local-optimized.json,
-build/startup-paired-payload-proof.json and build/startup-paired-comparison.json.
+A separate final instrumented load measured native ParseSources at 16.610 s.
+It remains the dominant normal warm-start work and is preserved for native
+semantics and freshness. The final streaming-instantiation interval was 83.8 ms
+on localhost, overlapping the transfer; native API availability followed about
+170 ms later. These diagnostic timing values are not additive to network time.
+Sampled orthogonal-routing self CPU was about 0.44 s, with about 0.65 s inclusive,
+and modelGraph about 43 ms inclusive. The diagnostic profile is separate from
+the unmodified six-run comparison.
+
+All twelve final paired loads, plus the separate final diagnostic load, passed
+with unchanged native element/view counts and no page errors or unexpected
+external requests. Final evidence is:
+
+- build/startup-local-baseline.json
+- build/startup-local-final.json
+- build/startup-local-final-instrumented.json and its .cpuprofile
+- build/startup-final-payload-proof.json
+- build/startup-final-comparison.json
+
+The earlier candidate ccb487c observations remain in
+build/startup-local-optimized.json and build/startup-paired-comparison.json.
+They are intermediate measurements, not the final values above.
+
+The updated publication keys unchanged native assets by the generated native
+payload fingerprint, allowing browser HTTP-cache reuse across app/story-only
+updates. Changed native bytes invalidate that key. This does not persist private
+model state or bypass complete native parsing and publisher/source/model cache
+validation.
 
 ## Reproducing the measurements
 
