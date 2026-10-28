@@ -27,7 +27,7 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `e4fd5aa4ce5e4b756992fcee2d69459833e5ef56`
+The prototype dependency revision is `aaf24bec050f84700f6191cca49e014f44158256`
 on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
 `opensysml-semantic-views.patch` contains its changes relative to the existing
 `af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
@@ -145,8 +145,8 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `e4fd5aa4ce5e4b756992fcee2d69459833e5ef56` (clean).
-Carried-patch SHA-256: `2ad5d8101a2288bedc01addeac27fed46467a6369e647e3df9f392ac0aa6d80a`.
+Current source revision: `aaf24bec050f84700f6191cca49e014f44158256` (clean).
+Carried-patch SHA-256: `e8332e02f984358dd8c3da41fb9d3fa53cb8e140fa6b2a7a44bff0c43a76d908`.
 
 ## Distinct parallel native relationships
 
@@ -237,6 +237,11 @@ Use Node 22.14.0 and Go 1.25.11. Applying the patch leaves the dependency
 intentionally dirty: provenance records the published base, complete source diff
 and carried-patch digest, rather than pretending the unpublished local commit was
 checked out. The verified resulting source-tree ID is
-65830302812358fcbe78ab5dd7ef111708d46e3f, equal to the tested native tree.
+d85adf5b2e95aad223e944768fc37769e32acab4, equal to the tested native tree.
 No separate dependency publication is needed. A fresh local base-plus-patch
-build and native/WASM parity are recorded under build/memory-carried-reuse-*.
+build and native/WASM parity are recorded under build/pages-carried-*.
+
+The deployment followup changes only the native wire test and its changelog
+fragment: the exact capability list now includes the implemented release_model
+and memory_stats APIs. The production Go files match the memory-tested e4fd5
+source. No capability check is removed or skipped.

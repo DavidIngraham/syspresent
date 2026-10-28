@@ -284,3 +284,22 @@ The stress driver ended with passed assertions; its outer shell wrapper had an
 exit-status quoting error, so no successful shell-wrapper exit is claimed.
 Driver JSON, continuity, source hashes and independently verified cleanup are
 the evidence for that run.
+
+## Deployment contract followup on October 28, 2026
+
+The first Pages run failed before deployment because the standalone wire parity
+test still expected the capability list before model release and memory statistics
+were introduced. The exact capability assertion now includes both implemented
+APIs; no check is skipped. The failure was reproduced locally, and the exact
+workflow native-contract command, full native build/vet and formatting passed.
+
+Native source aaf24bec050f84700f6191cca49e014f44158256 differs from the memory-tested e4fd5
+only in that test and its changelog fragment. Production Go files are unchanged.
+The current carried patch is e8332e02f984358dd8c3da41fb9d3fa53cb8e140fa6b2a7a44bff0c43a76d908;
+it reconstructs source tree d85adf5b2e95aad223e944768fc37769e32acab4
+from the same public base. The earlier memory figures and patch digest above
+remain historical measurements of their stated revisions.
+
+Rebuilding the public base with the updated patch produced byte-identical native
+and WASM binaries to the previous base-plus-patch build. Native/WASM parity
+passed again. The test repair therefore changes no shipped engine behavior.

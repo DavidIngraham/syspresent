@@ -61,6 +61,13 @@ index 000000000..1e217374a
 +++ b/changes/unreleased/parallel-rendered-relationships.fixed.md
 @@ -0,0 +1 @@
 +- Preserve distinct source relationship declarations with identical endpoints in general views, including parallel satisfaction assertions, while deduplicating repeated discovery of the same declaration.
+diff --git a/changes/unreleased/standalone-lifecycle-wire-contract.fixed.md b/changes/unreleased/standalone-lifecycle-wire-contract.fixed.md
+new file mode 100644
+index 000000000..3229adabf
+--- /dev/null
++++ b/changes/unreleased/standalone-lifecycle-wire-contract.fixed.md
+@@ -0,0 +1 @@
++- Correct the standalone wire capability contract to include explicit model release and memory diagnostics.
 diff --git a/changes/unreleased/symbol-large-integers.fixed.md b/changes/unreleased/symbol-large-integers.fixed.md
 new file mode 100644
 index 000000000..0f2b3384b
@@ -67522,7 +67529,7 @@ index 000000000..79f3dd207
 +	}{"complete", time.Since(started).Milliseconds(), len(result), counts})
 +}
 diff --git a/tests/wasm/combined_test.go b/tests/wasm/combined_test.go
-index fe2764acc..262daa9ed 100644
+index fe2764acc..a83b78923 100644
 --- a/tests/wasm/combined_test.go
 +++ b/tests/wasm/combined_test.go
 @@ -346,8 +346,10 @@ func TestCombinedWireParity(t *testing.T) {
@@ -67531,8 +67538,8 @@ index fe2764acc..262daa9ed 100644
  	}
 -	if !reflect.DeepEqual(info.Capabilities, expectedCapabilities) {
 -		t.Errorf("GetServerInfo capabilities = %v, want %v", info.Capabilities, expectedCapabilities)
-+	// Standalone-only view/export operations extend the shared execution contract.
-+	standaloneCapabilities := append(append([]string{}, expectedCapabilities...), "render_view", "semantic_rendering_identity", "export_model")
++	// Standalone view/export and lifecycle operations extend the shared execution contract.
++	standaloneCapabilities := append(append([]string{}, expectedCapabilities...), "render_view", "semantic_rendering_identity", "export_model", "release_model", "memory_stats")
 +	if !reflect.DeepEqual(info.Capabilities, standaloneCapabilities) {
 +		t.Errorf("GetServerInfo capabilities = %v, want %v", info.Capabilities, standaloneCapabilities)
  	}
