@@ -56,3 +56,64 @@ test('termination rejects pending work and prohibits future requests', async () 
   await assert.rejects(engine.call('GetServerInfo'), /terminated/);
   assert.equal(worker.terminated, true);
 });
+
+test('initialization progress does not settle the RPC and ignores obsolete messages', async () => {
+  const progress=[];
+  const engine=createSemanticEngine({assetBase:new URL('https://example.test/engine/'),WorkerClass:WorkerFake,onProgress:event=>progress.push(event)});
+  const worker=WorkerFake.latest;let settled=false;
+  engine.ready.then(()=>{settled=true;});
+  worker.onmessage({data:{id:999,progress:{stage:'stale'}}});
+  worker.onmessage({data:{id:1,progress:{stage:'engine-download',completed:10,unit:'bytes'}}});
+  await Promise.resolve();
+  assert.equal(settled,false);assert.equal(progress.length,1);
+  assert.equal(progress[0].requestId,1);assert.equal(progress[0].method,'Initialize');assert.equal(progress[0].completed,10);
+  worker.answer(1,{version:'actual'});await engine.ready;
+  worker.onmessage({data:{id:1,progress:{stage:'late'}}});
+  engine.terminate();worker.onmessage({data:{id:1,progress:{stage:'closed'}}});
+  assert.equal(progress.length,1);
+});
+
+test('a failed initialization closes its worker and a fresh engine can retry', async () => {
+  const engine=create();const failedWorker=WorkerFake.latest;
+  const failure=assert.rejects(engine.ready,/HTTP 503/);
+  failedWorker.answer(1,undefined,{message:'Cannot load semantic engine: HTTP 503'});await failure;
+  assert.equal(failedWorker.terminated,true);
+  await assert.rejects(engine.call('GetServerInfo'),/HTTP 503/);
+  const retry=create();const worker=WorkerFake.latest;worker.answer(1,{version:'retry'});
+  assert.equal((await retry.ready).version,'retry');retry.terminate();
+});
+
+test('a progress observer cannot interrupt engine initialization', async () => {
+  const engine=createSemanticEngine({assetBase:new URL('https://example.test/engine/'),WorkerClass:WorkerFake,onProgress:()=>{throw Error('display observer');}});
+  const worker=WorkerFake.latest;
+  assert.doesNotThrow(()=>worker.onmessage({data:{id:1,progress:{stage:'engine-start'}}}));
+  worker.answer(1,{version:'native'});assert.equal((await engine.ready).version,'native');engine.terminate();
+});
+
+test('worker transport and decoding failures reject pending initialization', async () => {
+  for(const kind of ['onerror','onmessageerror']){
+    const engine=create();const worker=WorkerFake.latest;const rejected=assert.rejects(engine.ready,/worker/);
+    worker[kind]({message:'worker asset unavailable'});await rejected;
+    assert.equal(worker.terminated,true);
+  }
+});
+
+test('worker creation and initialization post failures reject ready and expose closed state', async () => {
+ for(const WorkerClass of [
+  class {constructor(){throw Error('worker creation blocked');}},
+  class {postMessage(){throw Error('worker post blocked');}terminate(){this.terminated=true;WorkerFake.latest=this;}}
+ ]){
+  const engine=createSemanticEngine({assetBase:new URL('https://example.test/engine/'),WorkerClass});
+  await assert.rejects(engine.ready,/worker.*blocked/);
+  assert.equal(engine.closed,true);engine.terminate();
+ }
+});
+
+test('a stopped native bridge closes the engine and rejects other pending work', async () => {
+ const engine=create();const worker=WorkerFake.latest;worker.answer(1,{});await engine.ready;
+ const failed=engine.call('ExportModel'),other=engine.call('GetSymbol');await Promise.resolve();
+ const failure=assert.rejects(failed,error=>error.code==='NATIVE_NO_RESPONSE');
+ const rejection=assert.rejects(other,error=>error.code==='NATIVE_NO_RESPONSE');
+ worker.answer(2,undefined,{message:'native engine stopped',code:'NATIVE_NO_RESPONSE'});
+ await Promise.all([failure,rejection]);assert.equal(engine.closed,true);assert.equal(worker.terminated,true);
+});
