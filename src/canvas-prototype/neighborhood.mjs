@@ -15,7 +15,7 @@ const pathBoxes=edges=>edges.flatMap(e=>(e.points??[]).slice(1).map((b,i)=>{cons
  * a semantic connection; unavailable routes are disclosed, never shortened into
  * dangling arrows. Ownership and typing keep their own native notation.
  */
-export function prepareNeighborhood(context,activeNodes,area,options={}){
+function* neighborhoodSteps(context,activeNodes,area,options={}){
  const {width=156,height=70,gap=72,activeEdges=[],labelObstacles=[],obstacles=[],measureLabel}=options;
  if(![area?.x,area?.y,area?.width,area?.height,width,height,gap].every(Number.isFinite)||area.width<=0||area.height<=0||width<=0||height<=0||gap<0)throw new Error('Invalid neighborhood geometry');
  const active=activeNodes??[],known=new Map(active.map(n=>[n.id,n])),drafts=[...context.view.nodes].sort((a,b)=>compare(a.name,b.name)||compare(a.id,b.id));
@@ -29,6 +29,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
  const nodeHeight=id=>known.get(id)?.height??byID.get(id)?.height??height;
  const rankGap=id=>Math.max(gap,orders.filter(o=>o.above===id||o.below===id).length*10+24);
  for(let i=0;i<drafts.length+1;i++){
+  yield;
   let changed=false;
   for(const {above,below}of orders){
    const lo=limits.get(below),hi=limits.get(above),nextMin=lower(above)+nodeHeight(above)+rankGap(above),nextMax=upper(below)-nodeHeight(above)-rankGap(above);
@@ -41,11 +42,13 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
  // descendants. Conflicting/cyclic native ranks are explicitly disclosed.
  const remaining=new Set(drafts.map(n=>n.id)),ordered=[];
  while(remaining.size){
+  yield;
   const ready=[...remaining].filter(id=>!orders.some(o=>o.below===id&&remaining.has(o.above))).sort(compare);
   if(!ready.length){notices.push({reason:'context-rank-conflict',targets:[...remaining]});ordered.push(...[...remaining].sort(compare));break;}
   for(const id of ready){ordered.push(id);remaining.delete(id);}
  }
  for(const id of ordered){
+  yield;
   const node=byID.get(id),width=node.width,height=node.height,links=edges.filter(e=>e.source===id||e.target===id),linked=links.map(e=>known.get(e.source===id?e.target:e.source)).filter(Boolean),activeAnchors=linked.filter(n=>active.some(a=>a.id===n.id)),anchors=activeAnchors.length?activeAnchors:linked,anchor=anchors.length?{x:anchors.reduce((s,n)=>s+center(n).x,0)/anchors.length,y:anchors.reduce((s,n)=>s+center(n).y,0)/anchors.length}:center(hull);
   let {min,max}=limits.get(id);
   for(const {above,below}of orders){if(below===id&&known.has(above))min=Math.max(min,known.get(above).y+known.get(above).height+rankGap(above));if(above===id&&known.has(below))max=Math.min(max,known.get(below).y-height-rankGap(id));}
@@ -55,6 +58,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
   // Search increasingly distant rings; world space is deliberately unbounded.
   // A horizontal lane always remains available even for a tightly pinned rank.
   for(let ring=0;ring<drafts.length+blocked.length+8&&!placed;ring++){
+   yield;
    const candidates=[];
    const ranked=orders.some(o=>o.above===id||o.below===id);
    for(let row=ranked?0:-ring;row<=(ranked?0:ring);row++)for(let col=-ring;col<=ring;col++){
@@ -88,6 +92,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
   const ac=center(a),bc=center(b);return Math.abs(bc.y-ac.y)>Math.abs(bc.x-ac.x)*.65?(bc.y>=ac.y?'SOUTH':'NORTH'):(bc.x>=ac.x?'EAST':'WEST');
  };
  for(const node of allNodes){
+  yield;
   const incident=edges.filter(e=>e.source===node.id||e.target===node.id);
   for(const side of ['NORTH','SOUTH','EAST','WEST']){
    const neighbors=incident.map(e=>({edge:e,other:known.get(e.source===node.id?e.target:e.source)})).filter(({other})=>other&&sideFor(node,other)===side);
@@ -99,6 +104,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
  let routed=[];const fanCandidates=new Map();
  const sorted=[...edges].sort((a,b)=>compare(a.id,b.id));
  for(const edge of sorted){
+  yield;
   const endpoints=new Set([edge.source,edge.target]),proxyNodes=allNodes.flatMap(node=>{
    if(!endpoints.has(node.id))return [node];
    const point=attachments.get(`${edge.id}:${node.id}`);if(!point)return [node];
@@ -109,6 +115,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
   const routingOptions={activeEdges:[...activeEdges,...routed.filter(e=>!e.routingBlocked)],obstacles:[...obstacles,...labelObstacles],measureLabel,candidateBudget:4,reverse:false,visibilitySearches:0};
   const routingEdge={...edge,label:''};
   let result=routePeripheralEdges([routingEdge],proxyNodes,worldBounds,routingOptions).edges[0];
+  yield;
   const order=decisionOrder(edge);
   if(order){
    const above=known.get(order.above),below=known.get(order.below),top=attachments.get(`${edge.id}:${order.above}`),bottom=attachments.get(`${edge.id}:${order.below}`);
@@ -124,15 +131,17 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
     if(avoids&&routeIsClear(points,edge,allNodes,{orthogonalOnly:true})&&peripheralRouteScore(peripheralRoutingMetrics([candidate],routingOptions.activeEdges))<peripheralRouteScore(peripheralRoutingMetrics([result],routingOptions.activeEdges)))result=candidate;
    }
   }
-  if(result.routingBlocked)result=routePeripheralEdges([routingEdge],proxyNodes,worldBounds,{...routingOptions,candidateBudget:8,visibilitySearches:1}).edges[0];
+  if(result.routingBlocked){result=routePeripheralEdges([routingEdge],proxyNodes,worldBounds,{...routingOptions,candidateBudget:8,visibilitySearches:1}).edges[0];yield;}
   result={...result,label:edge.label};
   if(!result.routingBlocked&&(!routeIsClear(result.points,edge,allNodes,{orthogonalOnly:true})||!routeConnectsEndpoints(result.points,edge,allNodes)))result={...result,points:[],d:'',routingBlocked:true};
   if(result.routingBlocked){
    const fallback=routePeripheralEdges([routingEdge],allNodes,worldBounds,{...routingOptions,candidateBudget:16,visibilitySearches:2}).edges[0];
+   yield;
    if(!fallback.routingBlocked&&routeIsClear(fallback.points,edge,allNodes,{orthogonalOnly:true})&&routeConnectsEndpoints(fallback.points,edge,allNodes))result={...fallback,label:edge.label};
   }
   routed.push(result);
  }
+ yield;
  const allFans=routed.map(edge=>fanCandidates.get(edge.id)??edge);
  if(peripheralRouteScore(peripheralRoutingMetrics(allFans,activeEdges))<peripheralRouteScore(peripheralRoutingMetrics(routed,activeEdges)))routed=allFans;
  // Separate accidental collinear buses after the complete graph is known.
@@ -149,11 +158,13 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
  for(let pass=0;pass<3;pass++){
   let improved=false;
   for(let index=0;index<routed.length;index++){
+   yield;
    const current=routed[index];if(current.routingBlocked)continue;
    const other=[...activeEdges,...routed.filter((_,i)=>i!==index)],metric=peripheralRoutingMetrics([current],other);
    if(metric.overlapLength<.05&&!metric.crossings)continue;
    let best=current,bestScore=laneScore(metric,current,other);
    for(let segment=0;segment<current.points.length-1;segment++)for(const offset of [-7,7,-14,14,-28,28,-49,49,-98,98,-196,196]){
+    yield;
     const points=current.points.map(p=>({...p})),a=points[segment],b=points[segment+1];
     if(Math.abs(a.x-b.x)<.01){a.x+=offset;b.x+=offset;}else if(Math.abs(a.y-b.y)<.01){a.y+=offset;b.y+=offset;}else continue;
     const candidate={...current,points};if(!safe(candidate))continue;
@@ -168,6 +179,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
  // cannot block another real neighbor's terminal or connection corridor.
  const reserved=[...obstacles,...labelObstacles,...activeEdges.flatMap(e=>e.labelBox?[e.labelBox]:[])],corridors=pathBoxes([...activeEdges,...routed]);
  for(const edge of routed){
+  yield;
   if(!edge.label||edge.routingBlocked)continue;
   const measured=measureLabel?.(edge.label)??{width:String(edge.label).length*6.5+4,height:14},size={width:Math.max(1,measured.width),height:Math.max(1,measured.height)},slots=[];
   for(let i=1;i<edge.points.length;i++){
@@ -180,6 +192,7 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
   const box=slots.find(box=>box.x>=worldBounds.x&&box.y>=worldBounds.y&&box.x+box.width<=worldBounds.x+worldBounds.width&&box.y+box.height<=worldBounds.y+worldBounds.height&&![...allNodes,...reserved,...corridors].some(r=>overlap(box,r,2)));
   if(box){edge.labelBox=box;edge.x=box.x;edge.y=box.y+box.height*.78;reserved.push(box);}else edge.labelOmitted=true;
  }
+ yield;
  const routing={edges:routed,metrics:peripheralRoutingMetrics(routed,activeEdges)};
  const omissions=[...(context.omissions??[])],routedEdges=routing.edges.filter(e=>!e.routingBlocked);
  for(const edge of routing.edges.filter(e=>e.routingBlocked))omissions.push({relationshipId:edge.semanticId??edge.id,source:edge.semanticSource,target:edge.semanticTarget,reason:'context-route-unavailable'});
@@ -190,4 +203,37 @@ export function prepareNeighborhood(context,activeNodes,area,options={}){
  const byReason={};for(const omission of omissions)byReason[omission.reason]=(byReason[omission.reason]??0)+1;
  const finalBounds=bounds([worldBounds,...routedEdges.flatMap(e=>[...(e.points??[]).map(p=>({...p,width:0,height:0})),...(e.labelBox?[e.labelBox]:[])])]);
  return {...context.view,nodes,edges,routedEdges,stubEdges:[],boundaryMarkers:[],worldBounds:finalBounds,routingMetrics:routing.metrics,notices,omissions,boundary:{...context.boundary,cards:nodes.length,markers:0,omitted:omissions.length,byReason}};
+}
+
+
+/** Compatibility entry point: exactly the same candidate order and geometry. */
+export function prepareNeighborhood(context,activeNodes,area,options={}){
+ const steps=neighborhoodSteps(context,activeNodes,area,options);
+ let step;do{step=steps.next();}while(!step.done);
+ return step.value;
+}
+const taskYield=()=>typeof globalThis.scheduler?.yield==='function'?globalThis.scheduler.yield():new Promise(resolve=>setTimeout(resolve,0));
+const monotonicNow=()=>globalThis.performance?.now?.()??Date.now();
+function canceledNeighborhood(){
+ const error=new Error('Neighborhood layout was superseded or canceled.');
+ error.name='AbortError';error.code='LAYOUT_CANCELED';return error;
+}
+/** Yield between unchanged candidates so loading paint and newer requests can run. */
+export async function prepareNeighborhoodAsync(context,activeNodes,area,{
+ yieldControl=taskYield,isCurrent=()=>true,budgetMs=16,clock=monotonicNow,...options
+}={}){
+ if(!Number.isFinite(budgetMs)||budgetMs<0||typeof yieldControl!=='function'||typeof isCurrent!=='function'||typeof clock!=='function')throw new TypeError('Invalid cooperative neighborhood scheduling options');
+ const steps=neighborhoodSteps(context,activeNodes,area,options);
+ let sliceStarted=clock();
+ try{
+  while(true){
+   if(!isCurrent())throw canceledNeighborhood();
+   const step=steps.next();if(step.done)return step.value;
+   if(clock()-sliceStarted>=budgetMs){
+    await yieldControl();
+    if(!isCurrent())throw canceledNeighborhood();
+    sliceStarted=clock();
+   }
+  }
+ }finally{steps.return();}
 }
