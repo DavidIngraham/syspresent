@@ -125,27 +125,52 @@ ${(seeds??qualifiedRoots).map(q=>'  expose '+q.split('::').map(quoted).join('::'
 }
 
 export async function sourceDigest(documents){const bytes=new TextEncoder().encode(JSON.stringify(documents));return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');}
-export async function verifiedRuntimeCache(project,{trustedHash,engineVersion,engineFingerprint,documents,modelHash}){
- const filename=project.manifest.runtimeCache;if(!filename||!trustedHash)return null;
- const value=project.files[filename],bytes=typeof value==='string'?new TextEncoder().encode(value):value;
- if(!bytes)return null;const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
- if(hash!==trustedHash)return null;
- const cache=JSON.parse(fileText(project,filename));
- if(cache.schemaVersion!=='syspresent.native-cache.v1'||cache.engineVersion!==engineVersion||cache.engineFingerprint!==engineFingerprint||cache.modelHash!==modelHash||cache.sourceDigest!==await sourceDigest(documents))return null;
- return cache;
+// Cache readers are scoped to one compilation. Every check hashes the current
+// file bytes; only verified JSON parsing is shared with index preparation.
+export function createRuntimeCacheReader(project,{trustedHash,engineVersion,engineFingerprint}={}){
+ let parsed,queue=Promise.resolve();
+ const serial=operation=>{const result=queue.then(operation);queue=result.then(()=>{},()=>{});return result;};
+ async function read(){
+  const filename=project.manifest.runtimeCache;
+  if(!filename||!trustedHash){parsed=undefined;return null;}
+  const value=project.files[filename];
+  if(value===undefined||value===null){parsed=undefined;return null;}
+  // Capture the bytes which will be parsed, not a later read of a mutable file.
+  const bytes=typeof value==='string'?new TextEncoder().encode(value):parsed?value:new Uint8Array(value);
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(hash!==trustedHash){parsed=undefined;return null;}
+  parsed??=JSON.parse(typeof value==='string'?value:strFromU8(bytes));
+  if(!parsed||typeof parsed!=='object'||parsed.schemaVersion!=='syspresent.native-cache.v1'||parsed.engineVersion!==engineVersion||parsed.engineFingerprint!==engineFingerprint)return null;
+  return parsed;
+ }
+ return {
+  // An index can prepare native inputs, but never authorizes cached semantics.
+  index({documents}){
+   return serial(async()=>{
+    let cache;try{cache=await read();}catch(error){if(error instanceof SyntaxError)return null;throw error;}
+    if(!cache||cache.inputDigest!==await sourceDigest(documents))return null;
+    if(!Array.isArray(cache.modelRoots)||!cache.modelRoots.length||!cache.modelRoots.every(x=>typeof x==='string'&&x)||!Array.isArray(cache.requirementSeeds)||!cache.requirementSeeds.every(x=>typeof x==='string'&&x))return null;
+    if(cache.runtimePackage!==undefined&&(typeof cache.runtimePackage!=='string'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(cache.runtimePackage)))return null;
+    return {modelRoots:[...cache.modelRoots],requirementSeeds:[...cache.requirementSeeds],...(cache.runtimePackage!==undefined?{runtimePackage:cache.runtimePackage}:{})};
+   });
+  },
+  cache({documents,modelHash}){
+   return serial(async()=>{
+    const cache=await read();
+    if(!cache||cache.modelHash!==modelHash||cache.sourceDigest!==await sourceDigest(documents))return null;
+    // Transfer ownership so a later reader call cannot observe caller mutations.
+    parsed=undefined;
+    return cache;
+   });
+  }
+ };
+}
+export async function verifiedRuntimeCache(project,options){
+ return createRuntimeCacheReader(project,options).cache(options);
 }
 
 // A publisher-trusted cache may accelerate native index preparation. This does
 // not authorize reusing exported semantics before the actual native parse.
-export async function verifiedRuntimeIndex(project,{trustedHash,engineVersion,engineFingerprint,documents}){
- const filename=project.manifest.runtimeCache;if(!filename||!trustedHash)return null;
- const value=project.files[filename],bytes=typeof value==='string'?new TextEncoder().encode(value):value;
- if(!bytes)return null;
- const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
- if(hash!==trustedHash)return null;
- let cache;try{cache=JSON.parse(fileText(project,filename));}catch{return null;}
- if(cache.schemaVersion!=='syspresent.native-cache.v1'||cache.engineVersion!==engineVersion||cache.engineFingerprint!==engineFingerprint||cache.inputDigest!==await sourceDigest(documents))return null;
- if(!Array.isArray(cache.modelRoots)||!cache.modelRoots.length||!cache.modelRoots.every(x=>typeof x==='string'&&x)||!Array.isArray(cache.requirementSeeds)||!cache.requirementSeeds.every(x=>typeof x==='string'&&x))return null;
- if(cache.runtimePackage!==undefined&&(typeof cache.runtimePackage!=='string'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(cache.runtimePackage)))return null;
- return {modelRoots:[...cache.modelRoots],requirementSeeds:[...cache.requirementSeeds],...(cache.runtimePackage!==undefined?{runtimePackage:cache.runtimePackage}:{})};
+export async function verifiedRuntimeIndex(project,options){
+ return createRuntimeCacheReader(project,options).index(options);
 }
