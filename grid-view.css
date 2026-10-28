@@ -29,3 +29,9 @@
 .canvas-grid-view .canvas-grid-explore { margin-top:7px; padding:6px 10px; background:#e6efe8; border:1px solid #aabfb0; }
 .canvas-grid-disclosure { margin:0; padding:8px 12px; flex:none; font-size:12px; color:#63522c; background:#fff7db; }
 @media(max-width:600px) { .canvas-grid-toolbar { padding:6px 8px; } .canvas-grid-inspector { max-height:28%; } }
+
+.canvas-grid-view.focused-grid{border-radius:0;box-shadow:none;border-color:#17282b;background:white}
+.focused-grid .canvas-grid-table th,.focused-grid .canvas-grid-table td{background:white;border-color:#17282b}
+.focused-grid .canvas-grid-table .is-selected{background:#edf4f3}
+.canvas-grid-frame-label{padding:6px 12px;font-size:12px;align-self:flex-start;border-right:1px solid currentColor;border-bottom:1px solid currentColor;background:white}
+.canvas-grid-reset-widths{display:block;margin-top:8px;padding:5px 8px!important;border:1px solid #b9c8be!important}

@@ -17,6 +17,14 @@ The model owns requirements, assumptions, rationale and analysis contracts. [Doc
 
 Keep requirement documentation to one concise obligation. Put normative qualification context in named `comment conditions` and explanation in `comment notes`. Use standard `ModelingMetadata::Rationale`, `Issue` and `StatusInfo` metadata for justification, unresolved decisions and maturity; maturity is not a verification verdict.
 
+Review readability separately from relationship correctness. A requirement's main
+sentence must tell the reader what the boat must do; a list of requirement IDs
+belongs in its qualification conditions. Describe architecture elements by the
+work they perform and the information or power they exchange. Give each link a
+specific engineering reason. State missing evidence as the measurement or test
+still needed. Keep explanations of SysML relationship semantics in this guide
+instead of repeating them in every element description.
+
 Use `#derivation` only for justified obligations under the original requirement's conditions. The OMG Requirement Derivation library states **original satisfaction implies every derived requirement**; satisfying the children alone does not prove their parent. A new numerical allocation is not logically entailed by a qualitative mission need. Record its provisional basis and validation need. Owner constraints need not be derived from mission success.
 
 Use `verify` for verification objectives and `satisfy` for design satisfaction assertions about an identified subject. A satisfaction assertion is an engineering claim to establish, not an allocation or an accepted verdict. Use `allocate` to map logical responsibilities to candidate physical elements. Planned procedures and unaccepted evidence must remain inconclusive. Executable predicates reuse model calculations; numerical search is orchestrated by SciPy. External geometry and aerodynamic data retain provenance.

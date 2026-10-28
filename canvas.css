@@ -134,3 +134,23 @@ body.landing-mode{height:auto;min-height:100dvh;overflow:auto}
 @media(max-width:700px){header nav{max-width:100%}.figure-region figure{padding:8px}.figure-region figcaption{font-size:.85rem}}
 
 #contents-list button{border:0;background:transparent;text-align:left;width:100%;font:inherit}
+
+.hierarchy-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0;border-bottom:1px solid #475569}
+.hierarchy-row>span,.hierarchy-row>strong{flex-basis:100%;overflow-wrap:anywhere}
+.hierarchy-row pre{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:.85rem}
+#scope-context{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem;white-space:nowrap;flex:0 0 auto}
+#scope-context input{display:inline-block;width:auto;min-width:0;margin:0;padding:0}
+#scope-context[hidden]{display:none}
+
+.inline-choice{display:flex;align-items:center;gap:.35rem}
+.inline-choice input{display:inline-block;width:auto;margin:0;padding:0}
+#authoring-grounding,#authoring-review{max-height:18rem;overflow:auto}
+#rollup-list>div{padding:.7rem 0;border-bottom:1px solid var(--line)}
+
+#authoring-preview{position:relative;height:340px;min-width:0;border:1px solid var(--line);margin:.75rem 0;overflow:hidden}
+
+/* Guided history is canvas chrome: its first entry must not shrink a settled
+   drawing. The complete workspace row remains in the header during exploration. */
+#canvas-tools{max-width:calc(100% - 24px);flex-wrap:wrap}
+#canvas-tools #exploration-controls.guided-history{flex-basis:auto;border:0;padding:0;flex-wrap:nowrap}
+#canvas-tools .guided-history #exploration-label{display:none}

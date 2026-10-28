@@ -1,12 +1,270 @@
 {
   "inputs": {
-    "src/canvas-prototype/landing.mjs": {
-      "bytes": 492,
+    "src/canvas-prototype/engine/model-session.mjs": {
+      "bytes": 2104,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/geometry.mjs": {
+      "bytes": 14946,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/port-labels.mjs": {
+      "bytes": 6023,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/graph.mjs": {
+      "bytes": 7128,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/view-contract.mjs": {
+      "bytes": 5627,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/focused-native-view.mjs": {
+      "bytes": 2671,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/endpoint-labels.mjs": {
+      "bytes": 6834,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/preferences.mjs": {
+      "bytes": 4627,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/story-content.mjs": {
       "bytes": 10480,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/fflate/esm/browser.js": {
+      "bytes": 89198,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/project.mjs": {
+      "bytes": 14714,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/preferences.mjs",
+          "kind": "import-statement",
+          "original": "./preferences.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/story-content.mjs",
+          "kind": "import-statement",
+          "original": "./story-content.mjs"
+        },
+        {
+          "path": "node_modules/fflate/esm/browser.js",
+          "kind": "import-statement",
+          "original": "fflate"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/documentation.mjs": {
+      "bytes": 1627,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/conversation.mjs": {
+      "bytes": 6685,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/project.mjs",
+          "kind": "import-statement",
+          "original": "./project.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/authoring.mjs": {
+      "bytes": 30439,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/project.mjs",
+          "kind": "import-statement",
+          "original": "./project.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/graph.mjs",
+          "kind": "import-statement",
+          "original": "./graph.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/documentation.mjs",
+          "kind": "import-statement",
+          "original": "./documentation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/story-content.mjs",
+          "kind": "import-statement",
+          "original": "./story-content.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/conversation.mjs",
+          "kind": "import-statement",
+          "original": "./conversation.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/notation.mjs": {
+      "bytes": 18428,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/focused-notation.mjs": {
+      "bytes": 25727,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/notation.mjs",
+          "kind": "import-statement",
+          "original": "./notation.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/core/index.mjs": {
+      "bytes": 24245,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "../view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/rollups.mjs": {
+      "bytes": 11756,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/sequence-view.mjs": {
+      "bytes": 25586,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/core/index.mjs",
+          "kind": "import-statement",
+          "original": "./core/index.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/grid-view.mjs": {
+      "bytes": 21705,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/view-contract.mjs",
+          "kind": "import-statement",
+          "original": "./view-contract.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/manual-layout.mjs": {
+      "bytes": 17402,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/geometry.mjs",
+          "kind": "import-statement",
+          "original": "./geometry.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/presentation-layout.mjs": {
+      "bytes": 12580,
+      "imports": [
+        {
+          "path": "src/canvas-prototype/sequence-view.mjs",
+          "kind": "import-statement",
+          "original": "./sequence-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/grid-view.mjs",
+          "kind": "import-statement",
+          "original": "./grid-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/manual-layout.mjs",
+          "kind": "import-statement",
+          "original": "./manual-layout.mjs"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/canvas-prototype/element-compartments.mjs": {
+      "bytes": 4149,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/rendering-policy.mjs": {
+      "bytes": 1670,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/canvas-prototype/landing.mjs": {
+      "bytes": 492,
       "imports": [],
       "format": "esm"
     },
@@ -26,11 +284,6 @@
       "imports": [],
       "format": "esm"
     },
-    "src/canvas-prototype/geometry.mjs": {
-      "bytes": 14946,
-      "imports": [],
-      "format": "esm"
-    },
     "src/canvas-prototype/routing-style.mjs": {
       "bytes": 2442,
       "imports": [
@@ -38,44 +291,6 @@
           "path": "src/canvas-prototype/geometry.mjs",
           "kind": "import-statement",
           "original": "./geometry.mjs"
-        }
-      ],
-      "format": "esm"
-    },
-    "src/canvas-prototype/view-contract.mjs": {
-      "bytes": 4808,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/grid-view.mjs": {
-      "bytes": 17241,
-      "imports": [
-        {
-          "path": "src/canvas-prototype/view-contract.mjs",
-          "kind": "import-statement",
-          "original": "./view-contract.mjs"
-        }
-      ],
-      "format": "esm"
-    },
-    "src/canvas-prototype/core/index.mjs": {
-      "bytes": 24245,
-      "imports": [
-        {
-          "path": "src/canvas-prototype/view-contract.mjs",
-          "kind": "import-statement",
-          "original": "../view-contract.mjs"
-        }
-      ],
-      "format": "esm"
-    },
-    "src/canvas-prototype/sequence-view.mjs": {
-      "bytes": 9994,
-      "imports": [
-        {
-          "path": "src/canvas-prototype/core/index.mjs",
-          "kind": "import-statement",
-          "original": "./core/index.mjs"
         }
       ],
       "format": "esm"
@@ -96,13 +311,8 @@
       ],
       "format": "cjs"
     },
-    "src/canvas-prototype/notation.mjs": {
-      "bytes": 6208,
-      "imports": [],
-      "format": "esm"
-    },
     "src/canvas-prototype/elk-layout.mjs": {
-      "bytes": 25362,
+      "bytes": 25624,
       "imports": [
         {
           "path": "node_modules/elkjs/lib/elk-api.js",
@@ -138,8 +348,23 @@
       "format": "esm"
     },
     "src/canvas-prototype/scene-regions.mjs": {
-      "bytes": 7716,
+      "bytes": 10390,
       "imports": [
+        {
+          "path": "src/canvas-prototype/port-labels.mjs",
+          "kind": "import-statement",
+          "original": "./port-labels.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/focused-notation.mjs",
+          "kind": "import-statement",
+          "original": "./focused-notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/endpoint-labels.mjs",
+          "kind": "import-statement",
+          "original": "./endpoint-labels.mjs"
+        },
         {
           "path": "src/canvas-prototype/elk-layout.mjs",
           "kind": "import-statement",
@@ -173,37 +398,6 @@
       ],
       "format": "esm"
     },
-    "src/canvas-prototype/preferences.mjs": {
-      "bytes": 4627,
-      "imports": [],
-      "format": "esm"
-    },
-    "node_modules/fflate/esm/browser.js": {
-      "bytes": 89198,
-      "imports": [],
-      "format": "esm"
-    },
-    "src/canvas-prototype/project.mjs": {
-      "bytes": 14714,
-      "imports": [
-        {
-          "path": "src/canvas-prototype/preferences.mjs",
-          "kind": "import-statement",
-          "original": "./preferences.mjs"
-        },
-        {
-          "path": "src/canvas-prototype/story-content.mjs",
-          "kind": "import-statement",
-          "original": "./story-content.mjs"
-        },
-        {
-          "path": "node_modules/fflate/esm/browser.js",
-          "kind": "import-statement",
-          "original": "fflate"
-        }
-      ],
-      "format": "esm"
-    },
     "src/canvas-prototype/browser-project.mjs": {
       "bytes": 1374,
       "imports": [
@@ -226,7 +420,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/package-explorer.mjs": {
-      "bytes": 3503,
+      "bytes": 7548,
       "imports": [
         {
           "path": "src/canvas-prototype/view-contract.mjs",
@@ -241,13 +435,13 @@
       "imports": [],
       "format": "esm"
     },
-    "src/canvas-prototype/graph.mjs": {
-      "bytes": 4250,
+    "src/canvas-prototype/part-exploration.mjs": {
+      "bytes": 11210,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/exploration.mjs": {
-      "bytes": 15317,
+      "bytes": 16147,
       "imports": [
         {
           "path": "src/canvas-prototype/graph.mjs",
@@ -263,6 +457,11 @@
           "path": "src/canvas-prototype/prominence.mjs",
           "kind": "import-statement",
           "original": "./prominence.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/part-exploration.mjs",
+          "kind": "import-statement",
+          "original": "./part-exploration.mjs"
         }
       ],
       "format": "esm"
@@ -346,19 +545,74 @@
       ],
       "format": "esm"
     },
-    "src/canvas-prototype/documentation.mjs": {
-      "bytes": 1627,
-      "imports": [],
-      "format": "esm"
-    },
     "src/canvas-prototype/engine/client.mjs": {
       "bytes": 1750,
       "imports": [],
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 97638,
+      "bytes": 132213,
       "imports": [
+        {
+          "path": "src/canvas-prototype/engine/model-session.mjs",
+          "kind": "import-statement",
+          "original": "./engine/model-session.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/port-labels.mjs",
+          "kind": "import-statement",
+          "original": "./port-labels.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/focused-native-view.mjs",
+          "kind": "import-statement",
+          "original": "./focused-native-view.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/endpoint-labels.mjs",
+          "kind": "import-statement",
+          "original": "./endpoint-labels.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/authoring.mjs",
+          "kind": "import-statement",
+          "original": "./authoring.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/focused-notation.mjs",
+          "kind": "import-statement",
+          "original": "./focused-notation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/rollups.mjs",
+          "kind": "import-statement",
+          "original": "./rollups.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/presentation-layout.mjs",
+          "kind": "import-statement",
+          "original": "./presentation-layout.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/element-compartments.mjs",
+          "kind": "import-statement",
+          "original": "./element-compartments.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/conversation.mjs",
+          "kind": "import-statement",
+          "original": "./conversation.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/rendering-policy.mjs",
+          "kind": "import-statement",
+          "original": "./rendering-policy.mjs"
+        },
+        {
+          "path": "src/canvas-prototype/manual-layout.mjs",
+          "kind": "import-statement",
+          "original": "./manual-layout.mjs"
+        },
         {
           "path": "src/canvas-prototype/landing.mjs",
           "kind": "import-statement",
@@ -523,7 +777,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 783796
+      "bytes": 1155867
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -531,13 +785,82 @@
       "entryPoint": "src/canvas-prototype/app.mjs",
       "inputs": {
         "node_modules/elkjs/lib/elk-api.js": {
-          "bytesInOutput": 9829
+          "bytesInOutput": 9833
+        },
+        "src/canvas-prototype/engine/model-session.mjs": {
+          "bytesInOutput": 2205
+        },
+        "src/canvas-prototype/geometry.mjs": {
+          "bytesInOutput": 15794
+        },
+        "src/canvas-prototype/port-labels.mjs": {
+          "bytesInOutput": 6203
+        },
+        "src/canvas-prototype/graph.mjs": {
+          "bytesInOutput": 6301
+        },
+        "src/canvas-prototype/view-contract.mjs": {
+          "bytesInOutput": 3072
+        },
+        "src/canvas-prototype/focused-native-view.mjs": {
+          "bytesInOutput": 2140
+        },
+        "src/canvas-prototype/endpoint-labels.mjs": {
+          "bytesInOutput": 7419
+        },
+        "src/canvas-prototype/preferences.mjs": {
+          "bytesInOutput": 3815
+        },
+        "src/canvas-prototype/story-content.mjs": {
+          "bytesInOutput": 11920
+        },
+        "node_modules/fflate/esm/browser.js": {
+          "bytesInOutput": 24695
+        },
+        "src/canvas-prototype/project.mjs": {
+          "bytesInOutput": 14446
+        },
+        "src/canvas-prototype/documentation.mjs": {
+          "bytesInOutput": 1672
+        },
+        "src/canvas-prototype/conversation.mjs": {
+          "bytesInOutput": 6488
+        },
+        "src/canvas-prototype/authoring.mjs": {
+          "bytesInOutput": 25856
+        },
+        "src/canvas-prototype/notation.mjs": {
+          "bytesInOutput": 16910
+        },
+        "src/canvas-prototype/focused-notation.mjs": {
+          "bytesInOutput": 28060
+        },
+        "src/canvas-prototype/core/index.mjs": {
+          "bytesInOutput": 15851
+        },
+        "src/canvas-prototype/rollups.mjs": {
+          "bytesInOutput": 12122
+        },
+        "src/canvas-prototype/sequence-view.mjs": {
+          "bytesInOutput": 27983
+        },
+        "src/canvas-prototype/grid-view.mjs": {
+          "bytesInOutput": 21604
+        },
+        "src/canvas-prototype/manual-layout.mjs": {
+          "bytesInOutput": 17895
+        },
+        "src/canvas-prototype/presentation-layout.mjs": {
+          "bytesInOutput": 13909
+        },
+        "src/canvas-prototype/element-compartments.mjs": {
+          "bytesInOutput": 4399
+        },
+        "src/canvas-prototype/rendering-policy.mjs": {
+          "bytesInOutput": 1268
         },
         "src/canvas-prototype/landing.mjs": {
           "bytesInOutput": 414
-        },
-        "src/canvas-prototype/story-content.mjs": {
-          "bytesInOutput": 11913
         },
         "src/canvas-prototype/figure-view.mjs": {
           "bytesInOutput": 2320
@@ -545,47 +868,20 @@
         "src/canvas-prototype/reader-settings.mjs": {
           "bytesInOutput": 1072
         },
-        "src/canvas-prototype/geometry.mjs": {
-          "bytesInOutput": 15772
-        },
         "src/canvas-prototype/routing-style.mjs": {
-          "bytesInOutput": 2299
-        },
-        "src/canvas-prototype/view-contract.mjs": {
-          "bytesInOutput": 2436
-        },
-        "src/canvas-prototype/grid-view.mjs": {
-          "bytesInOutput": 17564
-        },
-        "src/canvas-prototype/core/index.mjs": {
-          "bytesInOutput": 15838
-        },
-        "src/canvas-prototype/sequence-view.mjs": {
-          "bytesInOutput": 11120
+          "bytesInOutput": 2319
         },
         "src/canvas-prototype/behavior-view.mjs": {
-          "bytesInOutput": 4249
+          "bytesInOutput": 4251
         },
         "src/canvas-prototype/elk-layout.mjs": {
-          "bytesInOutput": 27215
-        },
-        "src/canvas-prototype/notation.mjs": {
-          "bytesInOutput": 3902
+          "bytesInOutput": 27558
         },
         "src/canvas-prototype/camera.mjs": {
-          "bytesInOutput": 8767
+          "bytesInOutput": 8777
         },
         "src/canvas-prototype/scene-regions.mjs": {
-          "bytesInOutput": 8442
-        },
-        "src/canvas-prototype/preferences.mjs": {
-          "bytesInOutput": 3808
-        },
-        "node_modules/fflate/esm/browser.js": {
-          "bytesInOutput": 24695
-        },
-        "src/canvas-prototype/project.mjs": {
-          "bytesInOutput": 15410
+          "bytesInOutput": 11360
         },
         "src/canvas-prototype/browser-project.mjs": {
           "bytesInOutput": 1407
@@ -594,28 +890,28 @@
           "bytesInOutput": 653
         },
         "src/canvas-prototype/prominence.mjs": {
-          "bytesInOutput": 14411
+          "bytesInOutput": 14417
         },
         "src/canvas-prototype/package-explorer.mjs": {
-          "bytesInOutput": 3635
+          "bytesInOutput": 8033
         },
         "src/canvas-prototype/departures.mjs": {
-          "bytesInOutput": 7909
+          "bytesInOutput": 7914
         },
-        "src/canvas-prototype/graph.mjs": {
-          "bytesInOutput": 4285
+        "src/canvas-prototype/part-exploration.mjs": {
+          "bytesInOutput": 11935
         },
         "src/canvas-prototype/exploration.mjs": {
-          "bytesInOutput": 15270
+          "bytesInOutput": 16243
         },
         "src/canvas-prototype/context.mjs": {
-          "bytesInOutput": 8533
+          "bytesInOutput": 8552
         },
         "src/canvas-prototype/peripheral-routing.mjs": {
-          "bytesInOutput": 11314
+          "bytesInOutput": 11319
         },
         "src/canvas-prototype/neighborhood.mjs": {
-          "bytesInOutput": 18621
+          "bytesInOutput": 18642
         },
         "src/canvas-prototype/motion.mjs": {
           "bytesInOutput": 3257
@@ -623,17 +919,14 @@
         "src/canvas-prototype/journey-camera.mjs": {
           "bytesInOutput": 5168
         },
-        "src/canvas-prototype/documentation.mjs": {
-          "bytesInOutput": 1673
-        },
         "src/canvas-prototype/engine/client.mjs": {
           "bytesInOutput": 1698
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 109484
+          "bytesInOutput": 147945
         }
       },
-      "bytes": 397531
+      "bytes": 620805
     }
   }
 }

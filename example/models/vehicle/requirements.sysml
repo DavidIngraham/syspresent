@@ -8,7 +8,7 @@ package BlueDogRequirements {
     private import BlueDog::Goals::*;
     requirement def <'M-001'> RoundTrip {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall cross the configured Bingen departure, buoy 16 rounding checkpoints and Bingen return gates in order during one qualifying attempt. */
+        doc /* The vessel shall sail from the Bingen departure gate, around buoy 16 near Stevenson, and through the Bingen finish gate in one qualifying attempt.*/
         comment conditions /* C-000 defines the governing finite challenge obligations. Course review, unassisted sail-only operation, safety capability, recovery reserve and the persistent attempt state apply throughout. Safe unassisted righting may preserve qualification; motor propulsion, external intervention or required safety-capability loss ends it. */
     }
     requirement def <'M-002'> MultiDayEndurance {
@@ -25,32 +25,32 @@ package BlueDogRequirements {
     }
     requirement def <'E-002'> NavigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall provide autonomous navigation and sail/steering control within the selected operational profile. */
+        doc /* The vessel shall navigate the course and control its sail and rudder autonomously within the selected operating conditions.*/
         comment conditions /* Qualification uses the selected mission profile. Accuracy trials contain 1800 scheduled one-second epochs in 30 minutes; invalid or missing epochs count as failed epochs. Position and heading criteria use the same set of at least 1710 qualifying epochs, preventing separate selection of different good samples. Fault-injection runs are separate. */
     }
     requirement def <'E-003'> ResetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall restore mode-appropriate autonomous operation after a watchdog reset. */
+        doc /* After a watchdog reset, the vessel shall resume the autonomous behavior permitted by its retained operating mode.*/
         comment conditions /* Watchdog-reset tests start above protected reserve with valid navigation observations. Normal sailing remains subject to N-035; data and qualification persistence have shared leaf criteria. */
     }
     requirement def <'E-004'> LowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall protect essential functions when conservative usable energy reaches the recovery reserve. */
+        doc /* The vessel shall keep the functions needed for safe recovery powered when the conservative estimate of usable energy reaches the recovery reserve.*/
         comment conditions /* Reserve means R-002. Emergency/recovery cadence takes precedence; clearing low-energy state is independent of other modes, while payload enabling respects all restrictions. */
     }
     requirement def <'E-005'> Communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall retain telemetry through link outages for delivery after reconnection. */
+        doc /* The vessel shall store telemetry during communication outages and deliver the stored records after reconnection.*/
         comment conditions /* Link availability is a delivery-test precondition, not a coverage guarantee. Normal, low-energy and recovery delivery cadence is 30 seconds, as allocated by GorgeChallenge::liveObservation. Outage tests last 24 hours. */
     }
     requirement def <'E-006'> IngressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall retain recoverability during the specified hull-ingress qualification. */
+        doc /* The vessel shall remain recoverable while fresh water enters its normally dry hull at 10 mL/min for 30 minutes.*/
         comment conditions /* All leaves use a 30-minute freshwater injection at 10 mL/min into the normally dry hull. No pump technology is prescribed; R-004 remains applicable. */
     }
     requirement def <'E-007'> MissionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall retain time-correlated mission evidence through communication and power interruptions. */
+        doc /* The vessel shall preserve timestamped mission records through communication outages and power interruptions.*/
         comment conditions /* Periodic records contain position, heading, mode, gate progress, battery energy and fault state. Critical events are independent of periodic cadence. Timestamp accuracy is assessed with valid GNSS time. */
     }
     requirement roundTrip : RoundTrip;
@@ -67,45 +67,45 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "Ordered gate crossings use the marker-referenced proposal in TransGorgeCourse; operational release remains subject to course review."; }
     }
     dependency challengeEndurance from multiDayEndurance to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "The complete finite round trip, including holding and contingency exposure, determines required endurance. Repeated circuits are a separate future objective. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The complete finite round trip, including holding and contingency exposure, determines required endurance. Repeated circuits are a separate future objective."; }
     }
     dependency challengeAutonomy from navigationAndControl to GorgeChallenge::unassistedAttempt {
-        metadata rationale : ModelingMetadata::Rationale { text = "The vessel needs onboard guidance and control to complete an unassisted attempt. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The vessel needs onboard guidance and control to complete an unassisted attempt."; }
     }
     dependency challengePropulsion from roundTrip to GorgeChallenge::sailingPropulsion {
-        metadata rationale : ModelingMetadata::Rationale { text = "Vehicle challenge operation excludes auxiliary motor propulsion; powered development tests are separate. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Vehicle challenge operation excludes auxiliary motor propulsion; powered development tests are separate."; }
     }
     #refinement dependency challengeMonitoring from communications to GorgeChallenge::liveObservation {
         metadata rationale : ModelingMetadata::Rationale { text = "The vehicle telemetry requirement provides a more precise outage-retention and delivery specification for the observation aspect of C-005. Autonomous execution remains separately required."; }
     }
     dependency challengeOverride from communications to GorgeChallenge::emergencyIntervention {
-        metadata rationale : ModelingMetadata::Rationale { text = "Vehicle communications provide emergency commands whose use ends attempt qualification. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Vehicle communications provide emergency commands whose use ends attempt qualification."; }
     }
 
     // Derivations: direction is original requirement to derived requirement.
     dependency roundTripNavigation from navigationAndControl to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "Autonomous completion of the route needs observations, guidance, and actuation. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Autonomous completion of the route needs observations, guidance, and actuation."; }
     }
     dependency roundTripReset from resetRecovery to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "A reset during an autonomous journey must not leave mission behavior undefined. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "A reset during an autonomous journey must not leave mission behavior undefined."; }
     }
     dependency roundTripCommunications from communications to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "Mission supervision and recovery need an agreed operator communication policy. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Mission supervision and recovery need an agreed operator communication policy."; }
     }
     dependency roundTripIngress from ingressResponse to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "Recovering the boat after the journey motivates a defined response to small leaks. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Recovering the boat after the journey motivates a defined response to small leaks."; }
     }
     dependency roundTripEvidence from missionEvidence to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "Assessing route completion and learning from the mission requires recorded evidence. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Assessing route completion and learning from the mission requires recorded evidence."; }
     }
     dependency enduranceEnergy from energyAwareness to multiDayEndurance {
-        metadata rationale : ModelingMetadata::Rationale { text = "Multi-day operation with variable harvesting needs energy estimation and load management. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Multi-day operation with variable harvesting needs energy estimation and load management."; }
     }
     dependency enduranceLimpMode from lowEnergyRecovery to multiDayEndurance {
-        metadata rationale : ModelingMetadata::Rationale { text = "Harvest shortfalls need an explicit degraded operating mode. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Harvest shortfalls need an explicit degraded operating mode."; }
     }
     dependency energyLimpMode from lowEnergyRecovery to energyAwareness {
-        metadata rationale : ModelingMetadata::Rationale { text = "Available-energy estimates and reserve policy must drive low-energy transitions. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Available-energy estimates and reserve policy must drive low-energy transitions."; }
     }
 
     requirement def <'P-001'> Transportability {
@@ -121,7 +121,7 @@ package BlueDogRequirements {
     attribute printBuildLimit : LengthValue = 250 [mm];
     requirement def <'P-002'> DesktopManufacture {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* Every print job shall fit within positive X, Y and Z extents no greater than 250 mm each. */
+        doc /* Each print job shall fit within a 250 mm by 250 mm by 250 mm build volume.*/
         comment conditions /* Every printed component must be producible as one or more such jobs. The envelope includes the selected build orientation, supports, brim, raft and printer-required clearance. */
         attribute jobX : LengthValue;
         attribute jobY : LengthValue;
@@ -155,7 +155,7 @@ package BlueDogRequirements {
 
     requirement def <'S-001'> TrafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall assess and respond to collision risks within reviewed class-specific detection and response envelopes while meeting the collision avoidance and nonimpediment obligations.*/
+        doc /* The vessel shall detect and respond to traffic hazards within the reviewed limits for each target class, while avoiding collisions and allowing other vessels the passage required by navigation rules.*/
         metadata issue : ModelingMetadata::Issue { text = "BlueDogClassDetection defines the current class-specific allocation method. Numerical consequence, exposure, reliability, confidence and risk acceptance inputs remain unreviewed; hardware sensing and maneuver evidence is absent. Historical six-class 750 m analyses do not define the current requirement."; }
         comment conditions /* Use independently recorded head-on, crossing and overtaking AIS and non-AIS targets, day and night in the selected operational profile. Allocations shall include kinematic response distance, uncertainty, consequence-informed clearance and margins, and required timely observation and whole-response reliability with confidence criteria. Unreliably classified targets shall use a reviewed conservative envelope spanning plausible classes and occupant transitions. Collision avoidance and nonimpediment obligations remain unchanged.*/
     }
@@ -165,7 +165,7 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "S-001 specifies observation, assessment and response supporting collision-free passage. Its reviewed performance envelopes are selected allocations; C-007 independently supplies navigation duties. No-contact outcome alone does not imply the assessment process."; }
     }
     dependency deriveTrafficSafety from trafficSafety to navigationAndControl {
-        metadata rationale : ModelingMetadata::Rationale { text = "TrafficSafety supports navigationAndControl. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The boat must detect traffic and choose an avoidance maneuver while navigating the shared river."; }
     }
 
     requirement def <'S-002'> OperatingBoundary {
@@ -178,18 +178,17 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "Configured polygons and predictive boundary handling refine the challenge exclusion obligation."; }
     }
     dependency deriveOperatingBoundary from operatingBoundary to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "OperatingBoundary supports roundTrip. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The route must keep the boat inside permitted water and clear of restricted areas and obstacles."; }
     }
 
     requirement def <'S-003'> EmergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /*
-         *  The vessel shall preserve controlled emergency intervention through abort, local motor isolation and remote-control loss. */
+        doc /* The vessel shall support emergency control that permits abort, local motor isolation and safe response to remote-control loss.*/
         comment conditions /* Emergency intervention ends attempt qualification. Exercise abort, local isolation and remote-control loss with coexisting low-energy flags. S-110 through S-115 define the detailed acceptance criteria; powered shore-recovery capability is independently required by R-001. */
     }
     requirement emergencyControl : EmergencyControl;
     dependency deriveSafeRecovery from emergencyControl to GorgeChallenge::emergencyIntervention {
-        metadata rationale : ModelingMetadata::Rationale { text = "Permitted emergency intervention requires explicit abort, qualification, isolation and control-loss behavior. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Permitted emergency intervention requires explicit abort, qualification, isolation and control-loss behavior."; }
     }
 
     requirement def <'S-004'> NavigationConspicuity {
@@ -203,7 +202,7 @@ package BlueDogRequirements {
         metadata rationale : ModelingMetadata::Rationale { text = "S-004 clarifies C-007 signal presentation during an attempt only. Its powered-recovery and stationary-mode coverage has the separate C-027 and deployment-matrix basis; those modes are not derived from attempt-only compliance."; }
     }
     dependency deriveNavigationConspicuity from navigationConspicuity to trafficSafety {
-        metadata rationale : ModelingMetadata::Rationale { text = "NavigationConspicuity supports trafficSafety. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Other waterway users need to see and identify the boat in the conditions in which it operates."; }
     }
 
     requirement def <'S-005'> RegulatoryClassification {
@@ -213,41 +212,40 @@ package BlueDogRequirements {
     }
     requirement regulatoryClassification : RegulatoryClassification;
     dependency deriveRegulatoryClassification from regulatoryClassification to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "RegulatoryClassification supports roundTrip. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Entry review must identify which navigation and equipment rules apply to this boat and course."; }
     }
 
     requirement def <'N-001'> EnvironmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall retain the functions required by its selected environmental profile and operating mode. */
+        doc /* The vessel shall keep its sailing and safety functions working in the declared operating conditions and remain afloat and recoverable in the declared survival conditions.*/
         comment conditions /* Gorge qualification uses N-010; ocean qualification uses N-020. Both include applicable shared exposure requirements. Operational functions are navigation, sail/steering control, recording and available-link telemetry. Survival requires flotation, attached rig/ballast, dry electronics and retained mission state; course progress is not required. Required traffic assessment, navigation signals and available-link location reporting remain safety obligations in every mode. Loss of required safety capability invokes C-012 even when the structure survives. */
         comment notes /* Profiles are not interchangeable. Gorge release does not require ocean qualification, and Gorge success does not establish ocean capability. */
     }
     requirement environmentalEnvelope : EnvironmentalEnvelope;
     dependency deriveEnvironmentalEnvelope from environmentalEnvelope to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "EnvironmentalEnvelope supports roundTrip. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Wind, waves, current and wet exposure determine the conditions in which the boat must complete the circuit and recover."; }
     }
 
     requirement def <'N-002'> MarineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /* The vessel shall retain required function and structural integrity through its selected wet-exposure campaign. */
+        doc /* The vessel shall maintain structural strength and equipment operation through the wet-exposure tests for the selected mission.*/
         comment conditions /* Gorge uses N-041 freshwater exposure; ocean uses N-042 saltwater exposure; dual-profile qualification requires both. Shared sealing, material-aging and thermal checks use the selected campaign. */
         comment notes /* A derivation does not make every mission-specific descendant applicable to every deployment. */
     }
     requirement marineDurability : MarineDurability;
     dependency deriveMarineDurability from marineDurability to environmentalEnvelope {
-        metadata rationale : ModelingMetadata::Rationale { text = "MarineDurability supports environmentalEnvelope. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Water, corrosion and repeated exposure can damage equipment and prevent completion or recovery."; }
     }
 
     requirement def <'N-003'> CapsizeResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        doc /*
-         *  After the declared capsize disturbances, the vessel shall provide the recovery behavior defined for the selected righting or post-abort recovery strategy. */
+        doc /* After capsize, the vessel shall carry out the selected recovery strategy: right itself and restore upright control, or recover toward shore after abort.*/
         comment conditions /* Righting and upright control restoration apply to selected N-051/N-052 passive-righting criteria; C-018 independently permits post-abort limp recovery. No capsize waives required safety capability or motor inhibition. N-004 separately governs vegetation encounters. */
 
     }
     requirement capsizeResilience : CapsizeResilience;
     dependency deriveStabilityAndFouling from capsizeResilience to environmentalEnvelope {
-        metadata rationale : ModelingMetadata::Rationale { text = "CapsizeResilience supports environmentalEnvelope. This dependency records design motivation rather than a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Capsize can disable sailing and sensing. The boat needs a defined way to regain control or reach a retrieval location under the declared conditions."; }
     }
 
     requirement def <'R-001'> RecoveryPropulsion {
@@ -292,7 +290,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     requirement recoveryEnergy : RecoveryEnergy;
     dependency deriveRecoveryEnergy from recoveryEnergy to recoveryPropulsion {
-        metadata rationale : ModelingMetadata::Rationale { text = "RecoveryEnergy supports recoveryPropulsion. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The recovery route needs enough stored energy for propulsion and essential equipment through arrival at shore."; }
     }
 
     requirement def <'C-101'> TelemetryEquipment {
@@ -302,7 +300,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     requirement telemetryEquipment : TelemetryEquipment;
     dependency deriveTelemetryEquipment from telemetryEquipment to communications {
-        metadata rationale : ModelingMetadata::Rationale { text = "TelemetryEquipment supports communications. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The operator needs vessel identity, current observations and their age to interpret received telemetry."; }
     }
 
     requirement def <'C-102'> CommandIntegrity {
@@ -312,7 +310,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     requirement commandIntegrity : CommandIntegrity;
     dependency deriveCommandIntegrity from commandIntegrity to communications {
-        metadata rationale : ModelingMetadata::Rationale { text = "CommandIntegrity supports communications. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Authentication and freshness checks prevent unauthorized or replayed commands from changing the boat's behavior."; }
     }
 
     requirement def <'N-010'> GorgeEnvironment {
@@ -323,7 +321,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     requirement gorgeEnvironment : GorgeEnvironment;
     dependency deriveGorgeEnvironment from gorgeEnvironment to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "The Gorge mission sets the river environment; it does not impose the ocean profile. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The Gorge mission sets the river environment; it does not impose the ocean profile."; }
     }
 
     requirement def <'N-020'> OceanEnvironment {
@@ -335,7 +333,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     requirement oceanEnvironment : OceanEnvironment;
     dependency deriveOceanEnvironment from oceanEnvironment to BlueDog::Goals::hawaiiVoyage {
-        metadata rationale : ModelingMetadata::Rationale { text = "The Hawaii mission sets the ocean environment; this profile is not a Gorge acceptance prerequisite. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The Hawaii mission sets the ocean environment; this profile is not a Gorge acceptance prerequisite."; }
     }
 
     requirement def <'N-011'> GorgeWind {
@@ -347,7 +345,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement gorgeWind : GorgeWind;
     #refinement dependency deriveGorgeWind from BlueDogRequirements::gorgeWind to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-011 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-011 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
 
     requirement def <'N-012'> GorgeWaves {
@@ -358,7 +356,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement gorgeWaves : GorgeWaves;
     #refinement dependency deriveGorgeWaves from BlueDogRequirements::gorgeWaves to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-012 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-012 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
 
     requirement def <'N-013'> GorgeCurrent {
@@ -370,7 +368,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement gorgeCurrent : GorgeCurrent;
     #refinement dependency deriveGorgeCurrent from BlueDogRequirements::gorgeCurrent to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-013 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-013 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
 
     requirement def <'N-014'> GorgeSurvivalWind {
@@ -381,7 +379,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement gorgeSurvivalWind : GorgeSurvivalWind;
     #refinement dependency deriveGorgeSurvivalWind from BlueDogRequirements::gorgeSurvivalWind to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-014 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-014 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
 
     requirement def <'N-015'> GorgeSurvivalWaves {
@@ -392,7 +390,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement gorgeSurvivalWaves : GorgeSurvivalWaves;
     #refinement dependency deriveGorgeSurvivalWaves from BlueDogRequirements::gorgeSurvivalWaves to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-015 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-015 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
 
     requirement def <'N-021'> OceanWind {
@@ -405,7 +403,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement oceanWind : OceanWind;
     #refinement dependency deriveOceanWind from BlueDogRequirements::oceanWind to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-021 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-021 specifies a detailed acceptance condition for N-020 within their stated applicability."; }
     }
 
     requirement def <'N-022'> OceanWaves {
@@ -417,7 +415,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement oceanWaves : OceanWaves;
     #refinement dependency deriveOceanWaves from BlueDogRequirements::oceanWaves to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-022 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-022 specifies a detailed acceptance condition for N-020 within their stated applicability."; }
     }
 
     requirement def <'N-023'> OceanCurrent {
@@ -430,7 +428,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement oceanCurrent : OceanCurrent;
     #refinement dependency deriveOceanCurrent from BlueDogRequirements::oceanCurrent to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-023 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-023 specifies a detailed acceptance condition for N-020 within their stated applicability."; }
     }
 
     requirement def <'N-024'> OceanSurvivalWind {
@@ -442,7 +440,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement oceanSurvivalWind : OceanSurvivalWind;
     #refinement dependency deriveOceanSurvivalWind from BlueDogRequirements::oceanSurvivalWind to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-024 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-024 specifies a detailed acceptance condition for N-020 within their stated applicability."; }
     }
 
     requirement def <'N-025'> OceanSurvivalWaves {
@@ -454,7 +452,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement oceanSurvivalWaves : OceanSurvivalWaves;
     #refinement dependency deriveOceanSurvivalWaves from BlueDogRequirements::oceanSurvivalWaves to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-025 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-025 specifies a detailed acceptance condition for N-020 within their stated applicability."; }
     }
 
     requirement def <'N-030'> AirTemperature {
@@ -465,7 +463,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement airTemperature : AirTemperature;
     #refinement dependency deriveAirTemperature from BlueDogRequirements::airTemperature to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-030 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-030 specifies a detailed acceptance condition for N-001 within their stated applicability."; }
     }
 
     requirement def <'N-031'> WaterTemperature {
@@ -476,7 +474,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement waterTemperature : WaterTemperature;
     #refinement dependency deriveWaterTemperature from BlueDogRequirements::waterTemperature to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-031 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-031 specifies a detailed acceptance condition for N-001 within their stated applicability."; }
     }
 
     requirement def <'N-032'> Humidity {
@@ -486,7 +484,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement humidity : Humidity;
     #refinement dependency deriveHumidity from BlueDogRequirements::humidity to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-032 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-032 specifies a detailed acceptance condition for N-001 within their stated applicability."; }
     }
 
     requirement def <'N-033'> Visibility {
@@ -497,7 +495,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement visibility : Visibility;
     #refinement dependency deriveVisibility from BlueDogRequirements::visibility to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-033 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-033 specifies a detailed acceptance condition for N-001 within their stated applicability."; }
     }
 
     requirement def <'N-034'> CalmOperation {
@@ -509,7 +507,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement calmOperation : CalmOperation;
     #refinement dependency deriveCalmOperation from BlueDogRequirements::calmOperation to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-034 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-034 specifies a detailed acceptance condition for N-001 within their stated applicability."; }
     }
 
     requirement def <'N-035'> EnvelopeTransition {
@@ -520,7 +518,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement envelopeTransition : EnvelopeTransition;
     #refinement dependency deriveEnvelopeTransition from BlueDogRequirements::envelopeTransition to BlueDogRequirements::environmentalEnvelope {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-035 specifies a detailed acceptance condition for N-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-035 specifies a detailed acceptance condition for N-001 within their stated applicability."; }
     }
 
     requirement def <'N-041'> FreshwaterExposure {
@@ -530,7 +528,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement freshwaterExposure : FreshwaterExposure;
     #refinement dependency deriveFreshwaterExposure from BlueDogRequirements::freshwaterExposure to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-041 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-041 specifies a detailed acceptance condition for N-002 within their stated applicability."; }
     }
 
     requirement def <'N-042'> SaltwaterExposure {
@@ -548,7 +546,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement enclosureSealing : EnclosureSealing;
     #refinement dependency deriveEnclosureSealing from BlueDogRequirements::enclosureSealing to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-043 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-043 specifies a detailed acceptance condition for N-002 within their stated applicability."; }
     }
 
     requirement def <'N-044'> WetMechanicalIntegrity {
@@ -559,7 +557,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement wetMechanicalIntegrity : WetMechanicalIntegrity;
     #refinement dependency deriveWetMechanicalIntegrity from BlueDogRequirements::wetMechanicalIntegrity to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-044 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-044 specifies a detailed acceptance condition for N-002 within their stated applicability."; }
     }
 
     requirement def <'N-045'> WetElectricalIntegrity {
@@ -570,7 +568,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement wetElectricalIntegrity : WetElectricalIntegrity;
     #refinement dependency deriveWetElectricalIntegrity from BlueDogRequirements::wetElectricalIntegrity to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-045 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-045 specifies a detailed acceptance condition for N-002 within their stated applicability."; }
     }
 
     requirement def <'N-046'> SolarHeating {
@@ -581,7 +579,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement solarHeating : SolarHeating;
     #refinement dependency deriveSolarHeating from BlueDogRequirements::solarHeating to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-046 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-046 specifies a detailed acceptance condition for N-002 within their stated applicability."; }
     }
 
     requirement def <'N-047'> PrintedMaterialAging {
@@ -596,7 +594,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement printedMaterialAging : PrintedMaterialAging;
     #refinement dependency derivePrintedMaterialAging from BlueDogRequirements::printedMaterialAging to BlueDogRequirements::marineDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-047 specifies a detailed acceptance condition for N-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-047 specifies a detailed acceptance condition for N-002 within their stated applicability."; }
     }
 
     requirement def <'N-051'> SelfRighting {
@@ -628,7 +626,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement submergedWeedPassage : SubmergedWeedPassage;
     #refinement dependency deriveSubmergedWeedPassage from BlueDogRequirements::submergedWeedPassage to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-053 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-053 specifies a detailed acceptance condition for N-004 within their stated applicability."; }
     }
 
     requirement def <'N-054'> WeedSnagShedding {
@@ -639,7 +637,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedSnagShedding : WeedSnagShedding;
     #refinement dependency deriveWeedSnagShedding from BlueDogRequirements::weedSnagShedding to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-054 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-054 specifies a detailed acceptance condition for N-004 within their stated applicability."; }
     }
 
     requirement def <'N-055'> WeedBlockageResponse {
@@ -650,7 +648,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedBlockageResponse : WeedBlockageResponse;
     #refinement dependency deriveWeedBlockageResponse from BlueDogRequirements::weedBlockageResponse to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-055 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-055 specifies a detailed acceptance condition for N-004 within their stated applicability."; }
     }
 
     requirement def <'N-056'> RecoveryPropulsorWeeds {
@@ -661,10 +659,10 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement recoveryPropulsorWeeds : RecoveryPropulsorWeeds;
     #refinement dependency deriveRecoveryPropulsorWeeds from BlueDogRequirements::recoveryPropulsorWeeds to BlueDogRequirements::vegetationResilience {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-056 specifies a detailed acceptance condition for N-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-056 specifies a detailed acceptance condition for N-004 within their stated applicability."; }
     }
     dependency motorWeedTolerance from recoveryPropulsorWeeds to recoveryPropulsion {
-        metadata rationale : ModelingMetadata::Rationale { text = "The recovery propulsor must remain usable in the vegetation encountered by the sailing vessel. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The recovery propulsor must remain usable in the vegetation encountered by the sailing vessel."; }
     }
     requirement def <'E-008'> NavigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -701,7 +699,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement challengeMotorInhibition : ChallengeMotorInhibition;
     #refinement dependency auditDerivation1 from BlueDogRequirements::navigationAvailability to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-008 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-008 specifies a detailed acceptance condition for E-002 within their stated applicability."; }
     }
     dependency auditDerivation2 from launchEnergyAdmission to recoveryEnergy {
         metadata rationale : ModelingMetadata::Rationale { text = "The selected launch gate consumes the route-dependent reserve calculation. A changed reserve or validity rule requires admission review; the reserve magnitude alone does not define launch behavior."; }
@@ -710,29 +708,29 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
         metadata rationale : ModelingMetadata::Rationale { text = "The onboard interlock is the selected enforcement of sail-only qualification. The challenge rule governs the attempt outcome without mandating this particular interlock design."; }
     }
     dependency auditDerivation4 from challengeMotorInhibition to GorgeChallenge::unassistedAttempt {
-        metadata rationale : ModelingMetadata::Rationale { text = "No-intervention qualification must survive resets and motor-mode transitions. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "No-intervention qualification must survive resets and motor-mode transitions."; }
     }
     dependency auditDerivation5 from commandIntegrity to GorgeChallenge::unassistedAttempt {
-        metadata rationale : ModelingMetadata::Rationale { text = "Accepted external control changes the attempt qualification; communications alone does not supply this rule. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Accepted external control changes the attempt qualification; communications alone does not supply this rule."; }
     }
     dependency auditDerivation6 from commandIntegrity to GorgeChallenge::emergencyIntervention {
-        metadata rationale : ModelingMetadata::Rationale { text = "The emergency control channel needs authenticated, fresh commands and persistent qualification changes. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The emergency control channel needs authenticated, fresh commands and persistent qualification changes."; }
     }
     #refinement dependency auditDerivation10 from BlueDogRequirements::freshwaterExposure to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-041 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-041 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
     #refinement dependency auditDerivation11 from BlueDogRequirements::saltwaterExposure to BlueDogRequirements::oceanEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-042 specifies a detailed acceptance condition for N-020 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-042 specifies a detailed acceptance condition for N-020 within their stated applicability."; }
     }
     #refinement dependency auditDerivation12 from BlueDogRequirements::submergedWeedPassage to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-053 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-053 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
     #refinement dependency auditDerivation13 from BlueDogRequirements::weedSnagShedding to BlueDogRequirements::gorgeEnvironment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-054 specifies a detailed acceptance condition for N-010 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-054 specifies a detailed acceptance condition for N-010 within their stated applicability."; }
     }
 
     // Independently verifiable acceptance leaves.
@@ -745,7 +743,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement energyEstimateCadence : EnergyEstimateCadence;
     #refinement dependency decomposeEnergyEstimateCadence from BlueDogRequirements::energyEstimateCadence to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-101 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-101 specifies a detailed acceptance condition for E-001 within their stated applicability."; }
     }
 
     requirement def <'E-102'> ReserveEstimateCadence {
@@ -757,7 +755,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement reserveEstimateCadence : ReserveEstimateCadence;
     #refinement dependency decomposeReserveEstimateCadence from BlueDogRequirements::reserveEstimateCadence to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-102 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-102 specifies a detailed acceptance condition for E-001 within their stated applicability."; }
     }
 
     requirement def <'E-103'> EnergyEstimateAccuracy {
@@ -770,7 +768,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement energyEstimateAccuracy : EnergyEstimateAccuracy;
     #refinement dependency decomposeEnergyEstimateAccuracy from BlueDogRequirements::energyEstimateAccuracy to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-103 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-103 specifies a detailed acceptance condition for E-001 within their stated applicability."; }
     }
 
     requirement def <'E-104'> ConservativeEnergyEstimate {
@@ -782,7 +780,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement conservativeEnergyEstimate : ConservativeEnergyEstimate;
     #refinement dependency decomposeConservativeEnergyEstimate from BlueDogRequirements::conservativeEnergyEstimate to BlueDogRequirements::energyAwareness {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-104 specifies a detailed acceptance condition for E-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-104 specifies a detailed acceptance condition for E-001 within their stated applicability."; }
     }
 
     requirement def <'E-105'> GuidanceUpdateCadence {
@@ -797,7 +795,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement guidanceUpdateCadence : GuidanceUpdateCadence;
     #refinement dependency decomposeGuidanceUpdateCadence from BlueDogRequirements::guidanceUpdateCadence to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-105 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-105 specifies a detailed acceptance condition for E-002 within their stated applicability."; }
     }
 
     requirement def <'E-106'> SailCommandCadence {
@@ -812,7 +810,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement sailCommandCadence : SailCommandCadence;
     #refinement dependency decomposeSailCommandCadence from BlueDogRequirements::sailCommandCadence to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-106 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-106 specifies a detailed acceptance condition for E-002 within their stated applicability."; }
     }
 
     requirement def <'E-107'> SteeringCommandCadence {
@@ -827,7 +825,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement steeringCommandCadence : SteeringCommandCadence;
     #refinement dependency decomposeSteeringCommandCadence from BlueDogRequirements::steeringCommandCadence to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-107 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-107 specifies a detailed acceptance condition for E-002 within their stated applicability."; }
     }
 
     requirement def <'E-108'> PositionAccuracy {
@@ -839,7 +837,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement positionAccuracy : PositionAccuracy;
     #refinement dependency decomposePositionAccuracy from BlueDogRequirements::positionAccuracy to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-108 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-108 specifies a detailed acceptance condition for E-002 within their stated applicability."; }
     }
 
     requirement def <'E-109'> HeadingAccuracy {
@@ -851,7 +849,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement headingAccuracy : HeadingAccuracy;
     #refinement dependency decomposeHeadingAccuracy from BlueDogRequirements::headingAccuracy to BlueDogRequirements::navigationAndControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-109 specifies a detailed acceptance condition for E-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-109 specifies a detailed acceptance condition for E-002 within their stated applicability."; }
     }
 
     requirement def <'E-110'> RestartDeadline {
@@ -867,7 +865,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement restartDeadline : RestartDeadline;
     #refinement dependency decomposeRestartDeadline from BlueDogRequirements::restartDeadline to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-110 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-110 specifies a detailed acceptance condition for E-003 within their stated applicability."; }
     }
 
     requirement def <'E-111'> MissionStateRestoration {
@@ -878,7 +876,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement missionStateRestoration : MissionStateRestoration;
     #refinement dependency decomposeMissionStateRestoration from BlueDogRequirements::missionStateRestoration to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-111 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-111 specifies a detailed acceptance condition for E-003 within their stated applicability."; }
     }
 
     requirement def <'E-112'> GateProgressRestoration {
@@ -890,7 +888,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement gateProgressRestoration : GateProgressRestoration;
     #refinement dependency decomposeGateProgressRestoration from BlueDogRequirements::gateProgressRestoration to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-112 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-112 specifies a detailed acceptance condition for E-003 within their stated applicability."; }
     }
 
     requirement def <'E-113'> ResetRestrictionPreservation {
@@ -917,7 +915,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement lowEnergyEntry : LowEnergyEntry;
     #refinement dependency decomposeLowEnergyEntry from BlueDogRequirements::lowEnergyEntry to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-114 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-114 specifies a detailed acceptance condition for E-004 within their stated applicability."; }
     }
 
     requirement def <'E-115'> LowEnergyPayloadInhibition {
@@ -929,7 +927,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement lowEnergyPayloadInhibition : LowEnergyPayloadInhibition;
     #refinement dependency decomposeLowEnergyPayloadInhibition from BlueDogRequirements::lowEnergyPayloadInhibition to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-115 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-115 specifies a detailed acceptance condition for E-004 within their stated applicability."; }
     }
 
     requirement def <'E-116'> LowEnergyNavigationContinuity {
@@ -941,7 +939,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement lowEnergyNavigationContinuity : LowEnergyNavigationContinuity;
     #refinement dependency decomposeLowEnergyNavigationContinuity from BlueDogRequirements::lowEnergyNavigationContinuity to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-116 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-116 specifies a detailed acceptance condition for E-004 within their stated applicability."; }
     }
 
     requirement def <'E-117'> LowEnergyCollisionContinuity {
@@ -953,7 +951,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement lowEnergyCollisionContinuity : LowEnergyCollisionContinuity;
     #refinement dependency decomposeLowEnergyCollisionContinuity from BlueDogRequirements::lowEnergyCollisionContinuity to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-117 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-117 specifies a detailed acceptance condition for E-004 within their stated applicability."; }
     }
 
     requirement def <'E-118'> LowEnergyExit {
@@ -965,7 +963,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement lowEnergyExit : LowEnergyExit;
     #refinement dependency decomposeLowEnergyExit from BlueDogRequirements::lowEnergyExit to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-118 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-118 specifies a detailed acceptance condition for E-004 within their stated applicability."; }
     }
 
     requirement def <'E-119'> PayloadRestartPermission {
@@ -977,7 +975,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement payloadRestartPermission : PayloadRestartPermission;
     #refinement dependency decomposePayloadRestartPermission from BlueDogRequirements::payloadRestartPermission to BlueDogRequirements::lowEnergyRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-119 specifies a detailed acceptance condition for E-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-119 specifies a detailed acceptance condition for E-004 within their stated applicability."; }
     }
 
     requirement def <'E-120'> TelemetryDeliveryCadence {
@@ -1004,7 +1002,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement outageAutonomy : OutageAutonomy;
     #refinement dependency decomposeOutageAutonomy from BlueDogRequirements::outageAutonomy to BlueDogRequirements::communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-121 specifies a detailed acceptance condition for E-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-121 specifies a detailed acceptance condition for E-005 within their stated applicability."; }
     }
 
     requirement def <'E-122'> ReconnectCurrentRecord {
@@ -1016,7 +1014,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement reconnectCurrentRecord : ReconnectCurrentRecord;
     #refinement dependency decomposeReconnectCurrentRecord from BlueDogRequirements::reconnectCurrentRecord to BlueDogRequirements::communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-122 specifies a detailed acceptance condition for E-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-122 specifies a detailed acceptance condition for E-005 within their stated applicability."; }
     }
 
     requirement def <'E-123'> BacklogOrdering {
@@ -1028,7 +1026,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement backlogOrdering : BacklogOrdering;
     #refinement dependency decomposeBacklogOrdering from BlueDogRequirements::backlogOrdering to BlueDogRequirements::communications {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-123 specifies a detailed acceptance condition for E-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-123 specifies a detailed acceptance condition for E-005 within their stated applicability."; }
     }
 
     requirement def <'E-124'> BacklogCurrentPriority {
@@ -1055,7 +1053,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement ingressDetection : IngressDetection;
     #refinement dependency decomposeIngressDetection from BlueDogRequirements::ingressDetection to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-125 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-125 specifies a detailed acceptance condition for E-006 within their stated applicability."; }
     }
 
     requirement def <'E-126'> IngressRecoveryRequest {
@@ -1067,7 +1065,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement ingressRecoveryRequest : IngressRecoveryRequest;
     #refinement dependency decomposeIngressRecoveryRequest from BlueDogRequirements::ingressRecoveryRequest to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-126 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-126 specifies a detailed acceptance condition for E-006 within their stated applicability."; }
     }
 
     requirement def <'E-127'> IngressFlotation {
@@ -1079,7 +1077,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement ingressFlotation : IngressFlotation;
     #refinement dependency decomposeIngressFlotation from BlueDogRequirements::ingressFlotation to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-127 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-127 specifies a detailed acceptance condition for E-006 within their stated applicability."; }
     }
 
     requirement def <'E-128'> IngressElectronicsProtection {
@@ -1091,7 +1089,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement ingressElectronicsProtection : IngressElectronicsProtection;
     #refinement dependency decomposeIngressElectronicsProtection from BlueDogRequirements::ingressElectronicsProtection to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-128 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-128 specifies a detailed acceptance condition for E-006 within their stated applicability."; }
     }
 
     requirement def <'E-129'> IngressPositionContinuity {
@@ -1103,7 +1101,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement ingressPositionContinuity : IngressPositionContinuity;
     #refinement dependency decomposeIngressPositionContinuity from BlueDogRequirements::ingressPositionContinuity to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-129 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-129 specifies a detailed acceptance condition for E-006 within their stated applicability."; }
     }
 
     requirement def <'E-130'> PeriodicLogCadence {
@@ -1115,7 +1113,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement periodicLogCadence : PeriodicLogCadence;
     #refinement dependency decomposePeriodicLogCadence from BlueDogRequirements::periodicLogCadence to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-130 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-130 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-131'> LogRetention {
@@ -1127,7 +1125,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement logRetention : LogRetention;
     #refinement dependency decomposeLogRetention from BlueDogRequirements::logRetention to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-131 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-131 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-132'> CriticalEventRecording {
@@ -1139,7 +1137,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement criticalEventRecording : CriticalEventRecording;
     #refinement dependency decomposeCriticalEventRecording from BlueDogRequirements::criticalEventRecording to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-132 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-132 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-133'> LogTimestampAccuracy {
@@ -1151,7 +1149,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement logTimestampAccuracy : LogTimestampAccuracy;
     #refinement dependency decomposeLogTimestampAccuracy from BlueDogRequirements::logTimestampAccuracy to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-133 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-133 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-134'> InvalidTimestampMarking {
@@ -1163,7 +1161,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement invalidTimestampMarking : InvalidTimestampMarking;
     #refinement dependency decomposeInvalidTimestampMarking from BlueDogRequirements::invalidTimestampMarking to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-134 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-134 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-135'> LogGapIndication {
@@ -1175,7 +1173,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement logGapIndication : LogGapIndication;
     #refinement dependency decomposeLogGapIndication from BlueDogRequirements::logGapIndication to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-135 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-135 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-136'> LogInterruptionDurability {
@@ -1187,7 +1185,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement logInterruptionDurability : LogInterruptionDurability;
     #refinement dependency decomposeLogInterruptionDurability from BlueDogRequirements::logInterruptionDurability to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-136 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-136 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-137'> ReconnectLogPreservation {
@@ -1199,7 +1197,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement reconnectLogPreservation : ReconnectLogPreservation;
     #refinement dependency decomposeReconnectLogPreservation from BlueDogRequirements::reconnectLogPreservation to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-137 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-137 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-138'> QualificationPersistence {
@@ -1211,7 +1209,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement qualificationPersistence : QualificationPersistence;
     #refinement dependency decomposeQualificationPersistence from BlueDogRequirements::qualificationPersistence to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-138 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-138 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-139'> UnknownQualificationFallback {
@@ -1223,7 +1221,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement unknownQualificationFallback : UnknownQualificationFallback;
     #refinement dependency decomposeUnknownQualificationFallback from BlueDogRequirements::unknownQualificationFallback to BlueDogRequirements::missionEvidence {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-139 specifies a detailed acceptance condition for E-007 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-139 specifies a detailed acceptance condition for E-007 within their stated applicability."; }
     }
 
     requirement def <'E-140'> NavigationValidEpochs {
@@ -1239,7 +1237,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement navigationValidEpochs : NavigationValidEpochs;
     #refinement dependency decomposeNavigationValidEpochs from BlueDogRequirements::navigationValidEpochs to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-140 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-140 specifies a detailed acceptance condition for E-008 within their stated applicability."; }
     }
 
     requirement def <'E-141'> StaleNavigationInvalidation {
@@ -1251,7 +1249,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement staleNavigationInvalidation : StaleNavigationInvalidation;
     #refinement dependency decomposeStaleNavigationInvalidation from BlueDogRequirements::staleNavigationInvalidation to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-141 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-141 specifies a detailed acceptance condition for E-008 within their stated applicability."; }
     }
 
     requirement def <'E-142'> NavigationDegradedTransition {
@@ -1263,7 +1261,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement navigationDegradedTransition : NavigationDegradedTransition;
     #refinement dependency decomposeNavigationDegradedTransition from BlueDogRequirements::navigationDegradedTransition to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-142 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-142 specifies a detailed acceptance condition for E-008 within their stated applicability."; }
     }
 
     requirement def <'E-143'> StaleNavigationUseInhibition {
@@ -1275,7 +1273,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement staleNavigationUseInhibition : StaleNavigationUseInhibition;
     #refinement dependency decomposeStaleNavigationUseInhibition from BlueDogRequirements::staleNavigationUseInhibition to BlueDogRequirements::navigationAvailability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-143 specifies a detailed acceptance condition for E-008 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-143 specifies a detailed acceptance condition for E-008 within their stated applicability."; }
     }
 
     requirement def <'P-101'> SoloTransport {
@@ -1288,7 +1286,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement soloTransport : SoloTransport;
     #refinement dependency decomposeSoloTransport from BlueDogRequirements::soloTransport to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-101 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-101 specifies a detailed acceptance condition for P-001 within their stated applicability."; }
     }
 
     requirement def <'P-102'> LiftMass {
@@ -1300,7 +1298,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement liftMass : LiftMass;
     #refinement dependency decomposeLiftMass from BlueDogRequirements::liftMass to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-102 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-102 specifies a detailed acceptance condition for P-001 within their stated applicability."; }
     }
 
     requirement def <'P-103'> SetupDuration {
@@ -1313,7 +1311,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement setupDuration : SetupDuration;
     #refinement dependency decomposeSetupDuration from BlueDogRequirements::setupDuration to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-103 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-103 specifies a detailed acceptance condition for P-001 within their stated applicability."; }
     }
 
     requirement def <'P-104'> PackDuration {
@@ -1326,7 +1324,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement packDuration : PackDuration;
     #refinement dependency decomposePackDuration from BlueDogRequirements::packDuration to BlueDogRequirements::transportability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-104 specifies a detailed acceptance condition for P-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-104 specifies a detailed acceptance condition for P-001 within their stated applicability."; }
     }
 
     requirement def <'P-105'> SoloLaunch {
@@ -1370,7 +1368,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement replacementDuration : ReplacementDuration;
     #refinement dependency decomposeReplacementDuration from BlueDogRequirements::replacementDuration to BlueDogRequirements::serviceability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-107 specifies a detailed acceptance condition for P-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-107 specifies a detailed acceptance condition for P-003 within their stated applicability."; }
     }
 
     requirement def <'P-108'> NondestructiveService {
@@ -1397,7 +1395,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement postServiceSealing : PostServiceSealing;
     #refinement dependency decomposePostServiceSealing from BlueDogRequirements::postServiceSealing to BlueDogRequirements::serviceability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-109 specifies a detailed acceptance condition for P-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-109 specifies a detailed acceptance condition for P-003 within their stated applicability."; }
     }
 
     requirement def <'P-110'> PostServiceActuation {
@@ -1409,7 +1407,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement postServiceActuation : PostServiceActuation;
     #refinement dependency decomposePostServiceActuation from BlueDogRequirements::postServiceActuation to BlueDogRequirements::serviceability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "P-110 specifies a detailed acceptance condition for P-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "P-110 specifies a detailed acceptance condition for P-003 within their stated applicability."; }
     }
 
     requirement def <'S-101'> TrafficTracking {
@@ -1420,7 +1418,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement trafficTracking : TrafficTracking;
     #refinement dependency decomposeTrafficTracking from BlueDogRequirements::trafficTracking to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-101 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-101 specifies a detailed acceptance condition for S-001 within their stated applicability."; }
     }
 
     requirement def <'S-102'> CollisionAssessmentCadence {
@@ -1432,7 +1430,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement collisionAssessmentCadence : CollisionAssessmentCadence;
     #refinement dependency decomposeCollisionAssessmentCadence from BlueDogRequirements::collisionAssessmentCadence to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-102 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-102 specifies a detailed acceptance condition for S-001 within their stated applicability."; }
     }
 
     requirement def <'S-103'> AvoidanceCommandDeadline {
@@ -1444,7 +1442,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement avoidanceCommandDeadline : AvoidanceCommandDeadline;
     #refinement dependency decomposeAvoidanceCommandDeadline from BlueDogRequirements::avoidanceCommandDeadline to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-103 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-103 specifies a detailed acceptance condition for S-001 within their stated applicability."; }
     }
 
     requirement def <'S-104'> TrafficAwarenessFault {
@@ -1456,7 +1454,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement trafficAwarenessFault : TrafficAwarenessFault;
     #refinement dependency decomposeTrafficAwarenessFault from BlueDogRequirements::trafficAwarenessFault to BlueDogRequirements::trafficSafety {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-104 specifies a detailed acceptance condition for S-001 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-104 specifies a detailed acceptance condition for S-001 within their stated applicability."; }
     }
 
     requirement def <'S-105'> BoundaryEvaluationCadence {
@@ -1468,7 +1466,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement boundaryEvaluationCadence : BoundaryEvaluationCadence;
     #refinement dependency decomposeBoundaryEvaluationCadence from BlueDogRequirements::boundaryEvaluationCadence to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-105 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-105 specifies a detailed acceptance condition for S-002 within their stated applicability."; }
     }
 
     requirement def <'S-106'> BoundaryAvoidanceDeadline {
@@ -1480,7 +1478,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement boundaryAvoidanceDeadline : BoundaryAvoidanceDeadline;
     #refinement dependency decomposeBoundaryAvoidanceDeadline from BlueDogRequirements::boundaryAvoidanceDeadline to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-106 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-106 specifies a detailed acceptance condition for S-002 within their stated applicability."; }
     }
 
     requirement def <'S-107'> BoundaryAvoidanceRecording {
@@ -1492,7 +1490,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement boundaryAvoidanceRecording : BoundaryAvoidanceRecording;
     #refinement dependency decomposeBoundaryAvoidanceRecording from BlueDogRequirements::boundaryAvoidanceRecording to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-107 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-107 specifies a detailed acceptance condition for S-002 within their stated applicability."; }
     }
 
     requirement def <'S-108'> BoundaryStartInhibition {
@@ -1504,7 +1502,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement boundaryStartInhibition : BoundaryStartInhibition;
     #refinement dependency decomposeBoundaryStartInhibition from BlueDogRequirements::boundaryStartInhibition to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-108 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-108 specifies a detailed acceptance condition for S-002 within their stated applicability."; }
     }
 
     requirement def <'S-109'> BoundaryDegradedEvidence {
@@ -1516,7 +1514,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement boundaryDegradedEvidence : BoundaryDegradedEvidence;
     #refinement dependency decomposeBoundaryDegradedEvidence from BlueDogRequirements::boundaryDegradedEvidence to BlueDogRequirements::operatingBoundary {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-109 specifies a detailed acceptance condition for S-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-109 specifies a detailed acceptance condition for S-002 within their stated applicability."; }
     }
 
     requirement def <'S-110'> AbortLatchDeadline {
@@ -1528,7 +1526,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement abortLatchDeadline : AbortLatchDeadline;
     #refinement dependency decomposeAbortLatchDeadline from BlueDogRequirements::abortLatchDeadline to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-110 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-110 specifies a detailed acceptance condition for S-003 within their stated applicability."; }
     }
 
     requirement def <'S-111'> RecoveryTelemetryCadence {
@@ -1540,7 +1538,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement recoveryTelemetryCadence : RecoveryTelemetryCadence;
     #refinement dependency decomposeRecoveryTelemetryCadence from BlueDogRequirements::recoveryTelemetryCadence to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-111 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-111 specifies a detailed acceptance condition for S-003 within their stated applicability."; }
     }
 
     requirement def <'S-112'> MotorIsolationDeadline {
@@ -1552,7 +1550,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement motorIsolationDeadline : MotorIsolationDeadline;
     #refinement dependency decomposeMotorIsolationDeadline from BlueDogRequirements::motorIsolationDeadline to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-112 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-112 specifies a detailed acceptance condition for S-003 within their stated applicability."; }
     }
 
     requirement def <'S-113'> IsolationRestartInhibition {
@@ -1564,7 +1562,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement isolationRestartInhibition : IsolationRestartInhibition;
     #refinement dependency decomposeIsolationRestartInhibition from BlueDogRequirements::isolationRestartInhibition to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-113 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-113 specifies a detailed acceptance condition for S-003 within their stated applicability."; }
     }
 
     requirement def <'S-114'> ManualControlLossShutdown {
@@ -1576,7 +1574,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement manualControlLossShutdown : ManualControlLossShutdown;
     #refinement dependency decomposeManualControlLossShutdown from BlueDogRequirements::manualControlLossShutdown to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-114 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-114 specifies a detailed acceptance condition for S-003 within their stated applicability."; }
     }
 
     requirement def <'S-115'> ControlLossLocationContinuity {
@@ -1588,7 +1586,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement controlLossLocationContinuity : ControlLossLocationContinuity;
     #refinement dependency decomposeControlLossLocationContinuity from BlueDogRequirements::controlLossLocationContinuity to BlueDogRequirements::emergencyControl {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-115 specifies a detailed acceptance condition for S-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-115 specifies a detailed acceptance condition for S-003 within their stated applicability."; }
     }
 
     requirement def <'S-116'> NavigationLightPresentation {
@@ -1645,7 +1643,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement signalingModeDeadline : SignalingModeDeadline;
     #refinement dependency decomposeSignalingModeDeadline from BlueDogRequirements::signalingModeDeadline to BlueDogRequirements::navigationConspicuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-119 specifies a detailed acceptance condition for S-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-119 specifies a detailed acceptance condition for S-004 within their stated applicability."; }
     }
 
     requirement def <'S-120'> SignalingFaultRecording {
@@ -1657,7 +1655,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement signalingFaultRecording : SignalingFaultRecording;
     #refinement dependency decomposeSignalingFaultRecording from BlueDogRequirements::signalingFaultRecording to BlueDogRequirements::navigationConspicuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-120 specifies a detailed acceptance condition for S-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-120 specifies a detailed acceptance condition for S-004 within their stated applicability."; }
     }
 
     requirement def <'S-121'> SignalingFaultReporting {
@@ -1669,7 +1667,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement signalingFaultReporting : SignalingFaultReporting;
     #refinement dependency decomposeSignalingFaultReporting from BlueDogRequirements::signalingFaultReporting to BlueDogRequirements::navigationConspicuity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-121 specifies a detailed acceptance condition for S-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-121 specifies a detailed acceptance condition for S-004 within their stated applicability."; }
     }
 
     requirement def <'S-122'> DeploymentComplianceRecord {
@@ -1681,7 +1679,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement deploymentComplianceRecord : DeploymentComplianceRecord;
     #refinement dependency decomposeDeploymentComplianceRecord from BlueDogRequirements::deploymentComplianceRecord to BlueDogRequirements::regulatoryClassification {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "S-122 specifies a detailed acceptance condition for S-005 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "S-122 specifies a detailed acceptance condition for S-005 within their stated applicability."; }
     }
 
     requirement def <'S-123'> DeploymentReleaseGate {
@@ -1708,7 +1706,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement telemetryDisplayContent : TelemetryDisplayContent;
     #refinement dependency decomposeTelemetryDisplayContent from BlueDogRequirements::telemetryDisplayContent to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-201 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-201 specifies a detailed acceptance condition for C-101 within their stated applicability."; }
     }
 
     requirement def <'C-202'> TelemetryStaleIndication {
@@ -1720,7 +1718,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement telemetryStaleIndication : TelemetryStaleIndication;
     #refinement dependency decomposeTelemetryStaleIndication from BlueDogRequirements::telemetryStaleIndication to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-202 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-202 specifies a detailed acceptance condition for C-101 within their stated applicability."; }
     }
 
     requirement def <'C-203'> TelemetryIdentityPreservation {
@@ -1732,7 +1730,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement telemetryIdentityPreservation : TelemetryIdentityPreservation;
     #refinement dependency decomposeTelemetryIdentityPreservation from BlueDogRequirements::telemetryIdentityPreservation to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-203 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-203 specifies a detailed acceptance condition for C-101 within their stated applicability."; }
     }
 
     requirement def <'C-204'> TelemetryDuplicateSuppression {
@@ -1744,7 +1742,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement telemetryDuplicateSuppression : TelemetryDuplicateSuppression;
     #refinement dependency decomposeTelemetryDuplicateSuppression from BlueDogRequirements::telemetryDuplicateSuppression to BlueDogRequirements::telemetryEquipment {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-204 specifies a detailed acceptance condition for C-101 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-204 specifies a detailed acceptance condition for C-101 within their stated applicability."; }
     }
 
     requirement def <'C-205'> UnauthenticatedCommandRejection {
@@ -1756,7 +1754,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement unauthenticatedCommandRejection : UnauthenticatedCommandRejection;
     #refinement dependency decomposeUnauthenticatedCommandRejection from BlueDogRequirements::unauthenticatedCommandRejection to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-205 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-205 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'C-206'> ReplayCommandRejection {
@@ -1768,7 +1766,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement replayCommandRejection : ReplayCommandRejection;
     #refinement dependency decomposeReplayCommandRejection from BlueDogRequirements::replayCommandRejection to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-206 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-206 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'C-207'> ExpiredCommandRejection {
@@ -1780,7 +1778,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement expiredCommandRejection : ExpiredCommandRejection;
     #refinement dependency decomposeExpiredCommandRejection from BlueDogRequirements::expiredCommandRejection to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-207 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-207 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'C-208'> AcceptedCommandDeadline {
@@ -1792,7 +1790,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement acceptedCommandDeadline : AcceptedCommandDeadline;
     #refinement dependency decomposeAcceptedCommandDeadline from BlueDogRequirements::acceptedCommandDeadline to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-208 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-208 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'C-209'> OnboardAcknowledgmentDeadline {
@@ -1804,7 +1802,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement onboardAcknowledgmentDeadline : OnboardAcknowledgmentDeadline;
     #refinement dependency decomposeOnboardAcknowledgmentDeadline from BlueDogRequirements::onboardAcknowledgmentDeadline to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-209 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-209 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'C-210'> AcknowledgmentQueueing {
@@ -1816,7 +1814,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement acknowledgmentQueueing : AcknowledgmentQueueing;
     #refinement dependency decomposeAcknowledgmentQueueing from BlueDogRequirements::acknowledgmentQueueing to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-210 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-210 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'C-211'> ExternalControlDisqualification {
@@ -1828,7 +1826,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement externalControlDisqualification : ExternalControlDisqualification;
     #refinement dependency decomposeExternalControlDisqualification from BlueDogRequirements::externalControlDisqualification to BlueDogRequirements::commandIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "C-211 specifies a detailed acceptance condition for C-102 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "C-211 specifies a detailed acceptance condition for C-102 within their stated applicability."; }
     }
 
     requirement def <'N-101'> VisibilityNavigationCapability {
@@ -1870,7 +1868,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement restrictedVisibilityEntry : RestrictedVisibilityEntry;
     #refinement dependency decomposeRestrictedVisibilityEntry from BlueDogRequirements::restrictedVisibilityEntry to BlueDogRequirements::visibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-103 specifies a detailed acceptance condition for N-033 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-103 specifies a detailed acceptance condition for N-033 within their stated applicability."; }
     }
 
     requirement def <'N-104'> RestrictedVisibilityEvidence {
@@ -1882,7 +1880,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement restrictedVisibilityEvidence : RestrictedVisibilityEvidence;
     #refinement dependency decomposeRestrictedVisibilityEvidence from BlueDogRequirements::restrictedVisibilityEvidence to BlueDogRequirements::visibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-104 specifies a detailed acceptance condition for N-033 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-104 specifies a detailed acceptance condition for N-033 within their stated applicability."; }
     }
 
     requirement def <'N-105'> RestrictedVisibilityCollisionAssessment {
@@ -1909,7 +1907,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement survivalEntryDeadline : SurvivalEntryDeadline;
     #refinement dependency decomposeSurvivalEntryDeadline from BlueDogRequirements::survivalEntryDeadline to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-106 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-106 specifies a detailed acceptance condition for N-035 within their stated applicability."; }
     }
 
     requirement def <'N-107'> SurvivalTransitionRecording {
@@ -1921,7 +1919,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement survivalTransitionRecording : SurvivalTransitionRecording;
     #refinement dependency decomposeSurvivalTransitionRecording from BlueDogRequirements::survivalTransitionRecording to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-107 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-107 specifies a detailed acceptance condition for N-035 within their stated applicability."; }
     }
 
     requirement def <'N-108'> SailingResumptionDeadline {
@@ -1933,7 +1931,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement sailingResumptionDeadline : SailingResumptionDeadline;
     #refinement dependency decomposeSailingResumptionDeadline from BlueDogRequirements::sailingResumptionDeadline to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-108 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-108 specifies a detailed acceptance condition for N-035 within their stated applicability."; }
     }
 
     requirement def <'N-109'> SailingResumptionInhibition {
@@ -1960,7 +1958,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement resumptionBlockEvidence : ResumptionBlockEvidence;
     #refinement dependency decomposeResumptionBlockEvidence from BlueDogRequirements::resumptionBlockEvidence to BlueDogRequirements::envelopeTransition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-110 specifies a detailed acceptance condition for N-035 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-110 specifies a detailed acceptance condition for N-035 within their stated applicability."; }
     }
 
     requirement def <'N-111'> WetMechanismTravel {
@@ -1972,7 +1970,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement wetMechanismTravel : WetMechanismTravel;
     #refinement dependency decomposeWetMechanismTravel from BlueDogRequirements::wetMechanismTravel to BlueDogRequirements::wetMechanicalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-111 specifies a detailed acceptance condition for N-044 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-111 specifies a detailed acceptance condition for N-044 within their stated applicability."; }
     }
 
     requirement def <'N-112'> WetJointIntegrity {
@@ -1984,7 +1982,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement wetJointIntegrity : WetJointIntegrity;
     #refinement dependency decomposeWetJointIntegrity from BlueDogRequirements::wetJointIntegrity to BlueDogRequirements::wetMechanicalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-112 specifies a detailed acceptance condition for N-044 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-112 specifies a detailed acceptance condition for N-044 within their stated applicability."; }
     }
 
     requirement def <'N-113'> WetConductorResistance {
@@ -1996,7 +1994,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement wetConductorResistance : WetConductorResistance;
     #refinement dependency decomposeWetConductorResistance from BlueDogRequirements::wetConductorResistance to BlueDogRequirements::wetElectricalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-113 specifies a detailed acceptance condition for N-045 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-113 specifies a detailed acceptance condition for N-045 within their stated applicability."; }
     }
 
     requirement def <'N-114'> WetInsulationResistance {
@@ -2008,7 +2006,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement wetInsulationResistance : WetInsulationResistance;
     #refinement dependency decomposeWetInsulationResistance from BlueDogRequirements::wetInsulationResistance to BlueDogRequirements::wetElectricalIntegrity {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-114 specifies a detailed acceptance condition for N-045 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-114 specifies a detailed acceptance condition for N-045 within their stated applicability."; }
     }
 
     requirement def <'N-115'> HotSunElectronicsOperation {
@@ -2130,7 +2128,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement controlRecoveryDeadline : ControlRecoveryDeadline;
     #refinement dependency decomposeControlRecoveryDeadline from BlueDogRequirements::controlRecoveryDeadline to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-122 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-122 specifies a detailed acceptance condition for N-052 within their stated applicability."; }
     }
 
     requirement def <'N-123'> CapsizeGateProgressRetention {
@@ -2142,7 +2140,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement capsizeGateProgressRetention : CapsizeGateProgressRetention;
     #refinement dependency decomposeCapsizeGateProgressRetention from BlueDogRequirements::capsizeGateProgressRetention to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-123 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-123 specifies a detailed acceptance condition for N-052 within their stated applicability."; }
     }
 
     requirement def <'N-124'> CapsizeQualificationRetention {
@@ -2154,7 +2152,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement capsizeQualificationRetention : CapsizeQualificationRetention;
     #refinement dependency decomposeCapsizeQualificationRetention from BlueDogRequirements::capsizeQualificationRetention to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-124 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-124 specifies a detailed acceptance condition for N-052 within their stated applicability."; }
     }
 
     requirement def <'N-125'> CapsizeRestrictionRetention {
@@ -2166,7 +2164,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement capsizeRestrictionRetention : CapsizeRestrictionRetention;
     #refinement dependency decomposeCapsizeRestrictionRetention from BlueDogRequirements::capsizeRestrictionRetention to BlueDogRequirements::capsizeControlRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-125 specifies a detailed acceptance condition for N-052 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-125 specifies a detailed acceptance condition for N-052 within their stated applicability."; }
     }
 
     requirement def <'N-126'> WeedPassageSpeed {
@@ -2178,7 +2176,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedPassageSpeed : WeedPassageSpeed;
     #refinement dependency decomposeWeedPassageSpeed from BlueDogRequirements::weedPassageSpeed to BlueDogRequirements::submergedWeedPassage {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-126 specifies a detailed acceptance condition for N-053 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-126 specifies a detailed acceptance condition for N-053 within their stated applicability."; }
     }
 
     requirement def <'N-127'> WeedPassageSteering {
@@ -2190,7 +2188,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedPassageSteering : WeedPassageSteering;
     #refinement dependency decomposeWeedPassageSteering from BlueDogRequirements::weedPassageSteering to BlueDogRequirements::submergedWeedPassage {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-127 specifies a detailed acceptance condition for N-053 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-127 specifies a detailed acceptance condition for N-053 within their stated applicability."; }
     }
 
     requirement def <'N-128'> WeedSnagSpeedRecovery {
@@ -2232,7 +2230,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedBlockageFault : WeedBlockageFault;
     #refinement dependency decomposeWeedBlockageFault from BlueDogRequirements::weedBlockageFault to BlueDogRequirements::weedBlockageResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-130 specifies a detailed acceptance condition for N-055 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-130 specifies a detailed acceptance condition for N-055 within their stated applicability."; }
     }
 
     requirement def <'N-131'> WeedBlockageContingency {
@@ -2244,7 +2242,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedBlockageContingency : WeedBlockageContingency;
     #refinement dependency decomposeWeedBlockageContingency from BlueDogRequirements::weedBlockageContingency to BlueDogRequirements::weedBlockageResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-131 specifies a detailed acceptance condition for N-055 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-131 specifies a detailed acceptance condition for N-055 within their stated applicability."; }
     }
 
     requirement def <'N-132'> WeedBlockageLocation {
@@ -2256,7 +2254,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement weedBlockageLocation : WeedBlockageLocation;
     #refinement dependency decomposeWeedBlockageLocation from BlueDogRequirements::weedBlockageLocation to BlueDogRequirements::weedBlockageResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-132 specifies a detailed acceptance condition for N-055 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-132 specifies a detailed acceptance condition for N-055 within their stated applicability."; }
     }
 
     requirement def <'N-133'> PoweredWeedSpeed {
@@ -2268,7 +2266,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement poweredWeedSpeed : PoweredWeedSpeed;
     #refinement dependency decomposePoweredWeedSpeed from BlueDogRequirements::poweredWeedSpeed to BlueDogRequirements::recoveryPropulsorWeeds {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-133 specifies a detailed acceptance condition for N-056 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-133 specifies a detailed acceptance condition for N-056 within their stated applicability."; }
     }
 
     requirement def <'N-134'> PoweredWeedCurrent {
@@ -2310,7 +2308,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement lockedPropulsorShutdown : LockedPropulsorShutdown;
     #refinement dependency decomposeLockedPropulsorShutdown from BlueDogRequirements::lockedPropulsorShutdown to BlueDogRequirements::recoveryPropulsorWeeds {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "N-136 specifies a detailed acceptance condition for N-056 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "N-136 specifies a detailed acceptance condition for N-056 within their stated applicability."; }
     }
 
     requirement def <'R-101'> MotorQualificationInvariant {
@@ -2328,7 +2326,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement motorQualificationInvariant : MotorQualificationInvariant;
     #refinement dependency decomposeMotorQualificationInvariant from BlueDogRequirements::motorQualificationInvariant to BlueDogRequirements::challengeMotorInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "R-101 specifies a detailed acceptance condition for R-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "R-101 specifies a detailed acceptance condition for R-004 within their stated applicability."; }
     }
 
     requirement def <'R-102'> FreshRecoveryCommand {
@@ -2340,7 +2338,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement freshRecoveryCommand : FreshRecoveryCommand;
     #refinement dependency decomposeFreshRecoveryCommand from BlueDogRequirements::freshRecoveryCommand to BlueDogRequirements::challengeMotorInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "R-102 specifies a detailed acceptance condition for R-004 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "R-102 specifies a detailed acceptance condition for R-004 within their stated applicability."; }
     }
 
     requirement def <'E-144'> IngressEventDeadline {
@@ -2352,7 +2350,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement ingressEventDeadline : IngressEventDeadline;
     #refinement dependency decomposeIngressEventDeadline from BlueDogRequirements::ingressEventDeadline to BlueDogRequirements::ingressResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-144 specifies a detailed acceptance condition for E-006 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-144 specifies a detailed acceptance condition for E-006 within their stated applicability."; }
     }
 
     requirement def <'E-145'> QualificationRestoration {
@@ -2364,7 +2362,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement qualificationRestoration : QualificationRestoration;
     #refinement dependency decomposeQualificationRestoration from BlueDogRequirements::qualificationRestoration to BlueDogRequirements::resetRecovery {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-145 specifies a detailed acceptance condition for E-003 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-145 specifies a detailed acceptance condition for E-003 within their stated applicability."; }
     }
     dependency sharedAcceptance1 from BlueDogRequirements::resetRecovery to BlueDogRequirements::logInterruptionDurability {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2535,11 +2533,11 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement energyEvidenceReadiness : EnergyEvidenceReadiness;
 
     dependency energyDerivation1 from sustainedEnergyFeasibility to GorgeChallenge::repeatedOperation {
-        metadata rationale : ModelingMetadata::Rationale { text = "Repeated journeys motivate a repeatable energy cycle, beyond a one-off endurance run. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Repeated journeys motivate a repeatable energy cycle, beyond a one-off endurance run."; }
     }
 
     dependency energyDerivation2 from sustainedEnergyFeasibility to BlueDog::Goals::hawaiiVoyage {
-        metadata rationale : ModelingMetadata::Rationale { text = "The ocean ambition requires sustained energy autonomy; route-specific resources remain unresolved. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The ocean ambition requires sustained energy autonomy; route-specific resources remain unresolved."; }
     }
 
     #derivation connection energyDerivation3 {
@@ -2575,11 +2573,11 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     #refinement dependency energyDerivation8 from BlueDogRequirements::peakSupplyCapability to BlueDogRequirements::multiDayEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-203 specifies a detailed acceptance condition for M-002 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-203 specifies a detailed acceptance condition for M-002 within their stated applicability."; }
     }
     #refinement dependency energyDerivation9 from BlueDogRequirements::harvestCampaignCoverage to BlueDogRequirements::sustainedEnergyFeasibility {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-204 specifies a detailed acceptance condition for E-200 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-204 specifies a detailed acceptance condition for E-200 within their stated applicability."; }
     }
     dependency energyDerivation10 from BlueDogRequirements::energyEvidenceReadiness to BlueDogRequirements::multiDayEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2587,7 +2585,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
 
     dependency energyDerivation11 from sustainedReserveProtection to recoveryEnergy {
-        metadata rationale : ModelingMetadata::Rationale { text = "Sustained operation protects the recovery reserve sized by the existing R-002 policy. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "Sustained operation protects the recovery reserve sized by the existing R-002 policy."; }
     }
 
     calc def SustainedReserveProtectionCriterion {
@@ -2706,10 +2704,10 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     }
     requirement criticalFailureDisposition : CriticalFailureDisposition;
     dependency cruiseReliabilityDerivation1 from cruisePerformance to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "cruisePerformance is a selected engineering objective supporting roundTrip. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The cruise study estimates sailing speed and the time and energy needed to complete the river circuit."; }
     }
     dependency cruiseReliabilityDerivation3 from missionReliability to roundTrip {
-        metadata rationale : ModelingMetadata::Rationale { text = "missionReliability is a selected engineering objective supporting roundTrip. This is design motivation or an implementation choice, not a satisfaction implication."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "The reliability study compares failure exposure during the circuit; its target still needs evidence for the proposed boat."; }
     }
     #derivation connection cruiseReliabilityDerivation6 {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2822,7 +2820,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement windSampleCadence : WindSampleCadence;
     #refinement dependency decomposeWindSampleCadence from BlueDogRequirements::windSampleCadence to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-146 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-146 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'E-147'> WindSpeedAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2832,7 +2830,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement windSpeedAccuracy : WindSpeedAccuracy;
     #refinement dependency decomposeWindSpeedAccuracy from BlueDogRequirements::windSpeedAccuracy to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-147 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-147 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'E-148'> WindDirectionAccuracy {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2842,7 +2840,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement windDirectionAccuracy : WindDirectionAccuracy;
     #refinement dependency decomposeWindDirectionAccuracy from BlueDogRequirements::windDirectionAccuracy to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-148 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-148 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'E-149'> WindStaleInvalidation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2852,7 +2850,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement windStaleInvalidation : WindStaleInvalidation;
     #refinement dependency decomposeWindStaleInvalidation from BlueDogRequirements::windStaleInvalidation to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-149 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-149 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'E-150'> InvalidWindUseInhibition {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2862,7 +2860,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement invalidWindUseInhibition : InvalidWindUseInhibition;
     #refinement dependency decomposeInvalidWindUseInhibition from BlueDogRequirements::invalidWindUseInhibition to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-150 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-150 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'E-151'> WindLossResponse {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2872,7 +2870,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement windLossResponse : WindLossResponse;
     #refinement dependency decomposeWindLossResponse from BlueDogRequirements::windLossResponse to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-151 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-151 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'E-152'> WindSensingEndurance {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -2882,7 +2880,7 @@ dependency deriveRecoveryPropulsion from recoveryPropulsion to GorgeChallenge::a
     requirement windSensingEndurance : WindSensingEndurance;
     #refinement dependency decomposeWindSensingEndurance from BlueDogRequirements::windSensingEndurance to BlueDogRequirements::windObservation {
         metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-        metadata rationale : ModelingMetadata::Rationale { text = "E-152 specifies a detailed acceptance condition for E-009 within their stated applicability. Selected limits, mechanisms and campaign conditions remain independent allocations; refinement makes no satisfaction implication or automatic parent-coverage claim."; }
+        metadata rationale : ModelingMetadata::Rationale { text = "E-152 specifies a detailed acceptance condition for E-009 within their stated applicability."; }
     }
     requirement def <'N-004'> VegetationResilience {
         doc /* The vessel shall preserve or autonomously recover the sailing and recovery functions specified for the declared submerged-vegetation encounters. */
