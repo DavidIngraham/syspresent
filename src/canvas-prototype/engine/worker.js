@@ -9,14 +9,18 @@ function decodedLength(response) {
   return Number.isSafeInteger(length) && length > 0 ? length : undefined;
 }
 
-async function instantiateEngine(response, imports, progress) {
-  let total = decodedLength(response), lastBytes = 0, lastAt = 0;
+async function instantiateEngine(response, imports, progress, expectedDecodedBytes) {
+  let total = expectedDecodedBytes ?? decodedLength(response), lastBytes = 0, lastAt = 0;
   const download = (completed,force=false) => {
-    if (total !== undefined && completed > total) total = undefined;
+    if (total !== undefined && completed > total) { total = undefined; force = true; }
     const now = Date.now();
     if (!force && completed !== 0 && completed-lastBytes < 262144 && now-lastAt < 100) return;
     lastBytes=completed;lastAt=now;
-    progress({stage:'engine-download',label:'Downloading and compiling semantic engine',completed,...(total === undefined ? {} : {total}),unit:'bytes'});
+    progress({stage:'engine-download',label:'Downloading and compiling semantic engine',completed,...(total === undefined ? {} : {total}),unit:'bytes',detail:'Decoded engine bytes; the network transfer may be compressed.'});
+  };
+  const finishDownload = completed => {
+    if (total !== undefined && completed !== total) total = undefined;
+    download(completed,true);
   };
   download(0);
   if (typeof WebAssembly.instantiateStreaming === 'function' && response.body?.getReader && typeof ReadableStream === 'function') {
@@ -27,7 +31,7 @@ async function instantiateEngine(response, imports, progress) {
         try {
           const {done,value} = await reader.read();
           if (done) {
-            download(received,true);
+            finishDownload(received);
             progress({stage:'engine-compile',label:'Finishing semantic engine compilation'});
             controller.close();
           } else {
@@ -44,12 +48,12 @@ async function instantiateEngine(response, imports, progress) {
     return WebAssembly.instantiateStreaming(new Response(body,{headers:{'Content-Type':'application/wasm'}}),imports);
   }
   const bytes = await response.arrayBuffer();
-  download(bytes.byteLength,true);
+  finishDownload(bytes.byteLength);
   progress({stage:'engine-compile',label:'Compiling semantic engine'});
   return WebAssembly.instantiate(bytes,imports);
 }
 
-async function initialize({ assetBase, assetVersion }, progress = () => {}) {
+async function initialize({ assetBase, assetVersion, expectedDecodedBytes }, progress = () => {}) {
   if (engineReady) return engineReady;
   engineReady = (async () => {
     const base = new URL(assetBase);
@@ -59,11 +63,12 @@ async function initialize({ assetBase, assetVersion }, progress = () => {}) {
     catch (error) { throw new Error('Cannot load semantic runtime script: '+error.message); }
     const go = new Go();
     let response;
-    progress({stage:'engine-download',label:'Downloading semantic engine',completed:0,unit:'bytes'});
+    const expectedSize = typeof assetVersion === 'string' && assetVersion.trim() && Number.isSafeInteger(expectedDecodedBytes) && expectedDecodedBytes > 0 ? expectedDecodedBytes : undefined;
+    progress({stage:'engine-download',label:'Downloading semantic engine',completed:0,...(expectedSize === undefined ? {} : {total:expectedSize}),unit:'bytes',detail:'Decoded engine bytes; the network transfer may be compressed.'});
     try { response = await fetch(asset('sysml-wasm.wasm')); }
     catch (error) { throw new Error('Cannot download semantic engine: '+error.message); }
     if (!response.ok) throw new Error(`Cannot load semantic engine: HTTP ${response.status}`);
-    const { instance } = await instantiateEngine(response,go.importObject,progress);
+    const { instance } = await instantiateEngine(response,go.importObject,progress,expectedSize);
     progress({stage:'engine-start',label:'Starting native semantic engine'});
     let engineFailure;
     go.run(instance).catch(error => { engineFailure = error; });

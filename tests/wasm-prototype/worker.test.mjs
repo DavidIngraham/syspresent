@@ -22,7 +22,7 @@ test('worker onmessage returns stopped-engine status without a misleading JSON p
  assert.equal(responses[0].id,7);assert.equal(responses[0].error.code,'NATIVE_NO_RESPONSE');assert.match(responses[0].error.message,/native semantic engine/);assert.doesNotMatch(responses[0].error.message,/valid JSON/);
 });
 
-function startupHarness({streaming=true,headers={},status=200,scriptError,fetchError,compileError,bodyError}={}) {
+function startupHarness({streaming=true,headers={},status=200,scriptError,fetchError,compileError,bodyError,expectedDecodedBytes,assetVersion='pinned-build'}={}) {
  const events=[],fetches=[],scripts=[],compiles=[],bytes=new Uint8Array([0,97,115,109,1,0,0,0]);
  let consumed;
  const native={result:{version:'native',capabilities:['render_view']}};
@@ -39,7 +39,7 @@ function startupHarness({streaming=true,headers={},status=200,scriptError,fetchE
  });
  context.importScripts=url=>{scripts.push(url);if(scriptError)throw scriptError;context.Go=class{constructor(){this.importObject={native:true};}run(){context.sysmlWasm={call:()=>JSON.stringify(native)};return Promise.resolve();}};};
  vm.runInContext(source,context);
- const start=id=>context.self.onmessage({data:{id,method:'Initialize',params:{assetBase:'https://example.test/engine/',assetVersion:'pinned-build'}}});
+ const start=id=>context.self.onmessage({data:{id,method:'Initialize',params:{assetBase:'https://example.test/engine/',assetVersion,expectedDecodedBytes}}});
  return {context,events,fetches,scripts,compiles,bytes,start,get consumed(){return consumed;}};
 }
 
@@ -95,4 +95,59 @@ test('concurrent initialization requests share one engine without double downloa
  const h=startupHarness();await Promise.all([h.start(1),h.start(2)]);
  assert.equal(h.fetches.length,1);assert.equal(h.compiles.length,1);
  assert.deepEqual(h.events.filter(e=>e.result).map(e=>e.id).sort(),[1,2]);
+});
+
+test('pinned decoded byte metadata gives compressed streams an honest denominator',async()=>{
+ const h=startupHarness({expectedDecodedBytes:8,headers:{'content-encoding':'gzip','content-length':'3'}});
+ await h.start(1);
+ const download=h.events.filter(e=>e.progress?.stage==='engine-download').map(e=>e.progress);
+ assert.ok(download.length>=2);
+ assert.ok(download.every(e=>e.total===8&&e.unit==='bytes'&&e.detail.includes('Decoded engine bytes')));
+ assert.equal(download.at(-1).completed,8);
+ assert.equal(h.fetches.length,1);assert.equal(h.compiles.length,1);assert.deepEqual(h.consumed,h.bytes);
+ const compile=h.events.find(e=>e.progress?.stage==='engine-compile').progress;
+ assert.equal(compile.total,undefined);assert.equal(compile.completed,undefined);
+});
+
+test('invalid decoded metadata or an unpinned version cannot invent a compressed total',async()=>{
+ const scenarios=[
+  ...[undefined,0,-1,1.5,Infinity,Number.MAX_SAFE_INTEGER+1,'8'].map(expectedDecodedBytes=>({expectedDecodedBytes})),
+  ...['','  ',null].map(assetVersion=>({assetVersion,expectedDecodedBytes:8}))
+ ];
+ for(const options of scenarios){
+  const h=startupHarness({...options,headers:{'content-encoding':'gzip','content-length':'3'}});
+  await h.start(1);
+  assert.ok(h.events.filter(e=>e.progress?.stage==='engine-download').every(e=>e.progress.total===undefined));
+  assert.ok(h.events.some(e=>e.result?.version==='native'));
+ }
+});
+
+test('decoded metadata overrun and EOF underrun discard the total without altering native startup',async()=>{
+ for(const expectedDecodedBytes of [3,7,12]){
+  const h=startupHarness({expectedDecodedBytes,headers:{'content-encoding':'gzip','content-length':'3'}});
+  await h.start(1);
+  const download=h.events.filter(e=>e.progress?.stage==='engine-download').map(e=>e.progress);
+  assert.equal(download[0].total,expectedDecodedBytes);
+  assert.equal(download.at(-1).completed,8);assert.equal(download.at(-1).total,undefined);
+  if(expectedDecodedBytes<8)assert.ok(download.some(e=>e.completed>expectedDecodedBytes&&e.total===undefined));
+  if(expectedDecodedBytes===3)assert.equal(download.find(e=>e.completed>3).completed,4,'overrun must clear the total on the first chunk, before EOF or the throttle interval');
+  assert.equal(h.fetches.length,1);assert.equal(h.compiles.length,1);assert.ok(h.events.some(e=>e.result?.version==='native'));
+ }
+});
+
+test('non-streaming decoded totals validate EOF and never require another download',async()=>{
+ for(const expectedDecodedBytes of [8,7,12]){
+  const h=startupHarness({streaming:false,expectedDecodedBytes,headers:{'content-encoding':'gzip','content-length':'3'}});
+  await h.start(1);
+  const last=h.events.filter(e=>e.progress?.stage==='engine-download').at(-1).progress;
+  assert.equal(last.completed,8);assert.equal(last.total,expectedDecodedBytes===8?8:undefined);
+  assert.equal(h.fetches.length,1);assert.equal(h.compiles.length,1);assert.equal(h.compiles[0].streaming,false);
+  assert.ok(h.events.some(e=>e.result?.version==='native'));
+ }
+});
+
+test('an identity Content-Length mismatch is also discarded at EOF',async()=>{
+ const h=startupHarness({headers:{'content-length':'12'}});await h.start(1);
+ const last=h.events.filter(e=>e.progress?.stage==='engine-download').at(-1).progress;
+ assert.equal(last.completed,8);assert.equal(last.total,undefined);assert.ok(h.events.some(e=>e.result?.version==='native'));
 });

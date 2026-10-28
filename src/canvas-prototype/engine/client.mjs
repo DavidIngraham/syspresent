@@ -1,5 +1,5 @@
 /** Start the OpenSysML semantic engine in an isolated browser worker. */
-export function createSemanticEngine({ assetBase, assetVersion, workerURL = new URL('./worker.js', import.meta.url), WorkerClass = globalThis.Worker, onProgress } = {}) {
+export function createSemanticEngine({ assetBase, assetVersion, expectedDecodedBytes, workerURL = new URL('./worker.js', import.meta.url), WorkerClass = globalThis.Worker, onProgress } = {}) {
   if (!assetBase) throw new TypeError('assetBase must locate the pinned Go/WASM engine assets');
   let worker, startError;
   try { worker = new WorkerClass(workerURL); }
@@ -46,7 +46,8 @@ export function createSemanticEngine({ assetBase, assetVersion, workerURL = new 
   if (worker) worker.onerror = event => close(new Error(event.message || 'Semantic engine worker failed'));
   if (worker) worker.onmessageerror = () => close(new Error('Cannot read a response from the semantic engine worker. Retry loading the project.'));
   const base = new URL(assetBase, globalThis.location?.href || import.meta.url).href;
-  const ready = startError ? Promise.reject(startError) : request('Initialize', { assetBase: base, assetVersion });
+  const boundSize = typeof assetVersion === 'string' && assetVersion.trim() && Number.isSafeInteger(expectedDecodedBytes) && expectedDecodedBytes > 0;
+  const ready = startError ? Promise.reject(startError) : request('Initialize', { assetBase: base, assetVersion, ...(boundSize ? {expectedDecodedBytes} : {}) });
   return {
     ready,
     get closed() { return closed; },

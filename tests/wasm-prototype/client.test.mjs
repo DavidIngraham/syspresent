@@ -117,3 +117,17 @@ test('a stopped native bridge closes the engine and rejects other pending work',
  worker.answer(2,undefined,{message:'native engine stopped',code:'NATIVE_NO_RESPONSE'});
  await Promise.all([failure,rejection]);assert.equal(engine.closed,true);assert.equal(worker.terminated,true);
 });
+
+test('expected decoded size is forwarded only with a pinned engine version', async () => {
+ for(const [assetVersion,expectedDecodedBytes,forwarded] of [
+  ['engine-hash',8,true],['engine-hash',0,false],['engine-hash',-1,false],['engine-hash',1.5,false],
+  ['engine-hash',Number.MAX_SAFE_INTEGER+1,false],['engine-hash',Infinity,false],['engine-hash','8',false],
+  ['',8,false],['  ',8,false],[undefined,8,false],[null,8,false]
+ ]){
+  const engine=createSemanticEngine({assetBase:new URL('https://example.test/engine/'),assetVersion,expectedDecodedBytes,WorkerClass:WorkerFake});
+  const worker=WorkerFake.latest,params=worker.messages[0].params;
+  assert.equal(Object.hasOwn(params,'expectedDecodedBytes'),forwarded);
+  if(forwarded)assert.equal(params.expectedDecodedBytes,8);
+  worker.answer(1,{});await engine.ready;engine.terminate();
+ }
+});
