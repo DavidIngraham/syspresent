@@ -32,6 +32,7 @@ export function createModelSession(native) {
     return {
       engine:{
         ready:native.ready,
+        get closed(){return native.closed===true;},
         call(method,params={}){
           if(closed)return Promise.reject(Error('The native model lease has ended'));
           return enqueue(async()=>{

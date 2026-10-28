@@ -441,3 +441,18 @@ semantics, portable export and the memory lifecycle are unchanged.
 
 See [startup performance](startup-performance.md) for measured conditions and
 limits. Desktop network/page-CPU emulation is not physical iOS Safari evidence.
+
+Native download progress may use the decoded byte count generated from the same
+pinned engine provenance as its content cache key. An actual byte overrun or EOF
+mismatch removes that total; parsing and layout never acquire a guessed percent.
+App/story changes keep worker JavaScript and provenance fresh while unchanged
+WASM/runtime payloads retain their own cache key.
+
+Long neighborhood placement/routing and scene-validation loops yield between
+unchanged bounded work batches. A superseded layout stops at its owning revision;
+only that explicit stale-cancellation result is suppressed. Retry retains the
+whole target-scene/capture completion within the load transaction, including
+presentation-layout rebinding. Cancellation cannot run a caller continuation
+against the restored or newer model. Resume checks the retained lease's own
+worker, rebuilding retained local source data when that owner has died rather
+than treating a different healthy engine as proof the old model is usable.

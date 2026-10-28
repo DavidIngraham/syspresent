@@ -9,3 +9,10 @@ export function nativeAssetVersion(provenance) {
  }
  return hash.digest('hex');
 }
+
+/** These generated fields describe the same pinned decoded payload. */
+export function nativeAssetMetadata(provenance) {
+ const version=nativeAssetVersion(provenance),decodedBytes=provenance.assets['sysml-wasm.wasm'].bytes;
+ if(!Number.isSafeInteger(decodedBytes)||decodedBytes<=0)throw Error('Native decoded byte count is missing or invalid');
+ return {version,decodedBytes};
+}

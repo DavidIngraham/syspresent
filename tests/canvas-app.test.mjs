@@ -41,7 +41,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{get(){return size.width;}});Object.defineProperty(window.HTMLElement.prototype,'clientHeight',{get(){return size.height;}});
  let fetchOverride;window.fetch=async (url,options)=>{fetchCalls.push(String(url));if(fetchOverride){const value=await fetchOverride(String(url),options);if(value!==undefined)return value;}return ({ok:true,arrayBuffer:async()=>packProject({manifest:fixtureManifest,files:fixtureFiles}).buffer,json:async()=>String(url).includes('demos.json')?{schemaVersion:'syspresent.demos.v1',demos:[{id:'blue-dog',title:'Fixture',project:'project.zip'},{id:'flashlight',title:'Small fixture',project:'small.zip'}]}:String(url).includes('project.json')?fixtureManifest:{version:'fixture'},text:async()=>files[String(url).split('/').at(-1)]});};
- window.Worker=class{constructor(url){workerCount++;this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(method)nativeCalls.push({method,params});if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
+ const semanticWorkers=[];window.Worker=class{constructor(url){workerCount++;if(!String(url).includes('elk-worker'))semanticWorkers.push(this);this.layout=String(url).includes('elk-worker')?new ELK():null;}postMessage(message){const {id,method,params}=message;if(method)nativeCalls.push({method,params});if(message.cmd){if(message.cmd==='layout')this.layout.layout(structuredClone(message.graph)).then(data=>{const reply=()=>this.onmessage({data:{id,data}});if(holdLayout||holdCountdown===1){holdLayout=false;holdCountdown=null;heldLayouts.push(error=>error?this.onmessage({data:{id,error:{message:error}}}):reply());}else{if(holdCountdown!==null)holdCountdown--;reply();}});else queueMicrotask(()=>this.onmessage({data:{id,data:{}}}));return;}const respond=result=>queueMicrotask(()=>this.onmessage({data:{id,result}}));
   if(method==='RenderView'&&renderOverride){const reject=error=>queueMicrotask(()=>this.onmessage({data:{id,error:{message:error.message}}}));let override;try{override=renderOverride(params);}catch(error){reject(error);return;}if(override!==undefined){Promise.resolve(override).then(respond,reject);return;}}
   if(method==='Initialize')respond({version:'test'});
   else if(method==='ReleaseModel')respond({released:nativeModels.delete(params.modelHash)});
@@ -56,7 +56,7 @@ async function harness({landingOnly=false,reducedMotion=true,secondScene=false,s
   else if(method==='RenderView')respond(params.view.endsWith('::coverage')?fixtureCoverage:structuredClone(fixtureNative));
  }terminate(){}};
  window.eval(outputFiles[0].text);if(landingOnly)return {window,document:window.document,nativeCalls,fetchCalls,setFetch:handler=>{fetchOverride=handler;},workerCount:()=>workerCount};window.document.querySelector('[data-demo="blue-dog"]').click();await until(()=>(noStory?window.document.querySelectorAll('.node[data-context=\"false\"]').length>0:window.document.querySelectorAll('.node[data-context=\"false\"]').length===initialCount)&&window.document.getElementById('status').textContent.startsWith('OpenSysML WASM')).catch(e=>{throw Error(e.message+': '+window.document.getElementById('status').textContent);});
- return {window,nativeRequests,nativeCalls,nativeModels,fetchCalls,downloads,setNativeRender:handler=>{renderOverride=handler;},setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,layoutPendingCount:()=>heldLayouts.length,releaseNextLayout:error=>heldLayouts.shift()?.(error),releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
+ return {window,nativeRequests,nativeCalls,nativeModels,fetchCalls,downloads,failWorker:()=>semanticWorkers.at(-1).onerror({message:'Native worker lost'}),setNativeRender:handler=>{renderOverride=handler;},setMass:(numerator,denominator)=>Object.assign(massValue,{numerator,denominator}),holdParse:()=>{holdNextParse=true;},parsePending:()=>heldParses.length>0,releaseParse:()=>heldParses.splice(0).forEach(reply=>reply()),story:fixtureFiles['story.md'],document:window.document,resize:(width,height)=>{size.width=width;size.height=height;resizeCallback?.();},release:()=>pendingRender?.(),pending:()=>!!pendingRender,holdLayout:()=>{holdLayout=true;},holdLayoutAfter:count=>{holdCountdown=count;},layoutPending:()=>heldLayouts.length>0,layoutPendingCount:()=>heldLayouts.length,releaseNextLayout:error=>heldLayouts.shift()?.(error),releaseLayout:error=>heldLayouts.splice(0).forEach(reply=>reply(error))};
 }
 test('package workspace scopes search and traversal, offers native view switching and restores scene handoff',async()=>{
  const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
@@ -1120,7 +1120,7 @@ test('sequence capture waits for a resize-restarted target before rebinding port
   await until(()=>sceneSettled(d)&&d.querySelector('.sequence-view')&&h.nativeRequests.at(-1)==='#sequence:Model::exchange');
   const width=d.querySelector('.sequence-layout-fields input');width.value='460';width.dispatchEvent(new h.window.Event('change'));const gap=d.querySelector('[aria-label="Message spacing in pixels"]');gap.value='170';gap.dispatchEvent(new h.window.Event('change'));
   assert.equal(d.querySelector('.sequence-layout-fields input').value,'460');assert.equal(d.querySelector('[aria-label="Message spacing in pixels"]').value,'170');
-  h.holdLayoutAfter(2);d.getElementById('edit').click();d.getElementById('scene-title').value='Sequence captured across resize';d.getElementById('capture-scene').click();
+  h.holdLayout();d.getElementById('edit').click();d.getElementById('scene-title').value='Sequence captured across resize';d.getElementById('capture-scene').click();
   await until(()=>h.layoutPendingCount()===1&&d.querySelectorAll('#scenes option').length===2);assert.equal(d.getElementById('editor').open,true);assert.equal(d.getElementById('stage').getAttribute('aria-busy'),'true');
   h.holdLayout();h.resize(990,680);await until(()=>h.layoutPendingCount()===2);
   h.releaseNextLayout();await new Promise(resolve=>setTimeout(resolve,35));
@@ -1261,5 +1261,48 @@ test('canceling a pending project download aborts it and late completion cannot 
   reply();await new Promise(resolve=>setTimeout(resolve,30));
   assert.equal(d.getElementById('status').textContent,ready);assert.deepEqual(activeIDs(d),ids);assert.equal(h.window.location.href,url);
   assert.match(url,/demo=flashlight/);assert.equal(d.getElementById('loading').hidden,true);
+ }finally{h.window.close();}
+});
+
+
+test('capture load retry completes the exact target and original continuation without duplicating a native slide',async()=>{
+ const h=await harness({nativeCaptureFixture:true}),d=h.document;
+ try{
+  manualTarget(d,'part').click();action(d,'Internal view').click();await until(h.pending);h.release();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='part');
+  d.getElementById('adjust-layout').click();manualTarget(d,'part').click();action(d,'Move right').click();await until(()=>sceneSettled(d)&&d.getElementById('status').textContent.includes('Drawing positions saved'));
+  const sourcePosition=manualTarget(d,'part').style.transform;
+  d.getElementById('edit').click();d.getElementById('scene-title').value='Retry captured view';h.holdLayout();d.getElementById('capture-scene').click();await until(h.layoutPending);h.releaseLayout('capture layout unavailable');
+  await until(()=>d.getElementById('loading-error').textContent.includes('capture layout unavailable'));
+  assert.equal(d.querySelectorAll('#scenes option').length,1);assert.equal(d.getElementById('editor').open,true);
+  d.getElementById('loading-retry').click();d.getElementById('loading-retry').click();
+  await until(()=>sceneSettled(d)&&!d.getElementById('editor').open&&d.getElementById('status').textContent.startsWith('Native view captured'));
+  assert.equal(d.getElementById('scenes').value,'1');assert.equal(d.querySelectorAll('#scenes option').length,2);assert.equal(d.getElementById('loading').hidden,true);
+  assert.equal(manualTarget(d,'part').dataset.representation,'captured-part-representation');assert.ok(sourcePosition);
+ }finally{h.window.close();}
+});
+test('canceling a held capture target cannot append or close over a resumed previous project',async()=>{
+ const h=await harness({nativeCaptureFixture:true}),d=h.document;
+ try{
+  manualTarget(d,'part').click();action(d,'Internal view').click();await until(h.pending);h.release();await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='part');
+  const previous=activeIDs(d);d.getElementById('edit').click();d.getElementById('scene-title').value='Canceled capture';h.holdLayout();d.getElementById('capture-scene').click();await until(h.layoutPending);
+  d.getElementById('loading-cancel').click();h.releaseLayout();await until(()=>!d.getElementById('landing').hidden&&!d.getElementById('resume-model').hidden);
+  d.getElementById('resume-model').click();await until(()=>d.getElementById('landing').hidden&&sceneSettled(d)&&d.querySelectorAll('#scenes option').length===1&&d.getElementById('status').textContent.startsWith('OpenSysML WASM'));
+  const ready=d.getElementById('status').textContent;await new Promise(resolve=>setTimeout(resolve,30));
+  assert.deepEqual(activeIDs(d),previous);assert.equal(d.querySelectorAll('#scenes option').length,1);assert.equal(d.getElementById('editor').open,false);assert.equal(d.getElementById('loading').hidden,true);assert.match(ready,/OpenSysML WASM/);
+ }finally{h.window.close();}
+});
+
+
+test('Resume rebuilds the retained project when its own worker died even if a failed replacement created a healthy engine',async()=>{
+ const h=await harness({lifecycleFixture:true}),d=h.document;
+ try{
+  h.failWorker();d.getElementById('edit').click();d.getElementById('view-source').value+=' BROKEN';d.getElementById('apply-views').click();
+  await until(()=>d.getElementById('loading-error').textContent.includes('Native parse rejected'));
+  const afterFailure=h.nativeCalls.filter(c=>c.method==='ParseSources').length;
+  d.getElementById('loading-cancel').click();d.getElementById('resume-model').click();
+  await until(()=>d.getElementById('landing').hidden&&sceneSettled(d)&&d.getElementById('status').textContent.startsWith('OpenSysML WASM'));
+  assert.ok(h.nativeCalls.filter(c=>c.method==='ParseSources').length>afterFailure);
+  manualTarget(d,'part').click();action(d,'Internal view').click();await until(h.pending);h.release();
+  await until(()=>sceneSettled(d)&&activeIDs(d).join(',')==='part');assert.equal(d.getElementById('loading').hidden,true);
  }finally{h.window.close();}
 });

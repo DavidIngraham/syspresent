@@ -30,7 +30,7 @@ import {planDepartures} from './departures.mjs';
 import {requirementActions,structuralActions,isStructuralElement,traceContext} from './exploration.mjs';
 import {resolvePresentation,validatePresentation,PRESENTATION_RELATIONSHIP_KINDS} from './preferences.mjs';
 import {surroundingContext} from './context.mjs';
-import {prepareNeighborhood} from './neighborhood.mjs';
+import {prepareNeighborhoodAsync} from './neighborhood.mjs';
 import {journeyCameraTrack} from './journey-camera.mjs';
 import {createCamera,zoomCameraAt,fitCameraToBounds,bindCameraControls} from './camera.mjs';
 import {routePeripheralEdges,peripheralRoutingMetrics,peripheralRouteScore} from './peripheral-routing.mjs';
@@ -42,9 +42,10 @@ import {edgeAppearance,markerDefinition} from './notation.mjs';
 import {createSemanticEngine} from './engine/client.mjs';
 import {engineeringContext,findEngineeringRoute,findHierarchyRoute,planTransition,directTypingContext} from './core/index.mjs';
 import {adaptNativeView,modelGraph,graphView,requireNativeIdentity} from './graph.mjs';
-import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,requirementCoverageSource,verifiedRuntimeCache,verifiedRuntimeIndex,createRuntimeCacheReader,projectPath} from './project.mjs';
+import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,requirementCoverageSource,createRuntimeCacheReader,projectPath} from './project.mjs';
 const buildVersion=document.querySelector('meta[name="syspresent-build"]')?.content||'development';
 const engineAssetVersion=document.querySelector('meta[name="syspresent-engine"]')?.content||buildVersion;
+const expectedEngineBytes=Number(document.querySelector('meta[name="syspresent-engine-bytes"]')?.content);
 const $=id=>document.getElementById(id),el=(name,text,cls)=>{const e=document.createElement(name);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
 const button=(text,fn)=>{const e=el('button',text);e.type='button';e.onclick=()=>Promise.resolve(fn()).catch(report);return e;};
 const state={engine:null,project:null,graph:null,views:new Map(),scenes:[],sceneIndex:0,focus:null,selected:null,view:null,displayed:null,exploring:false,expanded:new Set(),collapsed:new Set(),rects:new Map(),reduce:matchMedia('(prefers-reduced-motion: reduce)').matches,revision:0,loadRevision:0,animations:[],transitioning:false,provenance:null,history:[],future:[],presentation:{},traceRequest:null,camera:createCamera(),cameraRevision:0,neighborhoodBudget:null};
@@ -53,9 +54,14 @@ state.renderingMode='exploratory';state.scopeContext=false;state.presentationLay
 state.surfaceStates={};state.surfaces=[];state.selectedIds=[];state.comparison=null;state.activeRegion='primary';
 const report=error=>{if(state.loadOperation?.pending)failLoading(state.loadRevision,error);const message=error.message||String(error);$('status').textContent=message;$('editor-error').textContent=message;if($('authoring-dialog')?.open)$('authoring-review').textContent=message;if(!$('landing').hidden){$('landing-error').textContent=message;$('landing-error').hidden=false;$('landing-status').textContent='';}console.error(error);};
 const elementIndexes=new WeakMap();
-function element(id){if(!state.graph)return;let index=elementIndexes.get(state.graph);if(!index){index=new Map(state.graph.elements.map(e=>[e.id,e]));elementIndexes.set(state.graph,index);}return index.get(id);}
+function graphIndex(graph){
+ let index=elementIndexes.get(graph);if(index)return index;
+ const byID=new Map(),byName=new Map();for(const item of graph.elements){if(!byID.has(item.id))byID.set(item.id,item);const prior=byName.get(item.qualifiedName);if(prior)prior.ambiguous=true;else byName.set(item.qualifiedName,{item,ambiguous:false});}
+ index={byID,byName};elementIndexes.set(graph,index);return index;
+}
+function element(id){return state.graph?graphIndex(state.graph).byID.get(id):undefined;}
 const label=id=>element(id)?.name||id;
-function resolveInGraph(graph,value){const exact=graph?.elements.find(e=>e.id===value);if(exact)return exact.id;const matches=graph?.elements.filter(e=>e.qualifiedName===value)??[];if(matches.length>1)throw Error('Ambiguous native qualified reference: '+value);return matches[0]?.id;}
+function resolveInGraph(graph,value){if(!graph)return;const index=graphIndex(graph),exact=index.byID.get(value);if(exact)return exact.id;const match=index.byName.get(value);if(match?.ambiguous)throw Error('Ambiguous native qualified reference: '+value);return match?.item.id;}
 const resolve=value=>resolveInGraph(state.graph,value);
 const qname=id=>element(id)?.qualifiedName;
 const scene=()=>state.scenes[state.sceneIndex];
@@ -90,8 +96,9 @@ function finishLoading(token){if(token!==state.loadRevision||state.loadOperation
 let engineReady, demoCatalog;
 async function ensureEngine(){
  if(engineReady&&!state.engine?.closed)return engineReady;
+ state.engineProgress={stage:'engine-start',label:'Starting the model engine…'};
  state.layoutEngine??=createLayoutEngine({workerUrl:new URL('./layout/elk-worker.js?v='+buildVersion,location.href).href});
- const models=createModelSession(createSemanticEngine({assetBase:new URL('./engine/',location.href),assetVersion:engineAssetVersion,workerURL:new URL('./engine/worker.js?v='+buildVersion,location.href),onProgress:event=>{
+ const models=createModelSession(createSemanticEngine({assetBase:new URL('./engine/',location.href),assetVersion:engineAssetVersion,expectedDecodedBytes:expectedEngineBytes,workerURL:new URL('./engine/worker.js?v='+buildVersion,location.href),onProgress:event=>{
   state.engineProgress=event;const operation=state.loadOperation;if(operation?.waitingEngine)loadEvent(operation.id,event);
  }}));state.models=models;state.engine=models.engine;
  engineReady=(async()=>{const provenance=fetch('./engine/provenance.json?v='+buildVersion).then(async response=>{if(!response.ok)throw Error('Model engine provenance is unavailable. Retry loading.');return response.json();});provenance.catch(()=>{});
@@ -179,13 +186,15 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=event=
  const graph=modelGraph(exported.elements,[...views.values(),coverage]);
  for(const root of project.manifest.systemOfInterest)if(!resolveInGraph(graph,root))throw Error('System of interest does not resolve: '+root);
  const byName=value=>resolveInGraph(graph,value);
+ let validationYield=performance.now();
+ const checkpoint=async()=>{active();if(performance.now()-validationYield>=16){await new Promise(resolve=>setTimeout(resolve,0));active();validationYield=performance.now();}};
  progress({stage:'story-validation',label:'Checking scene references and native relationships…'});await yieldLoadingPaint();active();
- for(const [sceneIndex,item] of scenes.entries()){resolvePresentation(item.presentation,{resolve:byName});if(item.journey?.length&&(byName(item.journey.at(-1))!==byName(item.focus)||(sceneIndex>0&&byName(item.journey[0])!==byName(scenes[sceneIndex-1].focus))))throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);if(!views.has(item.view))throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);if(!byName(item.focus))throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);for(let i=1;i<(item.journey??[]).length;i++){const from=byName(item.journey[i-1]),to=byName(item.journey[i]);if(!from||!to||!findEngineeringRoute(graph,{from,to,maxHops:1}).found&&!findHierarchyRoute(graph,{from,to,maxHops:1}).found)throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);}}
+ for(const [sceneIndex,item] of scenes.entries()){await checkpoint();resolvePresentation(item.presentation,{resolve:byName});if(item.journey?.length&&(byName(item.journey.at(-1))!==byName(item.focus)||(sceneIndex>0&&byName(item.journey[0])!==byName(scenes[sceneIndex-1].focus))))throw Error(`Scene ${item.id}: saved journey must connect the previous scene focus to this focus`);if(!views.has(item.view))throw Error(`Scene ${item.id}: native view ${item.view} does not resolve`);if(!byName(item.focus))throw Error(`Scene ${item.id}: focus ${item.focus} does not resolve`);for(let i=1;i<(item.journey??[]).length;i++){const from=byName(item.journey[i-1]),to=byName(item.journey[i]);if(!from||!to||!findEngineeringRoute(graph,{from,to,maxHops:1}).found&&!findHierarchyRoute(graph,{from,to,maxHops:1}).found)throw Error(`Scene ${item.id}: saved journey has a missing engineering connection`);}}
  const scoped=graph.elements.filter(e=>project.manifest.systemOfInterest.some(root=>e.qualifiedName===root||e.qualifiedName?.startsWith(root+'::'))).map(e=>e.id);
  for(const item of scenes)for(const region of item.regions??[])if(region.focus&&!byName(region.focus))throw Error(`Scene ${item.id}: region ${region.id} focus does not resolve`);
- for(let i=1;i<scenes.length;i++){const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found&&!b.allowDisconnected)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
+ for(let i=1;i<scenes.length;i++){await checkpoint();const a=scenes[i-1],b=scenes[i],plan=planTransition({view:views.get(a.view),focus:byName(a.focus)},{view:views.get(b.view),focus:byName(b.focus)},{graph,scopeIds:scoped,journey:b.journey?.map(byName)});if(b.journey?.length&&!plan.route.found)throw Error(`Scene ${b.id}: saved journey no longer resolves within the presentation boundary`);if(plan.mode==='cross-kind'&&!plan.route.found&&!b.allowDisconnected)throw Error(`Scene ${b.id}: no engineering route from the previous scene within the presentation boundary`);}
  if(m.entryFocus&&!byName(m.entryFocus))throw Error('Starting element does not resolve: '+m.entryFocus);
- for(let i=0;i<scenes.length;i++){active();scenes[i]=await resolveAuthoredScene(scenes[i],{engine,modelHash:parsed.modelHash,graph});}
+ for(let i=0;i<scenes.length;i++){await checkpoint();scenes[i]=await resolveAuthoredScene(scenes[i],{engine,modelHash:parsed.modelHash,graph});}
  validateStoryContent(scenes,{files:project.files,pathFor:projectPath,resolve:byName});
  return {project,modelHash:parsed.modelHash,exported,graph,views,scenes,coverage,availableViews};
 }
@@ -197,16 +206,16 @@ function prominenceScope(){
  return rankingScope.ids;
 }
 function busy(value){$('landing').setAttribute('aria-busy',String(value));for(const control of $('landing').querySelectorAll('button:not(#resume-model)'))control.disabled=value;for(const id of ['previous','next','scenes','standalone','return','system-overview','choose-package','workspace-overview','scope-up','scope-clear','view-navigation','view-catalog','fit','show-neighborhood','zoom-in','zoom-out','find-toggle','edit'])$(id).disabled=value;}
-async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,demo=null,publication=null,readURL=false}={}){
- const operation=loadToken===undefined?beginLoading('Opening model…',()=>loadProject(project,{cacheHash,demo,publication,readURL})):state.loadOperation;
+async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,demo=null,publication=null,readURL=false,targetScene=0,onReady}={}){
+ const operation=loadToken===undefined?beginLoading('Opening model…',()=>loadProject(project,{cacheHash,demo,publication,readURL,targetScene,onReady})):state.loadOperation;
  const revision=operation?.id??loadToken;if(revision!==state.loadRevision)return;++state.revision;invalidateAuthoring();discardLoadingModel();$('landing-error').hidden=true;$('landing-error').textContent='';busy(true);$('selection').hidden=true;
  let compiled,lease;try{operation.waitingEngine=true;loadEvent(revision,state.engineProgress??{stage:'engine-start',label:'Starting the model engine…'});await yieldLoadingPaint();assertLoading(revision);await state.projectDisplay?.finished;await (operation.enginePromise??ensureEngine());operation.waitingEngine=false;if(revision!==state.loadRevision)return;lease=state.models.createLease();state.loadingLease=lease;compiled=await compile(validateProject(project),{cacheHash,lease,progress:event=>loadEvent(revision,event),active:()=>assertLoading(revision)});}catch(error){await lease?.dispose();if(state.loadingLease===lease)state.loadingLease=null;if(revision!==state.loadRevision)return;failLoading(revision,error);busy(false);$('previous').disabled=state.sceneIndex===0;$('next').disabled=state.sceneIndex===state.scenes.length-1;throw error;}if(revision!==state.loadRevision){await lease.dispose();return;}
  if(state.loadingLease===lease)state.loadingLease=null;
- let initialScene=0;try{if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){await lease.dispose();failLoading(revision,error);busy(false);throw error;}
+ let initialScene=targetScene;try{if(compiled.scenes.length&&(!Number.isInteger(initialScene)||initialScene<0||initialScene>=compiled.scenes.length))throw Error('The requested scene is not in this project.');if(readURL){checkSharedModel(location.href,compiled.modelHash,publication);initialScene=sceneFromURL(location.href,compiled.scenes);}}catch(error){await lease.dispose();failLoading(revision,error);busy(false);throw error;}
  saveSurfaces();const previousLease=state.modelLease,savedURL=location.href,savedTitle=document.title;
  const infrastructure=new Set(['revision','loadRevision','loadingLease','modelLease','models','engine','engineInfo','provenance','layoutEngine','authoringRequest','authoringLease','authoringCandidate','authoringPreview','authoringFocus','projectDisplay','loadOperation','engineProgress']);
  const previous=Object.fromEntries(Object.entries(state).filter(([key])=>!infrastructure.has(key)));
- let finishDisplay,candidateAssets,accepted=false;
+ let finishDisplay,candidateAssets,readyMessage,accepted=false;
  const display={lease,previousLease,finished:new Promise(resolve=>{finishDisplay=resolve;})};state.projectDisplay=display;
  const rollback=async()=>{
   if(state.projectDisplay!==display)return;
@@ -229,8 +238,9 @@ async function loadProject(project,{cacheHash=state.trustedCacheHash,loadToken,d
   while(state.transitionAttempt){await state.transitionAttempt;if(revision!==state.loadRevision)break;}
   if(revision!==state.loadRevision){await rollback();return;}
   if(!state.view||expectedView&&state.view.id!==expectedView||state.transitioning||state.displayed?.id!==state.view.id)throw Error('The initial native view did not become active; the preceding project has been retained.');
+  if(onReady)readyMessage=await onReady(()=>assertLoading(revision));if(revision!==state.loadRevision){await rollback();return;}
   accepted=true;previous.assetURLs?.destroy();await previousLease?.dispose();if(revision!==state.loadRevision)return;busy(false);finishLoading(revision);
-  status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
+  status(readyMessage??`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);
   $('boundary').textContent=project.manifest.publication.scope==='scoped'?'Scoped publication · traversal stays within supplied model':'Complete project · standalone exploration available';
  }catch(error){if(!accepted)await rollback();if(revision===state.loadRevision){busy(false);failLoading(revision,error);}if(revision!==state.loadRevision)return;throw error;}
  finally{try{if(!accepted)await lease.dispose();}finally{if(state.projectDisplay===display)state.projectDisplay=null;finishDisplay();}}
@@ -266,7 +276,7 @@ function cancelAnimations(){state.motion?.cancel();state.motion=null;for(const a
 function svgel(name,attrs={}){const e=document.createElementNS('http://www.w3.org/2000/svg',name);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);return e;}
 const nodeKey=(node,counts,view)=>{const base=node.kind==='context-boundary'?'boundary:'+node.id:node.semanticId?'semantic:'+node.semanticId:'notation:'+view.id+':'+node.id;const count=counts.get(base)??0;counts.set(base,count+1);return base+':'+count;};
 function labelSize(text){const span=el('span',text);span.style.cssText='position:fixed;visibility:hidden;left:-10000px;white-space:pre;font:12px system-ui,sans-serif';document.body.append(span);const rect=span.getBoundingClientRect();span.remove();return {width:Math.ceil(rect.width)+4,height:16};}
-async function prepareFrame(view,focus,panels,{journey=false}={}){
+async function prepareFrame(view,focus,panels,{journey=false,revision=state.revision}={}){
  const stage=$('stage'),area=primaryArea(view,panels,journey);
  const overlay=!journey&&state.renderingMode==='exploratory'&&state.rollupsEnabled?rollupDrawing(view):{view,omissions:[],rollups:[]};
  const layoutFor=compact=>layoutDiagram(sizeView(overlay.view,focus,{compact}),{width:area.width,height:area.height,elk:state.layoutEngine,measureLabel:labelSize,grouping:displayPreferences().grouping});
@@ -283,7 +293,7 @@ async function prepareFrame(view,focus,panels,{journey=false}={}){
  const routeObstacles=routed.flatMap(e=>e.points.slice(1).map((p,i)=>({id:'route:'+e.id+':'+i,x:Math.min(p.x,e.points[i].x)-3,y:Math.min(p.y,e.points[i].y)-3,width:Math.max(6,Math.abs(p.x-e.points[i].x)+6),height:Math.max(6,Math.abs(p.y-e.points[i].y)+6)})));
  const budget=view.traceRequest?.mode==='effective'?0:renderingPolicy(state.renderingMode).contextBudget??state.neighborhoodBudget??displayPreferences().contextBudget,context=view.overview&&!journey?{view:{nodes:[],edges:[]},elements:[],omissions:[]}:surroundingContext(state.graph,layout,{budget:journey?Math.min(8,budget):budget,focus,scopeIds:explorationScope(),prominenceScopeIds:prominenceScope()});
  context.view.nodes=context.view.nodes.map(node=>({...node,...measureCard(document,node,'')}));
- const fringe=prepareNeighborhood(context,active,area,{width:160,height:80,gap:72,activeEdges:routed,labelObstacles,obstacles:[...labelObstacles,...routeObstacles],measureLabel:labelSize});
+ const fringe=await prepareNeighborhoodAsync(context,active,area,{width:160,height:80,gap:72,activeEdges:routed,labelObstacles,obstacles:[...labelObstacles,...routeObstacles],measureLabel:labelSize,isCurrent:()=>revision===state.revision});
  const ghosts=fringe.nodes.map(n=>({...n,scale:1,opacity:.3,context:true,displayDetail:'',displayID:''}));
  const markers=fringe.boundaryMarkers.map(n=>({...n,scale:1,opacity:.22,context:true,interactive:false}));
  const nodes=[...active,...ghosts,...markers],counts=new Map(),byID=new Map();
@@ -401,7 +411,16 @@ async function paintFrames(frames,{duration=0,caption='',outgoingPanel,cameraTar
  if(!result.cancelled){state.visualSnapshot=destination;for(const item of nodeTracks){if(!destination.nodes.some(n=>n.key===item.key))item.node.remove();else{item.oldFace?.remove();if(item.newFace?.style)item.newFace.style.opacity=1;}}for(const item of edgeTracks)if(!destination.edges.some(e=>e.key===item.key))item.group.remove();state.layout={...destination.layout,displayNodes:destination.nodes.filter(n=>!n.context),scale:destination.scale,area:destination.area};state.displayed=destination.view;state.displayOmissions=omissions;delete stage.dataset.motionProgress;}
  outgoingPanel?.remove();if(state.motion===motion)state.motion=null;return result;
 }
-async function frame(view,caption='',duration=0,focus=state.focus){if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;return transitionTo(pending.view,pending.focus,{animate:false,allowDisconnected:true,journey:pending.journey,camera:pending.cameraRevision===state.cameraRevision?pending.camera:state.camera});}const revision=++state.revision;view=state.renderingMode==='focused'?await displayNativeView(view):view;if(revision!==state.revision)return;saveSurfaces();disposeSurfaces();const panels=panelGeometry(view);if(rendererFamily(view)!=='graph'){await renderSurfaces(view,focus,panels,revision);return;}const destination=await prepareFrame(view,focus,panels),previous=state.visualSnapshot;if(revision!==state.revision)return;const result=await paintFrames(duration&&previous?[previous,destination]:[destination],{duration,caption});if(!result?.cancelled&&revision===state.revision)await renderSurfaces(view,focus,panels,revision);return result;}
+async function frame(view,caption='',duration=0,focus=state.focus){
+ if(state.transitioning&&state.pendingDestination){const pending=state.pendingDestination;return transitionTo(pending.view,pending.focus,{animate:false,allowDisconnected:true,journey:pending.journey,camera:pending.cameraRevision===state.cameraRevision?pending.camera:state.camera});}
+ const revision=++state.revision;
+ try{
+  view=state.renderingMode==='focused'?await displayNativeView(view):view;if(revision!==state.revision)return;
+  saveSurfaces();disposeSurfaces();const panels=panelGeometry(view);if(rendererFamily(view)!=='graph'){await renderSurfaces(view,focus,panels,revision);return;}
+  const destination=await prepareFrame(view,focus,panels,{revision}),previous=state.visualSnapshot;if(revision!==state.revision)return;
+  const result=await paintFrames(duration&&previous?[previous,destination]:[destination],{duration,caption});if(!result?.cancelled&&revision===state.revision)await renderSurfaces(view,focus,panels,revision);return result;
+ }catch(error){if(error.code==='LAYOUT_CANCELED'&&revision!==state.revision)return;throw error;}
+}
 
 async function displayNativeView(view,{mode=state.renderingMode,resolver=state.focusedViews}={}){
  if(mode!=='focused'||!resolver)return view;
@@ -510,8 +529,8 @@ async function performTransition(view,focus,{animate=true,journey,allowDisconnec
  saveSurfaces();surfaceAnchorSnapshot();disposeSurfaces();cancelAnimations();for(const p of $('stage').querySelectorAll('.narrative-outgoing'))p.remove();$('selection').hidden=true;state.transitioning=true;$('stage').setAttribute('aria-busy','true');state.pendingDestination={view,focus,journey,camera,cameraRevision};state.lastTransition=plan;
  let oldPanel;try{
  oldPanel=!$('narrative').hidden?$('narrative').cloneNode(true):null;if(oldPanel){oldPanel.removeAttribute('id');oldPanel.classList.add('narrative-outgoing');oldPanel.setAttribute('aria-hidden','true');$('stage').append(oldPanel);}
- const panels=panelGeometry(view),projection=rendererFamily(view)==='graph'?displayedView:gather(representedIdentities(view).filter(id=>element(id)).slice(0,24)),target=await prepareFrame(projection,focus,panels),frames=[];if(revision!==state.revision){oldPanel?.remove();return;}
- if(state.visualSnapshot&&animate&&!state.reduce&&renderingPolicy(state.renderingMode).journeys&&cameraRevision===state.cameraRevision){frames.push(state.visualSnapshot);if(plan?.journeyRequired&&!disconnected){for(const step of plan.stages.filter(step=>step.viewKind==='gv')){frames.push(await prepareFrame(gather(step.semanticIds,step.route),step.focusId??focus,panels,{journey:true}));if(revision!==state.revision){oldPanel?.remove();return;}}}frames.push(target);const anchors=destinationAnchors(view,focus,panels,target);if(anchors)frames.push(anchors);}else frames.push(target);
+ const panels=panelGeometry(view),projection=rendererFamily(view)==='graph'?displayedView:gather(representedIdentities(view).filter(id=>element(id)).slice(0,24)),target=await prepareFrame(projection,focus,panels,{revision}),frames=[];if(revision!==state.revision){oldPanel?.remove();return;}
+ if(state.visualSnapshot&&animate&&!state.reduce&&renderingPolicy(state.renderingMode).journeys&&cameraRevision===state.cameraRevision){frames.push(state.visualSnapshot);if(plan?.journeyRequired&&!disconnected){for(const step of plan.stages.filter(step=>step.viewKind==='gv')){frames.push(await prepareFrame(gather(step.semanticIds,step.route),step.focusId??focus,panels,{journey:true,revision}));if(revision!==state.revision){oldPanel?.remove();return;}}}frames.push(target);const anchors=destinationAnchors(view,focus,panels,target);if(anchors)frames.push(anchors);}else frames.push(target);
  if(revision!==state.revision){oldPanel?.remove();return;}
  if(cameraRevision!==state.cameraRevision)frames.splice(0,frames.length,target);
  const result=await paintFrames(frames,{duration:frames.length>2?Math.max(1700,(frames.length-1)*420):frames.length>1?780:0,caption:disconnected?'No engineering route · explicit view jump':plan?.route?.strategy==='ownership-ancestor'?'Model ownership route · location, not derivation':'',outgoingPanel:oldPanel,cameraTarget:cameraRevision===state.cameraRevision?camera:state.camera});
@@ -519,7 +538,7 @@ async function performTransition(view,focus,{animate=true,journey,allowDisconnec
  await renderSurfaces(displayedView,focus,panels,revision);if(revision!==state.revision)return;updateExplorationControls();
  if(!state.exploring)status(`OpenSysML WASM · ${state.graph.elements.length} native elements · ${state.availableViews.length} views`);else status(state.traceInfo?.summary.message??'Explore this native view · select an element for contextual actions');
  $('boundary').textContent=state.exploring&&state.packageScope?`Package scope · ${qname(state.packageScope)} · external links disclosed in Context`:!scopeIds().includes(focus)?'Outside presentation boundary · loaded model context':state.project.manifest.publication.scope==='scoped'?'Scoped publication · supplied model context only':'Complete project · standalone exploration available';
- }finally{oldPanel?.remove();if(revision===state.revision){state.transitioning=false;$('stage').setAttribute('aria-busy','false');state.pendingDestination=null;}}
+ }catch(error){if(error.code==='LAYOUT_CANCELED'&&revision!==state.revision)return;throw error;}finally{oldPanel?.remove();if(revision===state.revision){state.transitioning=false;$('stage').setAttribute('aria-busy','false');state.pendingDestination=null;}}
 }
 async function showScene(index,animate=true,{record=false,urlMode='push'}={}){
  if(index<0||index>=state.scenes.length)return;
@@ -702,7 +721,7 @@ async function capture(){
  const revision=state.revision,modelHash=state.modelHash,sourceView=state.view;
  const lease=state.models.createLease();let result;try{result=await prepareNativeCapture(state.project,{view:state.view,graph:state.graph,views:state.views,focus:state.focus,engine:lease.engine,title:$('scene-title').value||'Captured view',markdown:$('scene-prose').value,presentation:editorPresentation(),panel:{placement:$('panel-placement').value}});}finally{await lease.dispose();}
  if(revision!==state.revision||modelHash!==state.modelHash)return;
- await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:result.viewName});$('editor').close();status('Native view captured. Export the project ZIP to retain its definition and slide.');
+ await loadProject(savePresentationLayouts(result.project,state.presentationLayouts),{targetScene:result.sceneIndex,onReady:async active=>{await retainCapturedLayout(sourceView,{targetViewId:result.viewName});active();$('editor').close();return 'Native view captured. Export the project ZIP to retain its definition and slide.';}});
 }
 function renderHierarchy(){
  const request=state.hierarchyRequest??{},result=hierarchyPage(state.graph,{...request,query:$('hierarchy-search').value,scopeIds:explorationScope()});
@@ -734,7 +753,7 @@ async function submitQuestion(){
  $('submit-question').disabled=true;
  const lease=state.models.createLease();try{let result;try{result=await prepareQuestionSlide(state.project,{view,graph:state.graph,views:state.views,focus:id,engine:lease.engine,question,markdown:notice||'This slide references a native model view. No model relationships were inferred from the question text.',presentation:{contextBudget:0}});}finally{await lease.dispose();}
  if(revision!==state.revision||modelHash!==state.modelHash)return;
- await loadProject(savePresentationLayouts(result.project,state.presentationLayouts));await showScene(result.sceneIndex,false);await retainCapturedLayout(view,{targetViewId:result.viewName});$('question-dialog').close();status('Question appended as a native slide in this story. Export project ZIP to keep the conversation.');
+ await loadProject(savePresentationLayouts(result.project,state.presentationLayouts),{targetScene:result.sceneIndex,onReady:async active=>{await retainCapturedLayout(view,{targetViewId:result.viewName});active();$('question-dialog').close();return 'Question appended as a native slide in this story. Export project ZIP to keep the conversation.';}});
  }finally{$('submit-question').disabled=false;}
 }
 function beginManualMove(event,node,representation){
@@ -783,7 +802,7 @@ async function validateAuthoring(){
 }
 async function appendAuthoring(){
  const candidate=state.authoringCandidate;if(!candidate||candidate.revision!==state.revision||candidate.sourceModelHash!==state.modelHash||candidate.proposalText!==$('authoring-proposal').value)throw Error('The model, scope or proposal changed. Validate the proposal again before appending.');
- const sourceView=state.view,project=savePresentationLayouts(candidate.project,state.presentationLayouts);invalidateAuthoring();$('authoring-append').disabled=true;await loadProject(project);await showScene(candidate.sceneIndex,false);await retainCapturedLayout(sourceView,{targetViewId:candidate.viewName});invalidateAuthoring();$('authoring-dialog').close();$('editor').close();status('Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.');
+ const sourceView=state.view,project=savePresentationLayouts(candidate.project,state.presentationLayouts);invalidateAuthoring();$('authoring-append').disabled=true;await loadProject(project,{targetScene:candidate.sceneIndex,onReady:async active=>{await retainCapturedLayout(sourceView,{targetViewId:candidate.viewName});active();invalidateAuthoring();$('authoring-dialog').close();$('editor').close();return 'Validated native author draft appended. Native references and values are checked; prose and engineering approval remain unverified. Export project ZIP to keep it.';}});
 }
 function rollupDrawing(view){
  if(!['definition','interconnection','tree','mixed'].includes(view.kind))return {view,omissions:[{reason:'rollup-unsupported-view',message:'Typed rollups apply to structural graph projections; native behavioral and grid views remain intact.'}],rollups:[]};
@@ -813,7 +832,7 @@ async function retainCapturedLayout(sourceView,{targetViewId=scene()?.view}={}){
  while(state.transitionAttempt){await state.transitionAttempt;if(loadRevision!==state.loadRevision)return;}
  if(targetViewId&&state.view?.id!==targetViewId)throw Error('The captured native view did not become active; presentation settings have not been aliased.');
  if(sourceView.id===state.view.id||(!state.presentationLayouts.getRegion(sourceView)&&!state.visualSnapshot?.automaticFitted))return;
- const result=state.presentationLayouts.alias(sourceView,state.view,state.visualSnapshot?.automaticFitted);if(result.retained||result.settingsRetained){state.project=savePresentationLayouts(state.project,state.presentationLayouts);await frame(state.view);}if(result.omissions.length)status(result.omissions.map(o=>o.message).join(' '));
+ const result=state.presentationLayouts.alias(sourceView,state.view,state.visualSnapshot?.automaticFitted);if(result.retained||result.settingsRetained){state.project=savePresentationLayouts(state.project,state.presentationLayouts);await frame(state.view);}if(loadRevision!==state.loadRevision)return;if(result.omissions.length)status(result.omissions.map(o=>o.message).join(' '));
 }
 function contextNotice(notice){
  if(notice.message)return notice.message;
@@ -867,12 +886,15 @@ function bind(){
  $('open-view').onclick=()=>openNativeView($('views').value).catch(report);$('compare-view').onclick=()=>openNativeView($('views').value,{compare:true}).catch(report);
  $('context-details').onclick=()=>{$('information').classList.remove('statement');$('information-title').textContent=state.view?.overview?'Overview selection':'Prepared neighborhood';const omissions=state.displayOmissions??state.displayed?.omissions??[],n=state.visualSnapshot?.neighborhood;const summary=state.view?.overview?(state.view.overview.summary.message+'\n\nRanked by direct children, damped descendants, distinct connected elements and cross-branch links. Branches share the display budget; ties use native names and identities. Counts refer to eligible project elements in the selected native scope. These signals describe structural prominence, not engineering criticality. Select a subsystem and choose Expand contents to explore further.\n\n'):n?`${n.shown} of ${n.total} eligible one-hop neighbors prepared (limit ${n.budget}). Every included neighbor has a real tile. Pan or zoom to reveal tiles outside the active fit. Camera movement does not expand the model.\n\n`:'';$('information-text').textContent=renderingPolicy(state.renderingMode).notice+'\n\n'+summary+(state.traceInfo?.paths?.length?'Collapsed native paths:\n'+state.traceInfo.paths.map(p=>p.elementIds.map(id=>qname(id)||id).join(' → ')+' ['+p.kind+']').join('\n')+'\n\n':'')+omissionDisclosure(omissions,!!state.view?.overview)+'\n\nCoverage: part composition, dependencies and direct types come from the native API. Other engineering links come from native requirement and declared views. Unprojected relationship kinds may be unavailable.';$('information').showModal();};
  $('edit').onclick=openEditor;$('view-file').onchange=()=>{$('view-source').value=fileText(state.project,$('view-file').value);};
- $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{...(scenes[index].narrative?{narrative:{...scenes[index].narrative,template:$('scene-prose').value}}:{}),...editorStoryContent(),presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project);$('editor').close();await showScene(index,false);}catch(e){report(e);}};
- $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project);$('editor').close();}catch(e){report(e);}};
+ $('save-scene').onclick=async()=>{try{if(!scene())throw Error('Capture a first scene before editing it');const presentation=editorPresentation(),regions=updateRegionReferences(scene().regions??[],$('scene-regions').value.split('\n').map(s=>s.trim()).filter(Boolean)),index=state.sceneIndex,project=structuredClone(state.project),scenes=structuredClone(state.scenes);Object.assign(scenes[index],{...(scenes[index].narrative?{narrative:{...scenes[index].narrative,template:$('scene-prose').value}}:{}),...editorStoryContent(),presentation,regions,title:$('scene-title').value,markdown:$('scene-prose').value,panel:{placement:$('panel-placement').value}});project.files[project.manifest.story]=writeStory(project.manifest.title,scenes);await loadProject(project,{targetScene:index,onReady:active=>{active();$('editor').close();}});}catch(e){report(e);}};
+ $('capture-scene').onclick=()=>capture().catch(report);$('apply-views').onclick=async()=>{try{const project=structuredClone(state.project);project.files[$('view-file').value]=$('view-source').value;await loadProject(project,{onReady:active=>{active();$('editor').close();}});}catch(e){report(e);}};
  $('open-sysml').onclick=()=>$('sysml-files').click();$('open-folder').onclick=()=>$('folder-files').click();$('landing-project').onclick=()=>$('project-file').click();
  for(const [id,folder] of [['sysml-files',false],['folder-files',true]])$(id).onchange=async()=>{const files=Array.from($(id).files??[]);$(id).value='';await openSelectedFiles(files,{folder});};
  for(const demo of document.querySelectorAll('[data-demo]'))demo.onclick=()=>openDemo(demo.dataset.demo).catch(report);
- $('home').onclick=home;$('resume-model').onclick=async()=>{state.loadOperation?.abort.abort();if(state.loadOperation)loadingProgress.cancel(state.loadOperation.id);state.loadOperation=null;const revision=++state.loadRevision;++state.revision;discardLoadingModel();if(state.projectDisplay)await state.projectDisplay.finished;if(revision!==state.loadRevision)return;busy(false);showLanding(document,false);document.title=state.project.manifest.title+' · Syspresent';await frame(state.view).catch(report);};
+ $('home').onclick=home;$('resume-model').onclick=async()=>{try{state.loadOperation?.abort.abort();if(state.loadOperation)loadingProgress.cancel(state.loadOperation.id);state.loadOperation=null;const revision=++state.loadRevision;++state.revision;discardLoadingModel();if(state.projectDisplay)await state.projectDisplay.finished;if(revision!==state.loadRevision)return;
+  if(state.engine?.closed||state.modelLease?.engine.closed){await loadProject(state.project,{cacheHash:state.trustedCacheHash,demo:state.demo,publication:state.publication,targetScene:state.sceneIndex});return;}
+  busy(false);showLanding(document,false);document.title=state.project.manifest.title+' · Syspresent';await frame(state.view);if(revision===state.loadRevision)status('OpenSysML WASM · '+state.graph.elements.length+' native elements · '+state.availableViews.length+' views');
+ }catch(error){report(error);}};
  $('import-project').onclick=()=>{$('project-file').click();};$('project-file').onchange=async()=>{const file=$('project-file').files[0];$('project-file').value='';await openProjectFile(file);};
  $('import-markdown').onclick=()=>{$('markdown-file').click();};$('markdown-file').onchange=async()=>{const file=$('markdown-file').files[0];$('markdown-file').value='';await openMarkdownFile(file);};
  $('export-project').onclick=()=>{try{download('syspresent-project.zip',packProject(projectForExport()),'application/zip');$('project-menu').open=false;}catch(e){report(e);}};$('export-markdown').onclick=()=>{download('story.md',fileText(projectForExport(),state.project.manifest.story),'text/markdown');$('project-menu').open=false;};$('load-example').textContent='Choose another demo';$('load-example').onclick=home;
