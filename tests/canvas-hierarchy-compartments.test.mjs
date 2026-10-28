@@ -1,3 +1,4 @@
+import {completeRootContext} from '../src/canvas-prototype/child-exploration.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {modelGraph} from '../src/canvas-prototype/graph.mjs';
@@ -37,9 +38,9 @@ test('hierarchy search scans complete scope and never infers ownership from qual
  assert.throws(()=>hierarchyPage(graph,{parentId:'project',scopeIds:['other']}),/outside/);
  assert.equal(hierarchyPage(graph,{parentId:'assembly',page:999}).page,2);
 });
-test('native owner cycles terminate and retain an inspectable root without adding relationships',()=>{
+test('native owner cycles remain searchable and inspectable without asserting model roots',()=>{
  const graph=modelGraph([declaration('a','Package','b'),declaration('b','Package','a'),declaration('c','Package','d'),declaration('d','Package','c')]);
- const roots=hierarchyPage(graph);assert.deepEqual(roots.items.map(e=>e.id),['a','c']);
+ const roots=hierarchyPage(graph);assert.deepEqual(roots.items.map(e=>e.id),[]);assert.deepEqual(new Set(completeRootContext(graph).childProjection.inspectionEntries.map(e=>e.id)),new Set(['a','b','c','d']));
  assert.equal(hierarchyPage(graph,{rootId:'a',query:'b'}).items[0].id,'b');
  assert.deepEqual(hierarchyPage(graph,{parentId:'a'}).items[0].pathIds,['a']);
  assert.equal(graph.relationships.length,0);
@@ -58,4 +59,12 @@ test('bounded tile summaries disclose complete paged declaration access and do n
  const ids=[];for(let page=0;page<12;page++)ids.push(...elementCompartments(graph,'usage',{page}).items.map(e=>e.id));
  assert.equal(new Set(ids).size,140);assert.ok(ids.includes('subpart'));assert.equal(compartmentText(graph,'base'),'');assert.equal(compartmentText(graph,'missing'),'');
  assert.throws(()=>elementCompartments(graph,'missing'),/unavailable/);
+});
+
+test('hierarchy roots exclude metadata with a real nonstructural owner and retain search access',()=>{
+ const graph=modelGraph([declaration('project','Package'),declaration('rel','Dependency','project'),declaration('meta','MetadataUsage','rel'),declaration('text','AttributeUsage','meta')],[],{nativeRootIds:['project']});
+ assert.deepEqual(hierarchyPage(graph).items.map(row=>row.id),['project']);
+ assert.deepEqual(hierarchyPage(graph,{query:'meta'}).items.map(row=>row.id),['meta']);
+ assert.deepEqual(hierarchyPage(graph,{parentId:'meta'}).items.map(row=>row.id),['text']);
+ assert.equal(completeRootContext(graph).childProjection.inspectionEntries.find(row=>row.id==='meta').ownerIds[0],'rel');
 });

@@ -260,4 +260,15 @@ package SyspresentVerification {
         return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
     }
 
+    verification def <'SV-025'> nativeRootsAndMetadataInspection {
+        doc /* Compare actual visible Whole-project cards with native document roots and full ownership. For Blue Dog expect 21 payload roots plus the authored-view package, with no 605 Dependency-owned metadata cards at root. Inspect all source metadata IDs globally and from actual owner/annotation node and relationship actions without fabricated containment. Verify missing source text stays unavailable, genuine standalone metadata remains accessible, and missing/cyclic owners have explicit inspection paths. Repeat navigation, Back/Forward and phone widths; retain complete 90 Challenge/465 Requirements sibling membership and source ZIP hashes. Check live deployed cards and asset provenance. These checks do not claim physical validation or full notation conformance. */
+        objective acceptance {
+            verify SyspresentRequirements::InitialOverview::structuralProminence;
+            verify SyspresentRequirements::ConversationalExploration::completeHierarchy;
+            verify SyspresentRequirements::ConversationalExploration::scopedContextChoice;
+            verify SyspresentRequirements::PackageExploration::packageWorkspace;
+        }
+        return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
+    }
+
 }

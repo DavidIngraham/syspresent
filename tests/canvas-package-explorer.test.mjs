@@ -27,7 +27,7 @@ test('package scope uses native ownership through nested declarations, never nam
 test('native ownership cycles terminate and scope caches belong to their graph snapshot',()=>{
  const graph=fixture();graph.containment.push({source:'nested',target:'scope',nativeRole:'owner'});
  assert.equal(packageMembers(graph,'scope').length,5);assert.equal(containingPackage(graph,'scope'),'nested');
- const other=fixture();other.containment=other.containment.filter(e=>e.target!=='inside');
+ const other=fixture();other.containment=other.containment.filter(e=>e.target!=='inside');delete other.elements.find(e=>e.id==='inside').native.owner;
  assert.ok(!packageMembers(other,'scope').includes('inside'));
 });
 test('scoped traces and neighborhoods disclose external native targets and retain direction',()=>{
@@ -60,4 +60,12 @@ test('every native declaration kind can reopen complete contents without a relat
   assert.deepEqual(focusViewKinds({kind}).find(view=>view.id==='contents'),{id:'contents',label:'Complete contents'});
  }
  assert.equal(focusViewKinds({kind:'Membership'}).some(view=>view.id==='contents'),false);
+});
+
+test('scope and nearest package traverse actual Dependency owners without adopting annotation targets',()=>{
+ const graph=modelGraph([declaration('scope','Package'),declaration('other','Package'),declaration('relationship','Dependency','scope'),{...declaration('meta','MetadataUsage','relationship'),annotatedElement:[{'@id':'other'}]},declaration('value','AttributeUsage','meta')]);
+ assert.deepEqual(packageMembers(graph,'scope'),['meta','relationship','scope','value']);
+ assert.equal(containingPackage(graph,'meta'),'scope');
+ assert.ok(!packageMembers(graph,'scope').includes('other'));
+ assert.deepEqual(packageMembers(graph,'other'),['other']);
 });

@@ -1,6 +1,8 @@
 /** Reader scope over native ownership. Names are labels, never membership rules. */
 import {representations,nativeViewContextIdentities} from './view-contract.mjs';
 import {isDeclarationKind} from './graph.mjs';
+import {nativeOwnershipIndex} from './metadata-context.mjs';
+import {completeRootContext} from './child-exploration.mjs';
 
 const indexes=new WeakMap();
 export const isPackage=element=>['Package','Namespace'].includes(element?.kind);
@@ -13,6 +15,7 @@ function index(graph){
   if(!children.has(edge.source))children.set(edge.source,new Set());children.get(edge.source).add(edge.target);
   if(!parents.has(edge.target))parents.set(edge.target,new Set());parents.get(edge.target).add(edge.source);
  }
+ const native=nativeOwnershipIndex(graph);for(const [child,owners]of native.ownerIds)for(const parent of owners)if(elements.has(child)&&elements.has(parent)){if(!children.has(parent))children.set(parent,new Set());children.get(parent).add(child);if(!parents.has(child))parents.set(child,new Set());parents.get(child).add(parent);}
  const result={elements,children,parents,members:new Map()};indexes.set(graph,result);return result;
 }
 export function packageMembers(graph,id){
@@ -81,10 +84,9 @@ export function hierarchyPage(graph,{rootId=null,parentId=null,query='',page=0,p
  const parents=id=>sorted([...(data.parents.get(id)??[])].filter(p=>allowed.has(p)));
  const path=id=>{const seen=new Set([id]),result=[];let current=id;while(true){const parent=parents(current).find(e=>!seen.has(e.id));if(!parent)break;result.unshift(parent.id);seen.add(parent.id);current=parent.id;}return result;};
  const q=query.trim().toLowerCase();
- const candidates=q?sorted([...allowed].filter(id=>{const e=data.elements.get(id);return [e.name,e.qualifiedName,id].some(s=>s?.toLowerCase().includes(q));})):sorted(parentId?[...(data.children.get(parentId)??[])].filter(id=>allowed.has(id)):rootId?[rootId]:[...allowed].filter(id=>![...(data.parents.get(id)??[])].some(parent=>allowed.has(parent))));
- // Malformed ownership cycles may have no root. Keep them inspectable, disclosing
- // the native cycle rather than inventing a containing namespace.
- if(!parentId&&!rootId&&!q){const reached=new Set(),queue=candidates.map(e=>e.id);for(let i=0;i<queue.length;i++){const id=queue[i];if(reached.has(id))continue;reached.add(id);for(const child of data.children.get(id)??[])if(allowed.has(child))queue.push(child);}for(const e of sorted(allowed))if(!reached.has(e.id)){candidates.push(e);queue.push(e.id);for(let i=queue.length-1;i<queue.length;i++){const id=queue[i];if(reached.has(id))continue;reached.add(id);for(const child of data.children.get(id)??[])if(allowed.has(child))queue.push(child);}}}
+ const rootCandidates=scopeIds?[...allowed].filter(id=>![...(data.parents.get(id)??[])].some(parent=>scopeIds.includes(parent))):completeRootContext(graph).targets;
+ const candidates=q?sorted([...allowed].filter(id=>{const e=data.elements.get(id);return [e.name,e.qualifiedName,id].some(value=>value?.toLowerCase().includes(q));})):sorted(parentId?[...(data.children.get(parentId)??[])].filter(id=>allowed.has(id)):rootId?[rootId]:rootCandidates);
+ // Non-root/cyclic source records remain available through explicit Source inspection and search.
  const pages=Math.max(1,Math.ceil(candidates.length/size)),current=Math.max(0,Math.min(pages-1,Number.isInteger(page)?page:0));
  const items=candidates.slice(current*size,(current+1)*size).map(e=>({id:e.id,label:e.native?.declaredName||e.native?.declaredShortName||e.name,qualifiedName:e.qualifiedName,kind:e.kind,parentIds:parents(e.id).map(p=>p.id),pathIds:path(e.id),childCount:[...(data.children.get(e.id)??[])].filter(id=>allowed.has(id)).length,provenance:{authority:'native-api',role:'owner',sourceLine:e.native?.['sysx:sourceLine'],sourceColumn:e.native?.['sysx:sourceColumn']}}));
  return {items,rootId,parentId,query,page:current,pageSize:size,total:candidates.length,loadedTotal:allowed.size,pages,hasPrevious:current>0,hasNext:current+1<pages,summary:`Showing ${items.length} of ${candidates.length} ${q?'matching declarations':parentId?'directly owned declarations':'ownership roots'} in the loaded native declaration projection (${allowed.size} declarations in scope). Ownership is model location, not physical composition or runtime instances.`};

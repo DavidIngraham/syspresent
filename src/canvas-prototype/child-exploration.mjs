@@ -3,6 +3,7 @@
  * Related engineering nodes and presentation budgets cannot displace siblings.
  */
 import {isDeclarationKind} from './graph.mjs';
+import {nativeOwnershipIndex} from './metadata-context.mjs';
 
 const compareText=(a,b)=>a<b?-1:a>b?1:0;
 const endpoint=(edge,side)=>side==='source'?edge.source??edge.fromId??edge.from_id??edge.from:edge.target??edge.toId??edge.to_id??edge.to;
@@ -164,51 +165,46 @@ function closedCycleMembers(ids,children,parents){
  * ownership relation is created. Closed cycles remain reachable as cycle entries.
  */
 export function completeRootContext(graph,options={}){
- const {elements,edges}=prepare(graph),scope=options.scopeIds?new Set(options.scopeIds):null;
- const source=new Set([...elements.values()].filter(element=>element.layer==='project'&&element.metamodel!==true&&isDeclarationKind(element.kind)&&(!scope||scope.has(element.id))).map(element=>element.id));
+ const {elements,edges}=prepare(graph),index=nativeOwnershipIndex(graph),scope=options.scopeIds?new Set(options.scopeIds):null;
+ const eligible=new Set([...elements.values()].filter(element=>element.layer==='project'&&element.metamodel!==true&&isDeclarationKind(element.kind)&&(!scope||scope.has(element.id))).map(element=>element.id));
+ const nativeRoots=new Set(options.nativeRootIds??graph.nativeRootIds??[]);
  const compare=(a,b)=>Number(!['Package','Namespace'].includes(elements.get(a)?.kind))-Number(!['Package','Namespace'].includes(elements.get(b)?.kind))||compareText(elements.get(a)?.qualifiedName??elements.get(a)?.name??a,elements.get(b)?.qualifiedName??elements.get(b)?.name??b)||compareText(a,b);
- const nativeOwners=new Map(),parents=new Map(),children=new Map();
- const add=(parent,child)=>{
-  if(typeof parent!=='string'||!source.has(child))return;
-  if(!nativeOwners.has(child))nativeOwners.set(child,new Set());nativeOwners.get(child).add(parent);
-  if(!source.has(parent))return;
-  if(!parents.has(child))parents.set(child,new Set());parents.get(child).add(parent);
-  if(!children.has(parent))children.set(parent,new Set());children.get(parent).add(child);
+ const fullSource=new Set([...index.sourceIds].filter(id=>!scope||scope.has(id))),parents=new Map(),children=new Map();
+ for(const id of fullSource)for(const parent of index.ownerIds.get(id)??[])if(fullSource.has(parent)){
+  if(!parents.has(id))parents.set(id,new Set());parents.get(id).add(parent);
+  if(!children.has(parent))children.set(parent,new Set());children.get(parent).add(id);
+ }
+ const roots=[],inspectionEntries=[],entryById=new Map();
+ const inspect=(id,reason,extra={})=>{
+  if(entryById.has(id))return;
+  const entry={id,reason,ownerIds:index.ownerIds.get(id)??[],...extra};entryById.set(id,entry);inspectionEntries.push(entry);
  };
- for(const edge of edges)if(edge.kind==='containment'&&edge.nativeRole==='owner')add(edge.source,edge.target);
- for(const id of source)for(const parent of nativeRefs(elements.get(id).native?.owner))add(parent,id);
- const roots=[...source].filter(id=>!(parents.get(id)?.size)),reachable=new Set(),walk=starts=>{
+ for(const id of eligible){
+  const native=elements.get(id).native??{},ownerIds=index.ownerIds.get(id)??[],sourceParents=ownerIds.filter(parent=>fullSource.has(parent));
+  const targets=nativeRefs(native.annotatedElement);
+  if(sourceParents.length){
+   const nonStructural=sourceParents.filter(parent=>!isDeclarationKind(elements.get(parent)?.kind));
+   if(nonStructural.length)inspect(id,'native-nonstructural-owner',{ownerKinds:nonStructural.map(parent=>elements.get(parent)?.kind)});
+   continue;
+  }
+  if(elements.get(id).kind==='MetadataUsage'&&targets.length){inspect(id,'annotation-context',{annotatedElementIds:targets});continue;}
+  if(nativeRoots.has(id)||!ownerIds.length){roots.push(id);continue;}
+  const outside=ownerIds.filter(owner=>index.sourceIds.has(owner)&&!fullSource.has(owner));
+  inspect(id,outside.length?'outside-scope':'native-owner-unavailable',{outsideOwnerIds:outside});
+ }
+ const reachable=new Set(),walk=starts=>{
   const queue=[...starts];for(let cursor=0;cursor<queue.length;cursor++){const id=queue[cursor];if(reachable.has(id))continue;reachable.add(id);for(const child of children.get(id)??[])if(!reachable.has(child))queue.push(child);}
  };
  walk(roots);
- const cycleIds=closedCycleMembers([...source].filter(id=>!reachable.has(id)),children,parents),cycles=new Set(cycleIds);
- roots.push(...cycleIds);walk(cycleIds);
- // Every finite closed parent component should have a cycle. Keep any malformed
- // residual native records accessible rather than silently dropping them.
- const unresolved=[...source].filter(id=>!reachable.has(id)),unresolvedIds=new Set(unresolved);roots.push(...unresolved);
- const childIds=[...new Set(roots)].sort(compare),wanted=new Set(childIds),omissions=[],projectionRoots=[];
- const declarationOwners=Object.fromEntries(childIds.map(id=>[id,[...(nativeOwners.get(id)??[])].sort(compareText)]));
- for(const id of childIds){
-  const ownerIds=declarationOwners[id];
-  const omittedOwnerIds=ownerIds.filter(owner=>!elements.has(owner)||elements.get(owner).layer!=='project'||!isDeclarationKind(elements.get(owner).kind));
-  const outsideOwnerIds=scope?ownerIds.filter(owner=>elements.has(owner)&&elements.get(owner).layer==='project'&&isDeclarationKind(elements.get(owner).kind)&&!scope.has(owner)):[];
-  const reason=cycles.has(id)?'cycle':unresolvedIds.has(id)?'ownership-unresolved':!ownerIds.length?'native-root':!omittedOwnerIds.length&&outsideOwnerIds.length?'outside-scope':'native-owner-omitted';
-  projectionRoots.push({id,reason,ownerIds,omittedOwnerIds,outsideOwnerIds});
-  if(reason!=='native-root')omissions.push({relationshipId:null,target:id,reason,anchor:null,ownerIds});
- }
- const relationships=edges.filter(edge=>wanted.has(edge.source)&&wanted.has(edge.target));
- const kindCounts={};for(const id of childIds){const kind=elements.get(id).kind;kindCounts[kind]=(kindCounts[kind]??0)+1;}
- const packageCount=(kindCounts.Package??0)+(kindCounts.Namespace??0),metadataCount=projectionRoots.filter(entry=>['MetadataUsage','MetadataDefinition'].includes(elements.get(entry.id).kind)&&entry.reason!=='native-root').length;
- const boundaryCount=projectionRoots.filter(entry=>!['native-root','cycle'].includes(entry.reason)).length;
- let message=`All ${childIds.length} roots of the loaded source ownership projection shown: ${packageCount} packages/namespaces`;
- if(metadataCount)message+=` and ${metadataCount} unanchored metadata declarations`;
- message+='.';
- if(boundaryCount)message+=` ${boundaryCount} entries appear here because their explicit native owner is outside the available source-declaration projection or scope; they are not asserted to be physical or model-wide top-level roots.`;
- if(cycles.size)message+=` ${cycles.size} closed ownership-cycle members are exposed as inspectable entries; no containing hierarchy has been guessed.`;
- message+=` ${source.size} source declarations remain reachable through intentional immediate-child drilldown. No recursive model expansion or modeled project root is created.`;
- return structuredClone({
-  elements:childIds.map(id=>elements.get(id)),relationships,omissions,mode:'contents',focus:childIds[0],rootIds:[],page:0,pages:1,total:childIds.length,shown:childIds.length,targets:childIds,budget:null,typingBridges:[],
-  childProjection:{rootIds:[],childIds,ownChildIds:childIds,definitionChildIds:[],typeIds:[],declaredOn:{},declarationOwners,ownership:[],projectionRoots,complete:true,kindCounts,implicitProject:true},
-  summary:{status:childIds.length?'shown':'no-known-children',message,total:childIds.length,shown:childIds.length,unavailable:0,filtered:0,complete:true,kindCounts,sourceDeclarations:source.size,packages:packageCount,unanchoredMetadata:metadataCount,projectionBoundaries:boundaryCount,cycleEntries:cycles.size}
- });
+ const remaining=[...fullSource].filter(id=>!reachable.has(id)),cycles=new Set(closedCycleMembers(remaining,children,parents));
+ for(const id of eligible)if(!reachable.has(id)&&!entryById.has(id))inspect(id,cycles.has(id)?'ownership-cycle':'ownership-unresolved');
+ const childIds=[...new Set(roots)].sort(compare),wanted=new Set(childIds),kindCounts={};
+ for(const id of childIds){const kind=elements.get(id).kind;kindCounts[kind]=(kindCounts[kind]??0)+1;}
+ inspectionEntries.sort((a,b)=>compare(a.id,b.id));
+ const projectionRoots=childIds.map(id=>({id,reason:nativeRoots.has(id)?'native-document-root':'native-root',ownerIds:index.ownerIds.get(id)??[]}));
+ const packageCount=(kindCounts.Package??0)+(kindCounts.Namespace??0),metadataCount=[...eligible].filter(id=>elements.get(id).kind==='MetadataUsage').length;
+ const relationshipMetadata=inspectionEntries.filter(entry=>entry.reason==='native-nonstructural-owner'&&elements.get(entry.id).kind==='MetadataUsage').length;
+ const summary={status:childIds.length?'shown':'no-known-roots',total:childIds.length,shown:childIds.length,unavailable:0,filtered:0,complete:true,kindCounts,sourceDeclarations:eligible.size,packages:packageCount,sourceMetadata:metadataCount,relationshipMetadata,inspectionEntries:inspectionEntries.length,cycleEntries:[...eligible].filter(id=>cycles.has(id)).length,reachableThroughNativeOwnership:[...eligible].filter(id=>reachable.has(id)).length};
+ summary.message='All '+childIds.length+' native source roots shown ('+packageCount+' packages/namespaces). Whole project follows native document roots and ownership through every native record kind; native ownership through relationship records is retained. '+metadataCount+' source metadata usages remain available in Metadata inspection, including '+relationshipMetadata+' owned by nonstructural native records. '+inspectionEntries.length+' source inspection entries retain exact identities and owners. Complete child exploration is unchanged; annotations are never structural containment.';
+ return structuredClone({elements:childIds.map(id=>elements.get(id)),relationships:edges.filter(edge=>wanted.has(edge.source)&&wanted.has(edge.target)),omissions:inspectionEntries.map(entry=>({target:entry.id,reason:entry.reason,message:'Available through Source inspection; native owner '+entry.ownerIds.join(', ')})),mode:'contents',focus:childIds[0],rootIds:[],page:0,pages:1,total:childIds.length,shown:childIds.length,targets:childIds,budget:null,typingBridges:[],childProjection:{rootIds:[],childIds,ownChildIds:childIds,definitionChildIds:[],typeIds:[],declaredOn:{},declarationOwners:Object.fromEntries(projectionRoots.map(entry=>[entry.id,entry.ownerIds])),ownership:[],projectionRoots,inspectionEntries,complete:true,kindCounts,implicitProject:true},summary});
 }

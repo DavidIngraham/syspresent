@@ -195,10 +195,9 @@ has a canvas tile. No prominence rank, named-only filter, composition-only filte
 viewport budget or More page chooses siblings. Explicit engineering traces retain
 separate bounded paging. Effective requirements remains an explicit action.
 
-Whole project displays all roots of the loaded source ownership projection,
+Whole project displays native document/source roots through full native ownership,
 independent of authored story roots. Omitted native owners, scope boundaries and
-closed cycles are disclosed with actual native owner IDs; unanchored metadata is
-not asserted physically a top-level package. Immediate-child drilldown preserves
+closed cycles are disclosed with actual native owner IDs; relationship-owned metadata is inspected on its actual owner, not promoted to root cards. Immediate-child drilldown preserves
 the hierarchy without drawing all descendants.
 
 The child-exploration module uses native owner and direct typing records.
@@ -474,3 +473,20 @@ Native compilation, mapped identity/owner/type checks, complete package-child
 inventories, ZIP source-byte roundtrip and browser history/phone flows supply
 separate software evidence. This import does not rerun or accept the physical
 analyses, configure a provider or establish full SysML notation conformance.
+
+
+## Native roots and metadata inspection
+
+Dependency owners are retained by the native export even though the structural
+drawing does not render them as container cards. Whole project follows full native
+ownership and native ParseSources document-root IDs. Those IDs persist through
+graph rebuilds and prepared caches; a filtered parent never becomes an absent
+parent. Missing-owner and cyclic records use explicit Source inspection.
+
+The Metadata catalog retains every source MetadataUsage with truthful search and
+pagination. Element and relationship actions distinguish native owner roles,
+explicit annotatedElement targets and exact annotation-record provenance.
+Unavailable text or annotation records are not reconstructed. Inspection is
+stationary; explicit Contents opens the metadata declaration's actual fields.
+Package scope follows full ownership through relationship records; annotations
+never create containment. All model source bytes are unchanged.

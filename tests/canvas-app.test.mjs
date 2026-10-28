@@ -1415,7 +1415,7 @@ test('all-loaded metadata inspection is independent of isolated scope and explic
   const before=activeIDs(d),camera=d.getElementById('graph-world').style.transform;
   d.getElementById('inspect-metadata').click();assert.match(d.getElementById('metadata-summary').textContent,/44 records/);
   metadataSearch(h,'metadata-000');metadataButton(metadataRow(d,'metadata-000'),'Inspect').click();assert.deepEqual(activeIDs(d),before);assert.equal(d.getElementById('scope-label').textContent,'Model::Nested');assert.equal(d.getElementById('graph-world').style.transform,camera);
-  metadataButton(metadataRow(d,'metadata-000'),'Contents').click();await until(()=>sceneSettled(d)&&activeIDs(d).sort().join(',')==='metadata-000,metadata-text');
+  metadataButton(metadataRow(d,'metadata-000'),'Contents in Whole project').click();await until(()=>sceneSettled(d)&&activeIDs(d).sort().join(',')==='metadata-000,metadata-text');
   assert.equal(d.getElementById('scope-label').textContent,'Whole project');
   d.getElementById('explore-back').click();await until(()=>sceneSettled(d)&&d.getElementById('scope-label').textContent==='Model::Nested');assert.deepEqual(activeIDs(d),before);assert.equal(d.getElementById('graph-world').style.transform,camera);
  }finally{h.window.close();}

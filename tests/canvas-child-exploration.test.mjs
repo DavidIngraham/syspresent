@@ -110,7 +110,7 @@ test('project opening contains every genuine native root while unavailable owner
  const boundary=context.childProjection.inspectionEntries.find(entry=>entry.id==='metadata-0');
  assert.equal(boundary.reason,'native-owner-unavailable');assert.deepEqual(boundary.ownerIds,['omitted-native-owner-0']);
  assert.equal(context.childProjection.inspectionEntries.length,53);assert.equal(sourceMetadata(graph).total,53,'inspection retains every source metadata record');
- assert.match(context.summary.message,/not a new modeled root/);assert.ok(!context.targets.includes('nested'));assert.ok(!context.targets.includes('deep'));
+ assert.match(context.summary.message,/Metadata inspection/);assert.ok(!context.targets.includes('nested'));assert.ok(!context.targets.includes('deep'));
 });
 
 test('project roots require native root or absent ownership evidence, not QName or an unavailable owner',()=>{
@@ -185,4 +185,12 @@ test('relationship context diagnostics preserve multiple native occurrences with
  assert.equal(result.total,0);assert.equal(result.summary.status,'no-known-children');
  assert.equal(result.summary.relationshipContext.notOpened,1);
  assert.deepEqual(omission.occurrences,native.occurrences);omission.occurrences[0].id='edited';assert.equal(native.occurrences[0].id,'view-occurrence-1');
+});
+
+test('authoritative document roots distinguish genuine standalone declarations from unreported ownership boundaries',()=>{
+ const graph={elements:[item('package','Package'),item('standalone','MetadataUsage'),item('unknown','MetadataUsage',{native:{owner:{'@id':'missing-owner'}}})],containment:[],relationships:[],nativeRootIds:['package','standalone']};
+ const context=completeRootContext(graph);
+ assert.deepEqual(context.targets,['package','standalone']);
+ assert.equal(context.childProjection.inspectionEntries.find(entry=>entry.id==='unknown').reason,'native-owner-unavailable');
+ assert.ok(!context.relationships.length,'document roots never create modeled owner links');
 });

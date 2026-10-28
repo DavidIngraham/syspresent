@@ -91,16 +91,17 @@ test('isolated child cards do not reintroduce excluded type context or unrelated
  assert.ok(!view.edges.some(edge=>edge.nativeRelationship==='native:satisfy'));
 });
 
-test('implicit project root cards include all packages and unanchored metadata without fabricated owners',()=>{
+test('implicit project root cards retain all actual packages with boundary metadata explicitly inspectable',()=>{
  const roots=Array.from({length:31},(_,i)=>declaration('package-'+i,'Package'));
  roots.push(declaration('anonymous-metadata','MetadataUsage',{native:{owner:{'@id':'omitted-native-owner'},'sysx:sourceLine':31}}));
  const graph={elements:roots,containment:[],relationships:[]},context=completeRootContext(graph),view=completeChildView(graph,context);
- assert.equal(view.nodes.length,32);
- assert.equal(view.childProjection.childIds.length,32);
+ assert.equal(view.nodes.length,31);
+ assert.equal(view.childProjection.childIds.length,31);
  assert.deepEqual(view.childProjection.rootIds,[]);
  assert.deepEqual(view.childProjection.declaredOn,{});
- assert.equal(view.nodes.find(node=>node.semanticId==='anonymous-metadata').name,'Unnamed MetadataUsage');
- assert.ok(view.childProjection.projectionRoots.some(entry=>entry.id==='anonymous-metadata'&&entry.reason==='native-owner-omitted'&&entry.ownerIds[0]==='omitted-native-owner'));
+ assert.ok(!view.nodes.some(node=>node.semanticId==='anonymous-metadata'));
+ assert.equal(completeChildView(graph,completeChildContext(graph,{focus:'anonymous-metadata'})).nodes[0].name,'Unnamed MetadataUsage');
+ assert.ok(view.childProjection.inspectionEntries.some(entry=>entry.id==='anonymous-metadata'&&entry.reason==='native-owner-unavailable'&&entry.ownerIds[0]==='omitted-native-owner'));
  assert.equal(view.edges.length,0);
 });
 

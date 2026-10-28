@@ -27,6 +27,7 @@ import {discoverNativeIndex} from './native-project.mjs';
 import {nativeScopeIds} from './prominence.mjs';
 import {completeChildView} from './child-view.mjs';
 import {completeChildContext,completeRootContext} from './child-exploration.mjs';
+import {nativeOwnershipIndex,inspectNativeOwnership,metadataContext,sourceMetadata} from './metadata-context.mjs';
 import {layoutChildWorkspace,placeChildWorkspace} from './child-layout.mjs';
 import {isPackage,packageMembers,packageCatalog,containingPackage,outsidePackage,focusViewKinds,hierarchyPage} from './package-explorer.mjs';
 import {planDepartures} from './departures.mjs';
@@ -44,7 +45,7 @@ import {createLayoutEngine,layoutDiagram} from './elk-layout.mjs';
 import {edgeAppearance,markerDefinition} from './notation.mjs';
 import {createSemanticEngine} from './engine/client.mjs';
 import {engineeringContext,findEngineeringRoute,findHierarchyRoute,planTransition,directTypingContext} from './core/index.mjs';
-import {adaptNativeView,modelGraph,graphView,requireNativeIdentity} from './graph.mjs';
+import {adaptNativeView,modelGraph,graphView,requireNativeIdentity,isDeclarationKind} from './graph.mjs';
 import {validateProject,fileText,parseStory,writeStory,packProject,unpackProject,documentsFor,requirementCoverageSource,createRuntimeCacheReader,projectPath} from './project.mjs';
 const buildVersion=document.querySelector('meta[name="syspresent-build"]')?.content||'development';
 const engineAssetVersion=document.querySelector('meta[name="syspresent-engine"]')?.content||buildVersion;
@@ -186,7 +187,7 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=event=
  let preparedViews=0;for(const name of needed){active();if(!availableViews.includes(name))throw Error('Native view does not resolve: '+name);progress({stage:'views',label:'Preparing '+(scenes.find(s=>s.view===name)?.title||'model view')+'…',completed:preparedViews,total:needed.size,unit:'views'});const raw=cache?.views?.[name]??await engine.call('RenderView',{modelHash:parsed.modelHash,view:name,includeSemanticIdentity:true});const view=requireNativeIdentity(adaptNativeView(raw,name));if(!supportsView(view))throw Error('Unsupported native view kind: '+view.kind);views.set(name,view);preparedViews++;if(preparedViews%8===0){await yieldLoadingPaint();active();}}
  if(!m.systemOfInterest.length)m.systemOfInterest=[...roots];
  progress({stage:'graph-index',label:'Building model navigation…'});await yieldLoadingPaint();active();
- const graph=modelGraph(exported.elements,[...views.values(),coverage]);
+ const graph=modelGraph(exported.elements,[...views.values(),coverage],{nativeRootIds:(parsed.roots??[]).flatMap(root=>root.childIds??[])});
  for(const root of project.manifest.systemOfInterest)if(!resolveInGraph(graph,root))throw Error('System of interest does not resolve: '+root);
  const byName=value=>resolveInGraph(graph,value);
  let validationYield=performance.now();
@@ -646,7 +647,7 @@ async function openNativeView(name,{compare=false}={}){
  }
  assertInScope(view);
  const identities=representedIdentities(view);if(!identities.length)throw Error('This native view contains no represented model elements.');
- if(!state.views.has(name)){state.views.set(name,view);state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);}
+ if(!state.views.has(name)){state.views.set(name,view);state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()],{nativeRootIds:state.graph.nativeRootIds});}
  const target=identities.includes(state.focus)?state.focus:identities.find(id=>element(id))??state.focus;
  if(compare){remember();state.comparison={view,focus:target,title:name};state.activeRegion='comparison';await frame(state.view);updateWorkspaceControls();}
  else await openExploration(view,target,{resetRegions:true});
@@ -672,7 +673,7 @@ async function openExploration(view,id,{request=null,info=null,record=true,reset
 }
 async function openSystemOverview({record=true,scopeId=state.packageScope}={}){
  const context=scopeId?completeChildContext(state.graph,{focus:scopeId,scopeIds:!state.scopeContext?packageMembers(state.graph,scopeId):undefined}):completeRootContext(state.graph);
- if(!context.elements.length)throw Error('No source declarations are available in the loaded native projection.');
+ if(!context.elements.length&&!context.summary.sourceDeclarations)throw Error('No source declarations are available in the loaded native projection.');
  const view=completeChildView(state.graph,context,scopeId?'Package contents':'Whole project roots');
  view.id=scopeId?'children:scope:'+scopeId:'children:project';
  view.overview={rootIds:context.childProjection.rootIds,metrics:{},summary:context.summary,completeChildren:true};
@@ -693,7 +694,7 @@ async function explore(id,kind){
  const definition=({action:'ActionFlowView',state:'StateTransitionView',sequence:'SequenceView',interconnection:'InterconnectionView'})[kind];
  if(definition)view.capture={definition,root:q};
  state.extraViews??=new Map();state.extraViews.set(view.id,view);
- state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()]);
+ state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()],{nativeRootIds:state.graph.nativeRootIds});
  await openExploration(view,id);
 }
 async function followTrace(id,mode,page=0,{record=true}={}){
@@ -704,7 +705,7 @@ function select(id,node,origin){clearTrace();highlightSelection([id],origin);con
  if(!id){menu.append(el('p','This native notation element or embedded port has no independent model-element identity in this projection.'),button('Close',()=>{menu.hidden=true;}));return;}
  const documentation=documentationFor(state.graph,id);if(documentation.text)menu.append(button('Read full statement',()=>{$('information').classList.add('statement');$('information-title').textContent='Full statement';$('information-text').textContent=(documentation.source?.qualifiedName||label(id))+'\n\n'+documentation.text;$('information').showModal();}));
  const prominence=state.view?.overview?.metrics[id];if(prominence){menu.append(el('p',`${prominence.children} direct children · ${prominence.connections} distinct connected elements. Structural prominence describes the loaded model, not engineering criticality.`));if(prominence.children>0&&isStructuralElement(element(id)))menu.append(button('Expand contents',()=>followTrace(id,'contents')));}
- menu.append(button('Focus',()=>explore(id)),button(state.expanded.has(id)||!!node?.displayDetail?'Collapse compartment':'Show statement / compartment',async()=>{if(state.expanded.has(id)||!!node?.displayDetail){state.expanded.delete(id);state.collapsed.add(id);}else{state.collapsed.delete(id);state.expanded.add(id);}await frame(state.view);select(id,node);}));
+ menu.append(button('Inspect metadata',()=>openMetadata(id)),button('Focus',()=>explore(id)),button(state.expanded.has(id)||!!node?.displayDetail?'Collapse compartment':'Show statement / compartment',async()=>{if(state.expanded.has(id)||!!node?.displayDetail){state.expanded.delete(id);state.collapsed.add(id);}else{state.collapsed.delete(id);state.expanded.add(id);}await frame(state.view);select(id,node);}));
  const e=element(id);if(e?.native?.['sysx:sourceText'])menu.append(button('Read native declaration',()=>{$('information').classList.add('statement');$('information-title').textContent='Native declaration';$('information-text').textContent=e.id+'\n\n'+e.native['sysx:sourceText'];$('information').showModal();}));if(isPackage(e))menu.append(button('Explore package on its own',()=>openSystemOverview({scopeId:id})));if(isStructuralElement(e)){const actions=el('div',undefined,'requirement-actions');for(const action of structuralActions(state.graph,id,{scopeIds:explorationScope()})){const control=button(`${action.label} (${action.count})`,()=>followTrace(id,action.mode));control.disabled=!action.enabled;control.title=action.summary.message;actions.append(control);}menu.append(actions);}
  if(['PartUsage','PartDefinition'].includes(e?.kind))menu.append(button('Internal view',()=>explore(id,'interconnection')));if(['ActionUsage','ActionDefinition'].includes(e?.kind))menu.append(button('Activity view',()=>explore(id,'action')));
  if(['StateUsage','StateDefinition'].includes(e?.kind))menu.append(button('State view',()=>explore(id,'state')));
@@ -725,6 +726,9 @@ function traceEdge(edge,key){
  clearTrace();highlightSelection([edge.semanticId||edge.id]);$('stage').classList.add('tracing');for(const n of $('nodes').children)n.classList.toggle('trace-endpoint',[edge.sourceSemantic,edge.targetSemantic].includes(n.dataset.semanticId));
  for(const g of $('connections').querySelectorAll('g[data-relationship]')){const match=g.dataset.relationship===String(edge.semanticId||edge.id)&&g.dataset.source===(edge.sourceSemantic||'')&&g.dataset.target===(edge.targetSemantic||'');g.classList.toggle('traced',match);g.setAttribute('aria-pressed',String(match));}
  const menu=$('selection');menu.replaceChildren(el('strong',edge.label||edge.kind),el('p',`${label(edge.sourceSemantic)} → ${label(edge.targetSemantic)}`));
+ const nativeRecord=element(edge.semanticId),declarationRelation=['SatisfyRequirementUsage','ConnectionUsage','FlowUsage','SuccessionFlowUsage','AllocationUsage','SuccessionAsUsage','BindingConnectorAsUsage','Message'].includes(nativeRecord?.kind);
+ const relationshipId=element(edge.nativeRelationship)?.id??(edge.identityStatus==='native'&&nativeRecord&&(!isDeclarationKind(nativeRecord.kind)||declarationRelation)?nativeRecord.id:null);
+ if(relationshipId)menu.append(button('Inspect relationship metadata',()=>openMetadata(relationshipId)));
  for(const id of [...new Set([edge.sourceSemantic,edge.targetSemantic])].filter(Boolean))menu.append(button('Focus '+label(id),()=>explore(id)));
  menu.append(button('Close',()=>{clearTrace();menu.hidden=true;}));menu.hidden=false;
 }
@@ -756,6 +760,43 @@ function openDeclarations(id,page=0){
  for(const classifier of result.classifiers)list.append(button('Definition: '+classifier.label,()=>openDeclarations(classifier.id)));
  for(const item of result.items){const row=el('div',undefined,'hierarchy-row');row.append(el('strong',item.label+(item.typeLabels.length?' : '+item.typeLabels.join(', '):'')),el('small',item.category+' · declared on '+item.declaredOnLabel),el('pre',item.provenance.sourceText||item.valueStatus),button('Explore declaration',async()=>{$('declarations-dialog').close();$('hierarchy-dialog').close();await explore(item.id);}));list.append(row);}
  $('declaration-previous').disabled=!result.hasPrevious;$('declaration-next').disabled=!result.hasNext;if(!$('declarations-dialog').open)$('declarations-dialog').showModal();
+}
+function openMetadata(subjectId=null){state.metadataRequest={subjectId,page:0,mode:'metadata'};$('metadata-search').value='';renderMetadata();if(!$('metadata-dialog').open)$('metadata-dialog').showModal();}
+function renderMetadata(){
+ const request=state.metadataRequest??{subjectId:null,page:0,mode:'metadata'},query=$('metadata-search').value.trim().toLowerCase(),list=$('metadata-list');list.replaceChildren();$('metadata-detail').textContent='';
+ const index=nativeOwnershipIndex(state.graph);let items,total,pages,page,notice;
+ if(request.mode==='boundaries'){
+  const entries=completeRootContext(state.graph).childProjection.inspectionEntries;
+  const selected=entries.filter(entry=>!query||[entry.id,element(entry.id)?.qualifiedName,entry.reason].some(value=>value?.toLowerCase().includes(query)));
+  total=selected.length;pages=Math.max(1,Math.ceil(total/40));page=Math.min(request.page,pages-1);items=selected.slice(page*40,(page+1)*40).map(entry=>({id:entry.id,ownerIds:entry.ownerIds,boundaryReason:entry.reason}));
+  notice='Source records inspected outside the root drawing. Native ownership and annotation roles are preserved; no structural parent has been invented.';
+ }else if(request.subjectId){
+  const context=metadataContext(index,request.subjectId),records=new Map([...context.ownedMetadata,...context.annotatingMetadata,...(context.metadata?[context.metadata]:[])].map(record=>[record.id,record]));
+  const selected=[...records.values()].filter(record=>!query||[record.id,record.name,record.qualifiedName].some(value=>value?.toLowerCase().includes(query)));
+  total=selected.length;pages=Math.max(1,Math.ceil(total/40));page=Math.min(request.page,pages-1);items=selected.slice(page*40,(page+1)*40);
+  notice=context.summary.owned+' directly owned metadata; '+context.summary.annotating+' explicit target annotations. Annotation targets and native owner roles are separate. Unprojected annotation records are reported as unavailable.';
+ }else{
+  const result=sourceMetadata(index,{query,page:request.page,pageSize:40});({items,total,pages,page}=result);
+  notice='All loaded source metadata, independent of current canvas scope. Metadata owned by a relationship belongs to that native record; it is not a component or a top-level package.';
+ }
+ state.metadataRequest={...request,page};$('metadata-title').textContent=request.mode==='boundaries'?'Source inspection':request.subjectId?'Metadata for '+(qname(request.subjectId)||request.subjectId):'All source metadata';
+ $('metadata-summary').textContent='Showing '+items.length+' of '+total+' records · page '+(page+1)+' of '+pages+'. '+notice;
+ for(const record of items){
+  const node=element(record.id),row=el('div',undefined,'hierarchy-row');row.dataset.metadataId=record.id;
+  row.append(el('strong',node?.qualifiedName||node?.name||record.id),el('small',(node?.kind??'Unavailable record')+' · native owner: '+(record.ownerIds.map(id=>(qname(id)||id)+' ['+(element(id)?.kind??'unavailable')+']').join(', ')||'none recorded')+(record.boundaryReason?' · '+record.boundaryReason:'')),button('Inspect',()=>inspectMetadataRecord(record.id)));
+  const within=!explorationScope()||explorationScope().includes(record.id);
+  if(isDeclarationKind(node?.kind))row.append(button(within?'Contents':'Contents in Whole project',async()=>{
+   $('metadata-dialog').close();
+   if(within)await followTrace(record.id,'contents');else await openExploration(completeChildView(state.graph,completeChildContext(state.graph,{focus:record.id}),'Inspected native declaration'),record.id,{scopeId:null,resetRegions:true});
+  }));
+  list.append(row);
+ }
+ $('metadata-previous').disabled=page===0;$('metadata-next').disabled=page+1>=pages;
+}
+function inspectMetadataRecord(id){
+ const index=nativeOwnershipIndex(state.graph),node=index.byId.get(id),context=metadataContext(index,id),ownership=inspectNativeOwnership(index,id);
+ $('metadata-detail').dataset.metadataId=id;
+ $('metadata-detail').textContent=JSON.stringify({id,kind:node?.kind,qualifiedName:node?.qualifiedName,metadata:context.metadata,nativeOwnership:ownership,nativeAnnotationRecords:context.annotationLinks,nativeRecord:node?.native,notice:'Native owner, annotatedElement and annotation-record provenance are distinct. Unavailable source text or targets are not reconstructed.'},null,2);
 }
 function openQuestion(id){
  state.questionFocus=id;const modes=$('question-mode');modes.replaceChildren();
@@ -875,6 +916,11 @@ function bind(){
  $('hierarchy-roots').onclick=()=>{state.hierarchyRequest={page:0};$('hierarchy-search').value='';renderHierarchy();};
  $('hierarchy-up').onclick=()=>{const id=state.hierarchyRequest?.parentId,parent=id?state.graph.containment.find(e=>e.nativeRole==='owner'&&e.target===id)?.source:null;state.hierarchyRequest={parentId:parent,page:0};$('hierarchy-search').value='';renderHierarchy();};
  $('hierarchy-previous').onclick=()=>{state.hierarchyRequest.page--;renderHierarchy();};$('hierarchy-next').onclick=()=>{state.hierarchyRequest.page++;renderHierarchy();};
+ $('inspect-metadata').onclick=()=>openMetadata();
+ $('metadata-search').oninput=()=>{state.metadataRequest.page=0;renderMetadata();};
+ $('metadata-all').onclick=()=>{state.metadataRequest={subjectId:null,page:0,mode:'metadata'};$('metadata-search').value='';renderMetadata();};
+ $('metadata-boundaries').onclick=()=>{state.metadataRequest={subjectId:null,page:0,mode:'boundaries'};$('metadata-search').value='';renderMetadata();};
+ $('metadata-previous').onclick=()=>{state.metadataRequest.page--;renderMetadata();};$('metadata-next').onclick=()=>{state.metadataRequest.page++;renderMetadata();};
  $('declaration-previous').onclick=()=>openDeclarations(state.declarationRequest.id,state.declarationRequest.page-1);$('declaration-next').onclick=()=>openDeclarations(state.declarationRequest.id,state.declarationRequest.page+1);
  $('submit-question').onclick=()=>submitQuestion().catch(report);
  $('adjust-layout').onclick=()=>{state.adjustLayout=!state.adjustLayout;updateWorkspaceControls();$('camera-menu').open=false;status(state.adjustLayout?'Drag supported elements to adjust this drawing; constrained behavior moves horizontally. Positions are saved with this project; export its ZIP to keep them.':'Layout adjustment off.');};

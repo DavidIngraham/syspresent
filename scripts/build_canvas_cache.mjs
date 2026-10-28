@@ -33,7 +33,7 @@ try{
  const coverage=requirementSeeds.length?await render(runtimePackage+'::coverage'):{kind:'definition',nodes:[],edges:[]},scenes=parseStory(fileText(project,manifest.story)),views={};
  for(const name of new Set([...scenes.flatMap(scene=>[scene.view,...(scene.regions??[]).map(r=>r.view)]),...(manifest.entryView?[manifest.entryView]:[])]))views[name]=await render(name);
  const availableViews=exported.elements.filter(e=>e['@type']==='ViewUsage'&&e.qualifiedName&&e['sysx:sourceLine']&&!e.qualifiedName.startsWith(runtimePackage+'::')).map(e=>e.qualifiedName);
- const cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:engine.version,engineFingerprint:provenance.assets['sysml-wasm.wasm'].sha256,modelHash:parsed.modelHash,modelRoots:roots,requirementSeeds,runtimePackage,inputDigest:documentDigest(sources),sourceDigest:documentDigest(documents),exported,coverage,availableViews,views};
+ const cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:engine.version,engineFingerprint:provenance.assets['sysml-wasm.wasm'].sha256,modelHash:parsed.modelHash,modelRoots:roots,nativeRootIds:[...new Set((initial.roots??[]).flatMap(root=>root.childIds??[]))],requirementSeeds,runtimePackage,inputDigest:documentDigest(sources),sourceDigest:documentDigest(documents),exported,coverage,availableViews,views};
  await mkdir(dirname(output),{recursive:true});const data=JSON.stringify(cache);await writeFile(output,data);
  console.log(JSON.stringify({output,bytes:Buffer.byteLength(data),declarations:exported.elements.length,views:Object.fromEntries(Object.entries(views).map(([name,value])=>[name,{nodes:value.nodes.length,edges:value.edges.length}]))},null,2));
 }finally{child.stdin.end();}

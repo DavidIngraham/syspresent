@@ -4,7 +4,7 @@ const camel=value=>Array.isArray(value)?value.map(camel):value&&typeof value==='
 export function adaptNativeView(raw,name){const v=camel(raw);return {...v,id:name,title:name,nodes:v.nodes??[],edges:v.edges??[],notices:v.notices??[]};}
 // Native declaration categories, excluding relationship/membership/expression plumbing.
 export const isDeclarationKind=kind=>/^(Package|Namespace|[A-Za-z]+(?:Usage|Definition))$/.test(kind??'');
-export function modelGraph(raw,views=[]){
+export function modelGraph(raw,views=[],{nativeRootIds}={}){
  const elements=raw.map(e=>({id:e['@id'],kind:e['@type'],name:e.declaredName||e.qualifiedName||e['@id'],qualifiedName:e.qualifiedName,description:e.body||'',native:e,layer:e['sysx:sourceLine']?'project':'library'}));
  const index=new Map(elements.map(e=>[e.id,e])),relationships=[],containment=[];
  // Navigation-only ownership comes from the native API role, never qname
@@ -52,7 +52,7 @@ export function modelGraph(raw,views=[]){
  // one connection record; a mapped element identity is not a relationship ID.
  const records=new Map();
  for(const edge of relationships){const key=JSON.stringify([edge.source,edge.target,edge.kind,edge.nativeRelationship??null]),prior=records.get(key);if(!prior){records.set(key,edge);continue;}if(edge.occurrences){prior.occurrences??=[];const known=new Set(prior.occurrences.map(o=>o.id));prior.occurrences.push(...edge.occurrences.filter(o=>!known.has(o.id)));if(JSON.stringify(prior.notation)!==JSON.stringify(edge.notation))delete prior.notation;}}
- return {elements,containment,relationships:[...records.values()]};
+ return {elements,containment,relationships:[...records.values()],...(nativeRootIds?{nativeRootIds:[...new Set(nativeRootIds)]}:{})};
 }
 export function graphView(graph,context,name='Focused General View'){
  const known=new Map(graph.elements.map(e=>[e.id,e]));
