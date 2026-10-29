@@ -450,17 +450,16 @@ worker, rebuilding retained local source data when that owner has died rather
 than treating a different healthy engine as proof the old model is usable.
 
 
-## Blue Dog canonical namespace import
+## Blue Dog canonical namespace import baseline
 
-The bundled Blue Dog model is a committed source import, with exact upstream
-revision and per-file hashes in source.json. The namespace-migration.json file
-retains the upstream qualified-prefix/source-path mapping. Import replaces all
-76 prior project documents with the single canonical models/blue-dog.sysml
-document and retains the 20 byte-identical reusable library documents. The pinned
+The initial canonical Blue Dog import pinned its upstream revision and per-file
+hashes in source.json. The namespace-migration.json file retains that transition
+mapping. It replaced 76 project documents with models/blue-dog.sysml and retained
+20 byte-identical reusable library documents. The pinned
 native runtime cannot merge independently reopened project fragments. Keeping old
 fragments beside the canonical document would create duplicate declarations.
 
-The 21 model payload roots are one BlueDog project and 20 reusable libraries.
+That baseline had 21 model payload roots: one BlueDog project and 20 reusable libraries.
 The old unreferenced publication-document helper is excluded from the bundle;
 its 29 document roots are not part of the approved model payload. The authored
 viewer-view package and declaration-projection boundaries are counted separately. UI grouping is not a substitute for actual
@@ -493,20 +492,19 @@ never create containment. All model source bytes are unchanged.
 
 ## Shared Analysis library import
 
-The current Blue Dog example replaces fifteen independent calculation documents
-with the source-owned `models/libraries/analysis.sysml`. Its `Analysis` root owns
-Marine, Mechanics, Energy and Reliability calculations. Five mixed/domain library
-roots remain separate; project studies stay under `BlueDog::Analyses` and Gorge
-Challenge stays under `BlueDog::Mission::Challenge`. The seven model roots and the
-presentation-owned BlueDogCanvasViews root are distinct from metadata inspection.
+The shared Analysis import replaced fifteen independent calculation documents
+with models/libraries/analysis.sysml. Its Analysis root owns Marine, Mechanics,
+Energy and Reliability calculations. Five mixed/domain library roots remain
+separate; project studies stay under BlueDog::Analyses. That stage contained
+seven model roots and the presentation-owned BlueDogCanvasViews package.
 
-source.json pins the reviewed source commit and all seven current model hashes;
+The current source.json pins the latest source revision and model hashes.
 shared-analysis-migration.json and shared-analysis-element-map.json retain the
-reviewed namespace/identity mapping. The earlier namespace-migration.json and
-its source provenance remain historical migration evidence, not runtime aliases.
-Source ZIP export/import preserves current files and never appends the fifteen
-removed documents. Native parsing, ownership and cache digests select current
-content; neither labels nor qualified-name truncation establish relationships.
+reviewed Analysis transition; namespace-migration.json retains the earlier
+project transition. The subsequent standalone Gorge stage is described below.
+Source ZIP export/import preserves current files and excludes the fifteen
+replaced documents. Native parsing, ownership and cache digests select current
+content.
 
 Native general-view exploration uses the engine's MixedView projection. Capturing
 that view explicitly exposes every selected native identity, preserves its
@@ -528,3 +526,33 @@ it. All native nodes, ports, relationships and internal placements remain in the
 pan/zoom world; an overflow notice explains the off-screen geometry. Frame
 neighborhood explicitly fits the whole drawing. Focused notation keeps its
 native fit policy. This does not collapse or sample selected model content.
+
+
+## Standalone Gorge Challenge import
+
+GorgeChallenge is an actual independent native root, not a viewer group beneath
+BlueDog. The current payload contains models/gorge-challenge.sysml alongside the
+boat's canonical models/blue-dog.sysml and six unchanged shared library files.
+The eight model roots plus BlueDogCanvasViews form nine initial Whole project
+cards. Explicit capture may add another authored package; annotations do not
+become root cards.
+
+The source-owned gorge-challenge-migration.json and exact element map distinguish
+the root move from the provisional monitoring-technology issue that belongs in
+BlueDog::Requirements::Communications. Historical namespace and shared Analysis
+migration maps remain unchanged evidence. Current authored views, story bindings,
+navigation and value interpolation use GorgeChallenge qualified identities.
+No old nested alias or duplicate challenge rules are loaded.
+
+Native ownership and document-root identities establish root and child membership.
+Isolated Gorge exploration retains every immediate declaration and keeps Blue Dog
+allocations outside scope unless the user requests external context. Native
+traceability to the boat remains available with its original relationship kinds
+and direction. Source hashes, fresh native preservation, value tests and browser
+export/import establish separate software evidence; source numerical comparison
+and engineering acceptance remain distinct.
+
+scripts/wasm-prototype/check-gorge-challenge-standalone.mjs audits the current
+migration. Earlier check-blue-dog-namespaces.mjs and
+check-blue-dog-shared-analysis.mjs reproduce their historical payload transitions;
+they do not infer runtime aliases for the current source.

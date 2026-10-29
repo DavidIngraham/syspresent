@@ -4,6 +4,11 @@ The model owns requirements, assumptions, rationale and analysis contracts. [Doc
 
 [AGENTS.md](../AGENTS.md) governs how agents work. This README defines modeling conventions and locates authoritative definitions; it does not impose additional mission rules or select designs. Read the linked SysML definitions before changing engineering behavior or applicability. Resolve conflicting definitions explicitly, with rationale, rather than treating a prose summary as a new source of policy.
 
+The independent challenge is defined in [gorge-challenge.sysml](gorge-challenge.sysml)
+under `GorgeChallenge`. Its rules do not depend on a boat design. Blue Dog adopts
+those rules through native references, while its course proposal, mission choice,
+allocated requirements, studies and verification cases remain project-owned.
+
 The project is one native `BlueDog` package in [blue-dog.sysml](blue-dog.sysml).
 Its packages express engineering ownership; file names and publication views do
 not define another hierarchy. Reusable calculation libraries share the independent `Analysis` root under
@@ -12,7 +17,8 @@ remain separate; none depends on `BlueDog`.
 
 | Native scope | Responsibility |
 | --- | --- |
-| `BlueDog::Mission` | Challenge, course, applicability and use cases |
+| `GorgeChallenge` | Independent entry and qualification rules, derivations and vessel length limit |
+| `BlueDog::Mission` | Blue Dog course proposal, mission applicability and use cases |
 | `BlueDog::Requirements` | System obligations, allocation basis and structural requirements |
 | `BlueDog::Architecture` | System composition/context, logical and candidate physical architecture, interfaces and correspondences |
 | `BlueDog::Behavior` | Executable mission policy, navigation and behavior contracts |
@@ -56,7 +62,7 @@ Use native OOSEM roles and views for context, logical responsibilities, physical
 
 | Layer | Authoritative model | Meaning |
 | --- | --- | --- |
-| Mission and external context | `BlueDog::Mission`, `BlueDog::Architecture::MissionContext` | Challenge rules, external actors and current/future applicability |
+| Mission and external context | `GorgeChallenge`, `BlueDog::Mission`, `BlueDog::Architecture::MissionContext` | Independent challenge rules, boat mission choice, external actors and current/future applicability |
 | System obligations and design basis | `BlueDog::Requirements`, `BlueDog::Decisions` | Obligations, owner constraints, provisional allocations and selected strategies remain distinct |
 | Operational interactions | `BlueDog::Mission::UseCases`, `BlueDog::Method::Scenarios` | Actor objectives and typed observations, commands, permissions and records |
 | Logical architecture | `BlueDog::Architecture::Logical` | Responsibilities independent of processors, products and buses |

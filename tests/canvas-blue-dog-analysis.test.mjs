@@ -15,12 +15,13 @@ const sourceHashes={
  'models/libraries/navigation/inland-obligations.sysml':'8954be8c0904583cb977609428ed23734c59cd05aacf57ee82a8669c8e39da16',
  'models/libraries/navigation/inland-pair.sysml':'e0bb4518cbc1063a31ae63b5f8d3dbca4c06eb864c7a745199c45e47231de326'
 };
-test('shared Analysis payload has seven exact reviewed sources with old calculation documents replaced',async()=>{
+test('shared Analysis and retained domain library bytes survive standalone Challenge extraction',async()=>{
  const project=validateProject(await readProjectDirectory(fileURLToPath(root)));
- assert.deepEqual(project.manifest.modelSources.slice().sort(),Object.keys(sourceHashes).sort());
- const files=Object.keys(project.files).filter(name=>name.startsWith('models/')&&name.endsWith('.sysml')).sort();
- assert.deepEqual(files,Object.keys(sourceHashes).sort());
- for(const [name,digest]of Object.entries(sourceHashes))assert.equal(sha256(project.files[name]),digest,name);
+ const expectedLibraries=Object.keys(sourceHashes).filter(name=>name.startsWith('models/libraries/')).sort();
+ assert.deepEqual(project.manifest.modelSources.filter(name=>name.startsWith('models/libraries/')).sort(),expectedLibraries);
+ const files=Object.keys(project.files).filter(name=>name.startsWith('models/libraries/')&&name.endsWith('.sysml')).sort();
+ assert.deepEqual(files,expectedLibraries);
+ for(const name of expectedLibraries)assert.equal(sha256(project.files[name]),sourceHashes[name],name);
  const source=JSON.parse(fileText(project,'source.json')),migration=source.sharedAnalysisMigration,plan=JSON.parse(fileText(project,migration.mappingFile));
  assert.deepEqual(migration.sourceModelHashes,sourceHashes);
  assert.equal(Object.keys(plan.packages).length,15);assert.equal(Object.keys(plan.sourcePaths).length,15);
@@ -30,7 +31,7 @@ test('shared Analysis payload has seven exact reviewed sources with old calculat
  assert.deepEqual(new Set(plan.addedPackages),new Set(['Analysis','Analysis::Marine','Analysis::Mechanics','Analysis::Energy']));
  assert.equal(migration.preservedNativeElements,14929);assert.equal(migration.calculationDefinitions,44);
 });
-test('reviewed exact Analysis mapping is injective and preserves unchanged Challenge navigation',async()=>{
+test('reviewed exact Analysis mapping is injective and preserves independent Challenge navigation',async()=>{
  const project=validateProject(await readProjectDirectory(fileURLToPath(root))),source=JSON.parse(fileText(project,'source.json')),migration=source.sharedAnalysisMigration;
  const plan=JSON.parse(fileText(project,migration.mappingFile)),exact=JSON.parse(fileText(project,migration.elementMappingFile));
  assert.equal(Object.keys(exact).length,707);assert.equal(new Set(Object.values(exact)).size,707);
@@ -41,8 +42,8 @@ test('reviewed exact Analysis mapping is injective and preserves unchanged Chall
  }
  assert.equal(exact['MarineSailing::Core'],'Analysis::Marine::Sailing::Core');
  assert.equal(exact['MarineMass'],'Analysis::Mechanics::Mass');
- assert.ok(project.authorManifest.navigation.roots.includes('BlueDog::Mission::Challenge'));
- assert.ok(!project.authorManifest.navigation.roots.includes('GorgeChallenge'));
+ assert.ok(project.authorManifest.navigation.roots.includes('GorgeChallenge'));
+ assert.ok(!project.authorManifest.navigation.roots.includes('BlueDog::Mission::Challenge'));
  assert.ok(!Object.keys(exact).some(name=>name.startsWith('BlueDog::Mission::Challenge')));
 });
 test('Analysis source and authoritative migration maps survive portable export/import byte-for-byte',async()=>{

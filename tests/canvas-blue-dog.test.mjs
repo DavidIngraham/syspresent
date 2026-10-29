@@ -6,13 +6,14 @@ import {createHash} from 'node:crypto';
 import {validateProject,packProject,unpackProject,fileText} from '../src/canvas-prototype/project.mjs';
 const root=new URL('../examples/canvas-blue-dog/',import.meta.url);
 const sha256=data=>createHash('sha256').update(data).digest('hex');
-const evidenceRevision='e73d45624e9eedafc79f22f8559219195e9b313d';
-const implementationRevision='222a96e8adc240d4b5e11b9880d35d6633a6e69f';
+const evidenceRevision=null; // Final reviewed source commit is required before publication.
+const implementationRevision=null; // Awaiting the source repository's final commit.
 const namespaceBaseline='8f2dd804e964fd75828ff170c8c93572c751c8f2';
 // Byte identities from the reviewed, committed namespace handoff. Native semantic
 // ownership is validated separately; this test does not parse SysML text.
 const sourceModelHashes={
- "models/blue-dog.sysml": "f32961b47aa620dc09f2cde75d5fa27cb35cdf8d07a2ded7611deb386652f2e2",
+ "models/blue-dog.sysml": "9b4edf033775f6548658dc10fe263fcdc3e80f9c6e66cc36b16ebf6e98d4ba47",
+ "models/gorge-challenge.sysml": "abd0ad9d39cb5b334170c7239862d1e770b521831e56b9f4fa3453c584c54fe9",
  "models/libraries/analysis.sysml": "98065dc7f0298faffb538558fc960f030787a611632b0650b3706d1e748a37ff",
  "models/libraries/decision-records.sysml": "93102a19a7e9c69cd35544bf7f4815657164803fd1bbe9af6d6689ad613f52f3",
  "models/libraries/energy/budget.sysml": "6b2f8c827db736130e1f343652d7d45695a4c4b18d5b4e7ac07f3d7a444ca365",
@@ -22,18 +23,18 @@ const sourceModelHashes={
 };
 
 
-test('Blue Dog bundles the exact committed shared Analysis model and retained domain libraries',async()=>{
+test('Blue Dog bundles the exact committed standalone Challenge, shared Analysis and retained domain libraries',async()=>{
  const project=validateProject(await readProjectDirectory(fileURLToPath(root))),manifest=project.manifest,source=JSON.parse(fileText(project,'source.json'));
  assert.equal(project.authorManifest.schemaVersion,'syspresent.project.v2');assert.equal(project.authorManifest.modelRoots,undefined);assert.equal(project.authorManifest.requirementSeeds,undefined);
  assert.equal(source.sourceState,'committed');assert.equal(source.revision,evidenceRevision);assert.equal(source.sourceCommit,implementationRevision);assert.equal(source.baseRevision,namespaceBaseline);
- assert.equal(manifest.publication.scope,'complete');assert.equal(manifest.modelSources.length,7);
+ assert.equal(manifest.publication.scope,'complete');assert.equal(manifest.modelSources.length,8);
  const expected=Object.keys(sourceModelHashes).sort();
  assert.deepEqual([...manifest.modelSources].sort(),expected);
  assert.deepEqual(Object.keys(project.files).filter(path=>path.startsWith('models/')&&path.endsWith('.sysml')).sort(),Object.keys(sourceModelHashes).sort(),'old project documents are replaced, never loaded alongside the canonical source');
  for(const [path,digest]of Object.entries(sourceModelHashes))assert.equal(sha256(project.files[path]),digest,path+' matches the reviewed source bytes');
  assert.equal(project.files['tools/publishing/reference.sysml'],undefined,'unused publication-only helper is outside the exact model payload');
  assert.equal(manifest.modelSources.filter(path=>path.startsWith('models/libraries/')).length,6);
- assert.equal(manifest.modelSources.filter(path=>path.startsWith('models/')&&!path.startsWith('models/libraries/')).length,1);
+ assert.equal(manifest.modelSources.filter(path=>path.startsWith('models/')&&!path.startsWith('models/libraries/')).length,2);
  assert.ok(!Object.keys(project.files).some(path=>/^models\/(analyses|configurations|evidence|missions|vehicle)\//.test(path)),'legacy split project directories are absent from the portable bundle');
  const records=source.files;
  assert.equal(new Set(records.map(record=>record.path)).size,records.length,'provenance has no duplicate source paths');
@@ -54,7 +55,9 @@ test('Blue Dog namespace mapping records reviewed migration boundaries without r
  assert.equal(source.namespaceMigration.replacedProjectDocuments,76);assert.equal(source.namespaceMigration.modelPayloadFiles,21);assert.equal(source.namespaceMigration.libraryFiles,20);assert.equal(source.namespaceMigration.preservedNativeElements,14923);assert.equal(source.namespaceMigration.nativeTopLevelPackages,21);
  assert.equal(source.namespaceMigration.addedOrganizerIds.length,6);
  assert.equal(Object.keys(source.namespaceMigration.sourceModelHashes).length,21,'original project namespace migration remains historical provenance');
- assert.deepEqual(source.sharedAnalysisMigration.sourceModelHashes,sourceModelHashes);
+ assert.equal(Object.keys(source.sharedAnalysisMigration.sourceModelHashes).length,7,'shared Analysis remains historical provenance');
+ assert.deepEqual(source.gorgeChallengeMigration.sourceModelHashes,sourceModelHashes);
+ assert.equal(source.gorgeChallengeMigration.nativeTopLevelPackages,8);assert.equal(source.gorgeChallengeMigration.preservedNativeElements,14933);assert.equal(source.gorgeChallengeMigration.movedElementIds,401);
  assert.equal(source.sharedAnalysisMigration.baselineRevision,'556cd79e266394cae9e9b371a86941f50295cffc');
  assert.equal(source.sharedAnalysisMigration.nativeTopLevelPackages,7);assert.equal(source.sharedAnalysisMigration.preservedNativeElements,14929);assert.equal(source.sharedAnalysisMigration.calculationDefinitions,44);
 });
@@ -64,5 +67,5 @@ test('Blue Dog source, provenance, native bindings and asset bytes roundtrip thr
  assert.deepEqual(Object.keys(copy.files).sort(),Object.keys(project.files).sort());
  for(const name of Object.keys(project.files))assert.deepEqual(copy.files[name],project.files[name],name+' remains byte-identical');
  assert.deepEqual(copy.authorManifest,project.authorManifest);assert.deepEqual(copy.manifest,project.manifest);
- for(const name of [...project.manifest.modelSources,...project.manifest.viewSources,'source.json','namespace-migration.json','shared-analysis-migration.json','shared-analysis-element-map.json'])assert.equal(fileText(copy,name),fileText(project,name));
+ for(const name of [...project.manifest.modelSources,...project.manifest.viewSources,'source.json','namespace-migration.json','shared-analysis-migration.json','shared-analysis-element-map.json','gorge-challenge-migration.json','gorge-challenge-element-map.json'])assert.equal(fileText(copy,name),fileText(project,name));
 });

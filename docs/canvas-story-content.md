@@ -35,7 +35,7 @@ Narrow layouts use the existing explicit tabs. Enlarge figure opens the same ima
 caption and provenance without changing the scene or graph camera.
 
 ```syspresent
-{"type":"scene","id":"gorge-challenge","title":"The Gorge challenge","view":"BlueDogCanvasViews::challengeOverview","focus":"BlueDog::Mission::Challenge::transGorgeChallenge","chapter":{"id":"gorge","title":"The Gorge challenge"},"figures":[{"id":"course-map","title":"The course","asset":"assets/gorge-course.svg","alt":"Outbound from Bingen to the Stevenson rounding, then back to Bingen.","caption":"Schematic gate order; geographic geometry is omitted.","provenance":{"source":"BlueDog::Mission::Course; models/missions/course.sysml","context":"Identified Blue Dog source revision; schematic"},"modelRefs":["BlueDog::Mission::Challenge::courseCompletion"]}]}
+{"type":"scene","id":"gorge-challenge","title":"The Gorge challenge","view":"BlueDogCanvasViews::challengeOverview","focus":"GorgeChallenge::transGorgeChallenge","chapter":{"id":"gorge","title":"The Gorge challenge"},"figures":[{"id":"course-map","title":"The course","asset":"assets/gorge-course.svg","alt":"Outbound from Bingen to the Stevenson rounding, then back to Bingen.","caption":"Schematic gate order; geographic geometry is omitted.","provenance":{"source":"BlueDog::Mission::Course; models/missions/course.sysml","context":"Identified Blue Dog source revision; schematic"},"modelRefs":["GorgeChallenge::courseCompletion"]}]}
 ```
 
 Supported images are SVG, PNG, JPEG, WebP and GIF. Assets must exist inside the

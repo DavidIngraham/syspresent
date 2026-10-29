@@ -26,6 +26,7 @@ const refs=value=>Array.isArray(value)?value.flatMap(refs):value&&typeof value==
 const [project,cacheBytes,reviewBytes,comparisonBytes]=await Promise.all([readProjectDirectory(projectRoot),readFile(cachePath),readFile(resolve(reviewPath)),readFile(resolve(upstreamComparisonPath))]);
 const cache=JSON.parse(cacheBytes),review=JSON.parse(reviewBytes),upstream=JSON.parse(comparisonBytes);
 const source=JSON.parse(fileText(project,'source.json')),migration=source.sharedAnalysisMigration;
+if(source.gorgeChallengeMigration)throw Error('This command audits a historical namespace payload. Use check-gorge-challenge-standalone.mjs for the current source, or provide --project and --cache from the historical snapshot.');
 const mappingBytes=fileText(project,migration.mappingFile),exactMapBytes=fileText(project,migration.elementMappingFile);
 const mapping=JSON.parse(mappingBytes),exactMap=JSON.parse(exactMapBytes),prefixes=Object.keys(mapping.packages).sort((a,b)=>b.length-a.length);
 const mappedBody=value=>{for(const old of prefixes)value=value.replaceAll(old+'::',mapping.packages[old]+'::');return value;};

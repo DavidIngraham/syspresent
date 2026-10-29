@@ -22,6 +22,7 @@ const output=resolve(option('--output','build/canvas-prototype/namespace-integra
 const sha256=value=>createHash('sha256').update(value).digest('hex');
 const [project,cacheBytes,baselineBytes,mappingBytes]=await Promise.all([readProjectDirectory(projectRoot),readFile(cachePath),readFile(resolve(baselinePath)),readFile(resolve(mappingPath))]);
 const cache=JSON.parse(cacheBytes),baseline=JSON.parse(baselineBytes),mapping=JSON.parse(mappingBytes),source=JSON.parse(fileText(project,'source.json'));
+if(source.gorgeChallengeMigration)throw Error('This command audits a historical namespace payload. Use check-gorge-challenge-standalone.mjs for the current source, or provide --project and --cache from the historical snapshot.');
 assert.equal(cache.inputDigest,documentDigest(documentsFor(project)),'Native cache must match the current complete source/view inputs; rebuild stale caches.');
 assert.equal(fileText(project,source.namespaceMigration.mappingFile),mappingBytes.toString('utf8'),'Bundled migration map must preserve authoritative reviewed bytes.');
 assert.equal(mapping.baseline,source.namespaceMigration.baselineRevision);

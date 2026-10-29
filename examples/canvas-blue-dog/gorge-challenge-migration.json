@@ -1,0 +1,31 @@
+{
+  "baseline": "e73d45624e9eedafc79f22f8559219195e9b313d",
+  "packages": {
+    "BlueDog::Mission::Challenge::LiveObservation::issue": "BlueDog::Requirements::Communications::monitoringTechnologyIssue",
+    "BlueDog::Mission::Challenge": "GorgeChallenge"
+  },
+  "rootMove": {
+    "BlueDog::Mission::Challenge": "GorgeChallenge"
+  },
+  "movedBoatInterpretation": {
+    "BlueDog::Mission::Challenge::LiveObservation::issue": "BlueDog::Requirements::Communications::monitoringTechnologyIssue"
+  },
+  "sourcePaths": {
+    "models/blue-dog.sysml": [
+      "models/blue-dog.sysml",
+      "models/gorge-challenge.sysml"
+    ]
+  },
+  "policyChanges": [],
+  "boundary": "Independent requirements, rule derivations and maximum vessel length move to GorgeChallenge. Blue Dog course proposals, mission choice, verification cases and numerical studies stay under BlueDog. The provisional LTE-M technology issue moves to the boat communications requirement.",
+  "intendedRoots": [
+    "Analysis",
+    "BlueDog",
+    "GorgeChallenge",
+    "EngineeringDecisions",
+    "MarineDesign",
+    "MarineEnergy",
+    "InlandExtended",
+    "InlandNavigationExperiment"
+  ]
+}

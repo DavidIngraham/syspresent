@@ -4,10 +4,10 @@ package BlueDogCanvasViews {
     view challengeOverview : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose BlueDog::Mission::Challenge::transGorgeChallenge;
-        expose BlueDog::Mission::Challenge::courseCompletion;
-        expose BlueDog::Mission::Challenge::unassistedAttempt;
-        expose BlueDog::Mission::Challenge::sailingPropulsion;
+        expose GorgeChallenge::transGorgeChallenge;
+        expose GorgeChallenge::courseCompletion;
+        expose GorgeChallenge::unassistedAttempt;
+        expose GorgeChallenge::sailingPropulsion;
     }
     view rigAlternatives : GeneralView {
         filter @SysML::PartUsage or @SysML::ItemUsage or @SysML::Dependency;
@@ -29,7 +29,7 @@ package BlueDogCanvasViews {
     view challengeTraffic : GeneralView {
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
         filter @SysML::RequirementUsage;
-        expose BlueDog::Mission::Challenge::trafficCoexistence;
+        expose GorgeChallenge::trafficCoexistence;
         expose BlueDog::Requirements::trafficSafety;
     }
     view trafficDerivation : GeneralView {
@@ -64,11 +64,11 @@ package BlueDogCanvasViews {
     view story_qualifying_attempt : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDog::Mission::Challenge::unassistedAttempt;
-        expose BlueDog::Mission::Challenge::sailingPropulsion;
-        expose BlueDog::Mission::Challenge::unattachedPassage;
-        expose BlueDog::Mission::Challenge::safetyCapabilityAbort;
-        expose BlueDog::Mission::Challenge::communicationOutageAutonomy;
+        expose GorgeChallenge::unassistedAttempt;
+        expose GorgeChallenge::sailingPropulsion;
+        expose GorgeChallenge::unattachedPassage;
+        expose GorgeChallenge::safetyCapabilityAbort;
+        expose GorgeChallenge::communicationOutageAutonomy;
     }
 
     view story_gorge_environment : GeneralView {
@@ -250,7 +250,7 @@ package BlueDogCanvasViews {
     view story_blue_dog_next : GeneralView {
         filter @SysML::RequirementUsage;
         @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }
-        expose BlueDog::Mission::Challenge::transGorgeChallenge;
+        expose GorgeChallenge::transGorgeChallenge;
         expose BlueDog::Requirements::cruiseEvidence;
         expose BlueDog::Requirements::criticalFailureDisposition;
         expose BlueDog::Requirements::oceanEnvironment;

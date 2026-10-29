@@ -33,388 +33,6 @@ package BlueDog {
                 action returnForRecovery;
             }
 
-        package Challenge {
-            doc /* Independent trans-gorge autonomous sailing challenge.
-             * Inspired by the structure of the Microtransat rules:
-             * https://microtransat.org/content.php?p=rules&top=rules
-             * This is a separate project challenge, not a Microtransat entry or endorsement.
-             * Vessel architecture and communications technology are unrestricted; overall length is limited to 1.2 m.
-             * The Gorge is the proving ground for a longer-term voyage toward Hawaii.
-             * Marker-referenced virtual gates are defined in BlueDog::Mission::Course.
-             * There is no completion deadline. The vehicle defines candidate environmental qualification profiles; no dam passage is permitted.
-             */
-            private import RequirementDerivation::*;
-            private import ISQ::*;
-            private import SI::*;
-            attribute maximumOverallLength : LengthValue = 1.2 [m];
-            requirement def <'C-000'> TransGorgeChallenge {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall autonomously sail one round trip from Bingen, around buoy 16 near Stevenson, and back to Bingen.*/
-                metadata rationale : ModelingMetadata::Rationale { text = "One Bingen–Stevenson–Bingen circuit defines the finite challenge. Repeated circuits are a separate future endurance objective."; }
-                comment conditions /* Qualification requires C-001, C-003 through C-010 and C-012 through C-027 to be met for the same attempt. These cover the course, onboard control, sail propulsion, monitoring, safety, recovery and vessel constraints. Repeated circuits under C-002 are a future objective. The course gates require review before launch; there is no completion deadline.*/
-            }
-            requirement transGorgeChallenge : TransGorgeChallenge;
-            requirement def <'C-001'> CourseCompletion {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall cross the Bingen departure gate, the buoy 16 rounding checkpoints and the Bingen finish gate in that order during one attempt.*/
-                comment conditions /* BlueDog::Mission::Course defines nominal marker references and directed finite gate segments. Completion has no elapsed-time deadline. Position history must demonstrate crossings; touching a gate line alone does not count. */
-                metadata issue : ModelingMetadata::Issue { text = "The marker-based gate proposal remains subject to the course safety review before launch; route corridor and current notice exclusions must accompany the accepted configuration."; }
-            }
-            requirement def <'C-002'> RepeatedOperation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* After its first circuit, the vessel should repeat Bingen–Stevenson–Bingen autonomously for as long as practical. */
-                comment notes /* Future endurance objective, excluded from finite challenge acceptance. */
-                metadata issue : ModelingMetadata::Issue { text = "No fixed objective endurance duration has been selected."; }
-            }
-            requirement def <'C-003'> UnassistedAttempt {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* A qualifying attempt shall complete the round trip without operator intervention. */
-                comment conditions /* Passive live monitoring and autonomous polling of weather services are permitted. Any operator-supplied update, remote emergency abort or manual control ends qualification. Weather data must be obtained by the system without manual operator submission. */
-                comment restartConditions /* After intervention, a new qualifying attempt begins only with a new downstream crossing of the departure gate. Previous partial progress does not transfer. */
-            }
-            requirement def <'C-004'> SailingPropulsion {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* A qualifying attempt shall use sailing propulsion without auxiliary motor propulsion. */
-                comment conditions /* An auxiliary motor may remain installed. Motor use is permitted during separate development tests and vessel recovery; use during an attempt ends its qualification. */
-                comment notes /* The restriction concerns propulsion, not onboard electrical power. */
-            }
-            requirement def <'C-005'> LiveObservation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall deliver position, operating mode and health updates at intervals no greater than 30 seconds while the monitoring link is available. */
-                comment conditions /* C-020 governs autonomous continuation, retention and telemetry replay during monitoring-link outages. */
-                metadata issue : ModelingMetadata::Issue { text = "LTE-M-class throughput is a provisional vehicle design assumption, not a mandated challenge technology. End-to-end delivery qualification and stale-data presentation are allocated to the vehicle."; }
-            }
-            requirement def <'C-006'> EmergencyIntervention {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall permit remote emergency abort or manual control when a command link is available. */
-                comment conditions /* Use disqualifies the attempt as unassisted. */
-                metadata issue : ModelingMetadata::Issue { text = "Owner-approved policy: autonomous safety abort does not wait for operator contact. Recovery may use motor propulsion; operator-directed relocation or motor-sailing after abort never restores qualification."; }
-            }
-            requirement courseCompletion : CourseCompletion;
-            requirement repeatedOperation : RepeatedOperation;
-            requirement unassistedAttempt : UnassistedAttempt;
-            requirement sailingPropulsion : SailingPropulsion;
-            requirement liveObservation : LiveObservation;
-            requirement emergencyIntervention : EmergencyIntervention;
-            requirement def <'C-007'> NavigationRules {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall comply with the U.S. Inland Navigation Rules (33 CFR parts 83 through 90) and applicable local navigation provisions throughout the attempt on the approved Gorge course.*/
-                comment conditions /* Evaluate the actual encounter and visibility conditions, including lookout, collision-risk assessment, avoidance action, safe speed, overtaking, sailing encounters and narrow-channel obligations. A safety action takes precedence over preserving attempt qualification. */
-                metadata rationale : ModelingMetadata::Rationale { text = "USCG Navigation Rules: https://www.navcen.uscg.gov/navigation-rules-amalgamated . Detailed encounter cases and quantitative acceptance allocations belong to the vehicle analysis, not the independent challenge. Small size and sail propulsion do not exempt the vessel from collision avoidance or channel non-impediment."; }
-                comment processResponsibilities /* C-028 identifies entrant applicability review; C-029 controls the organizer rule and notice baseline; C-030 governs entry evidence; C-031 identifies operator safety intervention; C-032 governs adjudication. These preserve the C-007 entry and qualification policy. */
-                comment complianceSources /* Governing source: https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E . Applicability: https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E/part-83/subpart-A/section-83.01 . Source-linked verification cases in BlueDog::Verification::Challenge cover applicability, lookout/avoidance, encounter conduct, channel/visibility and signals. Their verdicts remain inconclusive pending accepted evidence; traceability is not a compliance finding.*/
-            }
-            requirement def <'C-008'> RestrictedWaters {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall remain outside waters prohibited to the attempt configuration. */
-                comment conditions /* Include dam restricted areas, lock approaches excluded by the challenge, and applicable temporary safety/security zones or closures. Use the chart and notice set applicable to the attempt. */
-                metadata rationale : ModelingMetadata::Rationale { text = "33 CFR 207.718 defines site-specific dam restrictions and lock-approach authority: https://www.ecfr.gov/current/title-33/chapter-II/part-207/section-207.718 . The course stays between the dams and requires no lock passage. Do not replace mapped restrictions with an invented universal stand-off radius."; }
-            }
-            requirement def <'C-009'> TrafficCoexistence {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall complete the course without collision with other waterway users. */
-                comment conditions /* The operating context includes commercial tows, passenger vessels, fishing craft, recreational powerboats, sailing vessels and people in the water. Channel non-impediment and encounter conduct remain independently required by C-007. The vehicle analysis defines representative and adverse traffic scenarios and assesses maneuver feasibility. */
-                metadata rationale : ModelingMetadata::Rationale { text = "The course is shared water, not a closed test range. Typical traffic and uncertainty in other users' behavior are part of mission validation; AIS absence is not evidence of clear water. Numeric separation allocations must be justified by encounter geometry and vessel performance."; }
-            }
-            requirement navigationRules : NavigationRules;
-            requirement restrictedWaters : RestrictedWaters;
-            requirement trafficCoexistence : TrafficCoexistence;
-            #derivation connection challengeNavigationRules {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "C-000 includes this obligation independently of course progress or elapsed time."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> navigationRules;
-            }
-            #derivation connection challengeRestrictedWaters {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "C-000 includes this obligation independently of course progress or elapsed time."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> restrictedWaters;
-            }
-            #derivation connection challengeTrafficCoexistence {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "C-000 includes this obligation independently of course progress or elapsed time."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> trafficCoexistence;
-            }
-            #derivation connection challengeRuleCourseCompletion {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "This rule is explicitly included in C-000; C-002 retains its objective-only status."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> courseCompletion;
-            }
-            dependency futureEnduranceBasis from repeatedOperation to courseCompletion {
-                metadata rationale : ModelingMetadata::Rationale { text = "Future repeated operation uses the same ordered course geometry. This design dependency does not impose repeating endurance on the current finite qualification mission."; }
-            }
-            #derivation connection challengeRuleUnassistedAttempt {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "This rule is explicitly included in C-000; C-002 retains its objective-only status."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> unassistedAttempt;
-            }
-            #derivation connection challengeRuleSailingPropulsion {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "This rule is explicitly included in C-000; C-002 retains its objective-only status."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> sailingPropulsion;
-            }
-            #derivation connection challengeRuleLiveObservation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "This rule is explicitly included in C-000; C-002 retains its objective-only status."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> liveObservation;
-            }
-            #derivation connection challengeRuleEmergencyIntervention {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                metadata rationale : ModelingMetadata::Rationale { text = "This rule is explicitly included in C-000; C-002 retains its objective-only status."; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> emergencyIntervention;
-            }
-            requirement def <'C-010'> OverallLength {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel overall length shall not exceed 1.2 m. */
-                attribute measuredOverallLength : LengthValue;
-                require constraint lengthLimit { measuredOverallLength > 0 [m] and measuredOverallLength <= maximumOverallLength }
-                comment conditions /* Measure maximum fore-and-aft extent, including rudders, rig projections, antennas and other equipment, across normal operating configurations. Hull arrangement is unrestricted. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Half the Microtransat 2.4 m overall-length entry limit; owner-selected challenge constraint."; }
-            }
-            requirement overallLength : OverallLength;
-            #derivation connection deriveOverallLength {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> overallLength;
-            }
-            requirement def <'C-012'> SafetyCapabilityAbort {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall autonomously terminate qualification when a required safety capability is lost. */
-                comment conditions /* A demonstrated backup preserving the function permits continuation. Darkness alone is not a fault. Fog triggers this rule when it compromises required capability. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Abort is based on capability, not individual component failure."; }
-            }
-            requirement safetyCapabilityAbort : SafetyCapabilityAbort;
-            #derivation connection deriveSafetyCapabilityAbort {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> safetyCapabilityAbort;
-            }
-            requirement def <'C-013'> AutonomousShoreRecovery {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* Following a safety abort, the vessel shall autonomously initiate recovery toward a suitable shore-accessible retrieval location. */
-                comment conditions /* Do not wait for operator intervention or communications. Select a viable route based on remaining capabilities. Intentional grounding at a suitable accessible shore is permitted. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Owner-selected recovery policy; residual risk of movement after traffic-sensing failure requires explicit analysis and review, not assumed acceptance."; }
-            }
-            requirement autonomousShoreRecovery : AutonomousShoreRecovery;
-            #derivation connection deriveAutonomousShoreRecovery {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> autonomousShoreRecovery;
-            }
-            requirement def <'C-014'> AbortAlert {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall attempt immediate transmission of an abort alert when an abort is declared. */
-                comment conditions /* Queue the alert while communications are unavailable and transmit when contact returns. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Operator awareness supports shore retrieval without being a prerequisite for recovery."; }
-            }
-            requirement abortAlert : AbortAlert;
-            #derivation connection deriveAbortAlert {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> abortAlert;
-            }
-            requirement def <'C-015'> NoLittering {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall support recovery without abandonment of the vessel or its major components in the waterway. */
-                comment conditions /* Apply flotation, retention and post-capsize recovery obligations C-016 through C-018. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Owner intent: no littering. This is a recoverability obligation, not a guarantee against every conceivable casualty."; }
-            }
-            requirement noLittering : NoLittering;
-            #derivation connection deriveNoLittering {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> noLittering;
-            }
-            requirement def <'C-016'> CasualtyFlotation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall remain afloat following capsize or hull flooding. */
-                comment conditions /* Demonstrate in the declared casualty qualification conditions for the interval needed to execute shore recovery. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Derived from recoverability; casualty definition and exposure allocations require SRR review."; }
-            }
-            requirement casualtyFlotation : CasualtyFlotation;
-            #derivation connection deriveCasualtyFlotation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> noLittering;
-                end #derive target ::> casualtyFlotation;
-            }
-            requirement def <'C-017'> MajorComponentRetention {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall retain its rig, ballast and battery following capsize or hull flooding. */
-                comment conditions /* Use the same casualty qualification conditions as C-016. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Retained major components prevent debris and support retrieval."; }
-            }
-            requirement majorComponentRetention : MajorComponentRetention;
-            #derivation connection deriveMajorComponentRetention {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> noLittering;
-                end #derive target ::> majorComponentRetention;
-            }
-            requirement def <'C-018'> CapsizeRecovery {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall demonstrate autonomous travel to a suitable shore retrieval location following capsize without communications. */
-                comment conditions /* Self-righting is not prescribed; inverted recovery is permitted. Auxiliary propulsion ends qualification. Demonstrate against declared course recovery conditions. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Limp recovery is the required outcome; hull architecture remains open."; }
-            }
-            requirement capsizeRecovery : CapsizeRecovery;
-            #derivation connection deriveCapsizeRecovery {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> noLittering;
-                end #derive target ::> capsizeRecovery;
-            }
-            requirement def <'C-019'> UnattachedPassage {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* A qualifying attempt shall remain afloat and unattached throughout the scored passage. */
-                comment conditions /* Grounding, anchoring, attaching to shore or entering designated refuge ends qualification. Safe waiting under sail is permitted and counts toward elapsed exposure. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Refuge does not preserve partial qualifying progress."; }
-            }
-            requirement unattachedPassage : UnattachedPassage;
-            #derivation connection deriveUnattachedPassage {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> unattachedPassage;
-            }
-            requirement def <'C-020'> OutageAutonomy {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* Loss of communications alone shall not terminate an otherwise safe qualifying attempt. */
-                comment conditions /* Continue navigation and retain telemetry onboard; replay retained data after reconnection. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Onboard safety and recovery do not depend on contact."; }
-            }
-            requirement communicationOutageAutonomy : OutageAutonomy;
-            #derivation connection deriveOutageAutonomy {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> communicationOutageAutonomy;
-            }
-            requirement def <'C-021'> ForecastAdmission {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* Launch authorization shall require a forecast window assessed to support the complete round trip with waiting and recovery margins. */
-                comment conditions /* Use the declared mission configuration and forecast-conditioned scenarios. No fixed completion deadline applies. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Whole-mission assessment replaces an arbitrary sailing-speed floor."; }
-            }
-            requirement forecastAdmission : ForecastAdmission;
-            #derivation connection deriveForecastAdmission {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> forecastAdmission;
-            }
-            requirement def <'C-022'> WeatherOutageContinuation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall permit continued qualification during weather-service outage only while the last forecast remains applicable and required safety capabilities remain available. */
-                comment conditions /* Forecast applicability must cover remaining passage and recovery options; assess against observations. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Loss of data access alone is not an abort trigger."; }
-            }
-            requirement weatherOutageContinuation : WeatherOutageContinuation;
-            #derivation connection deriveWeatherOutageContinuation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> weatherOutageContinuation;
-            }
-            requirement def <'C-023'> CourseRecoveryReserve {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall protect sufficient energy to reach a suitable shore retrieval location from its current course position. */
-                comment conditions /* Account for adverse current, essential onboard loads and uncertainty along the recovery route. No fixed motor-runtime reserve is substituted for route analysis. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Reserve follows the course and available recovery destinations."; }
-            }
-            requirement courseRecoveryReserve : CourseRecoveryReserve;
-            #derivation connection deriveCourseRecoveryReserve {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> courseRecoveryReserve;
-            }
-            requirement def <'C-024'> ReserveAbort {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall initiate autonomous recovery before further mission continuation would compromise the course-dependent recovery reserve. */
-                comment conditions /* Include the decision and maneuver margin needed to enter recovery. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Protecting reserve requires timely action, not only energy monitoring."; }
-            }
-            requirement reserveAbort : ReserveAbort;
-            #derivation connection deriveReserveAbort {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> reserveAbort;
-            }
-            requirement def <'C-025'> NightOperation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall support qualifying operation in darkness. */
-                comment conditions /* Required navigation, traffic safety and observation functions remain applicable. Nightfall alone does not require refuge. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Passage duration is uncertain and may include overnight sailing."; }
-            }
-            requirement nightOperation : NightOperation;
-            #derivation connection deriveNightOperation {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> nightOperation;
-            }
-            requirement def <'C-026'> AbortPersistence {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* An aborted attempt shall remain disqualified until a new attempt begins at the departure gate. */
-                comment conditions /* No autonomous resumption from refuge. Operator-commanded relocation is permitted outside qualification. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Recovery cannot silently resume a partial challenge."; }
-            }
-            requirement abortPersistence : AbortPersistence;
-            #derivation connection deriveAbortPersistence {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> abortPersistence;
-            }
-            requirement def <'C-027'> RecoveryConspicuity {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                doc /* The vessel shall present conspicuous recovery indications during autonomous shore recovery. */
-                comment conditions /* Allocate indications consistently with applicable navigation signals; no light or sound configuration is prescribed here. */
-                metadata rationale : ModelingMetadata::Rationale { text = "Prompt recovery and operator alerts do not replace visibility to other users."; }
-            }
-            requirement recoveryConspicuity : RecoveryConspicuity;
-            #derivation connection deriveRecoveryConspicuity {
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-                end #original source ::> transGorgeChallenge;
-                end #derive target ::> recoveryConspicuity;
-            }
-            comment trafficCourtesyGuidance /* Entrants are encouraged to choose routes and operating windows that reduce encounters with other waterway users. This is nonbinding guidance, not an entry or adjudication criterion. Another vessel changing course or speed is not by itself a breach. Navigation-rule compliance, applicable nonimpediment duties and collision avoidance remain governed by C-007 and C-009.*/
-            requirement def <'C-028'> NavigationRuleApplicability {
-                doc /* Before entry approval, the entrant shall submit a configuration-specific navigation-rule applicability assessment. */
-                comment conditions /* Before entry approval, the entrant shall submit a rule-applicability assessment for the identified vessel, propulsion modes, course and operating conditions. Identify the governing provisions and current local restrictions, required lights/shapes/sound signals, applicable exceptions and supporting authority. */
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-            }
-            requirement navigationRuleApplicability : NavigationRuleApplicability;
-            dependency navigationRuleApplicabilityBasis from navigationRuleApplicability to navigationRules;
-            requirement def <'C-029'> NavigationRuleBaseline {
-                doc /* The organizer shall record and maintain the reviewed rule and notice baseline for the attempt. */
-                comment conditions /* The organizer shall record the reviewed rule and notice baseline; later effective changes shall be reviewed before launch. */
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-            }
-            requirement navigationRuleBaseline : NavigationRuleBaseline;
-            dependency navigationRuleBaselineBasis from navigationRuleBaseline to navigationRules;
-            requirement def <'C-030'> NavigationEntryEvidence {
-                doc /* The organizer shall approve entry only when the configuration-specific navigation evidence satisfies the entry-evidence conditions. */
-                comment conditions /* Entry approval shall require organizer acceptance of configuration-specific evidence covering relevant sailing, overtaking, crossing and constrained-water encounters, uncertain classification, restricted visibility, degraded sensing and safety intervention. Record assumptions, observation and maneuver limits, pass/fail criteria, physical demonstrations, simulation coverage and remaining exclusions. Unsupported conditions shall be excluded from admission; unresolved capability within admitted conditions prevents entry approval. Entrants shall justify detection distances, margins and maneuver capability. Passing a limited software rule subset does not establish compliance with C-007. */
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-            }
-            requirement navigationEntryEvidence : NavigationEntryEvidence;
-            dependency navigationEntryEvidenceBasis from navigationEntryEvidence to navigationRules;
-            requirement def <'C-031'> OperatorSafetyIntervention {
-                doc /* The operator shall intervene when necessary if autonomous safety action is insufficient and intervention is available. */
-                comment conditions /* Safety action shall not be delayed to preserve qualification. Operator intervention or motor propulsion ends qualification under C-003/C-004 even when it prevents a violation. */
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-            }
-            requirement operatorSafetyIntervention : OperatorSafetyIntervention;
-            dependency operatorSafetyInterventionBasis from operatorSafetyIntervention to navigationRules;
-            requirement def <'C-032'> NavigationAdjudication {
-                doc /* The organizer shall record the attempt qualification decision and its supporting reason against the navigation adjudication conditions. */
-                comment conditions /* A collision, established navigation-rule breach or unsafe conduct requiring safety intervention disqualifies the attempt. Safety action shall not be delayed to preserve qualification, and the operator shall intervene when necessary if autonomous action is insufficient and intervention is available. Operator intervention or motor propulsion ends qualification under C-003/C-004 even when it prevents a violation. A compliant autonomous avoidance maneuver does not by itself end qualification. The organizer shall adjudicate using retained observations, commands, motion history and independent evidence where available, with a recorded reason. Insufficient evidence leaves qualification unconfirmed; absence of collision alone is not proof of compliance. Entry approval does not waive ongoing obligations. */
-                metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
-            }
-            requirement navigationAdjudication : NavigationAdjudication;
-            dependency navigationAdjudicationBasis from navigationAdjudication to navigationRules;
-
-        }
-
         package Course {
             private import ScalarValues::*;
 
@@ -498,7 +116,7 @@ package BlueDog {
                 metadata rationale : ModelingMetadata::Rationale { text = "The route stays in Bonneville Pool. Gate segments are defined relative to existing aids, with 80 m minimum nominal marker offset. Chart-derived polygons, water depth and local notices constrain route planning; neither the marker-to-marker chord nor the commercial fairway is the whole permitted sailing corridor. Completion has no elapsed-time deadline. A computational horizon reports censoring rather than failure."; }
                 metadata issue : ModelingMetadata::Issue { text = "Gate proposal for mission analysis, not a launch release. Verify complete segment clearance and maneuvering/drift margins, current MSI notices, current pool stage, bridge passage and autonomous traffic avoidance. A route through charted water does not establish safe operation. No universal vessel stand-off distance is inferred from navigation rules."; }
             }
-            dependency courseBasis from policy to BlueDog::Mission::Challenge::courseCompletion;
+            dependency courseBasis from policy to GorgeChallenge::courseCompletion;
 
             analysis GateGeometry {
                 out attribute bridgeSpanIdentifier : String = bridgePassage.spanIdentifier;
@@ -520,7 +138,7 @@ package BlueDog {
             metadata def Applicability {
                 attribute mission : MissionKind;
             }
-            metadata applicability : Applicability about BlueDog::Mission::Challenge::RepeatedOperation {
+            metadata applicability : Applicability about GorgeChallenge::RepeatedOperation {
                 mission = MissionKind::futureEndurance;
             }
             part current {
@@ -537,7 +155,7 @@ package BlueDog {
                 attribute acceptanceAllocated : Boolean = false;
                 metadata rationale : ModelingMetadata::Rationale { text = "Hawaii remains a future mission with independently allocated route, weather, endurance, communications, maintenance and recovery constraints. Existing ocean limits and repeating-energy cases are candidate future studies; they do not constrain Gorge acceptance."; }
             }
-            dependency currentMission from current to BlueDog::Mission::Challenge::transGorgeChallenge;
+            dependency currentMission from current to GorgeChallenge::transGorgeChallenge;
             dependency futureMission from future to BlueDog::Goals::hawaiiVoyage;
         }
 
@@ -634,7 +252,7 @@ package BlueDog {
         private import ScalarValues::*;
         private import ISQ::*;
         private import SI::*;
-        private import BlueDog::Mission::Challenge::*;
+        private import GorgeChallenge::*;
         private import BlueDog::Goals::*;
         requirement def <'M-001'> RoundTrip {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -671,7 +289,8 @@ package BlueDog {
         requirement def <'E-005'> Communications {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
             doc /* The vessel shall store telemetry during communication outages and deliver the stored records after reconnection.*/
-            comment conditions /* Link availability is a delivery-test precondition, not a coverage guarantee. Normal, low-energy and recovery delivery cadence is 30 seconds, as allocated by BlueDog::Mission::Challenge::liveObservation. Outage tests last 24 hours. */
+            comment conditions /* Link availability is a delivery-test precondition, not a coverage guarantee. Normal, low-energy and recovery delivery cadence is 30 seconds, as allocated by GorgeChallenge::liveObservation. Outage tests last 24 hours. */
+            metadata monitoringTechnologyIssue : ModelingMetadata::Issue { text = "LTE-M-class throughput is a provisional vehicle design assumption, not a mandated challenge technology. End-to-end delivery qualification and stale-data presentation are allocated to the vehicle."; }
         }
         requirement def <'E-006'> IngressResponse {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -693,22 +312,22 @@ package BlueDog {
         requirement ingressResponse : IngressResponse;
         requirement missionEvidence : MissionEvidence;
 
-        #refinement dependency challengeCourse from roundTrip to BlueDog::Mission::Challenge::courseCompletion {
+        #refinement dependency challengeCourse from roundTrip to courseCompletion {
             metadata rationale : ModelingMetadata::Rationale { text = "Ordered gate crossings use the marker-referenced proposal in BlueDog::Mission::Course; operational release remains subject to course review."; }
         }
         dependency challengeEndurance from multiDayEndurance to roundTrip {
             metadata rationale : ModelingMetadata::Rationale { text = "The complete finite round trip, including holding and contingency exposure, determines required endurance. Repeated circuits are a separate future objective."; }
         }
-        dependency challengeAutonomy from navigationAndControl to BlueDog::Mission::Challenge::unassistedAttempt {
+        dependency challengeAutonomy from navigationAndControl to unassistedAttempt {
             metadata rationale : ModelingMetadata::Rationale { text = "The vessel needs onboard guidance and control to complete an unassisted attempt."; }
         }
-        dependency challengePropulsion from roundTrip to BlueDog::Mission::Challenge::sailingPropulsion {
+        dependency challengePropulsion from roundTrip to sailingPropulsion {
             metadata rationale : ModelingMetadata::Rationale { text = "Vehicle challenge operation excludes auxiliary motor propulsion; powered development tests are separate."; }
         }
-        #refinement dependency challengeMonitoring from communications to BlueDog::Mission::Challenge::liveObservation {
+        #refinement dependency challengeMonitoring from communications to liveObservation {
             metadata rationale : ModelingMetadata::Rationale { text = "The vehicle telemetry requirement provides a more precise outage-retention and delivery specification for the observation aspect of C-005. Autonomous execution remains separately required."; }
         }
-        dependency challengeOverride from communications to BlueDog::Mission::Challenge::emergencyIntervention {
+        dependency challengeOverride from communications to emergencyIntervention {
             metadata rationale : ModelingMetadata::Rationale { text = "Vehicle communications provide emergency commands whose use ends attempt qualification."; }
         }
 
@@ -790,7 +409,7 @@ package BlueDog {
             comment conditions /* Use independently recorded head-on, crossing and overtaking AIS and non-AIS targets, day and night in the selected operational profile. Allocations shall include kinematic response distance, uncertainty, consequence-informed clearance and margins, and required timely observation and whole-response reliability with confidence criteria. Unreliably classified targets shall use a reviewed conservative envelope spanning plausible classes and occupant transitions. Collision avoidance and nonimpediment obligations remain unchanged.*/
         }
         requirement trafficSafety : TrafficSafety;
-        #refinement dependency challengeTrafficResponse from BlueDog::Requirements::trafficSafety to BlueDog::Mission::Challenge::trafficCoexistence {
+        #refinement dependency challengeTrafficResponse from BlueDog::Requirements::trafficSafety to trafficCoexistence {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
             metadata rationale : ModelingMetadata::Rationale { text = "S-001 specifies observation, assessment and response supporting collision-free passage. Its reviewed performance envelopes are selected allocations; C-007 independently supplies navigation duties. No-contact outcome alone does not imply the assessment process."; }
         }
@@ -804,7 +423,7 @@ package BlueDog {
             comment conditions /* Use uploaded permitted-water and exclusion polygons, with a 60-second prediction horizon. Inject approaches to every boundary, navigation loss and no-feasible-maneuver cases. Coordinates and uncertainty/clearance margins are controlled mission inputs with no default values. */
         }
         requirement operatingBoundary : OperatingBoundary;
-        #refinement dependency challengeExclusions from operatingBoundary to BlueDog::Mission::Challenge::restrictedWaters {
+        #refinement dependency challengeExclusions from operatingBoundary to restrictedWaters {
             metadata rationale : ModelingMetadata::Rationale { text = "Configured polygons and predictive boundary handling refine the challenge exclusion obligation."; }
         }
         dependency deriveOperatingBoundary from operatingBoundary to roundTrip {
@@ -817,7 +436,7 @@ package BlueDog {
             comment conditions /* Emergency intervention ends attempt qualification. Exercise abort, local isolation and remote-control loss with coexisting low-energy flags. S-110 through S-115 define the detailed acceptance criteria; powered shore-recovery capability is independently required by R-001. */
         }
         requirement emergencyControl : EmergencyControl;
-        dependency deriveSafeRecovery from emergencyControl to BlueDog::Mission::Challenge::emergencyIntervention {
+        dependency deriveSafeRecovery from emergencyControl to emergencyIntervention {
             metadata rationale : ModelingMetadata::Rationale { text = "Permitted emergency intervention requires explicit abort, qualification, isolation and control-loss behavior."; }
         }
 
@@ -827,7 +446,7 @@ package BlueDog {
             comment conditions /* Use the deployment-specific compliance matrix for sailing, powered-recovery and stationary modes, including its visibility, arcs, colors and sound criteria. The matrix remains a deployment hold point under S-005. */
         }
         requirement navigationConspicuity : NavigationConspicuity;
-        #refinement dependency challengeNavigationSignals from BlueDog::Requirements::navigationConspicuity to BlueDog::Mission::Challenge::navigationRules {
+        #refinement dependency challengeNavigationSignals from BlueDog::Requirements::navigationConspicuity to navigationRules {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
             metadata rationale : ModelingMetadata::Rationale { text = "S-004 clarifies C-007 signal presentation during an attempt only. Its powered-recovery and stationary-mode coverage has the separate C-027 and deployment-matrix basis; those modes are not derived from attempt-only compliance."; }
         }
@@ -885,7 +504,7 @@ package BlueDog {
             comment notes /* A sheltered thrust demonstration alone cannot qualify course-wide or capsized recovery. */
         }
         requirement recoveryPropulsion : RecoveryPropulsion;
-    dependency deriveRecoveryPropulsion from recoveryPropulsion to BlueDog::Mission::Challenge::autonomousShoreRecovery {
+    dependency deriveRecoveryPropulsion from recoveryPropulsion to autonomousShoreRecovery {
             metadata rationale : ModelingMetadata::Rationale { text = "R-001 specifies the installed powered means supporting course-dependent shore recovery. Emergency-control acceptance remains a separate S-003 obligation."; }
         }
 
@@ -1131,7 +750,7 @@ package BlueDog {
         requirement def <'N-034'> CalmOperation {
             metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
             doc /* While waiting in mean wind below 3 m/s, the vessel shall preserve the course-derived recovery reserve. */
-            comment conditions /* Calm-mode functions are navigation, recording and autonomous boundary/traffic contingency. Waiting may continue only while forecast coverage, traffic/boundary safety and measured calm-mode loads preserve route-dependent recovery authority; no fixed waiting endurance is imposed. Autonomous safety recovery first terminates qualification under BlueDog::Mission::Challenge::safetyCapabilityAbort, then may enable the motor under R-004. */
+            comment conditions /* Calm-mode functions are navigation, recording and autonomous boundary/traffic contingency. Waiting may continue only while forecast coverage, traffic/boundary safety and measured calm-mode loads preserve route-dependent recovery authority; no fixed waiting endurance is imposed. Autonomous safety recovery first terminates qualification under GorgeChallenge::safetyCapabilityAbort, then may enable the motor under R-004. */
             comment notes /* Neither progress nor station keeping is required. */
         }
         requirement calmOperation : CalmOperation;
@@ -1334,16 +953,16 @@ package BlueDog {
         dependency auditDerivation2 from launchEnergyAdmission to recoveryEnergy {
             metadata rationale : ModelingMetadata::Rationale { text = "The selected launch gate consumes the route-dependent reserve calculation. A changed reserve or validity rule requires admission review; the reserve magnitude alone does not define launch behavior."; }
         }
-        dependency auditDerivation3 from challengeMotorInhibition to BlueDog::Mission::Challenge::sailingPropulsion {
+        dependency auditDerivation3 from challengeMotorInhibition to sailingPropulsion {
             metadata rationale : ModelingMetadata::Rationale { text = "The onboard interlock is the selected enforcement of sail-only qualification. The challenge rule governs the attempt outcome without mandating this particular interlock design."; }
         }
-        dependency auditDerivation4 from challengeMotorInhibition to BlueDog::Mission::Challenge::unassistedAttempt {
+        dependency auditDerivation4 from challengeMotorInhibition to unassistedAttempt {
             metadata rationale : ModelingMetadata::Rationale { text = "No-intervention qualification must survive resets and motor-mode transitions."; }
         }
-        dependency auditDerivation5 from commandIntegrity to BlueDog::Mission::Challenge::unassistedAttempt {
+        dependency auditDerivation5 from commandIntegrity to unassistedAttempt {
             metadata rationale : ModelingMetadata::Rationale { text = "Accepted external control changes the attempt qualification; communications alone does not supply this rule."; }
         }
-        dependency auditDerivation6 from commandIntegrity to BlueDog::Mission::Challenge::emergencyIntervention {
+        dependency auditDerivation6 from commandIntegrity to emergencyIntervention {
             metadata rationale : ModelingMetadata::Rationale { text = "The emergency control channel needs authenticated, fresh commands and persistent qualification changes."; }
         }
         #refinement dependency auditDerivation10 from BlueDog::Requirements::freshwaterExposure to BlueDog::Requirements::gorgeEnvironment {
@@ -3162,7 +2781,7 @@ package BlueDog {
         }
         requirement energyEvidenceReadiness : EnergyEvidenceReadiness;
 
-        dependency energyDerivation1 from sustainedEnergyFeasibility to BlueDog::Mission::Challenge::repeatedOperation {
+        dependency energyDerivation1 from sustainedEnergyFeasibility to repeatedOperation {
             metadata rationale : ModelingMetadata::Rationale { text = "Repeated journeys motivate a repeatable energy cycle, beyond a one-off endurance run."; }
         }
 
@@ -3436,7 +3055,7 @@ package BlueDog {
         dependency windForAutonomousControl from windObservation to navigationAndControl {
             metadata rationale : ModelingMetadata::Rationale { text = "Apparent-wind feedback is the selected implementation for autonomous sail trim. This is a design-basis dependency, not an assertion that every autonomous sailing architecture must use this sensor."; }
         }
-        dependency windForSailOnlyMission from windObservation to BlueDog::Mission::Challenge::sailingPropulsion {
+        dependency windForSailOnlyMission from windObservation to sailingPropulsion {
             metadata rationale : ModelingMetadata::Rationale { text = "Changes to the sail-only operating concept require review of the selected wind-feedback strategy; sailing propulsion alone does not prescribe a sensor technology."; }
         }
         dependency windEnduranceBasis from windSensingEndurance to multiDayEndurance {
@@ -3520,8 +3139,8 @@ package BlueDog {
         requirement vegetationResilience : VegetationResilience;
         dependency vegetationEnvironmentBasis from vegetationResilience to environmentalEnvelope;
 
-        dependency navigationDutyBasis from trafficSafety to BlueDog::Mission::Challenge::navigationRules;
-        dependency recoverySignalBasis from navigationConspicuity to BlueDog::Mission::Challenge::recoveryConspicuity;
+        dependency navigationDutyBasis from trafficSafety to navigationRules;
+        dependency recoverySignalBasis from navigationConspicuity to recoveryConspicuity;
         dependency signalMatrixBasis from navigationConspicuity to regulatoryClassification;
 
         package Basis {
@@ -3712,19 +3331,19 @@ package BlueDog {
             metadata processEnergyEvidenceReadiness : ProcessObligation about BlueDog::Requirements::EnergyEvidenceReadiness {
                 responsibleRole = "Project owner, energy assessment"; output = "Energy-case acceptance record"; acceptance = "Identify accepted installed loads, resource bounds, battery derating and interval resolution evidence.";
             }
-            metadata processNavigationRuleApplicability : ProcessObligation about BlueDog::Mission::Challenge::NavigationRuleApplicability {
+            metadata processNavigationRuleApplicability : ProcessObligation about NavigationRuleApplicability {
                 responsibleRole = "Entrant"; output = "NavigationRuleApplicability record for the identified configuration and attempt"; acceptance = "Review the requirement conditions using the entry/adjudication verification case; no accepted evidence is implied by this role assignment.";
             }
-            metadata processNavigationRuleBaseline : ProcessObligation about BlueDog::Mission::Challenge::NavigationRuleBaseline {
+            metadata processNavigationRuleBaseline : ProcessObligation about NavigationRuleBaseline {
                 responsibleRole = "Organizer"; output = "NavigationRuleBaseline record for the identified configuration and attempt"; acceptance = "Review the requirement conditions using the entry/adjudication verification case; no accepted evidence is implied by this role assignment.";
             }
-            metadata processNavigationEntryEvidence : ProcessObligation about BlueDog::Mission::Challenge::NavigationEntryEvidence {
+            metadata processNavigationEntryEvidence : ProcessObligation about NavigationEntryEvidence {
                 responsibleRole = "Organizer"; output = "NavigationEntryEvidence record for the identified configuration and attempt"; acceptance = "Review the requirement conditions using the entry/adjudication verification case; no accepted evidence is implied by this role assignment.";
             }
-            metadata processOperatorSafetyIntervention : ProcessObligation about BlueDog::Mission::Challenge::OperatorSafetyIntervention {
+            metadata processOperatorSafetyIntervention : ProcessObligation about OperatorSafetyIntervention {
                 responsibleRole = "Operator"; output = "OperatorSafetyIntervention record for the identified configuration and attempt"; acceptance = "Review the requirement conditions using the entry/adjudication verification case; no accepted evidence is implied by this role assignment.";
             }
-            metadata processNavigationAdjudication : ProcessObligation about BlueDog::Mission::Challenge::NavigationAdjudication {
+            metadata processNavigationAdjudication : ProcessObligation about NavigationAdjudication {
                 responsibleRole = "Organizer"; output = "NavigationAdjudication record for the identified configuration and attempt"; acceptance = "Review the requirement conditions using the entry/adjudication verification case; no accepted evidence is implied by this role assignment.";
             }
 
@@ -4665,7 +4284,7 @@ package BlueDog {
                 require constraint acceptance { caseCoverageAccepted and loadedWeightN > 0 and availableBuoyancyN >= loadedWeightN }
             }
             requirement reserveBuoyancy : ReserveBuoyancy;
-            dependency flotationPurpose from reserveBuoyancy to BlueDog::Mission::Challenge::casualtyFlotation { metadata rationale : ModelingMetadata::Rationale { text = "Buoyancy assessment supports casualty flotation but does not establish damage stability, retained components or safe retrieval. Changes to casualty cases require a new assessment."; } }
+            dependency flotationPurpose from reserveBuoyancy to casualtyFlotation { metadata rationale : ModelingMetadata::Rationale { text = "Buoyancy assessment supports casualty flotation but does not establish damage stability, retained components or safe retrieval. Changes to casualty cases require a new assessment."; } }
             dependency basisReserveBuoyancy from reserveBuoyancy to BlueDog::Requirements::capsizeResilience { metadata rationale : ModelingMetadata::Rationale { text = "Capsize and flooding cases drive the required buoyancy assessment; intact reserve-volume screens do not establish casualty flotation."; } }
             requirement def <'T-112'> LaunchClearance {
                 metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; }
@@ -5823,11 +5442,11 @@ package BlueDog {
                 }
                 then done;
             }
-            dependency fallbackBasis from FallbackPolicy to BlueDog::Mission::Challenge::autonomousShoreRecovery;
+            dependency fallbackBasis from FallbackPolicy to GorgeChallenge::autonomousShoreRecovery;
 
-            dependency unassisted from HandleEvent to BlueDog::Mission::Challenge::unassistedAttempt;
-            dependency propulsion from HandleEvent to BlueDog::Mission::Challenge::sailingPropulsion;
-            dependency safeRecovery from SupervisoryCycle to BlueDog::Mission::Challenge::autonomousShoreRecovery;
+            dependency unassisted from HandleEvent to GorgeChallenge::unassistedAttempt;
+            dependency propulsion from HandleEvent to GorgeChallenge::sailingPropulsion;
+            dependency safeRecovery from SupervisoryCycle to GorgeChallenge::autonomousShoreRecovery;
             dependency normalScenario from SupervisoryCycle to BlueDog::Method::Scenarios::NormalSailing;
             dependency trafficScenario from SupervisoryCycle to BlueDog::Method::Scenarios::TrafficEncounter;
             dependency recoveryScenario from SupervisoryCycle to BlueDog::Method::Scenarios::AbortAndRecover;
@@ -6339,8 +5958,8 @@ package BlueDog {
             }
             dependency currentTraffic from policy to BlueDog::Requirements::trafficSafety;
             dependency currentTracking from policy to BlueDog::Requirements::trafficTracking;
-            dependency collisionObligation from policy to BlueDog::Mission::Challenge::trafficCoexistence;
-            dependency applicableNavigationDuties from policy to BlueDog::Mission::Challenge::navigationRules;
+            dependency collisionObligation from policy to GorgeChallenge::trafficCoexistence;
+            dependency applicableNavigationDuties from policy to GorgeChallenge::navigationRules;
             part classRow1 {
                 attribute target : String = "Commercial tow";
                 attribute targetSpeedMps : Real = illustrative.targetSpeedMps#(1);
@@ -6477,7 +6096,7 @@ package BlueDog {
             dependency recoveryTrace1 from recovery to BlueDog::Analyses::Safety::DFMEA::starter::steeringJam;
             dependency recoveryTrace2 from recovery to BlueDog::Analyses::Safety::DFMEA::starter::powerCommonCause;
             dependency recoveryTrace3 from recovery to BlueDog::Decisions::Design::recoveryScope;
-            dependency recoveryTrace4 from recovery to BlueDog::Mission::Challenge::casualtyFlotation;
+            dependency recoveryTrace4 from recovery to GorgeChallenge::casualtyFlotation;
             part structure {
                 metadata workStatus : ModelingMetadata::StatusInfo { status = ModelingMetadata::StatusKind::open; owner = "Analysis agent; owner reviews disposition"; }
                 metadata risk : Tracking {
@@ -6884,7 +6503,7 @@ package BlueDog {
             dependency basis from criteria to BlueDog::Requirements::trafficSafety;
             dependency tracking from criteria to BlueDog::Requirements::trafficTracking;
             dependency timing from criteria to BlueDog::Requirements::avoidanceCommandDeadline;
-            dependency applicableNavigationDuties from acceptance to BlueDog::Mission::Challenge::navigationRules;
+            dependency applicableNavigationDuties from acceptance to GorgeChallenge::navigationRules;
         }
 
         package Energy {
@@ -7066,8 +6685,8 @@ package BlueDog {
             dependency windBasis from proposed to BlueDog::Requirements::gorgeWind;
             dependency waveBasis from proposed to BlueDog::Requirements::gorgeWaves;
             dependency currentBasis from proposed to BlueDog::Requirements::gorgeCurrent;
-            dependency launchContext from proposed to BlueDog::Mission::Challenge::forecastAdmission;
-            dependency recoveryContext from proposed to BlueDog::Mission::Challenge::courseRecoveryReserve;
+            dependency launchContext from proposed to GorgeChallenge::forecastAdmission;
+            dependency recoveryContext from proposed to GorgeChallenge::courseRecoveryReserve;
         }
 
         package Hydrostatics {
@@ -7188,7 +6807,7 @@ package BlueDog {
             dependency recoveryConfiguration from RecoveryScreen to BlueDog::Configurations::IC01::design;
             dependency sizing from Inputs to BlueDog::Analyses::Sizing::Inputs;
             dependency sensing from Inputs to BlueDog::Requirements::trafficSafety;
-            dependency recovery from Inputs to BlueDog::Mission::Challenge::autonomousShoreRecovery;
+            dependency recovery from Inputs to GorgeChallenge::autonomousShoreRecovery;
             dependency energy from Inputs to BlueDog::Requirements::lowEnergyRecovery;
         }
 
@@ -7365,8 +6984,8 @@ package BlueDog {
 
          dependency allocationTrace from policy to BlueDog::Analyses::ClassDetection::policy;
          dependency trafficSafety from policy to BlueDog::Requirements::trafficSafety;
-         dependency launchReview from missionAdmission to BlueDog::Mission::Challenge::forecastAdmission;
-         dependency casualtyReview from missionAdmission to BlueDog::Mission::Challenge::courseRecoveryReserve;
+         dependency launchReview from missionAdmission to GorgeChallenge::forecastAdmission;
+         dependency casualtyReview from missionAdmission to GorgeChallenge::courseRecoveryReserve;
          dependency courseScope from missionAdmission to BlueDog::Mission::Course::policy;
          dependency windCases from policy to BlueDog::Verification::Challenge::WindSportEncounterVerification;
          dependency windowCases from missionAdmission to BlueDog::Verification::Challenge::LocationTrafficAdmissionVerification;
@@ -7527,11 +7146,11 @@ package BlueDog {
                 out attribute trafficBeams : Real [5] ordered nonunique = trafficHypothesis.beamsM;
                 out attribute trafficSeparation : Real [5] ordered nonunique = trafficHypothesis.separationM;
             }
-            dependency course from Inputs to BlueDog::Mission::Challenge::courseCompletion;
-            dependency autonomy from Inputs to BlueDog::Mission::Challenge::unassistedAttempt;
-            dependency sailing from Inputs to BlueDog::Mission::Challenge::sailingPropulsion;
-            dependency traffic from Inputs to BlueDog::Mission::Challenge::trafficCoexistence;
-            dependency navigation from Inputs to BlueDog::Mission::Challenge::navigationRules;
+            dependency course from Inputs to GorgeChallenge::courseCompletion;
+            dependency autonomy from Inputs to GorgeChallenge::unassistedAttempt;
+            dependency sailing from Inputs to GorgeChallenge::sailingPropulsion;
+            dependency traffic from Inputs to GorgeChallenge::trafficCoexistence;
+            dependency navigation from Inputs to GorgeChallenge::navigationRules;
             dependency reserve from Inputs to BlueDog::Requirements::lowEnergyRecovery;
             dependency finiteEndurance from Inputs to BlueDog::Requirements::multiDayEndurance;
             calc def MissionOutcome {
@@ -7551,10 +7170,10 @@ package BlueDog {
                 else if horizonReached ? "censored"
                 else "incomplete"
             }
-            dependency simulatedCourseCriterion from MissionOutcome to BlueDog::Mission::Challenge::courseCompletion;
-            dependency simulatedAutonomyCriterion from MissionOutcome to BlueDog::Mission::Challenge::unassistedAttempt;
-            dependency simulatedPropulsionCriterion from MissionOutcome to BlueDog::Mission::Challenge::sailingPropulsion;
-            dependency simulatedCollisionCriterion from MissionOutcome to BlueDog::Mission::Challenge::trafficCoexistence;
+            dependency simulatedCourseCriterion from MissionOutcome to GorgeChallenge::courseCompletion;
+            dependency simulatedAutonomyCriterion from MissionOutcome to GorgeChallenge::unassistedAttempt;
+            dependency simulatedPropulsionCriterion from MissionOutcome to GorgeChallenge::sailingPropulsion;
+            dependency simulatedCollisionCriterion from MissionOutcome to GorgeChallenge::trafficCoexistence;
             dependency simulatedReserveCriterion from MissionOutcome to BlueDog::Requirements::lowEnergyRecovery;
             comment acceptanceScope /* MissionOutcome classifies observed simulation facts. It does not establish complete navigation-rule compliance, sensor credibility, launch authorization or physical qualification. Python computes continuous geometry and dynamics; this calculation owns the outcome precedence. */
         }
@@ -7576,7 +7195,7 @@ package BlueDog {
                 out attribute staticMarginOutputs : String [11] ordered nonunique = ("wingLiftMargin", "keelLiftMargin", "rudderLiftMargin", "keelAngleMargin", "rudderAngleMargin", "wingDriveMargin", "rudderDriveMargin", "froudeMargin", "wingReMargin", "keelReMargin", "rudderReMargin");
                 out attribute peakMarginOutput : String = "peakMargin";
                 out attribute resistanceMarginOutputs : String [19] ordered nonunique = ("delftResistanceMargin", "delftDomain4", "delftDomain5", "delftDomain6", "delftDomain7", "delftDomain8", "delftDomain9", "delftDomain10", "delftDomain11", "delftDomain12", "delftDomain13", "delftDomain14", "delftDomain15", "delftDomain16", "delftDomain17", "delftDomain18", "delftDomain19", "delftDomain20", "delftDomain21");
-                out attribute maximumOverallLengthM : Real = BlueDog::Mission::Challenge::maximumOverallLength / (1 [SI::m]);
+                out attribute maximumOverallLengthM : Real = GorgeChallenge::maximumOverallLength / (1 [SI::m]);
                 out attribute challengeRequiresEastProgress : Boolean = BlueDog::Analyses::Weather::policy.challengeRequiresEastProgress;
                 out attribute allSeasonRequiresEastProgress : Boolean = BlueDog::Analyses::Weather::policy.allSeasonRequiresEastProgress;
                 out attribute windSpeeds : Real [2] ordered nonunique = BlueDog::Configurations::StudyPlan::operatingCoverage.windSpeeds;
@@ -7780,8 +7399,8 @@ package BlueDog {
                 attribute interpretation : String = "A 48 h example passage, loss rates 1e-4 to 1e-2 per hour and 0.1 conflicting encounter per hour span sensitivity only. Every conflicting encounter is pessimistically treated as contact. The product assumes conditional independence of sensing loss and subsequent traffic; fog, waves and common-power failures can invalidate it. Analyze these as separate deterministic cases. DFMEA ranks do not supply rates.";
                 attribute releaseCondition : String = "Before unattended trials, demonstrate casualty maneuvering and retention; measure installed fault exposure and local traffic; assess injury, entanglement and impediment as well as collision probability. If residual risk cannot be accepted, restrict the operating window/route or add independent protection. SRR approval does not accept that risk.";
             }
-            dependency safetyBasis from disposition to BlueDog::Mission::Challenge::autonomousShoreRecovery;
-            dependency casualtyBasis from Sensitivity to BlueDog::Mission::Challenge::capsizeRecovery;
+            dependency safetyBasis from disposition to GorgeChallenge::autonomousShoreRecovery;
+            dependency casualtyBasis from Sensitivity to GorgeChallenge::capsizeRecovery;
         }
 
         package RecoverySiteReview {
@@ -7841,10 +7460,10 @@ package BlueDog {
                 attribute fieldProtocol : String = "At each site record WGS84 approach polygon, chart and actual depth at stated pool level, submerged/overhead obstacles, weeds/nets, drift and landing exposure, casualty retention method, legal walking/vehicle access, access hours, and one-person pickup time. Photograph and run a supervised drifting/capsized capture. Owner conducts access/physical observations; analysis agent integrates measured records and repeats route reserve checks.";
             }
             metadata rationale : ModelingMetadata::Rationale { text = "Assess more than the two endpoints so recovery distance can vary with position and remaining authority. These source-backed candidates narrow the field survey; none is yet a safe harbor or an approved numerical destination. Source review date: 2026-10-12."; }
-            dependency reserveAssessment from bingen to BlueDog::Mission::Challenge::courseRecoveryReserve;
-            dependency westernRecovery from stevenson to BlueDog::Mission::Challenge::autonomousShoreRecovery;
-            dependency intermediateRecovery from springCreek to BlueDog::Mission::Challenge::autonomousShoreRecovery;
-            dependency oppositeBankRecovery from viento to BlueDog::Mission::Challenge::autonomousShoreRecovery;
+            dependency reserveAssessment from bingen to GorgeChallenge::courseRecoveryReserve;
+            dependency westernRecovery from stevenson to GorgeChallenge::autonomousShoreRecovery;
+            dependency intermediateRecovery from springCreek to GorgeChallenge::autonomousShoreRecovery;
+            dependency oppositeBankRecovery from viento to GorgeChallenge::autonomousShoreRecovery;
         }
 
         package Reliability {
@@ -8084,7 +7703,7 @@ package BlueDog {
             dependency collisionExposureVerification1 from gorge::collisionExposure to BlueDog::Verification::Requirements::TrafficSafetyVerification;
             dependency collisionExposureVerification2 from gorge::collisionExposure to BlueDog::Verification::Challenge::WindSportEncounterVerification;
             dependency boundaryLossControl1 from gorge::boundaryLoss to BlueDog::Requirements::operatingBoundary;
-            dependency boundaryLossControl2 from gorge::boundaryLoss to BlueDog::Mission::Challenge::restrictedWaters;
+            dependency boundaryLossControl2 from gorge::boundaryLoss to GorgeChallenge::restrictedWaters;
             dependency boundaryLossVerification1 from gorge::boundaryLoss to BlueDog::Verification::Requirements::OperatingBoundaryVerification;
             dependency boundaryLossVerification2 from gorge::boundaryLoss to BlueDog::Verification::Challenge::RestrictedWatersVerification;
             dependency unintendedThrustControl1 from gorge::unintendedThrust to BlueDog::Requirements::challengeMotorInhibition;
@@ -8092,8 +7711,8 @@ package BlueDog {
             dependency unintendedThrustControl3 from gorge::unintendedThrust to BlueDog::Requirements::qualificationPersistence;
             dependency unintendedThrustVerification1 from gorge::unintendedThrust to BlueDog::Verification::Planning::InterfaceAndDurabilityIntegrationVerification;
             dependency unintendedThrustVerification2 from gorge::unintendedThrust to BlueDog::Verification::Requirements::EmergencyControlVerification;
-            dependency flotationRetentionLossControl1 from gorge::flotationRetentionLoss to BlueDog::Mission::Challenge::casualtyFlotation;
-            dependency flotationRetentionLossControl2 from gorge::flotationRetentionLoss to BlueDog::Mission::Challenge::majorComponentRetention;
+            dependency flotationRetentionLossControl1 from gorge::flotationRetentionLoss to GorgeChallenge::casualtyFlotation;
+            dependency flotationRetentionLossControl2 from gorge::flotationRetentionLoss to GorgeChallenge::majorComponentRetention;
             dependency flotationRetentionLossControl3 from gorge::flotationRetentionLoss to BlueDog::Requirements::Structure::structuralIntegrity;
             dependency flotationRetentionLossVerification1 from gorge::flotationRetentionLoss to BlueDog::Verification::Requirements::FlotationEvidence;
             dependency flotationRetentionLossVerification2 from gorge::flotationRetentionLoss to BlueDog::Verification::Challenge::MajorComponentRetentionVerification;
@@ -8553,9 +8172,9 @@ package BlueDog {
                 dependency recoveryTooLateCriterion from functional::recoveryTooLate to BlueDog::Requirements::trafficSafety;
                 dependency sharedPowerLossCriterion from functional::sharedPowerLoss to BlueDog::Requirements::trafficSafety;
                 dependency sharedComputeLossCriterion from functional::sharedComputeLoss to BlueDog::Requirements::trafficSafety;
-                dependency navigationDuties from functional::wrongRuleAssessment to BlueDog::Mission::Challenge::navigationRules;
+                dependency navigationDuties from functional::wrongRuleAssessment to GorgeChallenge::navigationRules;
                 dependency courtesyPolicy from functional::unsafeCourtesyChange to BlueDog::Decisions::Design::trafficCourtesy;
-                dependency fallbackPolicy from functional::unsafeAbortTransition to BlueDog::Mission::Challenge::safetyCapabilityAbort;
+                dependency fallbackPolicy from functional::unsafeAbortTransition to GorgeChallenge::safetyCapabilityAbort;
                 dependency starterLink from functional to BlueDog::Analyses::Safety::DFMEA::starter::trafficMiss;
                 occurrence OR_fixedObservationUnavailable : OrGate { doc /* Conditional branch for SC-01 or SC-02 only; other concepts are alternatives, not installed backups. No physical failure rates or safeguards are credited. */ attribute :>> description = "Required concept observation or cue unavailable within the response interval"; ref occurrence :>> inputs = (fixedAngularGap, fixedStaleFrames, wetOptics, sharedHub); }
                 connection OR_fixedObservationUnavailable_0 : Causation connect fixedAngularGap to OR_fixedObservationUnavailable { metadata CausationMetadata { isSufficient = true; } }
@@ -11065,8 +10684,8 @@ package BlueDog {
                 attribute disposition :>> disposition = "Prefer safe, rule-consistent routes, operating windows and trajectories that reduce the likelihood of crewed vessels needing to maneuver. Accept delay or reduced mission progress to avoid developing encounters. Once encounter duties apply, preserve required predictable behavior and act when permitted or necessary; this is not an always-yield policy.";
                 attribute evidenceNeeded :>> evidenceNeeded = "Compare alternatives against the same traffic scenarios using close-encounter exposure, predicted need for other-vessel action and mission delay, with explicit behavior and sensing assumptions. These are comparative design measures, not evidence of why another skipper acted or challenge pass/fail criteria. The preference is not yet implemented as a planner objective or validated by the existing replay.";
             }
-            dependency courtesyWithinNavigationDuties from trafficCourtesy to BlueDog::Mission::Challenge::navigationRules;
-            dependency courtesyCollisionSafety from trafficCourtesy to BlueDog::Mission::Challenge::trafficCoexistence;
+            dependency courtesyWithinNavigationDuties from trafficCourtesy to GorgeChallenge::navigationRules;
+            dependency courtesyCollisionSafety from trafficCourtesy to GorgeChallenge::trafficCoexistence;
         }
 
         package OpenQuestions {
@@ -11080,7 +10699,7 @@ package BlueDog {
             }
             dependency trafficAcceptanceBasis1 from trafficAcceptance to BlueDog::Requirements::trafficSafety;
             dependency trafficAcceptanceBasis2 from trafficAcceptance to BlueDog::Requirements::regulatoryClassification;
-            dependency trafficAcceptanceBasis3 from trafficAcceptance to BlueDog::Mission::Challenge::navigationRuleApplicability;
+            dependency trafficAcceptanceBasis3 from trafficAcceptance to GorgeChallenge::navigationRuleApplicability;
             item <'U02'> recoveryAcceptance : EngineeringDecisions::DecisionRecord {
                 attribute :>> recordState = EngineeringDecisions::RecordState::openQuestion;
                 attribute :>> owner = "Project owner";
@@ -11090,7 +10709,7 @@ package BlueDog {
             }
             dependency recoveryAcceptanceBasis1 from recoveryAcceptance to BlueDog::Requirements::recoveryPropulsion;
             dependency recoveryAcceptanceBasis2 from recoveryAcceptance to BlueDog::Requirements::recoveryEnergy;
-            dependency recoveryAcceptanceBasis3 from recoveryAcceptance to BlueDog::Mission::Challenge::capsizeRecovery;
+            dependency recoveryAcceptanceBasis3 from recoveryAcceptance to GorgeChallenge::capsizeRecovery;
             item <'U03'> structuralQualification : EngineeringDecisions::DecisionRecord {
                 attribute :>> recordState = EngineeringDecisions::RecordState::openQuestion;
                 attribute :>> owner = "Project owner";
@@ -11200,117 +10819,117 @@ package BlueDog {
     package Verification {
 
         package Challenge {
-            doc /* Planned qualification cases, not completed evidence. Virtual regression checks and physical demonstrations are separate evidence streams. */
+            doc /* Planned Blue Dog qualification cases for GorgeChallenge, not completed evidence. Virtual regression checks and physical demonstrations are separate evidence streams. Source-linked cases cover applicability, lookout/avoidance, encounter conduct, channel/visibility and signals. Their verdicts remain inconclusive pending accepted evidence; traceability is not a compliance finding. */
             verification def OverallLengthVerification {
                 metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Inspect and measure the maximum fore-and-aft extent through all normal rig, steering and equipment configurations. Apply the executable lengthLimit constraint with recorded measurement uncertainty; confirm no unmeasured projection extends beyond the reported envelope. */
-                objective acceptance { verify BlueDog::Mission::Challenge::overallLength; }
+                objective acceptance { verify $::GorgeChallenge::overallLength; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def SafetyCapabilityAbortVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Inject loss of required safety functions, including visibility-driven loss and common-cause faults. Confirm qualification terminates when the function is unavailable; demonstrate continued qualification only when an accepted backup maintains that function. */
-                objective acceptance { verify BlueDog::Mission::Challenge::safetyCapabilityAbort; }
+                objective acceptance { verify $::GorgeChallenge::safetyCapabilityAbort; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def AutonomousShoreRecoveryVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* From declared course locations and casualty states, remove communications and trigger safety abort. Record recovery initiation, chosen accessible destination, transit and final approach. Assess impaired-sensing collision exposure and consequences independently; a successful transit alone does not accept that residual risk. */
-                objective acceptance { verify BlueDog::Mission::Challenge::autonomousShoreRecovery; }
+                objective acceptance { verify $::GorgeChallenge::autonomousShoreRecovery; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def AbortAlertVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Trigger abort with available and unavailable links. Observe immediate transmission attempts with a link, durable queueing without a link and delivery after reconnection. Timing implementation tolerance must be declared before qualification. */
-                objective acceptance { verify BlueDog::Mission::Challenge::abortAlert; }
+                objective acceptance { verify $::GorgeChallenge::abortAlert; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def NoLitteringVerification {
                 metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Review and demonstrate the linked flotation, major-component retention and capsize recovery cases using the same casualty configuration. Account for every major component at retrieval. */
-                objective acceptance { verify BlueDog::Mission::Challenge::noLittering; }
+                objective acceptance { verify $::GorgeChallenge::noLittering; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def CasualtyFlotationVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Execute the approved flooding and capsize exposure cases with maximum mission load. Observe flotation throughout the course-derived recovery duration. A short static float test cannot substantiate a longer recovery exposure. */
-                objective acceptance { verify BlueDog::Mission::Challenge::casualtyFlotation; }
+                objective acceptance { verify $::GorgeChallenge::casualtyFlotation; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def MajorComponentRetentionVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
                 doc /* Inspect rig, ballast and battery retention before and after the same flooding and capsize cases used for flotation. Record attachments and any released debris. */
-                objective acceptance { verify BlueDog::Mission::Challenge::majorComponentRetention; }
+                objective acceptance { verify $::GorgeChallenge::majorComponentRetention; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def CapsizeRecoveryVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Release the vessel in the declared capsize orientations with communications disabled and execute shore recovery under the approved current, wind and wave profile. Observe arrival at a retrievable location; remaining inverted is allowed. Motor use must disqualify the attempt. */
-                objective acceptance { verify BlueDog::Mission::Challenge::capsizeRecovery; }
+                objective acceptance { verify $::GorgeChallenge::capsizeRecovery; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def UnattachedPassageVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Review timestamped passage records and inject grounding, anchoring, shore attachment and refuge entry. Each ends qualification; safe afloat waiting does not. Missing evidence prevents an affirmative qualification verdict. */
-                objective acceptance { verify BlueDog::Mission::Challenge::unattachedPassage; }
+                objective acceptance { verify $::GorgeChallenge::unattachedPassage; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def OutageAutonomyVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Interrupt communications during healthy passage and verify continued autonomous operation, retained observations and backlog delivery. Separately inject a safety failure during the outage to ensure loss of contact does not inhibit recovery. */
-                objective acceptance { verify BlueDog::Mission::Challenge::communicationOutageAutonomy; }
+                objective acceptance { verify $::GorgeChallenge::communicationOutageAutonomy; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def ForecastAdmissionVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Exercise forecast-conditioned launch scenarios covering full passage, waiting and recovery exposure. Reject missing or insufficient forecast coverage. Evaluate the frozen Monte Carlo ensemble and explicit edge cases without treating sample completion fraction as calibrated real-world probability. */
-                objective acceptance { verify BlueDog::Mission::Challenge::forecastAdmission; }
+                objective acceptance { verify $::GorgeChallenge::forecastAdmission; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def WeatherOutageContinuationVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Interrupt weather access with applicable and expired forecasts; independently vary onboard safety capability. Confirm continuation requires both applicable forecast information and preserved safety capability. */
-                objective acceptance { verify BlueDog::Mission::Challenge::weatherOutageContinuation; }
+                objective acceptance { verify $::GorgeChallenge::weatherOutageContinuation; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def CourseRecoveryReserveVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Evaluate route-dependent reserve along the course using installed load evidence, adverse currents, route feasibility and uncertainty. An inaccessible shore, infeasible route or missing input cannot establish a protected reserve. */
-                objective acceptance { verify BlueDog::Mission::Challenge::courseRecoveryReserve; }
+                objective acceptance { verify $::GorgeChallenge::courseRecoveryReserve; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def ReserveAbortVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Inject declining energy and increasing recovery demand along the route. Confirm recovery begins with sufficient reserve for the decision delay, transition and transit rather than only after reserve exhaustion. */
-                objective acceptance { verify BlueDog::Mission::Challenge::reserveAbort; }
+                objective acceptance { verify $::GorgeChallenge::reserveAbort; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def NightOperationVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Exercise the declared navigation, traffic, communications and recovery scenarios in darkness. Confirm nightfall alone does not terminate qualification. Simulation cannot close optical sensing or navigation-light physical evidence. */
-                objective acceptance { verify BlueDog::Mission::Challenge::nightOperation; }
+                objective acceptance { verify $::GorgeChallenge::nightOperation; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def AbortPersistenceVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* After abort, test reboot, contact restoration, refuge departure and operator relocation. Qualification remains ended until the new attempt departure-gate condition is met; partial progress is not carried forward. */
-                objective acceptance { verify BlueDog::Mission::Challenge::abortPersistence; }
+                objective acceptance { verify $::GorgeChallenge::abortPersistence; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def RecoveryConspicuityVerification {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
                 doc /* Inspect and test recovery indications against the deployment-specific navigation-signal matrix in the approved visibility conditions, including the casualty states for which recovery is claimed. */
-                objective acceptance { verify BlueDog::Mission::Challenge::recoveryConspicuity; }
+                objective acceptance { verify $::GorgeChallenge::recoveryConspicuity; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
             verification def WindSportEncounterVerification {
@@ -11318,8 +10937,8 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Exercise BlueDog::Analyses::LocationTraffic windsurfCrossing, wingfoilTurn, kiteSweep, fallenRider and groupEncounter across both tacks, overtaking, unknown tack, glare, waves and darkness. Independently record rider/equipment extent, timing, swept-volume clearance and navigation obligations. Include timely, delayed and absent rider avoidance, falls, track swaps and no feasible sailing response. Scripted planar targets or cooperative passes cannot close these cases.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::trafficCoexistence;
-                    verify BlueDog::Mission::Challenge::navigationRules;
+                    verify $::GorgeChallenge::trafficCoexistence;
+                    verify $::GorgeChallenge::navigationRules;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11328,7 +10947,7 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Exercise BlueDog::Analyses::LocationTraffic windowOverrun and WindowAssessment for surveyed sectors and background reaches on both legs, waiting and recovery. Reject missing traffic evidence, unsupported wind/daylight conditions, incomplete coverage and intervals outside reviewed windows. Compare cumulative exposure, energy, sensing and recovery before departure. Sparse heatmaps and zero observed users cannot establish absence. Reassess delays and unexpected traffic; no accepted window yet.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::forecastAdmission;
+                    verify $::GorgeChallenge::forecastAdmission;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11338,12 +10957,12 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Planned case; no completed compliance evidence. Review entry applicability, current rule/notice baseline, installed observation and maneuver evidence, controlled demonstrations and simulation limitations against predeclared criteria. Reject unsupported admitted conditions. Replay compliant autonomous avoidance, no-contact rule breach, collision, operator intervention, motor-assisted safety action and insufficient evidence; confirm their distinct qualification outcomes. Record configuration, conditions, reviewer, evidence and rationale. Do not stage hazardous encounters with uninvolved users.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::navigationRules;
-                    verify BlueDog::Mission::Challenge::navigationRuleApplicability;
-                    verify BlueDog::Mission::Challenge::navigationRuleBaseline;
-                    verify BlueDog::Mission::Challenge::navigationEntryEvidence;
-                    verify BlueDog::Mission::Challenge::operatorSafetyIntervention;
-                    verify BlueDog::Mission::Challenge::navigationAdjudication;
+                    verify $::GorgeChallenge::navigationRules;
+                    verify $::GorgeChallenge::navigationRuleApplicability;
+                    verify $::GorgeChallenge::navigationRuleBaseline;
+                    verify $::GorgeChallenge::navigationEntryEvidence;
+                    verify $::GorgeChallenge::operatorSafetyIntervention;
+                    verify $::GorgeChallenge::navigationAdjudication;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11352,7 +10971,7 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Planned case; no completed compliance evidence. Sources: Rules 1-3, https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E/part-83/subpart-A . Review jurisdiction, vessel classification, sailing/powered/casualty modes, responsibility, local provisions and authority for exceptions. Record applicability dispositions; no blanket small-vessel or autonomous exemption.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::navigationRules;
+                    verify $::GorgeChallenge::navigationRules;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11361,7 +10980,7 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Planned case; no completed compliance evidence. Sources: Rules 5-8, https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E/part-83/subpart-B . Demonstrate installed lookout, safe speed, risk appraisal and effective avoidance under admitted conditions, including uncertain and missed tracks. Independently observe early/substantial action and effectiveness. No-contact outcome alone is insufficient.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::navigationRules;
+                    verify $::GorgeChallenge::navigationRules;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11370,7 +10989,7 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Planned case; no completed compliance evidence. Sources: Rules 11-18, https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E/part-83/subpart-B . Review applicability and demonstrate sailing, overtaking, crossing/head-on where relevant, give-way and stand-on escalation, unknown tack and exceptional status. Retain overtaking duty until past and clear. Distinguish permission from mandatory action; a subset does not verify omitted rules.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::navigationRules;
+                    verify $::GorgeChallenge::navigationRules;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11379,7 +10998,7 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Planned case; no completed compliance evidence. Sources: Rules 9, 10 and 19, https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E/part-83/subpart-B . Review channel confinement, nonimpediment, crossings, applicable traffic separation and restricted visibility. Exercise simultaneous pairwise/channel duties. Record applicability or justified exclusions, operating limits and response to deteriorating visibility. In-sight logic does not verify nonvisual encounters.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::navigationRules;
+                    verify $::GorgeChallenge::navigationRules;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11388,7 +11007,7 @@ package BlueDog {
                 metadata plannedInspect : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::inspect; }
                 doc /* Planned case; no completed compliance evidence. Sources: Rules 20-37 and applicable annexes, https://www.ecfr.gov/current/title-33/chapter-I/subchapter-E . Review lights, shapes and sound signals for sailing, powered recovery and casualty modes. Demonstrate required equipment performance and signal behavior under admitted conditions. Record authority for alternatives; review distress signaling and applicable exemptions separately.*/
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::navigationRules;
+                    verify $::GorgeChallenge::navigationRules;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11397,10 +11016,10 @@ package BlueDog {
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Review the approved course, configuration and predeclared admission evidence, then independently reconstruct the ordered finite gate crossings and complete attempt history. Exercise skipped/reversed/touched gates, operator updates, motor thrust, grounding and restart. A complete circuit is insufficient when another governing challenge obligation failed or evidence is missing. Safe unassisted righting preserves qualification only with required safety capability; recovery after disqualification cannot transfer partial progress into a new attempt. Accept C-000 only after every applicable C-001, C-003 through C-010 and C-012 through C-027 obligation has its own accepted evidence or justified coverage in the same attempt. */
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::transGorgeChallenge;
-                    verify BlueDog::Mission::Challenge::courseCompletion;
-                    verify BlueDog::Mission::Challenge::unassistedAttempt;
-                    verify BlueDog::Mission::Challenge::sailingPropulsion;
+                    verify $::GorgeChallenge::transGorgeChallenge;
+                    verify $::GorgeChallenge::courseCompletion;
+                    verify $::GorgeChallenge::unassistedAttempt;
+                    verify $::GorgeChallenge::sailingPropulsion;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11408,8 +11027,8 @@ package BlueDog {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 doc /* Measure acquisition-to-shore delivery under an available link, including current position, operating mode and health. Interrupt and restore the link; inspect durable backlog replay and continued autonomous control. Exercise authenticated emergency abort and manual-control commands with independent observation of the commanded response and persistent disqualification. Passive monitoring must not change mission state. Distinguish an unavailable link from a failed delivery on an available link. The demonstration must cover the installed vessel and shore endpoints; software queue tests alone do not establish communication service. */
                 objective acceptance {
-                    verify BlueDog::Mission::Challenge::liveObservation;
-                    verify BlueDog::Mission::Challenge::emergencyIntervention;
+                    verify $::GorgeChallenge::liveObservation;
+                    verify $::GorgeChallenge::emergencyIntervention;
                 }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
@@ -11418,7 +11037,7 @@ package BlueDog {
                 metadata plannedTest : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::test; }
                 metadata plannedAnalyze : VerificationCases::VerificationMethod { kind = VerificationCases::VerificationMethodKind::analyze; }
                 doc /* Review the applicable chart, dam and lock exclusions, local restrictions and current notice baseline for the configured course. Independently compare the complete observed vessel envelope and position uncertainty against approved exclusion geometry throughout the attempt. Exercise approach, navigation-loss and no-feasible-maneuver cases in a controlled test or simulation; do not enter prohibited waters to test the response. A route-planner clearance result is supporting analysis, not evidence that actual operation remained outside restrictions. */
-                objective acceptance { verify BlueDog::Mission::Challenge::restrictedWaters; }
+                objective acceptance { verify $::GorgeChallenge::restrictedWaters; }
                 return verdict : VerificationCases::VerdictKind = VerificationCases::VerdictKind::inconclusive;
             }
         }
@@ -12467,23 +12086,23 @@ package BlueDog {
 
             // System responsibility allocations for the finite Gorge challenge.
             // These assert intended design responsibility, not demonstrated compliance.
-            satisfy BlueDog::Mission::Challenge::overallLength by missionContext.boat;
-            satisfy BlueDog::Mission::Challenge::safetyCapabilityAbort by BlueDog::Architecture::Logical::vessel.recovery;
-            satisfy BlueDog::Mission::Challenge::autonomousShoreRecovery by BlueDog::Architecture::Logical::vessel.recovery;
-            satisfy BlueDog::Mission::Challenge::abortAlert by BlueDog::Architecture::Logical::vessel.communications;
-            satisfy BlueDog::Mission::Challenge::noLittering by missionContext.boat;
-            satisfy BlueDog::Mission::Challenge::casualtyFlotation by missionContext.boat.hullAndRig;
-            satisfy BlueDog::Mission::Challenge::majorComponentRetention by missionContext.boat.hullAndRig;
-            satisfy BlueDog::Mission::Challenge::capsizeRecovery by missionContext.boat;
-            satisfy BlueDog::Mission::Challenge::unattachedPassage by BlueDog::Architecture::Logical::vessel.supervision;
-            satisfy BlueDog::Mission::Challenge::communicationOutageAutonomy by BlueDog::Architecture::Logical::vessel.supervision;
-            satisfy BlueDog::Mission::Challenge::forecastAdmission by BlueDog::Architecture::Logical::vessel.supervision;
-            satisfy BlueDog::Mission::Challenge::weatherOutageContinuation by BlueDog::Architecture::Logical::vessel.supervision;
-            satisfy BlueDog::Mission::Challenge::courseRecoveryReserve by BlueDog::Architecture::Logical::vessel.energy;
-            satisfy BlueDog::Mission::Challenge::reserveAbort by BlueDog::Architecture::Logical::vessel.recovery;
-            satisfy BlueDog::Mission::Challenge::nightOperation by missionContext.boat;
-            satisfy BlueDog::Mission::Challenge::abortPersistence by BlueDog::Architecture::Logical::vessel.recovery;
-            satisfy BlueDog::Mission::Challenge::recoveryConspicuity by missionContext.boat.signaling;
+            satisfy $::GorgeChallenge::overallLength by missionContext.boat;
+            satisfy $::GorgeChallenge::safetyCapabilityAbort by BlueDog::Architecture::Logical::vessel.recovery;
+            satisfy $::GorgeChallenge::autonomousShoreRecovery by BlueDog::Architecture::Logical::vessel.recovery;
+            satisfy $::GorgeChallenge::abortAlert by BlueDog::Architecture::Logical::vessel.communications;
+            satisfy $::GorgeChallenge::noLittering by missionContext.boat;
+            satisfy $::GorgeChallenge::casualtyFlotation by missionContext.boat.hullAndRig;
+            satisfy $::GorgeChallenge::majorComponentRetention by missionContext.boat.hullAndRig;
+            satisfy $::GorgeChallenge::capsizeRecovery by missionContext.boat;
+            satisfy $::GorgeChallenge::unattachedPassage by BlueDog::Architecture::Logical::vessel.supervision;
+            satisfy $::GorgeChallenge::communicationOutageAutonomy by BlueDog::Architecture::Logical::vessel.supervision;
+            satisfy $::GorgeChallenge::forecastAdmission by BlueDog::Architecture::Logical::vessel.supervision;
+            satisfy $::GorgeChallenge::weatherOutageContinuation by BlueDog::Architecture::Logical::vessel.supervision;
+            satisfy $::GorgeChallenge::courseRecoveryReserve by BlueDog::Architecture::Logical::vessel.energy;
+            satisfy $::GorgeChallenge::reserveAbort by BlueDog::Architecture::Logical::vessel.recovery;
+            satisfy $::GorgeChallenge::nightOperation by missionContext.boat;
+            satisfy $::GorgeChallenge::abortPersistence by BlueDog::Architecture::Logical::vessel.recovery;
+            satisfy $::GorgeChallenge::recoveryConspicuity by missionContext.boat.signaling;
             satisfy BlueDog::Requirements::vegetationResilience by missionContext.boat;
         }
     }
@@ -13637,7 +13256,7 @@ package BlueDog {
          * Existing requirement derivations, refinements and owner constraints keep their
          * meanings. Package roles do not assert a one-level derivation for every member.
          */
-        metadata mission : OOSEMPackage about BlueDog::Mission::Challenge {
+        metadata mission : OOSEMPackage about GorgeChallenge {
             kind = OOSEMPackageKind::missionRequirements;
         }
         metadata requirements : OOSEMPackage about BlueDog::Requirements {
