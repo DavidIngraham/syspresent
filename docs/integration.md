@@ -521,3 +521,10 @@ Native view requests have a semantic navigation revision separate from frame
 redraw revisions. Resize/pan geometry work cannot silently discard a completed
 native query and leave Preparing visible. Newer views, contents, scene/history
 navigation, Home and model loads still invalidate superseded query results.
+
+Dense native MixedView drawings in exploratory mode retain one-to-one readable
+scale and anchor the focused header when fitting the full geometry would shrink
+it. All native nodes, ports, relationships and internal placements remain in the
+pan/zoom world; an overflow notice explains the off-screen geometry. Frame
+neighborhood explicitly fits the whole drawing. Focused notation keeps its
+native fit policy. This does not collapse or sample selected model content.

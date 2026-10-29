@@ -140,11 +140,14 @@ export function routeEdges(edges,nodes,options={}){
 }
 
 /** One camera transform for all occupied joint geometry, including labels. */
-export function fitDiagram(layout,area){
- const occupied=[...layout.nodes,...layout.nodes.flatMap(n=>n.portLabelBox?[n.portLabelBox]:[]),...layout.edges.flatMap(e=>[...(e.labelBox?[e.labelBox]:[]),...e.points.map(p=>({...p,width:0,height:0}))])],fit=fitNodes(occupied,area),scale=fit.scale;
- const origin=occupied[0],fitted=fit.nodes[0],dx=origin?fitted.x-origin.x*scale:area.x,dy=origin?fitted.y-origin.y*scale:area.y;
+export function fitDiagram(layout,area,{minimumScale=0,focus}={}){
+ const occupied=[...layout.nodes,...layout.nodes.flatMap(n=>n.portLabelBox?[n.portLabelBox]:[]),...layout.edges.flatMap(e=>[...(e.labelBox?[e.labelBox]:[]),...e.points.map(p=>({...p,width:0,height:0}))])],fit=fitNodes(occupied,area),scale=Math.max(fit.scale,Math.min(1,Math.max(0,Number(minimumScale)||0)));
+ const overflow=scale>fit.scale+.0001,origin=occupied[0],fitted=fit.nodes[0],anchor=layout.nodes.find(node=>node.semanticId===focus||node.id===focus)??layout.nodes.find(node=>!node.parentId)??origin;
+ // Keep the focused header reachable; centering a very large container would
+ // put the reader in empty internal space. Geometry remains intact for pan/zoom.
+ const dx=overflow&&anchor?area.x+8-anchor.x*scale:origin?fitted.x-origin.x*scale:area.x,dy=overflow&&anchor?area.y+8-anchor.y*scale:origin?fitted.y-origin.y*scale:area.y;
  const point=p=>({x:p.x*scale+dx,y:p.y*scale+dy}),box=n=>({...n,...point(n),width:n.width*scale,height:n.height*scale});
- return {...layout,scale,nodes:layout.nodes.map(n=>({...box(n),...(n.headerHeight?{headerHeight:n.headerHeight*scale}:{}),...(n.portLabelBox?{portLabelBox:box(n.portLabelBox)}:{})})),edges:layout.edges.map(e=>({...e,points:e.points.map(point),...(e.labelBox?{labelBox:box(e.labelBox),x:e.x*scale+dx,y:e.y*scale+dy}:{}),labelScale:scale})),ports:layout.ports?.map(p=>({...p,...point(p)}))};
+ return {...layout,scale,...(overflow?{readabilityNotice:{reason:'readable-native-overflow',message:'Native mixed view opens at readable scale. Pan or zoom to inspect its complete geometry; Frame neighborhood shows the full drawing.'}}:{}),nodes:layout.nodes.map(n=>({...box(n),...(n.headerHeight?{headerHeight:n.headerHeight*scale}:{}),...(n.portLabelBox?{portLabelBox:box(n.portLabelBox)}:{})})),edges:layout.edges.map(e=>({...e,points:e.points.map(point),...(e.labelBox?{labelBox:box(e.labelBox),x:e.x*scale+dx,y:e.y*scale+dy}:{}),labelScale:scale})),ports:layout.ports?.map(p=>({...p,...point(p)}))};
 }
 /** Validate actual segments, including during motion; containment is identity based. */
 function clearOfRouteObstacles(points,obstacles,orthogonalOnly){

@@ -118,3 +118,24 @@ test('prepared candidate validation retains port owners, ancestor headers and in
  nodes[3].x=240;
  assert.equal(routeIsClear(clear,edge,nodes),false,'dynamic validation recomputes the latest endpoint geometry');
 });
+
+test('dense native mixed placement preserves complete geometry at readable scale and anchors its focused header',()=>{
+ const nodes=[{id:'package',semanticId:'NativePackage',x:12,y:12,width:34372,height:1098},{id:'calc',semanticId:'NativeCalc',parentId:'package',x:36,y:108,width:31168,height:978},...Array.from({length:192},(_,i)=>({id:'n'+i,semanticId:'NativeAttribute'+i,parentId:'calc',x:60+i*160,y:200,width:160,height:76}))];
+ const edges=[{id:'native-link',semanticId:'Relation',source:'n0',target:'n1',kind:'dependency',points:[{x:220,y:238},{x:220,y:180},{x:380,y:180},{x:380,y:238}],labelBox:{x:260,y:164,width:80,height:16},x:260,y:164}],ports=[{id:'p',x:60,y:238}];
+ const layout={kind:'mixed',nodes,edges,ports},area={x:16,y:16,width:1408,height:800};
+ assert.ok(fitDiagram(layout,area).scale<.1,'fixture reproduces unreadable global shrink');
+ const actual=fitDiagram(layout,area,{minimumScale:1,focus:'NativePackage'});
+ assert.equal(actual.scale,1);assert.equal(actual.nodes.length,194);
+ assert.deepEqual(actual.nodes.map(n=>n.semanticId),nodes.map(n=>n.semanticId));
+ assert.equal(actual.nodes[0].x,24);assert.equal(actual.nodes[0].y,24);
+ assert.equal(actual.nodes.at(-1).width,160);assert.ok(actual.nodes.at(-1).x>area.width,'remaining content stays in the pan/zoom world');
+ assert.equal(actual.nodes[1].x-actual.nodes[0].x,nodes[1].x-nodes[0].x);
+ assert.deepEqual(actual.edges[0].points,edges[0].points.map(point=>({x:point.x+12,y:point.y+12})));
+ assert.deepEqual(actual.ports[0],{id:'p',x:72,y:250});assert.equal(actual.edges[0].semanticId,'Relation');
+ assert.equal(actual.readabilityNotice.reason,'readable-native-overflow');
+ assert.equal(actual.edges[0].labelBox.width,80);assert.equal(actual.edges[0].kind,'dependency');
+});
+test('ordinary fitting remains unchanged when readable overflow is unnecessary',()=>{
+ const layout={nodes:[{id:'a',semanticId:'a',x:0,y:0,width:160,height:76}],edges:[]},area={x:0,y:0,width:1000,height:700};
+ assert.deepEqual(fitDiagram(layout,area,{minimumScale:1,focus:'a'}),fitDiagram(layout,area));
+});
