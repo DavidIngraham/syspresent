@@ -6,8 +6,8 @@ import {createHash} from 'node:crypto';
 import {validateProject,packProject,unpackProject,fileText} from '../src/canvas-prototype/project.mjs';
 const root=new URL('../examples/canvas-blue-dog/',import.meta.url);
 const sha256=data=>createHash('sha256').update(data).digest('hex');
-const evidenceRevision=null; // Final reviewed source commit is required before publication.
-const implementationRevision=null; // Awaiting the source repository's final commit.
+const evidenceRevision='680a36b2ca452260cb5e01c32534d0a9ec715d30';
+const implementationRevision='680a36b2ca452260cb5e01c32534d0a9ec715d30';
 const namespaceBaseline='8f2dd804e964fd75828ff170c8c93572c751c8f2';
 // Byte identities from the reviewed, committed namespace handoff. Native semantic
 // ownership is validated separately; this test does not parse SysML text.

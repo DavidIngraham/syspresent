@@ -1,9 +1,9 @@
 {
   "repository": "https://github.com/DavidIngraham/sv-blue-dog",
   "baseRevision": "8f2dd804e964fd75828ff170c8c93572c751c8f2",
-  "revision": null,
-  "sourceCommit": null,
-  "sourceState": "awaiting-source-commit",
+  "revision": "680a36b2ca452260cb5e01c32534d0a9ec715d30",
+  "sourceCommit": "680a36b2ca452260cb5e01c32534d0a9ec715d30",
+  "sourceState": "committed",
   "capturedAt": "2026-10-29T15:56:09.467549+00:00",
   "sourceDigest": "172853be8d6e3da37c318967f8b8df22c5359554ad2e4cfa8d93ee3edfd96adf",
   "sourceDigestFormat": "SHA-256 over sorted UTF-8 path + NUL + lowercase file SHA-256 + LF records",
@@ -113,7 +113,7 @@
       "sha256": "51cdc87d049ddb849877ccb3925a3be09cd882a9f598da334bd9b0c99f49dbd8"
     }
   ],
-  "publishedRevision": null,
+  "publishedRevision": "680a36b2ca452260cb5e01c32534d0a9ec715d30",
   "sharedAnalysisMigration": {
     "mappingFile": "shared-analysis-migration.json",
     "elementMappingFile": "shared-analysis-element-map.json",
@@ -183,6 +183,7 @@
       "InlandExtended",
       "InlandNavigationExperiment"
     ],
-    "sourceCommitConfirmed": false
+    "sourceCommitConfirmed": true,
+    "sourceRevision": "680a36b2ca452260cb5e01c32534d0a9ec715d30"
   }
 }
