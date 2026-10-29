@@ -556,3 +556,8 @@ scripts/wasm-prototype/check-gorge-challenge-standalone.mjs audits the current
 migration. Earlier check-blue-dog-namespaces.mjs and
 check-blue-dog-shared-analysis.mjs reproduce their historical payload transitions;
 they do not infer runtime aliases for the current source.
+
+When policy or scope hides known native neighbors, trace summaries state that no
+matching neighbors are shown and disclose filtered/unavailable counts. They do
+not claim that the loaded model has no such links. Explicit external context
+retains the same native satisfaction identities, endpoint roles and direction.

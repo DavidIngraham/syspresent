@@ -116,7 +116,7 @@ function projection(graph,focus,mode,options={},prepared=prepare(graph)){
 function summaryFor(data,mode,shown,total){
  const unavailable=data.unavailable.size,filtered=data.filtered.size;
  let status=shown?'shown':unavailable?'unavailable':filtered?'filtered':'no-known-links';
- let message=shown?`${shown} of ${total} matching ${isStructuralElement(data.root)?'structural / engineering':'engineering'} neighbors shown.`:modes[mode].empty;
+ let message=shown?`${shown} of ${total} matching ${isStructuralElement(data.root)?'structural / engineering':'engineering'} neighbors shown.`:unavailable||filtered?'No matching neighbors are shown.':modes[mode].empty;
  if(data.rootReason){status=['not-requirement','not-structural'].includes(data.rootReason)?'filtered':'missing-focus';message=data.rootReason==='not-requirement'?'This action applies to requirement definitions and usages.':data.rootReason==='not-structural'?'This action applies to parts and packages.':'The focused element is unavailable or excluded from engineering exploration.';}
  if(unavailable)message+=` ${unavailable} referenced element${unavailable===1?' is':'s are'} unavailable; missing context is not evidence that a link is absent.`;
  if(filtered)message+=` ${filtered} matching neighbor${filtered===1?' is':'s are'} excluded by the active exploration policy.`;

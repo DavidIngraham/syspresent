@@ -219,3 +219,21 @@ test('prominence scope ranks the active system without hiding a direct external 
  assert.deepEqual(result.relationships.map(e=>[e.id,e.source,e.target]),[['a','alpha','r'],['external','outside','r']]);
  assert.ok(!result.omissions.some(o=>o.reason==='outside-scope'));
 });
+
+test('hidden and unavailable known links do not produce a no-links claim',()=>{
+ const link=edge('native-satisfy','boat','r','satisfy'),g=graph([element('r'),element('boat','PartUsage')],[link]);
+ const hidden=traceContext(g,{focus:'r',mode:'impact',scopeIds:['r']});
+ assert.equal(hidden.summary.status,'filtered');assert.equal(hidden.summary.filtered,1);
+ assert.match(hidden.summary.message,/No matching neighbors are shown/);
+ assert.match(hidden.summary.message,/1 matching neighbor is excluded/);
+ assert.doesNotMatch(hidden.summary.message,/No satisfaction or allocation links are known/);
+ assert.deepEqual(ids(hidden),['r']);
+ const menu=requirementActions(g,'r',{scopeIds:['r']}).find(item=>item.mode==='impact');
+ assert.equal(menu.total,1);assert.equal(menu.count,0);assert.equal(menu.summary.message,hidden.summary.message);
+ assert.deepEqual(traceContext(g,{focus:'r',mode:'impact'}).relationships,[link]);
+ const unavailable=traceContext(graph([element('r')],[link]),{focus:'r',mode:'impact'});
+ assert.equal(unavailable.summary.status,'unavailable');assert.equal(unavailable.summary.unavailable,1);
+ assert.match(unavailable.summary.message,/No matching neighbors are shown/);assert.match(unavailable.summary.message,/1 referenced element is unavailable/);
+ assert.doesNotMatch(unavailable.summary.message,/No satisfaction or allocation links are known/);
+ assert.deepEqual(ids(unavailable),['r']);
+});
