@@ -507,3 +507,12 @@ its source provenance remain historical migration evidence, not runtime aliases.
 Source ZIP export/import preserves current files and never appends the fifteen
 removed documents. Native parsing, ownership and cache digests select current
 content; neither labels nor qualified-name truncation establish relationships.
+
+Native general-view exploration uses the engine's MixedView projection. Capturing
+that view explicitly exposes every selected native identity, preserves its
+native MixedView definition and explicitly imports
+OpenSysMLRenderings; it is an engine rendering extension, not an OMG GeneralView
+conformance claim. Serializing it as a filtered GeneralView can select only the
+package graph and lose represented definitions, so exact native projection checks
+remain mandatory before appending a slide. Package filters are accepted only by
+the existing validated native source pipeline; arbitrary filter text is rejected.

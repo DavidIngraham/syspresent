@@ -71,3 +71,31 @@ test('native reusable capture resolves, appends questions and round-trips withou
   assert.deepEqual(project,original);
  }finally{engine.close();}
 });
+
+test('native Package general capture preserves the package and exact owned definitions', {skip:!existsSync(binary)}, async()=>{
+ const engine=nativeClient(binary);
+ try{
+  const project=await readProjectDirectory(resolve('examples/canvas-prototype'));
+  project.files['package-fixture.sysml']='package AnalysisFixture { calc def First; calc def Second; }';
+  project.manifest.modelSources.push('package-fixture.sysml');
+  const parsed=await engine.call('ParseSources',{documents:documentsFor(project)});
+  assert.deepEqual((parsed.diagnostics??[]).filter(row=>String(row.severity).toLowerCase().includes('error')),[]);
+  const exported=await engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'}),graph=modelGraph(exported.elements);
+  const raw=await engine.call('RenderView',{modelHash:parsed.modelHash,view:'#mixed:AnalysisFixture',includeSemanticIdentity:true}),view=adaptNativeView(raw,'#mixed:AnalysisFixture');
+  assert.ok(view.nodes.some(node=>node.semanticId==='AnalysisFixture'),'the native general view includes its actual Package');
+  view.capture={definition:'MixedView',root:'AnalysisFixture'};
+  const captured=await prepareNativeCapture(project,{view,graph,focus:'AnalysisFixture',views:new Map(),engine});
+  assert.match(captured.source,/view def Definition :> MixedView/);
+  assert.match(captured.source,/private import OpenSysMLRenderings::\*/);
+  assert.match(captured.source,/expose 'AnalysisFixture'::'First'/);
+  assert.match(captured.source,/expose 'AnalysisFixture'::'Second'/);
+  assert.match(nativeViewDefinitionSource({packageName:'PackageOnly',qualifiedNames:['AnalysisFixture'],kinds:['Package']}),/filter @SysML::Package/);
+  assertExactNativeProjection(view,captured.nativeView);
+  const roundtrip=unpackProject(packProject(captured.project));
+  assert.equal(fileText(roundtrip,'package-fixture.sysml'),fileText(project,'package-fixture.sysml'));
+  const fresh=await engine.call('ParseSources',{documents:documentsFor(roundtrip)});
+  assert.deepEqual((fresh.diagnostics??[]).filter(row=>String(row.severity).toLowerCase().includes('error')),[]);
+  assertExactNativeProjection(view,adaptNativeView(await engine.call('RenderView',{modelHash:fresh.modelHash,view:captured.viewName,includeSemanticIdentity:true}),captured.viewName));
+  assert.throws(()=>nativeViewDefinitionSource({packageName:'Captured',qualifiedNames:['AnalysisFixture'],kinds:['Package; expose X']}),/Unsupported native capture filter/);
+ }finally{engine.close();}
+});

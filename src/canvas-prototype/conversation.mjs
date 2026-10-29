@@ -3,7 +3,7 @@ import {appendScene,documentsFor,fileText,parseStory,validateProject} from './pr
 import {adaptNativeView,requireNativeIdentity} from './graph.mjs';
 import {representedIdentities} from './view-contract.mjs';
 
-const DEFINITIONS=new Set(['GeneralView','ActionFlowView','InterconnectionView','StateTransitionView','SequenceView']);
+const DEFINITIONS=new Set(['GeneralView','ActionFlowView','InterconnectionView','StateTransitionView','SequenceView','MixedView']);
 const quote=value=>"'"+value.replaceAll('\\','\\\\').replaceAll("'","\\'")+"'";
 const reference=value=>{
  if(typeof value!=='string'||!value||/[\u0000-\u001f\u007f]/.test(value))throw Error('Capture requires native-qualified model identities');
@@ -13,11 +13,11 @@ export function nativeViewDefinitionSource({packageName,name='slide',definition=
  for(const value of [packageName,name])if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(value??''))throw Error('Invalid captured declaration name');
  if(!DEFINITIONS.has(definition))throw Error('Unsupported captured native notation: '+definition);
  const refs=[...new Set(qualifiedNames??[])];if(!refs.length)throw Error('Capture requires native-qualified model elements');
- const filters=[...new Set(kinds)];if(filters.some(kind=>!/^\w+(Usage|Definition)$/.test(kind)))throw Error('Unsupported native capture filter');
+ const filters=[...new Set(kinds)];if(filters.some(kind=>kind!=='Package'&&!/^\w+(Usage|Definition)$/.test(kind)))throw Error('Unsupported native capture filter');
  const requirement=filters.some(kind=>/^Requirement(Usage|Definition)$/.test(kind));
  // Expose belongs to a view usage in SysML v2, never the definition body.
- // RequirementContext is an explicit OpenSysML rendering extension, not OMG notation.
- return `package ${packageName} {\n    private import StandardViewDefinitions::*;\n    view def Definition :> ${definition}${filters.length?' {\n        filter '+filters.map(kind=>'@SysML::'+kind).join(' or ')+';\n    }':';'}\n    view ${name} : Definition {\n${requirement?'        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }\n':''}${refs.map(q=>'        expose '+reference(q)+';').join('\n')}\n    }\n}\n`;
+ // MixedView and RequirementContext are explicit OpenSysML rendering extensions, not OMG notation.
+ return `package ${packageName} {\n    private import StandardViewDefinitions::*;\n${definition==='MixedView'?'    private import OpenSysMLRenderings::*;\n':''}    view def Definition :> ${definition}${filters.length?' {\n        filter '+filters.map(kind=>'@SysML::'+kind).join(' or ')+';\n    }':';'}\n    view ${name} : Definition {\n${requirement?'        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }\n':''}${refs.map(q=>'        expose '+reference(q)+';').join('\n')}\n    }\n}\n`;
 }
 function identities(view){return [...new Set((view.nodes??[]).map(node=>node.semanticId).filter(Boolean))].sort();}
 function edges(view){
@@ -51,7 +51,7 @@ export async function prepareNativeCapture(project,{view,graph,views,focus,title
  const declared=views?.has?.(viewName);
  if(!declared){
   const selected=identities(view),byId=new Map((graph?.elements??[]).map(element=>[element.id,element]));
-  const names=view.capture?[view.capture.root]:selected.map(id=>byId.get(id)?.qualifiedName);
+  const names=view.capture&&view.capture.definition!=='MixedView'?[view.capture.root]:selected.map(id=>byId.get(id)?.qualifiedName);
   if(names.some(name=>!name))throw Error('A selected element has no native qualified identity; capture is unavailable');
   const kinds=view.capture?[]:selected.map(id=>byId.get(id)?.kind).filter(Boolean);
   source=nativeViewDefinitionSource({packageName:identity.packageName,qualifiedNames:names,definition:view.capture?.definition??'GeneralView',kinds});

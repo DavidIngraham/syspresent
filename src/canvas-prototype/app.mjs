@@ -691,7 +691,7 @@ async function explore(id,kind){
  if(!supportsView(view))throw Error('Unsupported native notation: '+view.kind);
  if(!representedIdentities(view).length)throw Error('No native '+kind+' content is available for '+label(id)+'.');
  assertInScope(view);
- const definition=({action:'ActionFlowView',state:'StateTransitionView',sequence:'SequenceView',interconnection:'InterconnectionView'})[kind];
+ const definition=({action:'ActionFlowView',state:'StateTransitionView',sequence:'SequenceView',interconnection:'InterconnectionView',mixed:'MixedView'})[kind];
  if(definition)view.capture={definition,root:q};
  state.extraViews??=new Map();state.extraViews.set(view.id,view);
  state.graph=modelGraph(state.exported.elements,[...state.views.values(),state.coverage,...state.extraViews.values()],{nativeRootIds:state.graph.nativeRootIds});
