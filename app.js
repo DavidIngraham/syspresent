@@ -7819,7 +7819,7 @@ function projection(graph, focus, mode, options = {}, prepared = prepare4(graph)
 function summaryFor(data, mode, shown, total) {
   const unavailable = data.unavailable.size, filtered = data.filtered.size;
   let status2 = shown ? "shown" : unavailable ? "unavailable" : filtered ? "filtered" : "no-known-links";
-  let message = shown ? `${shown} of ${total} matching ${isStructuralElement(data.root) ? "structural / engineering" : "engineering"} neighbors shown.` : modes[mode].empty;
+  let message = shown ? `${shown} of ${total} matching ${isStructuralElement(data.root) ? "structural / engineering" : "engineering"} neighbors shown.` : unavailable || filtered ? "No matching neighbors are shown." : modes[mode].empty;
   if (data.rootReason) {
     status2 = ["not-requirement", "not-structural"].includes(data.rootReason) ? "filtered" : "missing-focus";
     message = data.rootReason === "not-requirement" ? "This action applies to requirement definitions and usages." : data.rootReason === "not-structural" ? "This action applies to parts and packages." : "The focused element is unavailable or excluded from engineering exploration.";

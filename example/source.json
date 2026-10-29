@@ -1,11 +1,11 @@
 {
   "repository": "https://github.com/DavidIngraham/sv-blue-dog",
   "baseRevision": "8f2dd804e964fd75828ff170c8c93572c751c8f2",
-  "revision": "e73d45624e9eedafc79f22f8559219195e9b313d",
-  "sourceCommit": "222a96e8adc240d4b5e11b9880d35d6633a6e69f",
+  "revision": "680a36b2ca452260cb5e01c32534d0a9ec715d30",
+  "sourceCommit": "680a36b2ca452260cb5e01c32534d0a9ec715d30",
   "sourceState": "committed",
-  "capturedAt": "2026-10-29T04:05:01.839817+00:00",
-  "sourceDigest": "95611e59d898cb4b7cd3032be774ee06276d7bdf3cf5ade99f3b988a4fb95586",
+  "capturedAt": "2026-10-29T15:56:09.467549+00:00",
+  "sourceDigest": "172853be8d6e3da37c318967f8b8df22c5359554ad2e4cfa8d93ee3edfd96adf",
   "sourceDigestFormat": "SHA-256 over sorted UTF-8 path + NUL + lowercase file SHA-256 + LF records",
   "modelValidationRuntimeRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
   "namespaceMigration": {
@@ -57,12 +57,24 @@
   },
   "files": [
     {
+      "path": "gorge-challenge-element-map.json",
+      "sha256": "d373f7211907f78f87fad8cb963401b5e3ded6cb273d9861d8d29224d45b36de"
+    },
+    {
+      "path": "gorge-challenge-migration.json",
+      "sha256": "d3e7e03c219fdb82f93869e14f7827b102bbd0afc320348f50338048549b4ec4"
+    },
+    {
       "path": "models/README.md",
-      "sha256": "d326375e963b609ea8b5f38272b077d8a075883ce84093e5f6064b1f8229e118"
+      "sha256": "3eb420da1907714e7a097b65c2d10101708826b50d908368613b135386da2cfa"
     },
     {
       "path": "models/blue-dog.sysml",
-      "sha256": "f32961b47aa620dc09f2cde75d5fa27cb35cdf8d07a2ded7611deb386652f2e2"
+      "sha256": "9b4edf033775f6548658dc10fe263fcdc3e80f9c6e66cc36b16ebf6e98d4ba47"
+    },
+    {
+      "path": "models/gorge-challenge.sysml",
+      "sha256": "abd0ad9d39cb5b334170c7239862d1e770b521831e56b9f4fa3453c584c54fe9"
     },
     {
       "path": "models/libraries/analysis.sysml",
@@ -90,21 +102,18 @@
     },
     {
       "path": "namespace-migration.json",
-      "sha256": "1e220c8dadd06afa7a9f702f8eb239af693d31dd7f309cd65a25f98944a2d9a8",
-      "upstreamPath": "reviews/namespace-restructure/namespace-map.json"
+      "sha256": "1e220c8dadd06afa7a9f702f8eb239af693d31dd7f309cd65a25f98944a2d9a8"
     },
     {
       "path": "shared-analysis-element-map.json",
-      "sha256": "73a4f731e0d406140993ad17eeffc6eb674b95e58bc4dc6144002d58d8df957f",
-      "upstreamPath": "reviews/shared-analysis-namespace/element-id-map.json"
+      "sha256": "73a4f731e0d406140993ad17eeffc6eb674b95e58bc4dc6144002d58d8df957f"
     },
     {
       "path": "shared-analysis-migration.json",
-      "sha256": "51cdc87d049ddb849877ccb3925a3be09cd882a9f598da334bd9b0c99f49dbd8",
-      "upstreamPath": "reviews/shared-analysis-namespace/namespace-map.json"
+      "sha256": "51cdc87d049ddb849877ccb3925a3be09cd882a9f598da334bd9b0c99f49dbd8"
     }
   ],
-  "publishedRevision": "e73d45624e9eedafc79f22f8559219195e9b313d",
+  "publishedRevision": "680a36b2ca452260cb5e01c32534d0a9ec715d30",
   "sharedAnalysisMigration": {
     "mappingFile": "shared-analysis-migration.json",
     "elementMappingFile": "shared-analysis-element-map.json",
@@ -142,5 +151,39 @@
       "InlandExtended",
       "InlandNavigationExperiment"
     ]
+  },
+  "gorgeChallengeMigration": {
+    "mappingFile": "gorge-challenge-migration.json",
+    "elementMappingFile": "gorge-challenge-element-map.json",
+    "baselineRevision": "e73d45624e9eedafc79f22f8559219195e9b313d",
+    "modelPayloadFiles": 8,
+    "libraryFiles": 6,
+    "standaloneProject": "models/gorge-challenge.sysml",
+    "sourceModelHashes": {
+      "models/blue-dog.sysml": "9b4edf033775f6548658dc10fe263fcdc3e80f9c6e66cc36b16ebf6e98d4ba47",
+      "models/gorge-challenge.sysml": "abd0ad9d39cb5b334170c7239862d1e770b521831e56b9f4fa3453c584c54fe9",
+      "models/libraries/analysis.sysml": "98065dc7f0298faffb538558fc960f030787a611632b0650b3706d1e748a37ff",
+      "models/libraries/decision-records.sysml": "93102a19a7e9c69cd35544bf7f4815657164803fd1bbe9af6d6689ad613f52f3",
+      "models/libraries/energy/budget.sysml": "6b2f8c827db736130e1f343652d7d45695a4c4b18d5b4e7ac07f3d7a444ca365",
+      "models/libraries/marine/design.sysml": "e39ba68e330e539167b298338b5bb20a98c3edb049d9a405a06df307640ef057",
+      "models/libraries/navigation/inland-obligations.sysml": "8954be8c0904583cb977609428ed23734c59cd05aacf57ee82a8669c8e39da16",
+      "models/libraries/navigation/inland-pair.sysml": "e0bb4518cbc1063a31ae63b5f8d3dbca4c06eb864c7a745199c45e47231de326"
+    },
+    "preservedNativeElements": 14933,
+    "movedElementIds": 401,
+    "nativeTopLevelPackages": 8,
+    "nativePackageCount": 115,
+    "intendedRoots": [
+      "Analysis",
+      "BlueDog",
+      "GorgeChallenge",
+      "EngineeringDecisions",
+      "MarineDesign",
+      "MarineEnergy",
+      "InlandExtended",
+      "InlandNavigationExperiment"
+    ],
+    "sourceCommitConfirmed": true,
+    "sourceRevision": "680a36b2ca452260cb5e01c32534d0a9ec715d30"
   }
 }

@@ -3,7 +3,7 @@
   "title": "Blue Dog: from the Gorge challenge to a defined boat",
   "navigation": {
     "roots": [
-      "BlueDog::Mission::Challenge",
+      "GorgeChallenge",
       "BlueDog::Requirements",
       "BlueDog",
       "BlueDog::Behavior::MissionLogic",

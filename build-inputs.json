@@ -509,7 +509,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/exploration.mjs": {
-      "bytes": 16494,
+      "bytes": 16551,
       "imports": [
         {
           "path": "src/canvas-prototype/child-exploration.mjs",
@@ -880,7 +880,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 1288941
+      "bytes": 1289015
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -1023,7 +1023,7 @@
           "bytesInOutput": 11935
         },
         "src/canvas-prototype/exploration.mjs": {
-          "bytesInOutput": 16559
+          "bytesInOutput": 16622
         },
         "src/canvas-prototype/context.mjs": {
           "bytesInOutput": 8552
@@ -1047,7 +1047,7 @@
           "bytesInOutput": 167034
         }
       },
-      "bytes": 696542
+      "bytes": 696605
     }
   }
 }
