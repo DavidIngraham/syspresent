@@ -1,11 +1,11 @@
 {
   "repository": "https://github.com/DavidIngraham/sv-blue-dog",
   "baseRevision": "8f2dd804e964fd75828ff170c8c93572c751c8f2",
-  "revision": "e8fb1601d35c5d1c8e7ec8084fe4a9391228ce30",
-  "sourceCommit": "ad26c68b7f01149cb207759cf390642c645ba514",
+  "revision": "e73d45624e9eedafc79f22f8559219195e9b313d",
+  "sourceCommit": "222a96e8adc240d4b5e11b9880d35d6633a6e69f",
   "sourceState": "committed",
-  "capturedAt": "2026-10-28T21:41:03.526311+00:00",
-  "sourceDigest": "1e3b86661c7a303ec1bed072e12f3ca6f6c1b8561d3a6edb604489752ab17998",
+  "capturedAt": "2026-10-29T04:05:01.839817+00:00",
+  "sourceDigest": "95611e59d898cb4b7cd3032be774ee06276d7bdf3cf5ade99f3b988a4fb95586",
   "sourceDigestFormat": "SHA-256 over sorted UTF-8 path + NUL + lowercase file SHA-256 + LF records",
   "modelValidationRuntimeRevision": "23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2",
   "namespaceMigration": {
@@ -58,75 +58,27 @@
   "files": [
     {
       "path": "models/README.md",
-      "sha256": "7ea593dea30407e14d020cfcf53f25b8ece4151c329dd04cc3e3d1b7892d5d45"
+      "sha256": "d326375e963b609ea8b5f38272b077d8a075883ce84093e5f6064b1f8229e118"
     },
     {
       "path": "models/blue-dog.sysml",
-      "sha256": "6e761cf3caf31a04e1421026d36961aeb1148ab9e41477e4cf224ae1035e964f"
+      "sha256": "f32961b47aa620dc09f2cde75d5fa27cb35cdf8d07a2ded7611deb386652f2e2"
+    },
+    {
+      "path": "models/libraries/analysis.sysml",
+      "sha256": "98065dc7f0298faffb538558fc960f030787a611632b0650b3706d1e748a37ff"
     },
     {
       "path": "models/libraries/decision-records.sysml",
       "sha256": "93102a19a7e9c69cd35544bf7f4815657164803fd1bbe9af6d6689ad613f52f3"
     },
     {
-      "path": "models/libraries/energy/actuation.sysml",
-      "sha256": "b0fba9c178586b4208e50bf7e681959c96cdff4c9d71d49f243b7ff9db57838f"
-    },
-    {
       "path": "models/libraries/energy/budget.sysml",
       "sha256": "6b2f8c827db736130e1f343652d7d45695a4c4b18d5b4e7ac07f3d7a444ca365"
     },
     {
-      "path": "models/libraries/marine/appendages.sysml",
-      "sha256": "86cefc51f2d86bcf3cc63fbe06fc8151836cd568d8dd7d73c23c696573131a9d"
-    },
-    {
-      "path": "models/libraries/marine/concept.sysml",
-      "sha256": "0d21f054d7cec7c54ead46154c2820787678dbcee57b433bf67d15077113f524"
-    },
-    {
-      "path": "models/libraries/marine/course.sysml",
-      "sha256": "3f58d6c0dc668858aa0b6bdad232c26b0ac75952ad67d0f06e73f4fbd464c85c"
-    },
-    {
       "path": "models/libraries/marine/design.sysml",
       "sha256": "e39ba68e330e539167b298338b5bb20a98c3edb049d9a405a06df307640ef057"
-    },
-    {
-      "path": "models/libraries/marine/hull-resistance.sysml",
-      "sha256": "967550313effe20092525e10c1695771b8354c66478203f449ac902d8af1a5f1"
-    },
-    {
-      "path": "models/libraries/marine/hydrostatics.sysml",
-      "sha256": "b6791576a108dee393063a15a1a359113a8c24aba793105fa7d60fa193e9d858"
-    },
-    {
-      "path": "models/libraries/marine/propulsion.sysml",
-      "sha256": "16848c8a487a3bd087d43099c5062ec4da6dc9e8aee5447af63e50ef3a5a6fc7"
-    },
-    {
-      "path": "models/libraries/marine/recovery.sysml",
-      "sha256": "00c8c1fcfda115116fc66bf1db5a67334e04ea893182a454a796ada62eeeaab4"
-    },
-    {
-      "path": "models/libraries/marine/reliability.sysml",
-      "sha256": "b5e5a18d2924737f1c84df6683c8806a56a65f62e06a3acf25e2d998008aaf29"
-    },
-    {
-      "path": "models/libraries/marine/sailing.sysml",
-      "sha256": "8281caf912a840d83d5a6d1c39fe0422419ce7fb9ccaae3d9044b0c5df33446f"
-    },
-    {
-      "path": "models/libraries/marine/surface.sysml",
-      "sha256": "781d337d8553160eb8d3c0724ae2aef4463d51ae6bc05ef475d32884645213c8"
-    },
-    {
-      "path": "models/libraries/marine/wave-performance.sysml",
-      "sha256": "ee1d491adb19773eb151588a5f8ccb52c8ee4364150c5783637c58ada8a07ba9"
-    },
-    {
-      "path": "models/libraries/marine/weather.sysml",
-      "sha256": "1d2d4a98082b0daefa5bcce180d4805c1e0907de818ed69d0b68b38d6c1f96b8"
     },
     {
       "path": "models/libraries/navigation/inland-obligations.sysml",
@@ -137,18 +89,58 @@
       "sha256": "e0bb4518cbc1063a31ae63b5f8d3dbca4c06eb864c7a745199c45e47231de326"
     },
     {
-      "path": "models/libraries/structures/mass-properties.sysml",
-      "sha256": "ced6365432541c9c9ada7b683564efde12f597d46e96144fd70221f767ef5dde"
-    },
-    {
-      "path": "models/libraries/structures/scantlings.sysml",
-      "sha256": "7ed46d886547ac779560838a5abc42c986ce3e41830b150ff0c11e3926fecd32"
-    },
-    {
       "path": "namespace-migration.json",
-      "upstreamPath": "reviews/namespace-restructure/namespace-map.json",
-      "sha256": "1e220c8dadd06afa7a9f702f8eb239af693d31dd7f309cd65a25f98944a2d9a8"
+      "sha256": "1e220c8dadd06afa7a9f702f8eb239af693d31dd7f309cd65a25f98944a2d9a8",
+      "upstreamPath": "reviews/namespace-restructure/namespace-map.json"
+    },
+    {
+      "path": "shared-analysis-element-map.json",
+      "sha256": "73a4f731e0d406140993ad17eeffc6eb674b95e58bc4dc6144002d58d8df957f",
+      "upstreamPath": "reviews/shared-analysis-namespace/element-id-map.json"
+    },
+    {
+      "path": "shared-analysis-migration.json",
+      "sha256": "51cdc87d049ddb849877ccb3925a3be09cd882a9f598da334bd9b0c99f49dbd8",
+      "upstreamPath": "reviews/shared-analysis-namespace/namespace-map.json"
     }
   ],
-  "publishedRevision": "556cd79e266394cae9e9b371a86941f50295cffc"
+  "publishedRevision": "e73d45624e9eedafc79f22f8559219195e9b313d",
+  "sharedAnalysisMigration": {
+    "mappingFile": "shared-analysis-migration.json",
+    "elementMappingFile": "shared-analysis-element-map.json",
+    "baselineRevision": "556cd79e266394cae9e9b371a86941f50295cffc",
+    "sourceRevision": "e73d45624e9eedafc79f22f8559219195e9b313d",
+    "modelPayloadFiles": 7,
+    "libraryFiles": 6,
+    "replacedCalculationDocuments": 15,
+    "canonicalAnalysis": "models/libraries/analysis.sysml",
+    "sourceModelHashes": {
+      "models/blue-dog.sysml": "f32961b47aa620dc09f2cde75d5fa27cb35cdf8d07a2ded7611deb386652f2e2",
+      "models/libraries/analysis.sysml": "98065dc7f0298faffb538558fc960f030787a611632b0650b3706d1e748a37ff",
+      "models/libraries/decision-records.sysml": "93102a19a7e9c69cd35544bf7f4815657164803fd1bbe9af6d6689ad613f52f3",
+      "models/libraries/energy/budget.sysml": "6b2f8c827db736130e1f343652d7d45695a4c4b18d5b4e7ac07f3d7a444ca365",
+      "models/libraries/marine/design.sysml": "e39ba68e330e539167b298338b5bb20a98c3edb049d9a405a06df307640ef057",
+      "models/libraries/navigation/inland-obligations.sysml": "8954be8c0904583cb977609428ed23734c59cd05aacf57ee82a8669c8e39da16",
+      "models/libraries/navigation/inland-pair.sysml": "e0bb4518cbc1063a31ae63b5f8d3dbca4c06eb864c7a745199c45e47231de326"
+    },
+    "preservedNativeElements": 14929,
+    "addedOrganizerIds": [
+      "Analysis",
+      "Analysis::Marine",
+      "Analysis::Mechanics",
+      "Analysis::Energy"
+    ],
+    "movedElementIds": 707,
+    "calculationDefinitions": 44,
+    "nativeTopLevelPackages": 7,
+    "intendedRoots": [
+      "Analysis",
+      "BlueDog",
+      "EngineeringDecisions",
+      "MarineDesign",
+      "MarineEnergy",
+      "InlandExtended",
+      "InlandNavigationExperiment"
+    ]
+  }
 }

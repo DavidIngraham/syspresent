@@ -859,11 +859,12 @@ function routeEdges(edges2, nodes, options = {}) {
     return result;
   }).filter(Boolean);
 }
-function fitDiagram(layout, area) {
-  const occupied = [...layout.nodes, ...layout.nodes.flatMap((n) => n.portLabelBox ? [n.portLabelBox] : []), ...layout.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], fit = fitNodes(occupied, area), scale = fit.scale;
-  const origin = occupied[0], fitted = fit.nodes[0], dx = origin ? fitted.x - origin.x * scale : area.x, dy = origin ? fitted.y - origin.y * scale : area.y;
+function fitDiagram(layout, area, { minimumScale = 0, focus } = {}) {
+  const occupied = [...layout.nodes, ...layout.nodes.flatMap((n) => n.portLabelBox ? [n.portLabelBox] : []), ...layout.edges.flatMap((e) => [...e.labelBox ? [e.labelBox] : [], ...e.points.map((p) => ({ ...p, width: 0, height: 0 }))])], fit = fitNodes(occupied, area), scale = Math.max(fit.scale, Math.min(1, Math.max(0, Number(minimumScale) || 0)));
+  const overflow = scale > fit.scale + 1e-4, origin = occupied[0], fitted = fit.nodes[0], anchor = layout.nodes.find((node) => node.semanticId === focus || node.id === focus) ?? layout.nodes.find((node) => !node.parentId) ?? origin;
+  const dx = overflow && anchor ? area.x + 8 - anchor.x * scale : origin ? fitted.x - origin.x * scale : area.x, dy = overflow && anchor ? area.y + 8 - anchor.y * scale : origin ? fitted.y - origin.y * scale : area.y;
   const point3 = (p) => ({ x: p.x * scale + dx, y: p.y * scale + dy }), box = (n) => ({ ...n, ...point3(n), width: n.width * scale, height: n.height * scale });
-  return { ...layout, scale, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point3), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point3(p) })) };
+  return { ...layout, scale, ...overflow ? { readabilityNotice: { reason: "readable-native-overflow", message: "Native mixed view opens at readable scale. Pan or zoom to inspect its complete geometry; Frame neighborhood shows the full drawing." } } : {}, nodes: layout.nodes.map((n) => ({ ...box(n), ...n.headerHeight ? { headerHeight: n.headerHeight * scale } : {}, ...n.portLabelBox ? { portLabelBox: box(n.portLabelBox) } : {} })), edges: layout.edges.map((e) => ({ ...e, points: e.points.map(point3), ...e.labelBox ? { labelBox: box(e.labelBox), x: e.x * scale + dx, y: e.y * scale + dy } : {}, labelScale: scale })), ports: layout.ports?.map((p) => ({ ...p, ...point3(p) })) };
 }
 function clearOfRouteObstacles(points, obstacles, orthogonalOnly) {
   if (points.length < 2 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
@@ -2876,7 +2877,7 @@ function measureCard(document2, node, detail) {
 }
 
 // src/canvas-prototype/conversation.mjs
-var DEFINITIONS = /* @__PURE__ */ new Set(["GeneralView", "ActionFlowView", "InterconnectionView", "StateTransitionView", "SequenceView"]);
+var DEFINITIONS = /* @__PURE__ */ new Set(["GeneralView", "ActionFlowView", "InterconnectionView", "StateTransitionView", "SequenceView", "MixedView"]);
 var quote = (value) => "'" + value.replaceAll("\\", "\\\\").replaceAll("'", "\\'") + "'";
 var reference = (value) => {
   if (typeof value !== "string" || !value || /[\u0000-\u001f\u007f]/.test(value)) throw Error("Capture requires native-qualified model identities");
@@ -2888,11 +2889,11 @@ function nativeViewDefinitionSource({ packageName, name = "slide", definition = 
   const refs5 = [...new Set(qualifiedNames ?? [])];
   if (!refs5.length) throw Error("Capture requires native-qualified model elements");
   const filters = [...new Set(kinds2)];
-  if (filters.some((kind) => !/^\w+(Usage|Definition)$/.test(kind))) throw Error("Unsupported native capture filter");
+  if (filters.some((kind) => kind !== "Package" && !/^\w+(Usage|Definition)$/.test(kind))) throw Error("Unsupported native capture filter");
   const requirement = filters.some((kind) => /^Requirement(Usage|Definition)$/.test(kind));
   return `package ${packageName} {
     private import StandardViewDefinitions::*;
-    view def Definition :> ${definition}${filters.length ? " {\n        filter " + filters.map((kind) => "@SysML::" + kind).join(" or ") + ";\n    }" : ";"}
+${definition === "MixedView" ? "    private import OpenSysMLRenderings::*;\n" : ""}    view def Definition :> ${definition}${filters.length ? " {\n        filter " + filters.map((kind) => "@SysML::" + kind).join(" or ") + ";\n    }" : ";"}
     view ${name} : Definition {
 ${requirement ? "        @OpenSysMLRenderings::RequirementContext { relationshipDepth = 0; }\n" : ""}${refs5.map((q) => "        expose " + reference(q) + ";").join("\n")}
     }
@@ -2932,7 +2933,7 @@ async function prepareNativeCapture(project, { view, graph, views, focus, title 
   const declared = views?.has?.(viewName);
   if (!declared) {
     const selected = identities(view), byId = new Map((graph?.elements ?? []).map((element2) => [element2.id, element2]));
-    const names = view.capture ? [view.capture.root] : selected.map((id) => byId.get(id)?.qualifiedName);
+    const names = view.capture && view.capture.definition !== "MixedView" ? [view.capture.root] : selected.map((id) => byId.get(id)?.qualifiedName);
     if (names.some((name) => !name)) throw Error("A selected element has no native qualified identity; capture is unavailable");
     const kinds2 = view.capture ? [] : selected.map((id) => byId.get(id)?.kind).filter(Boolean);
     source2 = nativeViewDefinitionSource({ packageName: identity5.packageName, qualifiedNames: names, definition: view.capture?.definition ?? "GeneralView", kinds: kinds2 });
@@ -8982,6 +8983,7 @@ function discardLoadingModel() {
   state.loadingLease = null;
 }
 function home() {
+  nextNativeViewRequest();
   const operation = state.loadOperation;
   operation?.abort.abort();
   if (operation) loadingProgress.cancel(operation.id);
@@ -9146,6 +9148,7 @@ async function loadProject(project, { cacheHash = state.trustedCacheHash, loadTo
   const revision = operation?.id ?? loadToken;
   if (revision !== state.loadRevision) return;
   ++state.revision;
+  nextNativeViewRequest();
   invalidateAuthoring();
   discardLoadingModel();
   $("landing-error").hidden = true;
@@ -9419,7 +9422,7 @@ async function prepareFrame(view, focus, panels, { journey = false, revision = s
     }
     return layoutChildWorkspace({ ...overlay.view, nodes: nodes2 }, { width: area.width, measureLabel: labelSize, isCurrent: () => revision === state.revision });
   };
-  let layout = await layoutFor(false), fitted = childWorkspace ? placeChildWorkspace(layout, area) : fitDiagram(layout, area);
+  let layout = await layoutFor(false), fitted = childWorkspace ? placeChildWorkspace(layout, area) : fitDiagram(layout, area, view.kind === "mixed" && !journey && state.renderingMode === "exploratory" ? { minimumScale: 1, focus } : void 0);
   const automaticFitted = fitted, placementKey = presentationViewKey(view), restored = !journey && renderingPolicy(state.renderingMode).manualLayout ? state.presentationLayouts.restore(view, automaticFitted, { area, measureLabel: labelSize }) : { positions: {}, omissions: [] };
   if (Object.keys(restored.positions).length) fitted = applyManualPositions({ ...automaticFitted, kind: view.kind }, restored.positions, { measureLabel: labelSize, area });
   const portPlacement = placePortLabels(fitted.nodes, fitted.edges, { area, scale: fitted.scale, measureLabel: labelSize });
@@ -9448,7 +9451,7 @@ async function prepareFrame(view, focus, panels, { journey = false, revision = s
     return { ...e, journey: journey && !e.context, sourceClipped: a?.kind === "context-boundary", targetClipped: b?.kind === "context-boundary", key: base + ":" + ordinal, sourceKey: a?.key, targetKey: b?.key, sourceSemantic: a?.semanticId || ownerA?.semanticId, targetSemantic: b?.semanticId || ownerB?.semanticId, opacity: e.context ? 0.18 : !journey && displayPreferences().emphasis.length && !displayPreferences().emphasis.includes(e.kind) ? 0.28 : 1, routePoints: e.points, points: samplePolyline(e.points.length ? e.points : [{ x: 0, y: 0 }, { x: 0, y: 0 }]) };
   });
   const notationNotices = layout.edges.map((e) => ({ e, appearance: (state.renderingMode === "focused" ? focusedEdgeAppearance : edgeAppearance)(e, { viewKind: view.kind, graph: state.graph, view }) })).filter((p) => p.appearance.notice).map((p) => ({ reason: p.appearance.supported ? "native-notation-notice" : "unsupported-notation", target: p.e.target, relationshipId: p.e.id, message: p.appearance.notice }));
-  const omissions = [...state.renderingMode === "focused" ? focusedNotationNotices(layout, state.graph) : [], ...overlay.omissions, ...restored.omissions, ...endpointPlacement.omissions, ...portPlacement.omissions, ...layout.omissions ?? [], ...view.omissions ?? [], ...(layout.notices ?? []).map((n) => ({ reason: n.code ?? "layout", message: n.message })), ...(view.notices ?? []).map((message) => ({ reason: "native-view", message: typeof message === "string" ? message : JSON.stringify(message) })), ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
+  const omissions = [...fitted.readabilityNotice ? [fitted.readabilityNotice] : [], ...state.renderingMode === "focused" ? focusedNotationNotices(layout, state.graph) : [], ...overlay.omissions, ...restored.omissions, ...endpointPlacement.omissions, ...portPlacement.omissions, ...layout.omissions ?? [], ...view.omissions ?? [], ...(layout.notices ?? []).map((n) => ({ reason: n.code ?? "layout", message: n.message })), ...(view.notices ?? []).map((message) => ({ reason: "native-view", message: typeof message === "string" ? message : JSON.stringify(message) })), ...notationNotices, ...fringe.omissions, ...fringe.notices, ...routed.filter((e) => e.labelOmitted || e.routingBlocked).map((e) => ({ reason: e.labelOmitted ? "label-space" : "route-space", target: e.semanticTarget || e.target, relationshipId: e.semanticId || e.id }))];
   return { view, focus, journey, nodes, edges: edges2, area, fitted, automaticFitted, restoredPositions: restored.positions, placementKey, rollups: overlay.rollups, width: stage.clientWidth, height: stage.clientHeight, panels, scale: fitted.scale, layout, omissions, routingMetrics: fringe.routingMetrics, worldBounds: childWorkspace ? fitted.worldBounds : fringe.worldBounds, neighborhood: { shown: context.elements.length, total: context.elements.length + new Set(context.omissions.filter((o) => o.reason === "budget").map((o) => o.target)).size, budget } };
 }
 function face(n) {
@@ -10107,6 +10110,7 @@ async function performTransition(view, focus, { animate = true, journey, allowDi
 }
 async function showScene(index5, animate = true, { record = false, urlMode = "push" } = {}) {
   if (index5 < 0 || index5 >= state.scenes.length) return;
+  nextNativeViewRequest();
   const saved = snapshot(), savedHistory = [...state.history], savedFuture = [...state.future], savedURL = location.href;
   if (record) remember();
   state.sceneIndex = index5;
@@ -10299,12 +10303,16 @@ async function switchWorkspaceView(value) {
   else if (value.startsWith("native:")) await explore(state.focus, value.slice(7));
   else if (["context", "contents", "effective", "local-understanding", "global-impact"].includes(value)) await followTrace(state.focus, value);
 }
+function nextNativeViewRequest() {
+  return state.nativeViewRevision = (state.nativeViewRevision ?? 0) + 1;
+}
 async function openNativeView(name, { compare: compare9 = false } = {}) {
-  const revision = ++state.revision, modelHash = state.modelHash;
+  const request = nextNativeViewRequest(), modelHash = state.modelHash;
+  ++state.revision;
   let view = state.views.get(name);
   if (!view) {
     const raw = await state.engine.call("RenderView", { modelHash, view: name, includeSemanticIdentity: true });
-    if (revision !== state.revision || modelHash !== state.modelHash) return;
+    if (request !== state.nativeViewRevision || modelHash !== state.modelHash) return;
     view = requireNativeIdentity(adaptNativeView(raw, name));
     if (!supportsView(view)) throw Error("Unsupported native notation: " + view.kind);
   }
@@ -10349,6 +10357,7 @@ function updateExplorationControls() {
 async function restoreHistory(direction) {
   const from = direction === "back" ? state.history : state.future, to = direction === "back" ? state.future : state.history;
   if (!from.length) return;
+  nextNativeViewRequest();
   const target = from.pop(), current = snapshot();
   to.push(current);
   restoreValues(target);
@@ -10372,6 +10381,7 @@ async function restoreHistory(direction) {
 }
 async function openExploration(view, id, { request = null, info = null, record = true, resetRegions = false, scopeId = state.packageScope } = {}) {
   assertInScope(view, scopeId);
+  nextNativeViewRequest();
   const previous = snapshot(), history2 = [...state.history], future = [...state.future];
   if (record) remember();
   if (view.childProjection) state.renderingMode = "exploratory";
@@ -10421,16 +10431,17 @@ async function explore(id, kind) {
     await followTrace(id, "contents");
     return;
   }
-  const revision = ++state.revision, modelHash = state.modelHash, q = qname(id);
+  const request = nextNativeViewRequest(), modelHash = state.modelHash, q = qname(id);
+  ++state.revision;
   if (!q) throw Error("Native view requires a qualified model identity");
   status("Preparing native " + kind + " view\u2026");
   const name = `#${kind}:${q}`, raw = await state.engine.call("RenderView", { modelHash, view: name, includeSemanticIdentity: true });
-  if (revision !== state.revision || modelHash !== state.modelHash) return;
+  if (request !== state.nativeViewRevision || modelHash !== state.modelHash) return;
   const view = requireNativeIdentity(adaptNativeView(raw, name));
   if (!supportsView(view)) throw Error("Unsupported native notation: " + view.kind);
   if (!representedIdentities(view).length) throw Error("No native " + kind + " content is available for " + label(id) + ".");
   assertInScope(view);
-  const definition = { action: "ActionFlowView", state: "StateTransitionView", sequence: "SequenceView", interconnection: "InterconnectionView" }[kind];
+  const definition = { action: "ActionFlowView", state: "StateTransitionView", sequence: "SequenceView", interconnection: "InterconnectionView", mixed: "MixedView" }[kind];
   if (definition) view.capture = { definition, root: q };
   state.extraViews ??= /* @__PURE__ */ new Map();
   state.extraViews.set(view.id, view);
@@ -11352,6 +11363,7 @@ function bind() {
   for (const demo of document.querySelectorAll("[data-demo]")) demo.onclick = () => openDemo(demo.dataset.demo).catch(report);
   $("home").onclick = home;
   $("resume-model").onclick = async () => {
+    nextNativeViewRequest();
     try {
       state.loadOperation?.abort.abort();
       if (state.loadOperation) loadingProgress.cancel(state.loadOperation.id);

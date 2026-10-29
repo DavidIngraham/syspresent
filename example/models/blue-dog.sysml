@@ -6172,10 +6172,10 @@ package BlueDog {
              * and immutable replay; this is not an installed equipment qualification.
              * No independent electronics component split or perception capability is credited. */
             attribute exposureHours : Real = candidate.westerlyPassageHours*energyInputs.durationMultiplier+energyInputs.delayHours;
-            attribute wingAverageCase : Real [3] ordered nonunique = MarineActuation::DrivePower(energyGoverningCase.wingTorqueNm,energyInputs.wingRateRadS,energyInputs.motorEfficiency,energyInputs.gearboxEfficiency,energyInputs.wingNoLoadW,energyInputs.wingControllerW,energyInputs.wingMotorHoldingW,energyInputs.wingMoveFraction,energyInputs.wingHoldingFraction);
-            attribute rudderAverageCase : Real [3] ordered nonunique = MarineActuation::DrivePower(energyGoverningCase.rudderTorqueNm,energyInputs.rudderRateRadS,energyInputs.motorEfficiency,1,1,0.1,energyInputs.rudderHoldingWPerNm*energyGoverningCase.rudderTorqueNm,energyInputs.rudderMoveFraction,1-energyInputs.rudderMoveFraction);
-            attribute wingPeakCase : Real [3] ordered nonunique = MarineActuation::DrivePower(peakGoverningCase.wingTorqueNm,energyInputs.wingRateRadS,energyInputs.motorEfficiency,energyInputs.gearboxEfficiency,energyInputs.wingNoLoadW,energyInputs.wingControllerW,energyInputs.wingMotorHoldingW,energyInputs.wingMoveFraction,energyInputs.wingHoldingFraction);
-            attribute rudderPeakCase : Real [3] ordered nonunique = MarineActuation::DrivePower(peakGoverningCase.rudderTorqueNm,energyInputs.rudderRateRadS,energyInputs.motorEfficiency,1,1,0.1,energyInputs.rudderHoldingWPerNm*peakGoverningCase.rudderTorqueNm,energyInputs.rudderMoveFraction,1-energyInputs.rudderMoveFraction);
+            attribute wingAverageCase : Real [3] ordered nonunique = Analysis::Energy::Actuation::DrivePower(energyGoverningCase.wingTorqueNm,energyInputs.wingRateRadS,energyInputs.motorEfficiency,energyInputs.gearboxEfficiency,energyInputs.wingNoLoadW,energyInputs.wingControllerW,energyInputs.wingMotorHoldingW,energyInputs.wingMoveFraction,energyInputs.wingHoldingFraction);
+            attribute rudderAverageCase : Real [3] ordered nonunique = Analysis::Energy::Actuation::DrivePower(energyGoverningCase.rudderTorqueNm,energyInputs.rudderRateRadS,energyInputs.motorEfficiency,1,1,0.1,energyInputs.rudderHoldingWPerNm*energyGoverningCase.rudderTorqueNm,energyInputs.rudderMoveFraction,1-energyInputs.rudderMoveFraction);
+            attribute wingPeakCase : Real [3] ordered nonunique = Analysis::Energy::Actuation::DrivePower(peakGoverningCase.wingTorqueNm,energyInputs.wingRateRadS,energyInputs.motorEfficiency,energyInputs.gearboxEfficiency,energyInputs.wingNoLoadW,energyInputs.wingControllerW,energyInputs.wingMotorHoldingW,energyInputs.wingMoveFraction,energyInputs.wingHoldingFraction);
+            attribute rudderPeakCase : Real [3] ordered nonunique = Analysis::Energy::Actuation::DrivePower(peakGoverningCase.rudderTorqueNm,energyInputs.rudderRateRadS,energyInputs.motorEfficiency,1,1,0.1,energyInputs.rudderHoldingWPerNm*peakGoverningCase.rudderTorqueNm,energyInputs.rudderMoveFraction,1-energyInputs.rudderMoveFraction);
             part def Load {
                 attribute label : String;
                 attribute averageBusW : Real;
@@ -6249,7 +6249,7 @@ package BlueDog {
                 assert constraint { RealFunctions::abs(departureWh-candidate.departureWh)<0.00000001 }
             }
             dependency replayBasis from Reconciliation to BlueDog::Evidence::SRRCurrent::candidate;
-            dependency driveBasis from Reconciliation to MarineActuation::DrivePower;
+            dependency driveBasis from Reconciliation to Analysis::Energy::Actuation::DrivePower;
             dependency reserveBasis from reserve to BlueDog::Requirements::lowEnergyRecovery;
         }
 
@@ -7025,7 +7025,7 @@ package BlueDog {
                 attribute surfaceLimit : String = "Archived airport observations support seasonal sensitivity; they do not provide a calibrated along-route launch forecast or small-wing exposure.";
                 attribute chartSource : String = "evidence/course/2026-10-11/sources.json";
                 attribute currentLimit : String = "Chart geometry and pool stage do not establish a local current maximum. Retain 1.5 m/s as a proposed sensitivity bound pending spatial current evidence; recovery routing must reject insufficient authority.";
-                attribute waveBasis : String = "MarineSurface::FetchSea; effective fetch 3, 8 and 15 km. These are model sensitivities, not surveyed directional fetch or observed wave statistics.";
+                attribute waveBasis : String = "Analysis::Marine::Surface::FetchSea; effective fetch 3, 8 and 15 km. These are model sensitivities, not surveyed directional fetch or observed wave statistics.";
                 attribute reviewAccepted : Boolean = false;
                 metadata issue : ModelingMetadata::Issue { text = "Qualification shall use coupled wind, current and waves plus separate wake events. The SRR allocations define the design domain; measured route profiles and forecast-conditioned exposure are required before field release. Do not infer joint extremes by combining independent maxima or assign return periods without evidence."; }
             }
@@ -7059,9 +7059,9 @@ package BlueDog {
                 out attribute windsMps : Real [9] ordered nonunique = (6,6,6,10,10,10,15,15,15);
                 out attribute fetchesM : Real [9] ordered nonunique = (3000,8000,15000,3000,8000,15000,3000,8000,15000);
                 out attribute heightsM : Real [9] ordered nonunique = (1..9)->ControlFunctions::collect {
-                    in i : Integer; MarineSurface::FetchSea((windsMps#(i),fetchesM#(i),9.80665))#(1) };
+                    in i : Integer; Analysis::Marine::Surface::FetchSea((windsMps#(i),fetchesM#(i),9.80665))#(1) };
                 out attribute periodsSeconds : Real [9] ordered nonunique = (1..9)->ControlFunctions::collect {
-                    in i : Integer; MarineSurface::FetchSea((windsMps#(i),fetchesM#(i),9.80665))#(2) };
+                    in i : Integer; Analysis::Marine::Surface::FetchSea((windsMps#(i),fetchesM#(i),9.80665))#(2) };
             }
             dependency windBasis from proposed to BlueDog::Requirements::gorgeWind;
             dependency waveBasis from proposed to BlueDog::Requirements::gorgeWaves;
@@ -7072,7 +7072,7 @@ package BlueDog {
 
         package Hydrostatics {
             private import ScalarValues::*;
-            public import MarineHydrostatics::*;
+            public import Analysis::Marine::Hydrostatics::*;
             analysis analyticExample {
                 out attribute partial : Real [4] ordered nonunique = WetMoment((0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0),0.5);
                 out attribute full : Real [4] ordered nonunique = WetMoment((0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0),1.0);
@@ -7139,7 +7139,7 @@ package BlueDog {
                 assert constraint inputDomain { exposureHours >= 0 and distanceM >= 0 }
                 attribute speedMps : Real = if inverted ? hypothesis.invertedSpeedMps else hypothesis.recoverySpeedMps;
                 attribute motorW : Real = if inverted ? hypothesis.invertedMotorW else hypothesis.recoveryMotorW;
-                attribute segment : Real [4] ordered nonunique = MarineRecovery::Segment((distanceM,speedMps,alongCurrentMps,crossCurrentMps,motorW,hypothesis.recoveryEssentialW,hypothesis.recoveryUncertainty));
+                attribute segment : Real [4] ordered nonunique = Analysis::Marine::Recovery::Segment((distanceM,speedMps,alongCurrentMps,crossCurrentMps,motorW,hypothesis.recoveryEssentialW,hypothesis.recoveryUncertainty));
                 out attribute configurationId : String = hypothesis.identifier;
                 out attribute mainNameplateWh : Real = BlueDog::Configurations::IC01::design.battery_Wh;
                 out attribute independentNameplateWh : Real = hypothesis.recoveryBatteryWh;
@@ -7561,9 +7561,9 @@ package BlueDog {
 
         package Operating {
             private import ScalarValues::*;
-            public import MarineSailing::*;
-            public import MarineStructures::*;
-            public import MarineCourse::*;
+            public import Analysis::Marine::Sailing::*;
+            public import Analysis::Mechanics::Structures::*;
+            public import Analysis::Marine::Course::*;
             doc /* Quasi-steady force balance. VSPAERO supplies inviscid CL/CDi/CMy;
              * discrepancy factors and viscous drag remain provisional model inputs.
              * Hydrostatic heave/pitch and mast-trim geometry are external geometry solves.
@@ -7627,14 +7627,14 @@ package BlueDog {
             private import ScalarValues::*;
             analysis Contours {
                 out attribute hours : Real [15] ordered = (12,18,24,30,36,42,48,54,60,66,72,78,84,90,96);
-                out attribute rate99 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; MarineReliability::EqualSurvivalRate(0.99,h) };
-                out attribute rate95 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; MarineReliability::EqualSurvivalRate(0.95,h) };
-                out attribute rate90 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; MarineReliability::EqualSurvivalRate(0.90,h) };
-                out attribute rate80 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; MarineReliability::EqualSurvivalRate(0.80,h) };
+                out attribute rate99 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; Analysis::Reliability::EqualSurvivalRate(0.99,h) };
+                out attribute rate95 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; Analysis::Reliability::EqualSurvivalRate(0.95,h) };
+                out attribute rate90 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; Analysis::Reliability::EqualSurvivalRate(0.90,h) };
+                out attribute rate80 : Real [15] ordered nonunique = hours->ControlFunctions::collect { in h : Real; Analysis::Reliability::EqualSurvivalRate(0.80,h) };
                 out attribute exampleHours : Real [2] ordered = (60,30);
                 out attribute exampleRates : Real [2] ordered = (0.001,0.0015);
-                out attribute slowerSurvival : Real = MarineReliability::ConstantHazardSurvival(exampleRates#(1),exampleHours#(1));
-                out attribute fasterSurvival : Real = MarineReliability::ConstantHazardSurvival(exampleRates#(2),exampleHours#(2));
+                out attribute slowerSurvival : Real = Analysis::Reliability::ConstantHazardSurvival(exampleRates#(1),exampleHours#(1));
+                out attribute fasterSurvival : Real = Analysis::Reliability::ConstantHazardSurvival(exampleRates#(2),exampleHours#(2));
                 out attribute fasterWins : Boolean = fasterSurvival > slowerSurvival;
                 metadata rationale : ModelingMetadata::Rationale { text = "Illustrative sensitivity for the finite Gorge mission: hourly critical failure rate may rise if total accumulated hazard falls. Points are hypothetical, not displacement/planing predictions or measured Blue Dog rates. Contours describe conditional hardware survival only; route completion, holds, weather and operational failures require joint trajectory evaluation."; }
             }
@@ -7704,7 +7704,7 @@ package BlueDog {
                     candidate.essentialPower > 0 [W] and candidate.availableReserve >= 0 [J] and
                     candidate.poweredDuration > 0 [s] and candidate.essentialDuration >= candidate.poweredDuration and candidate.uncertaintyFactor >= 1
                 }
-                out attribute idealPower : PowerValue = MarinePropulsion::IdealAxialDiskPower(thrustN, diameterM, rho, speed) * 1 [W];
+                out attribute idealPower : PowerValue = Analysis::Marine::Propulsion::IdealAxialDiskPower(thrustN, diameterM, rho, speed) * 1 [W];
                 out attribute electricalPower : PowerValue = idealPower / candidate.overallEfficiency;
                 return requiredReserve : EnergyValue = BlueDog::Requirements::RecoveryReserveDemand(electricalPower, candidate.essentialPower, candidate.poweredDuration, candidate.essentialDuration, candidate.uncertaintyFactor);
                 out attribute reserveMargin : EnergyValue = candidate.availableReserve - requiredReserve;
@@ -7767,7 +7767,7 @@ package BlueDog {
                 in missionHours : Real;
                 in conflictRatePerHour : Real;
                 in recoveryHours : Real;
-                return probability : Real = (1-MarineReliability::ConstantHazardSurvival(lossRatePerHour,missionHours))*(1-MarineReliability::ConstantHazardSurvival(conflictRatePerHour,recoveryHours));
+                return probability : Real = (1-Analysis::Reliability::ConstantHazardSurvival(lossRatePerHour,missionHours))*(1-Analysis::Reliability::ConstantHazardSurvival(conflictRatePerHour,recoveryHours));
             }
             analysis Sensitivity {
                 out attribute lossRatesPerHour : Real [9] ordered nonunique = (0.0001,0.0001,0.0001,0.001,0.001,0.001,0.01,0.01,0.01);
@@ -7907,8 +7907,8 @@ package BlueDog {
                 out attribute voyageHours : Real = profile.voyageDuration / (3600 [s]);
                 out attribute minimumProgressMet : Boolean = BlueDog::Requirements::LegProgressCriterion(groundSpeeds);
                 out attribute durationMet : Boolean = BlueDog::Requirements::PassageDurationCriterion(profile.voyageDuration, profile.qualifiedDuration);
-                out attribute allowableRatePerHour : Real = if inputsValid ? MarineReliability::EqualSurvivalRate(0.90, voyageHours) else 0;
-                out attribute modeledReliability : Real = if inputsValid ? MarineReliability::ConstantHazardSurvival(profile.totalRatePerHour, voyageHours) else 0;
+                out attribute allowableRatePerHour : Real = if inputsValid ? Analysis::Reliability::EqualSurvivalRate(0.90, voyageHours) else 0;
+                out attribute modeledReliability : Real = if inputsValid ? Analysis::Reliability::ConstantHazardSurvival(profile.totalRatePerHour, voyageHours) else 0;
                 out attribute rateBudgetMet : Boolean = inputsValid and BlueDog::Requirements::FailureRateCriterion(profile.totalRatePerHour, voyageHours);
                 out attribute requiredZeroFailureHours : Real = if inputsValid ? -OpenSysMLMathFunctions::ln(0.05) / allowableRatePerHour else 0;
                 out attribute demonstrationApplicable : Boolean = inputsValid and profile.observedCriticalFailures == 0;
@@ -9084,7 +9084,7 @@ package BlueDog {
                 attribute geometryReference : String;
                 attribute geometryEvidenceAccepted : Boolean default false;
             }
-            public import MarineHydrostatics::BuoyancyMomentSensitivity;
+            public import Analysis::Marine::Hydrostatics::BuoyancyMomentSensitivity;
             analysis buoyancyIllustration {
                 doc /* Ten litres fully immersed at +/-1 m horizontal lever in freshwater.
                  * This is a sensitivity example, not a candidate volume or predicted GZ. */
@@ -9243,7 +9243,7 @@ package BlueDog {
 
         package Sizing {
             private import ScalarValues::*;
-            public import MarineMass::*;
+            public import Analysis::Mechanics::Mass::*;
             private import BlueDog::Requirements::Structure::material;
             doc /* CAD/mesh metrics supply geometry; native calculations own material mass,
              * center of gravity and engineering loads. All numerical process allocations
@@ -9585,8 +9585,8 @@ package BlueDog {
                     result.operatingMargins->ControlFunctions::forAll { in x : Real; x >= -0.0001 };
                 out attribute westPass : Boolean = eligible and result.routeMargins#(4) >= -0.0001 and result.routeMargins#(5) >= -0.0001 and result.routeMargins#(6) >= -0.0001;
                 out attribute eastPass : Boolean = eligible and result.routeMargins#(1) >= -0.0001 and result.routeMargins#(2) >= -0.0001 and result.routeMargins#(3) >= -0.0001;
-                out attribute coverage : Real [11] ordered nonunique = probabilities->ControlFunctions::collect { in p : Real; MarineWeather::TwoRegimeCoverage(p,westPass,eastPass) };
-                out attribute conditionalHours : Real [11] ordered nonunique = probabilities->ControlFunctions::collect { in p : Real; MarineWeather::ConditionalPassageHours(p,westPass,eastPass,result.westerlyHours,result.easterlyHours) };
+                out attribute coverage : Real [11] ordered nonunique = probabilities->ControlFunctions::collect { in p : Real; Analysis::Marine::Weather::TwoRegimeCoverage(p,westPass,eastPass) };
+                out attribute conditionalHours : Real [11] ordered nonunique = probabilities->ControlFunctions::collect { in p : Real; Analysis::Marine::Weather::ConditionalPassageHours(p,westPass,eastPass,result.westerlyHours,result.easterlyHours) };
                 doc /* Counterfactual persistent-regime sensitivity over archived fixed geometry.
                  * Probabilities are swept, not calibrated from hourly station frequencies.
                  * A failed route screen is a failure, not a large finite passage time.
@@ -9609,7 +9609,7 @@ package BlueDog {
 
         package WingActuator {
             private import ScalarValues::*;
-            public import MarineActuation::*;
+            public import Analysis::Energy::Actuation::*;
             doc /* Output-shaft torque and speed drive electrical consumption. Efficiency
              * and idle/no-load losses are measured or bounded inputs, not free design
              * improvements. A self-locking candidate may be studied with holding motor
@@ -9656,7 +9656,7 @@ package BlueDog {
                 metadata rationale : ModelingMetadata::Rationale { text = "Cover the current operating heel bounds and three wind directions. Resolve heel-induced spanwise flow and compare with the provisional cosine projection, holding mast trim fixed for each nominal incidence. Free-air attached-flow sensitivity only; no water surface, hull, mast, stall, gust or dynamic roll model. No automatic replacement of the optimizer polar."; }
             }
             dependency purpose from sweepInputs to BlueDog::Requirements::cruiseEvidence;
-            dependency approximationUnderReview from sweepInputs to MarineSailing::Evaluate;
+            dependency approximationUnderReview from sweepInputs to Analysis::Marine::Sailing::Evaluate;
             dependency scope from sweepInputs to BlueDog::Decisions::Design::aerodynamicScope;
         }
     }
@@ -11011,7 +11011,7 @@ package BlueDog {
             dependency holdingFiniteAdmission from holdingDrive to BlueDog::Requirements::launchEnergyAdmission;
             dependency holdingFiniteReserve from holdingDrive to BlueDog::Requirements::recoveryEnergy;
             dependency holdingRecovery from holdingDrive to BlueDog::Requirements::capsizeControlRecovery;
-            dependency holdingCalculation from holdingDrive to MarineActuation::DrivePower;
+            dependency holdingCalculation from holdingDrive to Analysis::Energy::Actuation::DrivePower;
 
             item aerodynamicScope : EngineeringDecisions::DecisionRecord {
                 attribute :>> recordState = EngineeringDecisions::RecordState::workingDisposition;
@@ -11022,7 +11022,7 @@ package BlueDog {
             dependency heelSensitivityEvidence from aerodynamicScope to BlueDog::Analyses::WingHeel::sweepInputs;
             dependency sizingAerodynamicPolicy from aerodynamicScope to BlueDog::Analyses::AerodynamicPolicy::sizing;
             dependency polarPurpose from aerodynamicScope to BlueDog::Requirements::cruiseEvidence;
-            dependency polarCalculation from aerodynamicScope to MarineSailing::Evaluate;
+            dependency polarCalculation from aerodynamicScope to Analysis::Marine::Sailing::Evaluate;
 
             item structuralScope : EngineeringDecisions::DecisionRecord {
                 attribute :>> recordState = EngineeringDecisions::RecordState::workingDisposition;
@@ -11032,7 +11032,7 @@ package BlueDog {
             }
             dependency structureChoice from structuralScope to BlueDog::Requirements::Structure::hybridConstruction;
             dependency structureCriteria from structuralScope to BlueDog::Requirements::Structure::structuralIntegrity;
-            dependency structureCalculation from structuralScope to MarineStructures::DesignMargins;
+            dependency structureCalculation from structuralScope to Analysis::Mechanics::Structures::DesignMargins;
 
             item recoveryScope : EngineeringDecisions::DecisionRecord {
                 attribute :>> recordState = EngineeringDecisions::RecordState::workingDisposition;
@@ -11041,7 +11041,7 @@ package BlueDog {
                 metadata rationale : ModelingMetadata::Rationale { text = "Positive sampled roll moments on a pitch-unstable equilibrium branch do not establish a recovery trajectory. Freely flooded material and fully retained water are distinct static sensitivities, not leakage or slosh predictions."; }
             }
             dependency recoveryCriteria from recoveryScope to BlueDog::Requirements::selfRighting;
-            dependency recoveryCalculation from recoveryScope to MarineHydrostatics::Balance;
+            dependency recoveryCalculation from recoveryScope to Analysis::Marine::Hydrostatics::Balance;
 
             item energyEvidenceAcceptance : EngineeringDecisions::DecisionRecord {
                 attribute :>> recordState = EngineeringDecisions::RecordState::workingDisposition;

@@ -16,7 +16,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/geometry.mjs": {
-      "bytes": 15995,
+      "bytes": 16697,
       "imports": [],
       "format": "esm"
     },
@@ -110,7 +110,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/conversation.mjs": {
-      "bytes": 6685,
+      "bytes": 6843,
       "imports": [
         {
           "path": "src/canvas-prototype/project.mjs",
@@ -624,7 +624,7 @@
       "format": "esm"
     },
     "src/canvas-prototype/app.mjs": {
-      "bytes": 148878,
+      "bytes": 149529,
       "imports": [
         {
           "path": "src/canvas-prototype/loading-progress.mjs",
@@ -880,7 +880,7 @@
       "imports": [],
       "exports": [],
       "inputs": {},
-      "bytes": 1286664
+      "bytes": 1288941
     },
     "build/canvas-prototype/site/app.js": {
       "imports": [],
@@ -900,7 +900,7 @@
           "bytesInOutput": 2369
         },
         "src/canvas-prototype/geometry.mjs": {
-          "bytesInOutput": 16962
+          "bytesInOutput": 17579
         },
         "src/canvas-prototype/port-labels.mjs": {
           "bytesInOutput": 6203
@@ -933,7 +933,7 @@
           "bytesInOutput": 1672
         },
         "src/canvas-prototype/conversation.mjs": {
-          "bytesInOutput": 6502
+          "bytesInOutput": 6663
         },
         "src/canvas-prototype/authoring.mjs": {
           "bytesInOutput": 25880
@@ -1044,10 +1044,10 @@
           "bytesInOutput": 2790
         },
         "src/canvas-prototype/app.mjs": {
-          "bytesInOutput": 166493
+          "bytesInOutput": 167034
         }
       },
-      "bytes": 695223
+      "bytes": 696542
     }
   }
 }
