@@ -1,0 +1,60 @@
+{
+  "baseline": "556cd79e266394cae9e9b371a86941f50295cffc",
+  "packages": {
+    "MarineActuation": "Analysis::Energy::Actuation",
+    "MarineAppendages": "Analysis::Marine::Appendages",
+    "MarineConcept": "Analysis::Marine::Concept",
+    "MarineCourse": "Analysis::Marine::Course",
+    "MarineResistance": "Analysis::Marine::Resistance",
+    "MarineHydrostatics": "Analysis::Marine::Hydrostatics",
+    "MarinePropulsion": "Analysis::Marine::Propulsion",
+    "MarineRecovery": "Analysis::Marine::Recovery",
+    "MarineReliability": "Analysis::Reliability",
+    "MarineSailing": "Analysis::Marine::Sailing",
+    "MarineSurface": "Analysis::Marine::Surface",
+    "MarineWavePerformance": "Analysis::Marine::WavePerformance",
+    "MarineWeather": "Analysis::Marine::Weather",
+    "MarineMass": "Analysis::Mechanics::Mass",
+    "MarineStructures": "Analysis::Mechanics::Structures"
+  },
+  "sourcePaths": {
+    "models/libraries/energy/actuation.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/appendages.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/concept.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/course.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/hull-resistance.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/hydrostatics.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/propulsion.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/recovery.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/reliability.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/sailing.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/surface.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/wave-performance.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/marine/weather.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/structures/mass-properties.sysml": "models/libraries/analysis.sysml",
+    "models/libraries/structures/scantlings.sysml": "models/libraries/analysis.sysml"
+  },
+  "retained": {
+    "EngineeringDecisions": "Engineering information and review schemas; no calculation-only role.",
+    "MarineDesign": "Named design, parameter, state and result schemas; vector adapters stay with their contract.",
+    "MarineEnergy": "Electrical load, load budget, battery and interval domain/physical definitions with derived properties and rollup.",
+    "InlandExtended": "Rule-domain enums, context and conditional regulatory assessments; not a calculation-only numerical library.",
+    "InlandNavigationExperiment": "Encounter/obligation domain types, context and conditional assessment; not a calculation-only numerical library."
+  },
+  "addedPackages": [
+    "Analysis",
+    "Analysis::Marine",
+    "Analysis::Mechanics",
+    "Analysis::Energy"
+  ],
+  "calculationDefinitions": 44,
+  "intendedRoots": [
+    "Analysis",
+    "BlueDog",
+    "EngineeringDecisions",
+    "MarineDesign",
+    "MarineEnergy",
+    "InlandExtended",
+    "InlandNavigationExperiment"
+  ]
+}

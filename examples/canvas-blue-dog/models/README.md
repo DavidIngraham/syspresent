@@ -6,8 +6,9 @@ The model owns requirements, assumptions, rationale and analysis contracts. [Doc
 
 The project is one native `BlueDog` package in [blue-dog.sysml](blue-dog.sysml).
 Its packages express engineering ownership; file names and publication views do
-not define another hierarchy. Reusable libraries remain independent under
-`libraries/` and do not depend on `BlueDog`.
+not define another hierarchy. Reusable calculation libraries share the independent `Analysis` root under
+`libraries/analysis.sysml`. Domain schemas, component types and mixed libraries
+remain separate; none depends on `BlueDog`.
 
 | Native scope | Responsibility |
 | --- | --- |
@@ -21,7 +22,8 @@ not define another hierarchy. Reusable libraries remain independent under
 | `BlueDog::Verification` | Verification definitions, plans and satisfaction assertions |
 | `BlueDog::Evidence` | Source evidence and generated projections of recorded results |
 | `BlueDog::Method`, `BlueDog::Goals`, `BlueDog::DesignIntent` | Method/scenario roles, goals and design intent |
-| Independent library packages in `libraries/` | Reusable marine, energy, structural and decision-information definitions |
+| `Analysis::Marine`, `Analysis::Mechanics`, `Analysis::Energy`, `Analysis::Reliability` | Reusable calculation-only kernels, organized by domain |
+| `MarineDesign`, `MarineEnergy`, `InlandExtended`, `InlandNavigationExperiment`, `EngineeringDecisions` | Design/physical/domain types, mixed rule assessments and engineering information schemas |
 
 See [namespace ownership and source maintenance](../docs/reference/namespace-structure.md)
 for the hierarchy, extension rules and generated-section boundaries.

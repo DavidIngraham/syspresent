@@ -490,3 +490,20 @@ Unavailable text or annotation records are not reconstructed. Inspection is
 stationary; explicit Contents opens the metadata declaration's actual fields.
 Package scope follows full ownership through relationship records; annotations
 never create containment. All model source bytes are unchanged.
+
+## Shared Analysis library import
+
+The current Blue Dog example replaces fifteen independent calculation documents
+with the source-owned `models/libraries/analysis.sysml`. Its `Analysis` root owns
+Marine, Mechanics, Energy and Reliability calculations. Five mixed/domain library
+roots remain separate; project studies stay under `BlueDog::Analyses` and Gorge
+Challenge stays under `BlueDog::Mission::Challenge`. The seven model roots and the
+presentation-owned BlueDogCanvasViews root are distinct from metadata inspection.
+
+source.json pins the reviewed source commit and all seven current model hashes;
+shared-analysis-migration.json and shared-analysis-element-map.json retain the
+reviewed namespace/identity mapping. The earlier namespace-migration.json and
+its source provenance remain historical migration evidence, not runtime aliases.
+Source ZIP export/import preserves current files and never appends the fifteen
+removed documents. Native parsing, ownership and cache digests select current
+content; neither labels nor qualified-name truncation establish relationships.
