@@ -516,3 +516,8 @@ conformance claim. Serializing it as a filtered GeneralView can select only the
 package graph and lose represented definitions, so exact native projection checks
 remain mandatory before appending a slide. Package filters are accepted only by
 the existing validated native source pipeline; arbitrary filter text is rejected.
+
+Native view requests have a semantic navigation revision separate from frame
+redraw revisions. Resize/pan geometry work cannot silently discard a completed
+native query and leave Preparing visible. Newer views, contents, scene/history
+navigation, Home and model loads still invalidate superseded query results.

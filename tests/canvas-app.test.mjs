@@ -1429,3 +1429,27 @@ test('relationship metadata inspection rejects a mapped declaration identity eve
   assert.equal(d.getElementById('metadata-dialog').open,false);
  }finally{h.window.close();}
 });
+
+test('a resize redraw does not discard an in-flight native workspace view',async()=>{
+ const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
+ try{
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&!d.getElementById('workspace-controls').hidden);
+  await pickPackage(h,'Model');
+  const select=d.getElementById('view-navigation');select.value='native:mixed';select.dispatchEvent(new h.window.Event('change'));
+  await until(h.pending);h.resize(1010,710);await new Promise(resolve=>setTimeout(resolve,160));h.release();
+  await until(()=>sceneSettled(d)&&select.title==='#mixed:Model');
+  assert.equal(select.value,'native:mixed');
+  assert.ok(!d.getElementById('status').textContent.startsWith('Preparing native'));
+ }finally{h.window.close();}
+});
+test('newer workspace contents navigation supersedes an older native view request',async()=>{
+ const h=await harness({structuralFixture:true,packageFixture:true,overviewFixture:true}),d=h.document;
+ try{
+  d.getElementById('standalone').click();await until(()=>sceneSettled(d)&&!d.getElementById('workspace-controls').hidden);
+  await pickPackage(h,'Model');
+  const select=d.getElementById('view-navigation');select.value='native:mixed';select.dispatchEvent(new h.window.Event('change'));await until(h.pending);
+  select.value='overview';select.dispatchEvent(new h.window.Event('change'));await until(()=>sceneSettled(d)&&select.title==='children:scope:Model');
+  h.release();await new Promise(resolve=>setTimeout(resolve,150));
+  assert.equal(select.title,'children:scope:Model');assert.equal(select.value,'overview');
+ }finally{h.window.close();}
+});
