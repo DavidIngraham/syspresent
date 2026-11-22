@@ -4,6 +4,21 @@ The canvas is the sole Syspresent implementation. Its [scoped evidence record](c
 
 Automated canvas and worker checks cover native identity and direction, behavior notation, view/region navigation, hidden context, history, snapshot immutability, portable project import/export and publication validation. The canvas is published directly at the project root through [the CI pipeline](ci.md).
 
+## OpenSysML baseline upgrade (22 November 2026)
+
+The current review pin is `5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c` on official
+upstream `318c3e02b059fe67f869cfc2dc7a9624e5a39536`, with extension library
+`38097bbc0198767590c58f89796a436678319924`. Native/WASM parity, 735 JavaScript
+checks, six publication checks and native validation of all four specification
+packages pass. The authored Gorge depth-zero view retains its four exposed
+requirement identities and three derivations, paired with the Flashlight
+depth-one check. The [memory regression record](native-memory-validation.md)
+records the seven-cycle source/identity and headroom result.
+
+Earlier dated observations below keep their original runtime revisions. The
+imported model's `source.json` records historical source provenance; it is not
+the active engine dependency.
+
 ## Updated Blue Dog model snapshot (24 October 2026)
 
 The canvas example captures all 96 current model sources, the publication queries

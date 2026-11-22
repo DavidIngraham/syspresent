@@ -28,10 +28,10 @@ the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
 The current native/WASM source is pinned in [`dependency.json`](dependency.json):
-`69756092d1a1361514775e99363ddc50aab5e041` in DavidIngraham/OpenSysML,
+`5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c` in DavidIngraham/OpenSysML,
 with official upstream base `318c3e02b059fe67f869cfc2dc7a9624e5a39536` and
 extension-library commit `38097bbc0198767590c58f89796a436678319924`.
-Blue Dog's native pin is an ancestor on the same upstream/library baseline.
+Blue Dog uses the same source commit and upstream/library baseline.
 The browser-specific compatibility layer remains separately reviewable.
 
 Build both engines from the exact source pin with Go 1.27.4:
@@ -237,8 +237,9 @@ node scripts/wasm-prototype/parity.mjs
 npm run build
 ~~~
 
-The current pin must be reachable in David's personal fork before this default
-bootstrap can succeed in a clean clone. A local source override works before
+The current pin is reachable in David's personal fork on
+`review/engine-contracts-20261122`. A clean empty-cache bootstrap rebuilt all four
+engine assets byte-for-byte identically and passed the normal static build. A local source override works before
 publication and verifies the same pinned tree. `--prepare-only` fetches and
 verifies without building. Versioned source directories let the new checkout
 coexist with a previously patched cache.
@@ -280,3 +281,16 @@ required contracts. Native gRPC serves `GetElementProperties` and `Convert`;
 the combined JSON dispatcher already reported those calls Unimplemented on the
 old baseline and continues to do so. A stock nightly missing model release is
 an interface incompatibility, not evidence of a memory regression.
+
+
+## Execution and full model profiles
+
+The combined frontend supplies full native export and canonical identities through
+the thin execution engine's model-extension interface. Both native and WASM use
+that same composed profile. The standalone execution engine keeps its converter-free
+boundary. Default view JSON retains protobuf compatibility; native notation/state
+metadata is requested by `includeSemanticIdentity` or independently with
+`includeRenderingMetadata`. All browser view requests already use semantic identity.
+The current repaired source has its own parity and browser traces under
+`build/upgrade-5578dbc/`; earlier candidate traces retain their original source and
+asset hashes.
