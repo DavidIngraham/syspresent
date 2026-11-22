@@ -21,30 +21,25 @@ jobs:
           cache: npm
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: '1.25.11'
+          go-version: '1.27.4'
           cache: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: DavidIngraham/OpenSysML
-          ref: af37bbf155aea785b8ac494a14afe659244bbcdf
-          path: .tools/opensysml-canvas
-      - name: Apply David's standalone semantic-view changes
-        run: git -C .tools/opensysml-canvas apply --check "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch" && git -C .tools/opensysml-canvas apply "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch"
+      - name: Fetch and verify pinned OpenSysML source
+        id: engine-source
+        run: |
+          python3 scripts/wasm-prototype/build.py --prepare-only > "$RUNNER_TEMP/engine-source.json"
+          python3 -c 'import json,os; p=json.load(open(os.environ["RUNNER_TEMP"]+"/engine-source.json")); print("path="+p["sourcePath"])' >> "$GITHUB_OUTPUT"
       - name: Install pinned canvas dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Check affected native contracts
-        working-directory: .tools/opensysml-canvas
+        working-directory: ${{ steps.engine-source.outputs.path }}
         run: |
+          go generate ./internal/workspace/libs
           go test ./internal/frontend/engine ./internal/frontend/combined ./internal/frontend/renderidentity
           go test ./tests/wasm -run 'TestCombinedWireParity|TestEngineDependencies|TestCombinedDependencies' -count=1
       - name: Build matching native and browser engines
-        run: python3 scripts/wasm-prototype/build.py --source .tools/opensysml-canvas
+        run: python3 scripts/wasm-prototype/build.py
       - name: Validate product specification with the native compiler
-        run: |
-          cd .tools/opensysml-canvas
-          go build -o ../sysml ./cmd/sysml
-          cd ../..
-          python3 scripts/validate_spec.py --sysml "$PWD/.tools/sysml"
+        run: python3 scripts/validate_spec.py --sysml "$PWD/build/canvas-prototype/engine/sysml"
       - name: Check semantic parity, capture, traversal and UI recovery
         run: |
           npm test

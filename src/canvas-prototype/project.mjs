@@ -1,3 +1,4 @@
+import {nativeReference} from './native-reference.mjs';
 import {validatePresentation} from './preferences.mjs';
 import {validateStoryContent} from './story-content.mjs';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
@@ -103,22 +104,20 @@ export function appendScene(project,scene){
 }
 export function captureViewSource({packageName='CanvasCaptured',name,qualifiedNames,definition='GeneralView'}){
  // References are already resolved native names. No SysML is parsed here.
- const quoted=s=>"'"+s.replaceAll('\\','\\\\').replaceAll("'","\\'")+"'";
  if(!['GeneralView','ActionFlowView','InterconnectionView','StateTransitionView','SequenceView'].includes(definition))throw Error('Unsupported captured view definition');
  if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(packageName))throw Error('Invalid captured package name');
  if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(name))throw Error('Invalid captured view name');
  const refs=[...new Set(qualifiedNames)];if(!refs.length)throw Error('Capture requires native-qualified model elements');
- const reference=q=>q.split('::').map(quoted).join('::');
+ const reference=nativeReference;
  return `package ${packageName} {\n    private import StandardViewDefinitions::*;\n    view ${name} : ${definition} {\n${refs.map(q=>'        expose '+reference(q)+';').join('\n')}\n    }\n}\n`;
 }
 
 export function requirementCoverageSource(qualifiedRoots,packageName='SyspresentRuntimeContext',seeds){
- const quoted=s=>"'"+s.replaceAll('\\','\\\\').replaceAll("'","\\'")+"'";
  return `package ${packageName} {
  private import StandardViewDefinitions::*;
  view coverage : GeneralView {
 ${seeds?'  @OpenSysMLRenderings::RequirementContext { relationshipDepth = 1; }\n':''}  filter @SysML::RequirementUsage or @SysML::RequirementDefinition;
-${(seeds??qualifiedRoots).map(q=>'  expose '+q.split('::').map(quoted).join('::')+(seeds?';':'::**;')).join('\n')}
+${(seeds??qualifiedRoots).map(q=>'  expose '+nativeReference(q)+(seeds?';':'::**;')).join('\n')}
  }
 }
 `;

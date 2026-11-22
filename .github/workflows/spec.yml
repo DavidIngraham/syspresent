@@ -12,18 +12,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Fetch pinned native compiler source from David's fork
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: DavidIngraham/OpenSysML
-          ref: 23ca2e2f0f1fae4da6bc3e1488951cb017ed43e2
-          path: .tools/opensysml
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: '1.25.11'
+          go-version: '1.27.4'
           cache: false
+      - name: Fetch and verify pinned native compiler source
+        id: engine-source
+        run: |
+          python3 scripts/wasm-prototype/build.py --prepare-only > "$RUNNER_TEMP/engine-source.json"
+          python3 -c 'import json,os; p=json.load(open(os.environ["RUNNER_TEMP"]+"/engine-source.json")); print("path="+p["sourcePath"])' >> "$GITHUB_OUTPUT"
       - name: Build native compiler
-        working-directory: .tools/opensysml
-        run: go build -o ../sysml ./cmd/sysml
+        working-directory: ${{ steps.engine-source.outputs.path }}
+        run: |
+          go generate ./internal/workspace/libs
+          go build -o ../sysml ./cmd/sysml
       - name: Validate product specification
         run: python3 scripts/validate_spec.py --sysml "$PWD/.tools/sysml"

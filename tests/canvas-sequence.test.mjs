@@ -142,10 +142,11 @@ test('real native sequence renders six canonical event proxies and two explicit 
   const documents=await Promise.all(['sequence.sysml','behaviors.sysml'].map(async name=>({name,content:await readFile(new URL('fixtures/canvas-views/'+name,import.meta.url),'utf8')}))),parsed=await engine.call('ParseSources',{documents});
   assert.equal((parsed.diagnostics??[]).filter(d=>String(d.severity).toLowerCase().includes('error')).length,0);
   const native=await engine.call('RenderView',{modelHash:parsed.modelHash,view:'BehaviorViews::sequence',includeSemanticIdentity:true}),before=structuredClone(native);
-  assert.equal(native.sequenceOrdering,'partial-order-linearization');assert.deepEqual(native.edges.map(edge=>edge.notation.production),['message','message','message']);
+  assert.equal(native.sequenceOrdering,'partial-order-linearization');assert.deepEqual(native.edges.filter(edge=>edge.kind==='message').map(edge=>edge.notation.production),['message','message','message']);
+  assert.equal(native.edges.filter(edge=>edge.kind==='succession').length,2);
   const nodes=new Map(native.nodes.map(node=>[node.id,node]));
-  for(const edge of native.edges)for(const [role,lifeline]of [['sourceEvent',edge.from],['targetEvent',edge.to]]){
-   const ref=edge.notation[role];assert.equal(ref.kind,'event occurrence');assert.equal(ref.lifelineId,lifeline);assert.ok(ref.semanticId);assert.ok(nodes.has(ref.lifelineId));assert.equal(ref.identityStatus,'mapped');
+  for(const edge of native.edges.filter(edge=>edge.kind==='message'))for(const [role,proxy]of [['sourceEvent',edge.from],['targetEvent',edge.to]]){
+   const ref=edge.notation[role];assert.equal(ref.kind,'event occurrence');assert.equal(ref.lifelineId,nodes.get(proxy).parent);assert.equal(ref.semanticId,nodes.get(proxy).semanticId);assert.ok(ref.semanticId);assert.ok(nodes.has(ref.lifelineId));assert.equal(ref.identityStatus,'mapped');
   }
   const view=sequenceLayout(native,{renderingMode:'focused'});assert.equal(view.events.length,6);assert.equal(view.orders.filter(order=>order.supported).length,2);assert.equal(view.edges.filter(edge=>edge.supported).length,3);assert.equal(view.coverage.records.filter(record=>record.status!=='implemented').length,0);
   const dom=new JSDOM('<div></div>'),host=dom.window.document.querySelector('div'),controller=mountSequence(host,native,{renderingMode:'focused'});assert.equal(host.querySelectorAll('.sequence-event-proxy').length,6);assert.equal(host.querySelectorAll('.sequence-order-line').length,2);

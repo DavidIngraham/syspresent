@@ -303,3 +303,46 @@ remain historical measurements of their stated revisions.
 Rebuilding the public base with the updated patch produced byte-identical native
 and WASM binaries to the previous base-plus-patch build. Native/WASM parity
 passed again. The test repair therefore changes no shipped engine behavior.
+
+
+## November 22 upstream baseline review
+
+The browser engine derives from official develop
+`318c3e02b059fe67f869cfc2dc7a9624e5a39536` and extension-library commit
+`38097bbc0198767590c58f89796a436678319924`. The committed browser source is
+`69756092d1a1361514775e99363ddc50aab5e041`, tree `ef4dd8a534d4119873cd4d1ea57f0f49d0365374`,
+built with Go 1.27.4. Its paired native and WASM source is clean. The WASM
+SHA-256 is `778fc94b3eb88ba19a4c89271ae4434d6dae68f2522f022937d50f1b811f4cff`; the matching
+`wasm_exec.js` SHA-256 is `0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14`.
+The earlier af37bbf/e8332e02 patched source and measurements above remain rollback evidence.
+
+Seven validate/append/export-ZIP/reload cycles passed in one uninterrupted worker.
+All exported ZIPs preserve the nine original SysML source files byte for byte;
+the 29 represented native identities and the battery value 140 remain stable.
+Peak acquired linear memory was 2750.3125 MiB,
+leaving 1345.6875 MiB below 4 GiB.
+Cycles 5–7 grew by 0.25 MiB and passed
+the existing plateau policy. The 180-second step timeout, 512 MiB minimum
+headroom and worker-continuity assertions are unchanged. Explicit idle collection
+occurs after acceptance; it is not used to establish the plateau.
+
+Earlier current-baseline attempts exceeded 4 GiB, and subsequent bounded-cache
+attempts exceeded the step timeout. Their traces remain under `build/upgrade-*`.
+The final integration bounds evaluator memoization, yields for cooperative Go/WASM
+GC and uses a 2.5 GiB Go soft target. Native discovery metadata avoids performing
+a complete semantic API JSON export twice while opening a project. The final
+`declarations` export remains authoritative, including all its native properties.
+A discovery index is never a replacement for those objects or for fresh parsing.
+
+Reproduce the recorded same-worker acceptance after the source build and cache:
+
+```sh
+node scripts/wasm-prototype/browser-export-memory.mjs \
+  --site build/upgrade-6975609/site \
+  --output build/upgrade-6975609/browser-seven-cycle.json \
+  --stress-plateau --cycles 7 --min-cycles 7 --validations-per-cycle 1
+```
+
+The test uses Playwright and Chromium. The task trace is
+`build/upgrade-6975609/browser-seven-cycle.json`, with all seven ZIPs beside it.
+These are software and memory measurements, not physical engineering acceptance.

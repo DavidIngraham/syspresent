@@ -1,14 +1,11 @@
+import {nativeReference} from './native-reference.mjs';
 /** Native capture and explicit conversation turns. Never interprets question prose. */
 import {appendScene,documentsFor,fileText,parseStory,validateProject} from './project.mjs';
 import {adaptNativeView,requireNativeIdentity} from './graph.mjs';
 import {representedIdentities} from './view-contract.mjs';
 
 const DEFINITIONS=new Set(['GeneralView','ActionFlowView','InterconnectionView','StateTransitionView','SequenceView','MixedView']);
-const quote=value=>"'"+value.replaceAll('\\','\\\\').replaceAll("'","\\'")+"'";
-const reference=value=>{
- if(typeof value!=='string'||!value||/[\u0000-\u001f\u007f]/.test(value))throw Error('Capture requires native-qualified model identities');
- return value.split('::').map(quote).join('::');
-};
+const reference=nativeReference;
 export function nativeViewDefinitionSource({packageName,name='slide',definition='GeneralView',qualifiedNames,kinds=[]}){
  for(const value of [packageName,name])if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(value??''))throw Error('Invalid captured declaration name');
  if(!DEFINITIONS.has(definition))throw Error('Unsupported captured native notation: '+definition);

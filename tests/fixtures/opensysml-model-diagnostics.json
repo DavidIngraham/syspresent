@@ -1,0 +1,86 @@
+[
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 31,
+      "endLine": 9201,
+      "file": "models/blue-dog.sysml",
+      "startCol": 25,
+      "startLine": 9201
+    }
+  },
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 70,
+      "endLine": 9214,
+      "file": "models/blue-dog.sysml",
+      "startCol": 64,
+      "startLine": 9214
+    }
+  },
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 75,
+      "endLine": 9215,
+      "file": "models/blue-dog.sysml",
+      "startCol": 69,
+      "startLine": 9215
+    }
+  },
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 74,
+      "endLine": 9216,
+      "file": "models/blue-dog.sysml",
+      "startCol": 68,
+      "startLine": 9216
+    }
+  },
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 75,
+      "endLine": 9217,
+      "file": "models/blue-dog.sysml",
+      "startCol": 69,
+      "startLine": 9217
+    }
+  },
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 69,
+      "endLine": 9218,
+      "file": "models/blue-dog.sysml",
+      "startCol": 63,
+      "startLine": 9218
+    }
+  },
+  {
+    "code": "name-conflict",
+    "message": "Duplicate of inherited member name 'result' from Case",
+    "severity": "warning",
+    "span": {
+      "endCol": 71,
+      "endLine": 9219,
+      "file": "models/blue-dog.sysml",
+      "startCol": 65,
+      "startLine": 9219
+    }
+  }
+]

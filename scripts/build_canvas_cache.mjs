@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve,join,dirname} from 'node:path';
 import {documentsFor,parseStory,fileText,requirementCoverageSource} from '../src/canvas-prototype/project.mjs';
-import {discoverNativeIndex} from '../src/canvas-prototype/native-project.mjs';
+import {discoverModelIndex} from '../src/canvas-prototype/native-project.mjs';
 import {readProjectDirectory,documentDigest} from './canvas_project_files.mjs';
 import {validateProjectStory} from './canvas_story_validation.mjs';
 const args=process.argv.slice(2),option=(name,fallback)=>args.includes(name)?args[args.indexOf(name)+1]:fallback;
@@ -18,11 +18,10 @@ try{
  const engine=await call('GetServerInfo');
  const initial=await call('ParseSources',{documents:sources});
  if((initial.diagnostics??[]).some(d=>String(d.severity).toLowerCase().includes('error')))throw Error('Native model has errors: '+JSON.stringify(initial.diagnostics));
- const declarations=await call('ExportModel',{modelHash:initial.modelHash,projection:'declarations'});
- const discovered=discoverNativeIndex(initial,declarations,{modelDocumentCount:manifest.modelSources.length});
+ const discovered=await discoverModelIndex({call},initial,{capabilities:engine.capabilities,modelDocumentCount:manifest.modelSources.length});
  const roots=manifest.modelRoots??discovered.modelRoots,requirementSeeds=manifest.requirementSeeds??discovered.requirementSeeds;
  if(!roots.length)throw Error('Native model has no discoverable model roots');
- let runtimePackage='SyspresentRuntimeContext';while(declarations.elements.some(element=>element.qualifiedName===runtimePackage))runtimePackage+='X';
+ let runtimePackage='SyspresentRuntimeContext';while(discovered.qualifiedNames.includes(runtimePackage))runtimePackage+='X';
  const documents=[...sources,{name:'__syspresent_runtime_context.sysml',content:requirementCoverageSource(roots,runtimePackage,requirementSeeds)}];
  const parsed=await call('ParseSources',{documents});
  if((parsed.diagnostics??[]).some(d=>String(d.severity).toLowerCase().includes('error')))throw Error('Native model has errors: '+JSON.stringify(parsed.diagnostics));
@@ -35,5 +34,5 @@ try{
  const availableViews=exported.elements.filter(e=>e['@type']==='ViewUsage'&&e.qualifiedName&&e['sysx:sourceLine']&&!e.qualifiedName.startsWith(runtimePackage+'::')).map(e=>e.qualifiedName);
  const cache={schemaVersion:'syspresent.native-cache.v1',engineVersion:engine.version,engineFingerprint:provenance.assets['sysml-wasm.wasm'].sha256,modelHash:parsed.modelHash,modelRoots:roots,nativeRootIds:[...new Set((initial.roots??[]).flatMap(root=>root.childIds??[]))],requirementSeeds,runtimePackage,inputDigest:documentDigest(sources),sourceDigest:documentDigest(documents),exported,coverage,availableViews,views};
  await mkdir(dirname(output),{recursive:true});const data=JSON.stringify(cache);await writeFile(output,data);
- console.log(JSON.stringify({output,bytes:Buffer.byteLength(data),declarations:exported.elements.length,views:Object.fromEntries(Object.entries(views).map(([name,value])=>[name,{nodes:value.nodes.length,edges:value.edges.length}]))},null,2));
+ console.log(JSON.stringify({output,bytes:Buffer.byteLength(data),declarations:exported.elements.length,views:Object.fromEntries(Object.entries(views).map(([name,value])=>[name,{nodes:value.nodes.length,edges:(value.edges??[]).length}]))},null,2));
 }finally{child.stdin.end();}

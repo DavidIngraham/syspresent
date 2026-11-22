@@ -27,26 +27,28 @@ explicit notice. It is an exchange graph, not a claim that the browser implement
 the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
-The prototype dependency revision is `aaf24bec050f84700f6191cca49e014f44158256`
-on the local `fix/syspresent-parallel-identity` branch, based on David's standalone semantic-view fork. The carried
-`opensysml-semantic-views.patch` contains its changes relative to the existing
-`af37bbf155aea785b8ac494a14afe659244bbcdf` pin. It can be applied to that base
-without publishing a dependency branch; a patch-applied source tree is honestly
-recorded as dirty in build provenance.
+The current native/WASM source is pinned in [`dependency.json`](dependency.json):
+`69756092d1a1361514775e99363ddc50aab5e041` in DavidIngraham/OpenSysML,
+with official upstream base `318c3e02b059fe67f869cfc2dc7a9624e5a39536` and
+extension-library commit `38097bbc0198767590c58f89796a436678319924`.
+Blue Dog's native pin is an ancestor on the same upstream/library baseline.
+The browser-specific compatibility layer remains separately reviewable.
 
-Build both engines from the same local dependency revision:
+Build both engines from the exact source pin with Go 1.27.4:
 
 ```sh
-python3 scripts/wasm-prototype/build.py \
-  --source /home/david/repos/opensysml-syspresent-voice-identity
-node --stack-size=8192 --no-concurrent-sparkplug scripts/wasm-prototype/parity.mjs
-node --test tests/wasm-prototype/client.test.mjs
+python3 scripts/wasm-prototype/build.py
+node scripts/wasm-prototype/parity.mjs
+npm test
 ```
 
-The build records the dependency revision, dirty state, Go version, asset sizes,
-SHA-256 digests, carried-patch digest and source-diff digest (including untracked
-new files), plus OpenSysML and Go runtime license information. The native executable is a validation tool;
-published static assets need only WASM, its matching runtime, worker and provenance.
+The builder fetches the exact personal-fork commit into a versioned `.tools`
+checkout and verifies its Git tree. `--source ../opensysml-upgrade` instead uses
+an existing checkout of that exact pin. Dirty source requires `--allow-dirty`
+and is labeled as a development artifact. Builds record the source commit,
+tree, upstream, dirty state, Go version and asset SHA-256 hashes, plus the
+complete development source diff when applicable. Native and WASM artifacts
+are built together with the matching `wasm_exec.js`.
 The parity harness compares actual native and WASM parse responses, API graphs and
 native view projections, including mapped identities, directed parameter pins, derivation roles, sequence events/orders, state behaviors and exact large-integer attribute values. Native and WASM Evaluate agree for selected attribute interpolation, including quantity/enum values and honest unset/collection rejection. It
 also checks kind-preserving capture of ad hoc action/interconnection views, and
@@ -135,7 +137,7 @@ Live exports of large changed/imported projects remain a mobile memory limitatio
 
 ## Native grid identity extension
 
-The current carried patch includes sparse matrix relationship-cell identities and
+The preserved pre-upgrade carried patch includes sparse matrix relationship-cell identities and
 column element identities in the native JSON and WASM render contract.
 `columnElements` preserves display-column indexes (including the leading label
 column); `relationshipCells` preserves native row/column indexes and all matching
@@ -145,7 +147,8 @@ cover isolation. The parity harness compares actual native and WASM grid fixture
 including duplicate relationships and derivation direction. The protobuf/gRPC
 contract has not been extended by this change.
 
-Current source revision: `aaf24bec050f84700f6191cca49e014f44158256` (clean).
+Historical native-branch observation: `aaf24bec050f84700f6191cca49e014f44158256`.
+The shipped base-plus-patch provenance is recorded under Rollback source below.
 Carried-patch SHA-256: `e8332e02f984358dd8c3da41fb9d3fa53cb8e140fa6b2a7a44bff0c43a76d908`.
 
 ## Distinct parallel native relationships
@@ -216,32 +219,58 @@ source revisions reuse compatible spans in the nonshrinking WASM heap. The
 success envelope uses a local string builder without the formatter/string copy.
 Repeated same-worker stability is an independent acceptance gate.
 
-## Building from the published dependency base
+## Reproducible source bootstrap
 
-The locally tested native commit is not required on a remote branch. The carried
-patch reconstructs its complete source tree from the published base used by CI:
+Use Node 22.14.0 and Go 1.27.4. No release or nightly asset is assumed:
 
 ~~~sh
-git clone --no-checkout https://github.com/DavidIngraham/OpenSysML .tools/opensysml-canvas
-git -C .tools/opensysml-canvas checkout --detach af37bbf155aea785b8ac494a14afe659244bbcdf
-git -C .tools/opensysml-canvas apply --check "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch"
-git -C .tools/opensysml-canvas apply "$PWD/scripts/wasm-prototype/opensysml-semantic-views.patch"
-python3 scripts/wasm-prototype/build.py --source .tools/opensysml-canvas
+python3 scripts/wasm-prototype/build.py
 npm ci --ignore-scripts --no-audit --no-fund
 npm test
 node scripts/wasm-prototype/parity.mjs
 npm run build
 ~~~
 
-Use Node 22.14.0 and Go 1.25.11. Applying the patch leaves the dependency
-intentionally dirty: provenance records the published base, complete source diff
-and carried-patch digest, rather than pretending the unpublished local commit was
-checked out. The verified resulting source-tree ID is
-d85adf5b2e95aad223e944768fc37769e32acab4, equal to the tested native tree.
-No separate dependency publication is needed. A fresh local base-plus-patch
-build and native/WASM parity are recorded under build/pages-carried-*.
+The current pin must be reachable in David's personal fork before this default
+bootstrap can succeed in a clean clone. A local source override works before
+publication and verifies the same pinned tree. `--prepare-only` fetches and
+verifies without building. Versioned source directories let the new checkout
+coexist with a previously patched cache.
 
-The deployment followup changes only the native wire test and its changelog
-fragment: the exact capability list now includes the implemented release_model
-and memory_stats APIs. The production Go files match the memory-tested e4fd5
-source. No capability check is removed or skipped.
+## Rollback source
+
+The earlier `aaf24bec050f84700f6191cca49e014f44158256` observation describes
+the pre-upgrade native branch. Shipped base-plus-patch provenance instead records
+published base `af37bbf155aea785b8ac494a14afe659244bbcdf`, dirty source, patch
+SHA-256 `e8332e02f984358dd8c3da41fb9d3fa53cb8e140fa6b2a7a44bff0c43a76d908`
+and reconstructed tree `d85adf5b2e95aad223e944768fc37769e32acab4`.
+The patch file and historical memory evidence remain available for rollback;
+the new source bootstrap does not apply that old patch to the newer upstream.
+
+## November baseline contracts
+
+The declaration projection retains full native derived-property context and
+selects unchanged source-backed API objects. Bounded memoization releases caches
+without filtering semantic context. Browser Go GC uses a 2560 MiB soft limit and
+GOGC=50 to leave address-space headroom. Sequence proxies, event IDs and explicit
+orders remain native facts. Start/done control nodes stay synthetic.
+
+The authored `BlueDogCanvasViews::challengeOverview` depth-zero acceptance keeps
+exactly its four exposed requirements and three authored derivations, alongside
+the Flashlight depth-one coverage case. The real Blue Dog declaration export is
+also compared object-for-object between native and WASM. Seven inherited-name
+warnings are preserved in both runtimes; they do not become parse errors.
+
+Discovery uses the native `ExportModel` projection `declaration-index` when the
+engine advertises `declaration_index`. Its IDs, qualified names and requirement
+seed flags come from the same native declaration and metaclass inventory as the
+complete API export. It is a discovery response, not a substitute API graph.
+Older engines fall back to the full declaration projection. Differential fixtures
+and the actual Blue Dog project compare every model root and requirement seed;
+subsequent exploration still receives the authoritative declaration objects.
+
+Combined JSON `ExportModel`, exact `ReleaseModel` and `GetMemoryStats` are
+required contracts. Native gRPC serves `GetElementProperties` and `Convert`;
+the combined JSON dispatcher already reported those calls Unimplemented on the
+old baseline and continues to do so. A stock nightly missing model release is
+an interface incompatibility, not evidence of a memory regression.

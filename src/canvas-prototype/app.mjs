@@ -23,7 +23,7 @@ import {mountSequence} from './sequence-view.mjs';
 import {behaviorFace,behaviorNodeDetail} from './behavior-view.mjs';
 import {regionAreas,mountGraphRegion,updateRegionReferences} from './scene-regions.mjs';
 import {projectFromSelection} from './browser-project.mjs';
-import {discoverNativeIndex} from './native-project.mjs';
+import {discoverModelIndex} from './native-project.mjs';
 import {nativeScopeIds} from './prominence.mjs';
 import {completeChildView} from './child-view.mjs';
 import {completeChildContext,completeRootContext} from './child-exploration.mjs';
@@ -165,10 +165,10 @@ async function compile(project,{cacheHash=state.trustedCacheHash,progress=event=
  if(index){roots=index.modelRoots;seeds=index.requirementSeeds;runtimePackage=index.runtimePackage;}
  if(!roots?.length||seeds===undefined||!runtimePackage){
   progress({stage:'model-discovery',label:'Discovering native model declarations…'});parsed=await engine.call('ParseSources',{documents});active();check(parsed);
-  progress({stage:'declarations',label:'Indexing native declarations…'});exported=await engine.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'});active();
-  const discovered=discoverNativeIndex(parsed,exported,{modelDocumentCount:m.modelSources.length});
+  progress({stage:'declarations',label:'Indexing native declarations…'});
+  const discovered=await discoverModelIndex(engine,parsed,{capabilities:state.engineInfo?.capabilities,modelDocumentCount:m.modelSources.length});active();
   roots=roots?.length?roots:discovered.modelRoots;seeds??=discovered.requirementSeeds;
-  runtimePackage='SyspresentRuntimeContext';const names=new Set(exported.elements.map(e=>e.qualifiedName));while(names.has(runtimePackage))runtimePackage+='X';
+  runtimePackage='SyspresentRuntimeContext';const names=new Set(discovered.qualifiedNames);while(names.has(runtimePackage))runtimePackage+='X';
  }
  if(!roots.length)throw Error('No named model declarations were found in the supplied files.');
  progress({stage:'model-parse',label:'Resolving the complete project with OpenSysML WASM…',detail:'Native parsing and resolution have no measurable completion percentage.'});

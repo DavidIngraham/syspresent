@@ -23,7 +23,7 @@ export function sequencePresentationLayout(nativeView,layout){
 const occurrenceEndpointKinds=new Set(['event occurrence','occurrence','part','port','item','action','state','use case','verification','analysis']);
 const eventProxy=ref=>ref?.kind==='event occurrence';
 function messageNotation(edge){
- if(edge.kind!=='flow')return {status:'rejected',reason:'Unsupported native sequence relationship kind '+edge.kind+'. No message arrow is inferred.'};
+ if(!['flow','message'].includes(edge.kind))return {status:'rejected',reason:'Unsupported native sequence relationship kind '+edge.kind+'. No message arrow is inferred.'};
  const notation=edge.notation;
  if(!notation?.production)return {status:'data-blocked',reason:'Original native message/flow production is unavailable. The exploratory message projection is retained; exact focused notation is withheld.'};
  if(notation.production==='message'){
@@ -35,8 +35,29 @@ function messageNotation(edge){
 }
 /** Coverage concerns actual native records, never sync/async classifications
  * inferred from a label or an edge array's display position. */
+function sequenceProjection(nativeView){
+ const view=projectView(nativeView),byId=new Map(view.nodes.map(node=>[node.id,node]));
+ const proxies=new Map(view.nodes.filter(node=>node.kind==='event occurrence'&&node.parentId&&byId.has(node.parentId)).map(node=>[node.id,node]));
+ const nativeOrderEdges=[],orders=new Map((view.sequenceOrders??[]).filter(order=>semanticId(order)).map(order=>[semanticId(order),order]));
+ const endpoint=(edge,role,id)=>{
+  const proxy=proxies.get(id);if(!proxy)return id;
+  const ref=edge.notation?.[role];
+  if(!ref||semanticId(ref)!==semanticId(proxy)||ref.lifelineId!==proxy.parentId)throw Error('Native sequence proxy identity or lifeline disagrees with its endpoint facts');
+  return proxy.parentId;
+ };
+ const edges=[];
+ for(const edge of view.edges){
+  const order=edge.kind==='succession'?orders.get(semanticId(edge)):undefined;
+  if(order){
+   if(semanticId(byId.get(edge.source)??{})!==semanticId(order.sourceEvent??{})||semanticId(byId.get(edge.target)??{})!==semanticId(order.targetEvent??{}))throw Error('Native sequence succession disagrees with its explicit event order');
+   nativeOrderEdges.push(edge);continue;
+  }
+  edges.push({...edge,source:endpoint(edge,'sourceEvent',edge.source),target:endpoint(edge,'targetEvent',edge.target)});
+ }
+ return {...view,nodes:view.nodes.filter(node=>!proxies.has(node.id)),edges,nativeEventNodes:[...(view.nativeEventNodes??[]),...proxies.values()],nativeOrderEdges:[...(view.nativeOrderEdges??[]),...nativeOrderEdges]};
+}
 export function sequenceNotationCoverage(nativeView){
- const nodes=nativeView.nodes??[],edges=nativeView.edges??[],records=[];
+ const view=sequenceProjection(nativeView),nodes=view.nodes,edges=view.edges,records=[];
  for(const node of nodes)records.push({role:'participant',representationId:node.id,semanticId:semanticId(node),kind:node.kind,status:['part','port'].includes(node.kind)?'implemented':'rejected',reason:['part','port'].includes(node.kind)?'Native feature header and lifeline; OMG 8.2.3.9.':'Native participant kind has no implemented sequence head production.'});
  for(const edge of edges){
   records.push({role:'message',semanticId:semanticId(edge),kind:edge.kind,production:edge.notation?.production,...messageNotation(edge)});
@@ -50,7 +71,7 @@ export function sequenceNotationCoverage(nativeView){
  return {authority:'OMG SysML 2.0 formal/2026-03-02',sections:['8.2.3.9','8.2.3.16','8.2.3.26'],records,notice:'Supported native sequence subset. Native message production, event roles and explicit event orders are preserved; no elapsed time, call/return subtype or interaction-fragment semantics are inferred.'};
 }
 export function sequenceLayout(nativeView,{layout:preferences,renderingMode='exploratory'}={}){
-  const view=projectView(nativeView);
+  const view=sequenceProjection(nativeView);
   if(view.kind!=='sequence')throw Error('Sequence renderer requires a native sequence view');
   const notices=[...(view.notices??[])],presentationLayout=sequencePresentationLayout(view,preferences),saved=new Map((presentationLayout?.lanes??[]).map(lane=>[laneKey({id:lane.representationId,semanticId:lane.semanticId}),lane.width]));
   for(const lane of presentationLayout?.lanes??[])if(!view.nodes.some(node=>laneKey(node)===laneKey({id:lane.representationId,semanticId:lane.semanticId})))notices.push('Saved sequence lane '+lane.semanticId+' has no exact native representation; its width was not applied.');
@@ -71,7 +92,7 @@ export function sequenceLayout(nativeView,{layout:preferences,renderingMode='exp
     const text=[label,detail].filter(Boolean).join('\n');
     const labelHeight=Math.max(30,text.split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length*7/(width-12)))*19,0)+8);
     const points=self?[{x:a,y},{x:a+Math.max(65,from.laneWidth*.37),y},{x:a+Math.max(65,from.laneWidth*.37),y:y+30},{x:a,y:y+30}]:[{x:a,y},{x:b,y}];
-    const supported=renderingMode==='focused'?messageNotation(edge).status==='implemented':['flow','succession','transition'].includes(edge.kind);
+    const supported=renderingMode==='focused'?messageNotation(edge).status==='implemented':['flow','message','succession','transition'].includes(edge.kind);
     if(!supported)notices.push('Unsupported sequence message kind: '+edge.kind+'. '+messageNotation(edge).reason+' Its native record remains available.');
     const result={...edge,semanticId:semanticId(edge),sourceSemanticId:from.semanticId,targetSemanticId:to.semanticId,order:index,points,supported,self,
       labelBox:{x:self?a+12:Math.min(a,b)+12,y:y-labelHeight-5,width,height:labelHeight},text};

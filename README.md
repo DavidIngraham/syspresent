@@ -17,7 +17,7 @@ npm run build
 python3 -m http.server 8783 --directory build/canvas-prototype/site
 ```
 
-The engine source must include the [carried patch and exact base](scripts/wasm-prototype/README.md). Open http://localhost:8783/. The landing page offers the complete Blue Dog story, a native view gallery and a small flashlight model, plus local file, folder and ZIP import. Project > Export project ZIP saves ordinary model, view and Markdown files. Models without authored entry content open a bounded native system overview.
+The builder uses the [verified source pin and matching toolchain](scripts/wasm-prototype/README.md). Open http://localhost:8783/. The landing page offers the complete Blue Dog story, a native view gallery and a small flashlight model, plus local file, folder and ZIP import. Project > Export project ZIP saves ordinary model, view and Markdown files. Models without authored entry content open a bounded native system overview.
 
 ## Authoring and publication
 

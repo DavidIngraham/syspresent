@@ -1,0 +1,7 @@
+{
+  "repository": "DavidIngraham/OpenSysML",
+  "commit": "69756092d1a1361514775e99363ddc50aab5e041",
+  "tree": "ef4dd8a534d4119873cd4d1ea57f0f49d0365374",
+  "upstreamCommit": "318c3e02b059fe67f869cfc2dc7a9624e5a39536",
+  "goVersion": "1.27.4"
+}

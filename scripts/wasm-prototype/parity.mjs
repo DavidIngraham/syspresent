@@ -2,13 +2,16 @@
 /** Exercise the same parsed sources and calls through native JSON-RPC and real WASM. */
 import { spawn } from 'node:child_process';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { webcrypto } from 'node:crypto';
+import { webcrypto, createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { modelGraph, adaptNativeView } from '../../src/canvas-prototype/graph.mjs';
 import { engineeringContext } from '../../src/canvas-prototype/core/index.mjs';
+import {readProjectDirectory} from '../canvas_project_files.mjs';
+import {documentsFor} from '../../src/canvas-prototype/project.mjs';
+import {discoverNativeIndex,discoverModelIndex} from '../../src/canvas-prototype/native-project.mjs';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
@@ -108,7 +111,7 @@ try {
       if (node.identityStatus === 'synthetic') assert.equal(node.semanticId, undefined, 'Synthetic notation must not acquire a model identity');
     }
     const renderIDs = new Set(a.nodes.map(node => node.id));
-    for (const edge of a.edges) {
+    for (const edge of a.edges ?? []) {
       assert.ok(renderIDs.has(edge.from) && renderIDs.has(edge.to), `${view} edge endpoint absent`);
       if (edge.identityStatus === 'mapped') assert.ok(exportedIDs.has(edge.semanticId), `${view} mapped edge absent from graph`);
     }
@@ -298,7 +301,10 @@ try {
     assert.deepEqual(await wasm.call('RenderView',params),drawing,'Every structured native notation fact must agree in WASM');notationViews[view]=drawing;
   }
   const sequence=notationViews['ViewDemo::BehaviorViews::sequence'];assert.equal(sequence.sequenceOrdering,'partial-order-linearization');assert.equal(sequence.sequenceOrders.length,2,'Gallery has two explicit native message-event ordering relationships');
-  for(const edge of sequence.edges){assert.equal(edge.notation.production,'message');for(const [role,lifeline]of [['sourceEvent',edge.from],['targetEvent',edge.to]]){const event=edge.notation[role];assert.equal(event.kind,'event occurrence');assert.equal(event.lifelineId,lifeline);assert.equal(event.identityStatus,'mapped');assert.ok(galleryIDs.has(event.semanticId));}}
+  const sequenceNodes=new Map(sequence.nodes.map(node=>[node.id,node]));
+  assert.equal(sequence.edges.filter(edge=>edge.kind==='message').length,3);
+  assert.equal(sequence.edges.filter(edge=>edge.kind==='succession').length,2);
+  for(const edge of sequence.edges.filter(edge=>edge.kind==='message')){assert.equal(edge.notation.production,'message');for(const [role,proxy]of [['sourceEvent',edge.from],['targetEvent',edge.to]]){const event=edge.notation[role];assert.equal(event.kind,'event occurrence');assert.equal(event.lifelineId,sequenceNodes.get(proxy).parent);assert.equal(event.semanticId,sequenceNodes.get(proxy).semanticId);assert.equal(event.identityStatus,'mapped');assert.ok(galleryIDs.has(event.semanticId));}}
   for(const order of sequence.sequenceOrders){assert.equal(order.kind,'succession');assert.ok(galleryIDs.has(order.semanticId));assert.ok(galleryIDs.has(order.sourceEvent.semanticId));assert.ok(galleryIDs.has(order.targetEvent.semanticId));}
   const derive=notationViews['NativeNotationParity::requirements'].edges.find(e=>e.kind==='derive');assert.ok(derive?.notation);assert.deepEqual([derive.notation.production,derive.notation.sourceRole,derive.notation.targetRole],['derivation','derived','original']);assert.deepEqual([derive.notation.sourceEndName,derive.notation.targetEndName],['detail','basis']);
   const pipeline=notationViews['NativeNotationParity::pipeline'],flow=pipeline.edges.find(e=>e.kind==='flow');assert.equal(flow.notation.production,'flow');assert.ok(flow.fromPort&&flow.toPort);
@@ -331,10 +337,49 @@ try {
   }
   lifecycle.reparsed=disposable.modelHash;
 
+  for(const client of [native,wasm]){const stats=await client.call('GetMemoryStats',{});for(const modelHash of stats.modelHashes)await client.call('ReleaseModel',{modelHash});}
+  const challengeProject=await readProjectDirectory(resolve('examples/canvas-blue-dog'));
+  const challengeDocuments=documentsFor(challengeProject);
+  const challengeParsed=await native.call('ParseSources',{documents:challengeDocuments});
+  assert.deepEqual(await wasm.call('ParseSources',{documents:challengeDocuments}),challengeParsed,'Authored challenge sources must parse identically');
+  assert.equal((challengeParsed.diagnostics??[]).filter(d=>d.severity==='error').length,0);
+  const challengeMemoryBefore=await wasm.call('GetMemoryStats',{});
+  await writeFile(output+'.challenge-memory-before.json',JSON.stringify(challengeMemoryBefore,null,2));
+  const challengeExport=await native.call('ExportModel',{modelHash:challengeParsed.modelHash,projection:'declarations'});
+  const wasmChallengeExport=await wasm.call('ExportModel',{modelHash:challengeParsed.modelHash,projection:'declarations'});
+  assert.deepEqual(wasmChallengeExport,challengeExport,'Whole-project declaration objects must agree after bounded cache reuse');
+  let challengeIndexContract;
+  if(serverInfo.capabilities.includes('declaration_index')){
+    const parameters={modelHash:challengeParsed.modelHash,projection:'declaration-index'};
+    const indexed=await native.call('ExportModel',parameters);
+    assert.deepEqual(await wasm.call('ExportModel',parameters),indexed,'Native discovery inventories must agree');
+    const options={capabilities:serverInfo.capabilities,modelDocumentCount:challengeProject.manifest.modelSources.length};
+    const discovered=await discoverModelIndex(native,challengeParsed,options),previous=discoverNativeIndex(challengeParsed,challengeExport,options);
+    assert.deepEqual(discovered.modelRoots,previous.modelRoots,'Discovery must preserve every native model root');
+    assert.deepEqual(discovered.requirementSeeds,previous.requirementSeeds,'Discovery must preserve exactly the named native requirements');
+    challengeIndexContract={entries:indexed.declarationIndex.length,modelRoots:discovered.modelRoots,requirementSeeds:discovered.requirementSeeds,sha256:createHash('sha256').update(JSON.stringify(indexed)).digest('hex')};
+  }
+  const challengeDeclarationContract={elementCount:challengeExport.elementCount,omittedElementCount:challengeExport.omittedElementCount,
+    sha256:createHash('sha256').update(JSON.stringify(challengeExport.elements)).digest('hex')};
+  const challengeParams={modelHash:challengeParsed.modelHash,view:'BlueDogCanvasViews::challengeOverview',includeSemanticIdentity:true};
+  const challengeOverview=await native.call('RenderView',challengeParams);
+  assert.deepEqual(await wasm.call('RenderView',challengeParams),challengeOverview,'Authored depth-zero requirement view must agree in native and WASM');
+  const challengeIDs=['transGorgeChallenge','courseCompletion','unassistedAttempt','sailingPropulsion'].map(name=>'GorgeChallenge__'+name);
+  assert.deepEqual(challengeOverview.nodes.map(node=>node.semanticId).sort(),[...challengeIDs].sort(),'Depth zero must retain exactly the four exposed requirement identities');
+  const challengeNodes=new Map(challengeOverview.nodes.map(node=>[node.id,node.semanticId]));
+  const challengeRelations=['CourseCompletion','UnassistedAttempt','SailingPropulsion'].map(name=>'GorgeChallenge__challengeRule'+name);
+  assert.deepEqual(challengeOverview.edges.map(edge=>edge.semanticId).sort(),[...challengeRelations].sort(),'Depth zero must retain the three authored derivations without other context');
+  for(const edge of challengeOverview.edges){
+    assert.equal(edge.kind,'derive');assert.equal(edge.identityStatus,'mapped');
+    assert.equal(challengeNodes.get(edge.to),'GorgeChallenge__transGorgeChallenge');
+    assert.equal(challengeNodes.get(edge.from),'GorgeChallenge__'+edge.semanticId.replace('GorgeChallenge__challengeRule','').replace(/^./,c=>c.toLowerCase()));
+  }
+  for(const client of [native,wasm])await client.call('ReleaseModel',{modelHash:challengeParsed.modelHash});
+
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, gridContract, parallelIdentity,valueContract,notationContract,lifecycle }, null, 2) + '\n');
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, challengeDeclarationContract, challengeIndexContract, challengeOverview, challengeDiagnostics:challengeParsed.diagnostics, gridContract, parallelIdentity,valueContract,notationContract,lifecycle }, null, 2) + '\n');
   console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size, parallelRelationships: assertionIds.length,valueAttributes:Object.keys(evaluatedAttributes).length,notationViews:Object.keys(notationViews).length,
-    views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: view.edges.length }])) }, null, 2));
+    views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: (view.edges??[]).length }])) }, null, 2));
 } finally { native.close(); }
 // Go remains resident by design. This harness owns the process lifetime.
 process.exit(0);
