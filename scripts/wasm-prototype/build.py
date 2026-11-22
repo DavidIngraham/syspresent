@@ -55,6 +55,19 @@ def main():
         raise SystemExit('OpenSysML checkout does not match dependency.json; use a separate checkout of the exact pin')
     if dirty and not args.allow_dirty:
         raise SystemExit('OpenSysML source is dirty; --allow-dirty is required for a development artifact')
+    tag = pin['vcsVersionTag']
+    existing_tag = subprocess.run(['git', '-C', str(source), 'show-ref', '--verify', '--quiet', tag['ref']],
+                                  text=True, capture_output=True)
+    if existing_tag.returncode == 1:
+        subprocess.run(['git', '-C', str(source), 'fetch', '--no-tags',
+                        'https://github.com/' + tag['repository'] + '.git',
+                        tag['ref'] + ':' + tag['ref']], check=True)
+    elif existing_tag.returncode != 0:
+        raise SystemExit('Cannot inspect the pinned Go version tag: ' + existing_tag.stderr)
+    if (run('git', '-C', str(source), 'rev-parse', tag['ref']) != tag['object'] or
+            run('git', '-C', str(source), 'rev-parse', tag['ref'] + '^{}') != tag['commit']):
+        raise SystemExit('The Go version tag does not match dependency.json')
+    subprocess.run(['git', '-C', str(source), 'merge-base', '--is-ancestor', tag['commit'], commit], check=True)
     if args.prepare_only:
         print(json.dumps({'sourceCommit': commit, 'sourceTree': tree, 'sourceDirty': dirty, 'sourcePath': str(source)}))
         return
@@ -75,6 +88,10 @@ def main():
     native_env.update(GOOS=run('go', 'env', 'GOHOSTOS', cwd=source, env=toolchain_env), GOARCH=run('go', 'env', 'GOHOSTARCH', cwd=source, env=toolchain_env))
     subprocess.run(['go', 'build', '-trimpath', f'-ldflags={flags}', '-o', str(target / 'sysml-native'), './cmd/sysml-wasm'], cwd=source, env=native_env, check=True)
     subprocess.run(['go', 'build', '-trimpath', f'-ldflags={flags}', '-o', str(target / 'sysml'), './cmd/sysml'], cwd=source, env=native_env, check=True)
+    build_info = run('go', 'version', '-m', str(target / 'sysml-native'), cwd=source, env=toolchain_env)
+    module_version = next(line.split()[2] for line in build_info.splitlines() if line.strip().startswith('mod\t'))
+    if not dirty and module_version != pin['goModuleVersion']:
+        raise SystemExit('Go module-version stamping differs from dependency.json: ' + module_version)
     goroot = Path(run('go', 'env', 'GOROOT', cwd=source, env=toolchain_env))
     copy_asset(goroot / 'lib/wasm/wasm_exec.js', target / 'wasm_exec.js')
     copy_asset(source / 'LICENSE', target / 'OPENSYSML-LICENSE')
@@ -86,7 +103,7 @@ def main():
     provenance = {'schemaVersion': 1, 'sourceCommit': commit, 'sourceDirty': dirty, 'version': version,
                   'sourceDiffSha256': hashlib.sha256(source_diff).hexdigest(),
                   'sourceRepository': pin['repository'], 'sourceTree': tree,
-                  'upstreamCommit': pin['upstreamCommit'],
+                  'upstreamCommit': pin['upstreamCommit'], 'goModuleVersion': module_version,
                   'goVersion': run('go', 'version', cwd=source, env=toolchain_env), 'license': 'Apache-2.0',
                   'runtimeLicense': 'BSD-3-Clause', 'assets': assets,
                   'experimentalMapping': True}

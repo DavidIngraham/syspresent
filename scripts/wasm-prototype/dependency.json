@@ -3,5 +3,12 @@
   "commit": "69756092d1a1361514775e99363ddc50aab5e041",
   "tree": "ef4dd8a534d4119873cd4d1ea57f0f49d0365374",
   "upstreamCommit": "318c3e02b059fe67f869cfc2dc7a9624e5a39536",
-  "goVersion": "1.27.4"
+  "goVersion": "1.27.4",
+  "vcsVersionTag": {
+    "repository": "Open-MBEE/OpenSysML",
+    "ref": "refs/tags/v0.12.1",
+    "object": "fbea54d6f5340902ad660535f5dde7a1d39d3c59",
+    "commit": "b2f0e9b802a334369da94312c35cefbd8726d3bf"
+  },
+  "goModuleVersion": "v0.12.2-0.20261122204130-69756092d1a1"
 }

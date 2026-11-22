@@ -46,7 +46,10 @@ The builder fetches the exact personal-fork commit into a versioned `.tools`
 checkout and verifies its Git tree. Full commit history is retained because Go
 1.27 stamps the module version from reachable tags; a shallow override is rejected
 rather than silently producing a different binary. Existing builder-owned shallow
-checkouts are repaired with a read-only fetch. `--source ../opensysml-upgrade` instead uses
+checkouts are repaired with a read-only fetch. The official `v0.12.1` annotated
+tag is fetched and verified against the exact object and commit in the manifest;
+this is version-stamping context, not a different source baseline. The builder
+checks the resulting Go module version before accepting a clean artifact. `--source ../opensysml-upgrade` instead uses
 an existing checkout of that exact pin. Dirty source requires `--allow-dirty`
 and is labeled as a development artifact. Builds record the source commit,
 tree, upstream, dirty state, Go version and asset SHA-256 hashes, plus the
