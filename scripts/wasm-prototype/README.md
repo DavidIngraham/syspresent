@@ -43,7 +43,10 @@ npm test
 ```
 
 The builder fetches the exact personal-fork commit into a versioned `.tools`
-checkout and verifies its Git tree. `--source ../opensysml-upgrade` instead uses
+checkout and verifies its Git tree. Full commit history is retained because Go
+1.27 stamps the module version from reachable tags; a shallow override is rejected
+rather than silently producing a different binary. Existing builder-owned shallow
+checkouts are repaired with a read-only fetch. `--source ../opensysml-upgrade` instead uses
 an existing checkout of that exact pin. Dirty source requires `--allow-dirty`
 and is labeled as a development artifact. Builds record the source commit,
 tree, upstream, dirty state, Go version and asset SHA-256 hashes, plus the

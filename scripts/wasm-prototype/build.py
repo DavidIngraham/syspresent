@@ -39,8 +39,13 @@ def main():
         source.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(['git', 'clone', '--filter=blob:none', '--no-checkout',
                         'https://github.com/' + pin['repository'] + '.git', str(source)], check=True)
-        subprocess.run(['git', '-C', str(source), 'fetch', '--depth=1', 'origin', pin['commit']], check=True)
+        subprocess.run(['git', '-C', str(source), 'fetch', 'origin', pin['commit']], check=True)
         subprocess.run(['git', '-C', str(source), 'checkout', '--detach', pin['commit']], check=True)
+    if run('git', '-C', str(source), 'rev-parse', '--is-shallow-repository') == 'true':
+        if args.source is not None:
+            raise SystemExit('OpenSysML source is shallow; fetch its full history so Go module-version stamping is reproducible')
+        subprocess.run(['git', '-C', str(source), 'fetch', '--unshallow',
+                        'https://github.com/' + pin['repository'] + '.git', pin['commit']], check=True)
     target = args.output.resolve()
     target.mkdir(parents=True, exist_ok=True)
     commit = run('git', '-C', str(source), 'rev-parse', 'HEAD')
