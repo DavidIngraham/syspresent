@@ -135,7 +135,7 @@ function nativeSequenceClient(binary){
  for(const event of ['error','exit'])child.on(event,error=>{for(const job of pending.values())job.reject(Error(String(error)));pending.clear();});
  return {call(method,params){const id=++nextId,body=Buffer.from(JSON.stringify({jsonrpc:'2.0',id,method,params}));return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});child.stdin.write('Content-Length: '+body.length+'\r\n\r\n');child.stdin.write(body);});},close(){child.stdin.end();}};
 }
-const nativeSequenceBinary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??'build/canvas-prototype/engine/sysml-native');
+const nativeSequenceBinary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??process.env.SYSPRESENT_NATIVE??'build/canvas-prototype/engine/sysml-native');
 test('real native sequence renders six canonical event proxies and two explicit orders; portable spacing preserves semantics',{skip:!existsSync(nativeSequenceBinary),timeout:60000},async()=>{
  const engine=nativeSequenceClient(nativeSequenceBinary);
  try{

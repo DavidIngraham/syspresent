@@ -14,7 +14,7 @@ function nativeClient(binary){
  for(const event of ['error','exit'])child.on(event,error=>{for(const job of pending.values())job.reject(Error(String(error)));pending.clear();});
  return {call(method,params={}){const id=++sequence,data=Buffer.from(JSON.stringify({jsonrpc:'2.0',id,method,params}));return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});child.stdin.write(`Content-Length: ${data.length}\r\n\r\n`);child.stdin.write(data);});},close(){child.stdin.end();}};
 }
-const binary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??'build/canvas-prototype/engine/sysml-native');
+const binary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??process.env.SYSPRESENT_NATIVE??'build/canvas-prototype/engine/sysml-native');
 const narrative=bindings=>({schemaVersion:NARRATIVE_SCHEMA,template:bindings.map(binding=>'{{'+binding.name+'}}').join(' | '),bindings});
 test('native quantities, big integers, enum identity and unknown/collection results keep their typed meaning',()=>{
  assert.equal(formatNativeValue({type:'Length',value:{quantity:{rationalMagnitude:{numerator:'6',denominator:'5'},unit:'m'}}},{unit:'m',type:'Length',decimals:2}),'1.20 m');

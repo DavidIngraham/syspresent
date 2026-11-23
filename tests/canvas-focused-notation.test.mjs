@@ -95,7 +95,7 @@ test('focused native prose stays inert and omission markers retain the actual de
  const descriptor=focusedNodeDescriptor(node('def'),graph,{pageSize:1});assert.ok(descriptor.compartments.some(c=>c.text==='…'));assert.ok(descriptor.notices.some(n=>n.shown===1&&n.total===3));
 });
 
-const binary=resolve(process.env.SYSPRESENT_NATIVE??'build/canvas-prototype/engine/sysml-native');
+const binary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??process.env.SYSPRESENT_NATIVE??'build/canvas-prototype/engine/sysml-native');
 function nativeClient(){
  const child=spawn(binary,[],{stdio:['pipe','pipe','inherit']});let buffer=Buffer.alloc(0),sequence=0;const jobs=new Map();
  child.stdout.on('data',chunk=>{buffer=Buffer.concat([buffer,chunk]);while(true){const end=buffer.indexOf('\r\n\r\n');if(end<0)return;const length=Number(/Content-Length:\s*(\d+)/i.exec(buffer.subarray(0,end).toString())?.[1]);if(!Number.isFinite(length))throw Error('Invalid native frame');if(buffer.length<end+4+length)return;const message=JSON.parse(buffer.subarray(end+4,end+4+length));buffer=buffer.subarray(end+4+length);const job=jobs.get(message.id);if(!job)continue;jobs.delete(message.id);message.error?job.reject(Error(message.error.message)):job.resolve(message.result);}});
@@ -104,7 +104,7 @@ function nativeClient(){
  return {call(method,params){const id=++sequence,data=Buffer.from(JSON.stringify({jsonrpc:'2.0',id,method,params}));return new Promise((resolve,reject)=>{jobs.set(id,{resolve,reject});child.stdin.write(`Content-Length: ${data.length}\r\n\r\n`);child.stdin.write(data);});},close(){child.stdin.end();}};
 }
 
-test('actual native declarations and action rendering drive focused notation without label inference',{skip:!existsSync(binary)&&'Build native engine or set SYSPRESENT_NATIVE first',timeout:30000},async()=>{
+test('actual native declarations and action rendering drive focused notation without label inference',{skip:!existsSync(binary)&&'Build native engine or set SYSPRESENT_NATIVE_ENGINE first',timeout:30000},async()=>{
  const client=nativeClient();
  try{
   const content=`package FocusedFixture {
@@ -253,7 +253,9 @@ test('actual native enumeration, calculation parameters and ordered declarations
   const parsed=await client.call('ParseSources',{documents:[{name:'more-notation.sysml',content}]});assert.ok(!parsed.diagnostics?.some(d=>String(d.severity).toLowerCase()==='error'),JSON.stringify(parsed.diagnostics));
   const exported=await client.call('ExportModel',{modelHash:parsed.modelHash,projection:'declarations'}),g=modelGraph(exported.elements),id=name=>g.elements.find(e=>e.qualifiedName==='MoreNotation::'+name)?.id;
   const enumeration=focusedNodeDescriptor({id:'enum',semanticId:id('Mode'),kind:'enum'},g),calculation=focusedNodeDescriptor({id:'calc',semanticId:id('Offset'),kind:'calc'},g),device=focusedNodeDescriptor({id:'part',semanticId:id('Device'),kind:'part'},g);
-  assert.equal(enumeration.keyword,'enum def');assert.deepEqual(new Set(enumeration.compartments.find(c=>c.title==='enums').entries.map(e=>e.text)),new Set(['stopped','running']));
+  const nativeEnumeration=exported.elements.find(e=>e.qualifiedName==='MoreNotation::Mode');
+  assert.equal(nativeEnumeration?.['@type'],'EnumerationDefinition');assert.equal(nativeEnumeration.isAbstract,true);
+  assert.equal(enumeration.keyword,'abstract enum def');assert.deepEqual(new Set(enumeration.compartments.find(c=>c.title==='enums').entries.map(e=>e.text)),new Set(['stopped','running']));
   assert.equal(calculation.keyword,'calc def');const parameters=calculation.compartments.find(c=>c.title==='parameters');assert.ok(parameters.entries.some(e=>e.text.startsWith('in input')));assert.ok(parameters.entries.some(e=>e.text.startsWith('out output')));
   const entries=device.compartments.flatMap(c=>c.entries??[]);assert.ok(entries.some(e=>e.text.includes('samples')&&e.text.includes('ordered nonunique')));assert.ok(entries.some(e=>e.text.startsWith('constant limit')));
  }finally{client.close();}

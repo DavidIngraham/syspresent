@@ -34,7 +34,7 @@ function nativeClient(binary){
  for(const event of ['error','exit'])child.on(event,error=>{for(const job of pending.values())job.reject(Error(String(error)));pending.clear();});
  return {call(method,params={}){const id=++sequence,data=Buffer.from(JSON.stringify({jsonrpc:'2.0',id,method,params}));return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});child.stdin.write(`Content-Length: ${data.length}\r\n\r\n`);child.stdin.write(data);});},close(){child.stdin.end();}};
 }
-const binary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??'build/canvas-prototype/engine/sysml-native');
+const binary=resolve(process.env.SYSPRESENT_NATIVE_ENGINE??process.env.SYSPRESENT_NATIVE??'build/canvas-prototype/engine/sysml-native');
 test('native reusable capture resolves, appends questions and round-trips without pinning model version',{skip:!existsSync(binary)},async()=>{
  const engine=nativeClient(binary);
  try{
