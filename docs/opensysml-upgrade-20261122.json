@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "applicationBaseCommit": "25000c1864f0c1c3d7f11eec2650e71e2339b259",
-  "testedImplementationCommit": "2950d825b67283937adc5238997b6bb20679435c",
+  "testedImplementationCommit": "de4b65d06db4198ad30aa363f9fbbbb02a2d29f7",
   "engine": {
     "schemaVersion": 1,
     "sourceCommit": "5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c",
@@ -40,7 +40,10 @@
     "tests": 735,
     "passed": 735,
     "failed": 0,
-    "skipped": 0
+    "skipped": 0,
+    "engineSelection": "Default installed 5578 engine, both override variables unset",
+    "allNativeFilesUseSameResolution": true,
+    "logSha256": "7116fc03839593bc21f146b0573b59b85d4c61e2d04d9a9c00808eb98a31e1bb"
   },
   "publicationTests": {
     "passed": 6
@@ -200,7 +203,9 @@
   "localTraceHashes": {
     "parity.json": "a6c0913929e9183bd40783733cbc0127b5600eeac46e25bd2e597f62c1926837",
     "browser-seven-cycle.json": "327e5340b38c205f900050a93d7baac876c0694d8a952022b3da5ce5cb126c0f",
-    "browser-revalidation-fresh.json": "c716c0b856774c84ccbc49a3889e35a76b8b93136ad4715974a4383a451ffdab"
+    "browser-revalidation-fresh.json": "c716c0b856774c84ccbc49a3889e35a76b8b93136ad4715974a4383a451ffdab",
+    "default-test-log": "7116fc03839593bc21f146b0573b59b85d4c61e2d04d9a9c00808eb98a31e1bb",
+    "canonical-override-test-log": "289ef3508a16009488a327009ac22480113857ee0d2d5d34c615a53e2dca586d"
   },
   "publicSourceBootstrap": {
     "status": "passed",
@@ -258,5 +263,31 @@
     "originalAf37PatchedPeakBytes": 2810183680,
     "previous697CandidatePeakBytes": 2883911680,
     "interpretation": "Current measured linear-memory high-water is higher; the unchanged plateau/headroom policy passes. This is not physical-memory or Safari evidence."
+  },
+  "runtimeAssetsTestedAtImplementationCommit": "2950d825b67283937adc5238997b6bb20679435c",
+  "nativeOverrideConsistency": {
+    "files": 9,
+    "tests": 71,
+    "failed": 0,
+    "skipped": 0,
+    "canonicalVariable": "SYSPRESENT_NATIVE_ENGINE",
+    "legacyFallback": "SYSPRESENT_NATIVE",
+    "conflictingLegacyPath": "Nonexistent sentinel; canonical source selected in every native test file",
+    "logSha256": "289ef3508a16009488a327009ac22480113857ee0d2d5d34c615a53e2dca586d"
+  },
+  "priorDefaultPathFailure": {
+    "failed": 1,
+    "passed": 734,
+    "cause": "Stale enum-def label assertion: the pinned native API reports EnumerationDefinition.isAbstract=true",
+    "fix": "Assert the native property and abstract enum-def label; preserve literals, parameter roles and ordering assertions",
+    "logSha256": "67bcbe466fc872b1e2493712a07fab541b7da131208c1cc296f0ecc7fab363d6"
+  },
+  "earlierOverrideRunLimitation": "Four files used the legacy override variable and therefore the old default engine. That mixed run is superseded by the all-default 735-test pass and canonical-precedence 71-test pass recorded here.",
+  "defaultWorkspaceInstallation": {
+    "engineSourceCommit": "5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c",
+    "engineDirectory": "build/canvas-prototype/engine",
+    "previousBaselinePreservedAt": "build/rollback-af37-canvas-prototype",
+    "normalStaticBuildPassed": true,
+    "normalTestsWithoutOverrides": true
   }
 }

@@ -294,3 +294,10 @@ metadata is requested by `includeSemanticIdentity` or independently with
 The current repaired source has its own parity and browser traces under
 `build/upgrade-5578dbc/`; earlier candidate traces retain their original source and
 asset hashes.
+
+
+Native Node tests consistently prefer `SYSPRESENT_NATIVE_ENGINE`, retain
+`SYSPRESENT_NATIVE` as a legacy fallback, and otherwise use the default paired
+build. An override must select the same engine for every test file. The default
+735-test run has no skips; a 71-test native run with a conflicting nonexistent
+legacy path verifies canonical-override precedence.

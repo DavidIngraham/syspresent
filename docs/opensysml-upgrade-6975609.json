@@ -39,7 +39,8 @@
     "tests": 735,
     "passed": 735,
     "failed": 0,
-    "skipped": 0
+    "skipped": 0,
+    "engineSelectionLimitation": "Historical run used SYSPRESENT_NATIVE_ENGINE while four files still selected SYSPRESENT_NATIVE or the af37 default. Browser/parity/build receipts retain their exact 6975609 artifacts; current all-native results are in opensysml-upgrade-20261122.json."
   },
   "publicationTests": {
     "passed": 6

@@ -415,3 +415,19 @@ node scripts/wasm-prototype/browser-export-memory.mjs \
 
 These are Linux Chromium software and WASM32 address-space measurements.
 Target Safari/iPad physical-memory and reader acceptance remain unrun.
+
+
+The final default-path Node check executes all 735 tests against this engine with
+no overrides or skips; six publication tests also pass. Nine native test files
+now share canonical/legacy override precedence, verified by 71 passing tests
+with the legacy path deliberately nonexistent. The prior isolated override run
+had mixed four old-default files with the candidate and is superseded for this
+gate. The first all-default attempt exposed one stale enum label expectation:
+the native API reports `EnumerationDefinition.isAbstract=true`. The assertion
+now checks that native fact, its rendered abstract prefix and the original
+literals/parameter/ordering contracts. The native rule is visible in
+[the pinned reflection implementation](https://github.com/DavidIngraham/OpenSysML/blob/5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c/internal/semantic/query/properties.go#L80).
+No product, model, engine or numerical code changed in this correction; the
+validated browser runtime assets remain identical. The old default af37 build
+is preserved locally at `build/rollback-af37-canvas-prototype/`; the task's
+normal build paths now contain the final engine.
