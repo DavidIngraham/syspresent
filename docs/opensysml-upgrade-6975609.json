@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "applicationBaseCommit": "25000c1864f0c1c3d7f11eec2650e71e2339b259",
+  "testedImplementationCommit": "556ccc082e2f4911e77a436edd65e886814667d2",
+  "engine": {
+    "schemaVersion": 1,
+    "sourceCommit": "69756092d1a1361514775e99363ddc50aab5e041",
+    "sourceDirty": false,
+    "version": "syspresent-69756092d1a1",
+    "sourceDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sourceRepository": "DavidIngraham/OpenSysML",
+    "sourceTree": "ef4dd8a534d4119873cd4d1ea57f0f49d0365374",
+    "upstreamCommit": "318c3e02b059fe67f869cfc2dc7a9624e5a39536",
+    "goVersion": "go version go1.27.4 linux/amd64",
+    "license": "Apache-2.0",
+    "runtimeLicense": "BSD-3-Clause",
+    "assets": {
+      "sysml-wasm.wasm": {
+        "sha256": "778fc94b3eb88ba19a4c89271ae4434d6dae68f2522f022937d50f1b811f4cff",
+        "bytes": 54060968
+      },
+      "wasm_exec.js": {
+        "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
+        "bytes": 16992
+      },
+      "sysml-native": {
+        "sha256": "d432d0b6293bd39b882cb2036c195d10105a3ec0a0208e5ee0bcfda93d57b28c",
+        "bytes": 36946183
+      },
+      "sysml": {
+        "sha256": "efa0f15ee2f39420125299a44e20b1d29a1d3d2fdf95c9f5d21bc4e156d34018",
+        "bytes": 63746311
+      }
+    },
+    "experimentalMapping": true
+  },
+  "extensionsCommit": "38097bbc0198767590c58f89796a436678319924",
+  "javascriptTests": {
+    "tests": 735,
+    "passed": 735,
+    "failed": 0,
+    "skipped": 0
+  },
+  "publicationTests": {
+    "passed": 6
+  },
+  "specificationValidation": {
+    "packages": 4,
+    "errors": 0
+  },
+  "nativeWasmParity": {
+    "passed": true,
+    "declarations": {
+      "elementCount": 15949,
+      "omittedElementCount": 169413,
+      "sha256": "636bd26283cf36b6b460376287af11732264039b5662e62f564541f6c4fd8cb1"
+    },
+    "index": {
+      "entries": 13864,
+      "modelRoots": [
+        "Analysis",
+        "BlueDog",
+        "EngineeringDecisions",
+        "GorgeChallenge",
+        "InlandExtended",
+        "InlandNavigationExperiment",
+        "MarineDesign",
+        "MarineEnergy"
+      ],
+      "requirementSeedCount": 634
+    },
+    "challengeDepthZero": {
+      "nodes": [
+        {
+          "qualifiedName": "GorgeChallenge::transGorgeChallenge",
+          "semanticId": "GorgeChallenge__transGorgeChallenge",
+          "identityStatus": "mapped"
+        },
+        {
+          "qualifiedName": "GorgeChallenge::courseCompletion",
+          "semanticId": "GorgeChallenge__courseCompletion",
+          "identityStatus": "mapped"
+        },
+        {
+          "qualifiedName": "GorgeChallenge::unassistedAttempt",
+          "semanticId": "GorgeChallenge__unassistedAttempt",
+          "identityStatus": "mapped"
+        },
+        {
+          "qualifiedName": "GorgeChallenge::sailingPropulsion",
+          "semanticId": "GorgeChallenge__sailingPropulsion",
+          "identityStatus": "mapped"
+        }
+      ],
+      "relationships": [
+        {
+          "kind": "derive",
+          "from": "n1",
+          "to": "n0",
+          "semanticId": "GorgeChallenge__challengeRuleCourseCompletion"
+        },
+        {
+          "kind": "derive",
+          "from": "n2",
+          "to": "n0",
+          "semanticId": "GorgeChallenge__challengeRuleUnassistedAttempt"
+        },
+        {
+          "kind": "derive",
+          "from": "n3",
+          "to": "n0",
+          "semanticId": "GorgeChallenge__challengeRuleSailingPropulsion"
+        }
+      ]
+    },
+    "flashlightDepthOne": {
+      "nodes": 4,
+      "relationships": 3
+    }
+  },
+  "sevenCycle": {
+    "passed": true,
+    "workerInstances": 1,
+    "cycles": 7,
+    "validationsPerCycle": 1,
+    "peakLinearMemoryBytes": 2883911680,
+    "policy": {
+      "minimumCycles": 7,
+      "maximumCycles": 7,
+      "windowCycles": 3,
+      "maximumWindowGrowthBytes": 16777216,
+      "maximumCycleGrowthBytes": 4194304,
+      "minimumHeadroomBytes": 536870912,
+      "addressSpaceBytes": 4294967296,
+      "stopLinearBytes": 3758096384
+    },
+    "decision": {
+      "status": "passed",
+      "reason": "Late uninterrupted cycles meet the measured high-water plateau policy",
+      "completedCycles": 7,
+      "headroomBytes": 1411055616,
+      "windowGrowthBytes": 262144,
+      "cycleGrowthBytes": [
+        0,
+        262144,
+        0
+      ],
+      "windowCycles": [
+        5,
+        6,
+        7
+      ]
+    },
+    "nativeIdentityCount": 29,
+    "identityPreservedAcrossAllAppendsAndReloads": true,
+    "originalSourceHashes": {
+      "models/blue-dog.sysml": "9b4edf033775f6548658dc10fe263fcdc3e80f9c6e66cc36b16ebf6e98d4ba47",
+      "models/gorge-challenge.sysml": "abd0ad9d39cb5b334170c7239862d1e770b521831e56b9f4fa3453c584c54fe9",
+      "models/libraries/analysis.sysml": "98065dc7f0298faffb538558fc960f030787a611632b0650b3706d1e748a37ff",
+      "models/libraries/decision-records.sysml": "93102a19a7e9c69cd35544bf7f4815657164803fd1bbe9af6d6689ad613f52f3",
+      "models/libraries/energy/budget.sysml": "6b2f8c827db736130e1f343652d7d45695a4c4b18d5b4e7ac07f3d7a444ca365",
+      "models/libraries/marine/design.sysml": "e39ba68e330e539167b298338b5bb20a98c3edb049d9a405a06df307640ef057",
+      "models/libraries/navigation/inland-obligations.sysml": "8954be8c0904583cb977609428ed23734c59cd05aacf57ee82a8669c8e39da16",
+      "models/libraries/navigation/inland-pair.sysml": "e0bb4518cbc1063a31ae63b5f8d3dbca4c06eb864c7a745199c45e47231de326",
+      "views.sysml": "6b982a276103daca1039161aea4cb717e48f105f20670c697eae60bc582928b2"
+    },
+    "nativeValue": "140",
+    "zipSha256": [
+      "cc2f9cca0ea088e435c69656b7f6b8ec540cb6df3e6b4a34a941f4475d2db364",
+      "53c31f0d42e537436f41574fa93ea605835febc8a43e76d04b84f895248e9feb",
+      "99480e4afc55fea0b3bd8e5673fd5782bcbc7b69db7acb8a02bb6cd8d1f3d5e4",
+      "43f2391ed6a02cabcfa45230fb96c0c4b620abd7a17e23584150f7e6278a7b71",
+      "dc00813b319db547f4fc2bf29fab10a5337d536d2bf28324e305e7baa1af390c",
+      "06464a6097887ac0b34f29e8b7a8f2660db8f37763d0c5350bbf6efa95277242",
+      "6e826ed9eb478ee5b2846ae8e9df8c6bdd4558700095c73699861c2bd70ab1b5"
+    ]
+  },
+  "repeatedEvaluationAndFreshWorker": {
+    "passed": true,
+    "cycles": 1,
+    "validationsPerCycle": 2,
+    "workerInstances": 2,
+    "peakLinearMemoryBytes": 3138650112,
+    "headroomBytes": 1156317184,
+    "stepTimeoutMilliseconds": 180000,
+    "sameWorkerReloadPassed": true,
+    "freshWorkerImportPassed": true,
+    "traceSha256": "df1b145776db774a15be25b83d35987717d20df9d443b84d2d6ef5c5b56e7f0a"
+  },
+  "priorContendedAttempt": {
+    "passed": false,
+    "failure": "180-second append deadline under concurrent full compiler, API referee and application test load",
+    "traceSha256": "350d52b669a5f0bbfff4f2037ace5f2f0f335b7c8de6895585c0802abe58bb56",
+    "samePolicyPassedOnRetry": true
+  },
+  "cleanStaticBuild": {
+    "cleanRevision": "556ccc082e2f4911e77a436edd65e886814667d2",
+    "comparedAssets": 50,
+    "allRuntimeAndSourceAssetsIdentical": true,
+    "buildMetafileDifference": "Output-directory keys only; input metadata and output descriptions equal after basename normalization",
+    "testedSnapshotDirty": true,
+    "cleanSnapshotDirty": false
+  },
+  "localTraceHashes": {
+    "parity.json": "b91e46dde238d3894a9a6ceddd16e1b1e9b96de400d38c33680bdd4eb6bdbb80",
+    "browser-seven-cycle.json": "c1f95e7a476ec14f1d0aad0730e533a1672392cf4d69ada1189954f5050dcafc"
+  },
+  "publicSourceBootstrap": {
+    "status": "passed",
+    "sourceCommit": "69756092d1a1361514775e99363ddc50aab5e041",
+    "sourceTree": "ef4dd8a534d4119873cd4d1ea57f0f49d0365374",
+    "sourceDirty": false,
+    "goModuleVersion": "v0.12.2-0.20261122204130-69756092d1a1",
+    "initialSourceDirectoryAbsent": true,
+    "allFourAssetsByteIdentical": true,
+    "assets": {
+      "sysml-wasm.wasm": {
+        "sha256": "778fc94b3eb88ba19a4c89271ae4434d6dae68f2522f022937d50f1b811f4cff",
+        "bytes": 54060968
+      },
+      "wasm_exec.js": {
+        "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
+        "bytes": 16992
+      },
+      "sysml-native": {
+        "sha256": "d432d0b6293bd39b882cb2036c195d10105a3ec0a0208e5ee0bcfda93d57b28c",
+        "bytes": 36946183
+      },
+      "sysml": {
+        "sha256": "efa0f15ee2f39420125299a44e20b1d29a1d3d2fdf95c9f5d21bc4e156d34018",
+        "bytes": 63746311
+      }
+    },
+    "repairedPreviousShallowCacheAlsoPassed": true,
+    "workerContractTestsPassed": 35,
+    "normalStaticBuildPassed": true,
+    "vcsVersionTag": {
+      "repository": "Open-MBEE/OpenSysML",
+      "ref": "refs/tags/v0.12.1",
+      "object": "fbea54d6f5340902ad660535f5dde7a1d39d3c59",
+      "commit": "b2f0e9b802a334369da94312c35cefbd8726d3bf"
+    },
+    "earlierMetadataDifferences": "Shallow history and missing upstream version tag changed only Go module-version stamping; builder now preserves full ancestry and verifies the exact official tag and module version."
+  },
+  "limits": [
+    "No target Safari/iPad hardware measurement",
+    "No physical engineering or representative-reader acceptance",
+    "No semantic model edits or draw.io importer exposure"
+  ],
+  "rollback": {
+    "base": "af37bbf155aea785b8ac494a14afe659244bbcdf",
+    "patchSha256": "e8332e02f984358dd8c3da41fb9d3fa53cb8e140fa6b2a7a44bff0c43a76d908",
+    "patchedTree": "d85adf5b2e95aad223e944768fc37769e32acab4"
+  }
+}

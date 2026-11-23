@@ -305,7 +305,7 @@ and WASM binaries to the previous base-plus-patch build. Native/WASM parity
 passed again. The test repair therefore changes no shipped engine behavior.
 
 
-## November 22 upstream baseline review
+## November 22 candidate 6975609 (historical)
 
 The browser engine derives from official develop
 `318c3e02b059fe67f869cfc2dc7a9624e5a39536` and extension-library commit
@@ -346,3 +346,72 @@ node scripts/wasm-prototype/browser-export-memory.mjs \
 The test uses Playwright and Chromium. The task trace is
 `build/upgrade-6975609/browser-seven-cycle.json`, with all seven ZIPs beside it.
 These are software and memory measurements, not physical engineering acceptance.
+
+The additional one-cycle run validates the proposal twice, appends it, reloads
+its ZIP in the same worker, then imports it into a fresh worker. It passes with
+the unchanged 180-second step deadline, a 2,993.25 MiB maximum linear buffer and
+1,102.75 MiB headroom. It checks the 32-scene ZIP independently of the seven-cycle
+38-scene stress result. The first attempt timed out during append while full
+compiler, API-referee and application suites competed for CPU; that failed trace
+is retained. The retry uses the clean static build whose 50 runtime/source assets
+match the seven-cycle build exactly; build metadata differs only in output paths.
+
+Compact source, hash and acceptance receipts are in
+[opensysml-upgrade-6975609.json](opensysml-upgrade-6975609.json). Raw task traces
+remain in `build/upgrade-6975609/`. These checks do not establish target Safari or
+iPad physical-memory behavior.
+
+The public-source bootstrap also reproduces all four engine assets byte-for-byte
+from an initially absent source cache. It verifies the exact official version-tag
+object used by Go 1.27's module-version stamping. This supplies reproducible build
+metadata without changing the newer upstream source pin or the tested WASM.
+The normal static build and all 35 worker-contract checks pass from that checkout.
+
+
+## Shared source 5578dbc acceptance (23 November 2026)
+
+The final paired native/browser source is
+`5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c`, tree
+`06dd5999d5d4b817fd4c88493a23f797923ab633`, on the same official November 22
+upstream base and extension revision above. Blue Dog consumes this same source.
+The engine is built with Go 1.27.4. WASM SHA-256 is
+`51dd7e7f20adef258f01745214ffa4e9607a3d2934e1f3ac8786b95b9ac45c61`;
+matching `wasm_exec.js` remains
+`0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14`.
+
+Seven uninterrupted same-worker validate/append/ZIP/reload cycles pass. Every ZIP
+retains the nine original sources byte for byte, the same 29 represented native
+identities and value 140. Peak linear memory is 3,124.5 MiB, leaving 971.5 MiB
+below 4 GiB. Cycles 5–7 show zero growth. Settled projects retain one model;
+review candidates retain two. No harness-forced collection establishes the plateau.
+This high-water is higher than the original patched baseline's 2,680 MiB and
+the earlier 6975609 candidate's 2,750.3125 MiB. The unchanged 512 MiB minimum
+headroom and plateau policy pass; this is not a claim of lower memory use.
+
+A separate normal run validates the proposal twice, reloads its 32-scene ZIP
+in the same worker and imports it in a fresh worker. Both worker instances pass
+with the unchanged 180-second step deadline. Its peak is 2969.75 MiB, with
+1126.25 MiB headroom. The clean application build reproduces all four
+engine assets byte-for-byte from the public source pin and an initially absent
+source cache; 35 worker-contract checks and the normal static build pass.
+Its 51 runtime/source assets equal the seven-cycle site; differences are Git
+provenance and normalized output paths in build metadata.
+
+Current compact receipts are in
+[opensysml-upgrade-20261122.json](opensysml-upgrade-20261122.json); earlier
+candidate measurements remain in
+[opensysml-upgrade-6975609.json](opensysml-upgrade-6975609.json). Raw current
+traces and ZIPs are under `build/upgrade-5578dbc/`. Reproduce after the normal
+source/cache/site build with:
+
+```sh
+node scripts/wasm-prototype/browser-export-memory.mjs \
+  --stress-plateau --cycles 7 --min-cycles 7 --validations-per-cycle 1 \
+  --output build/canvas-prototype/browser-seven-cycle.json
+node scripts/wasm-prototype/browser-export-memory.mjs \
+  --cycles 1 --validations-per-cycle 2 \
+  --output build/canvas-prototype/browser-revalidation-fresh.json
+```
+
+These are Linux Chromium software and WASM32 address-space measurements.
+Target Safari/iPad physical-memory and reader acceptance remain unrun.

@@ -37,6 +37,15 @@ Use focused tasks with clear owned files and a coordinator integrating contract,
 
 The canvas is the sole viewer. Documentation must distinguish intended product behavior from features actually demonstrated by this milestone. Keep a concrete evidence record in the final integration report rather than editing planned verification verdicts to pass without a model-backed result.
 
+## Current baseline review
+
+The paired native/WASM engine now uses the exact source and tree in
+[`dependency.json`](../scripts/wasm-prototype/dependency.json), built with
+Go 1.27.4. Current build, parity and bounded-context contracts are documented in
+[the engine README](../scripts/wasm-prototype/README.md); the seven-cycle memory
+regression is recorded in [native memory validation](native-memory-validation.md).
+The dated milestone observations below retain their original pins and limits.
+
 ## Evidence recorded on 18 October 2026
 
 The implementation is `src/canvas-prototype/`; the fixture is `examples/canvas-prototype/`. `npm run build:canvas` emits `build/canvas-prototype/site/`, a complete static-site ZIP, and a write-once ZIP under `build/canvas-prototype/snapshots/<sha256>.zip`. Publication serves the canvas directly at `/syspresent/`; see [CI and Pages](ci.md). `.github/workflows/canvas.yml` reproduces the engine and artifact build without VS Code source dependencies; this workflow has not yet been observed running on GitHub.
