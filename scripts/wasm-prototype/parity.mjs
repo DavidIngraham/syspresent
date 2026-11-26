@@ -12,6 +12,7 @@ import { engineeringContext } from '../../src/canvas-prototype/core/index.mjs';
 import {readProjectDirectory} from '../canvas_project_files.mjs';
 import {documentsFor} from '../../src/canvas-prototype/project.mjs';
 import {discoverNativeIndex,discoverModelIndex} from '../../src/canvas-prototype/native-project.mjs';
+import {traceContext} from '../../src/canvas-prototype/exploration.mjs';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
@@ -376,8 +377,26 @@ try {
   }
   for(const client of [native,wasm])await client.call('ReleaseModel',{modelHash:challengeParsed.modelHash});
 
+  const effectiveDocuments=[{name:'part-effective.sysml',content:await readFile(resolve('tests/fixtures/part-effective.sysml'),'utf8')}];
+  const effectiveParsed=await native.call('ParseSources',{documents:effectiveDocuments});
+  assert.deepEqual(await wasm.call('ParseSources',{documents:effectiveDocuments}),effectiveParsed);
+  assert.equal(effectiveParsed.diagnostics?.length??0,0);
+  const effectiveExport=await native.call('ExportModel',{modelHash:effectiveParsed.modelHash,projection:'declarations'});
+  assert.deepEqual(await wasm.call('ExportModel',{modelHash:effectiveParsed.modelHash,projection:'declarations'}),effectiveExport,'Effective requirement declarations and inheritance provenance must agree in WASM');
+  const effectiveID=name=>effectiveExport.elements.find(e=>e.qualifiedName==='EffectiveFixture::'+name)?.['@id'];
+  const effectiveContext=traceContext(modelGraph(effectiveExport.elements),{focus:effectiveID('component'),mode:'effective'});
+  assert.deepEqual(new Set(effectiveContext.targets),new Set([effectiveID('Base::baseReq'),effectiveID('Derived::localReq')]));
+  assert.equal(effectiveContext.relationships.length,0,'Collapsed declaration paths must not become invented requirement links');
+  const inheritedPath=effectiveContext.paths.find(path=>path.target===effectiveID('Base::baseReq'));
+  assert.deepEqual(inheritedPath.elementIds,['component','Derived','Base','Base::baseReq'].map(effectiveID));
+  assert.deepEqual(inheritedPath.relationships.map(edge=>edge.kind),['typing','specialization','containment']);
+  const derivedDeclaration=effectiveExport.elements.find(e=>e['@id']===effectiveID('Derived'));
+  assert.equal(inheritedPath.relationships[1].nativeRelationship,derivedDeclaration.ownedSubclassification[0]['@id']);
+  const effectiveRequirementContract={modelHash:effectiveParsed.modelHash,targets:effectiveContext.targets,paths:effectiveContext.paths,collapsedContext:effectiveContext.collapsedContext};
+  for(const client of [native,wasm])await client.call('ReleaseModel',{modelHash:effectiveParsed.modelHash});
+
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, challengeDeclarationContract, challengeIndexContract, challengeOverview, challengeDiagnostics:challengeParsed.diagnostics, gridContract, parallelIdentity,valueContract,notationContract,lifecycle }, null, 2) + '\n');
+  await writeFile(output, JSON.stringify({ serverInfo, parsed, exported, declarations, views, capturedViews, requirementCoverage, boundedRequirementView, challengeDeclarationContract, challengeIndexContract, challengeOverview, challengeDiagnostics:challengeParsed.diagnostics, effectiveRequirementContract, gridContract, parallelIdentity,valueContract,notationContract,lifecycle }, null, 2) + '\n');
   console.log(JSON.stringify({ modelHash, diagnostics: parsed.diagnostics?.length || 0, elements: exported.elements.length, declarations: declarations.elementCount, omittedElements: declarations.omittedElementCount, captures: Object.keys(capturedViews), gridRelationships: foundRelations.size, parallelRelationships: assertionIds.length,valueAttributes:Object.keys(evaluatedAttributes).length,notationViews:Object.keys(notationViews).length,
     views: Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { kind: view.kind, nodes: view.nodes.length, edges: (view.edges??[]).length }])) }, null, 2));
 } finally { native.close(); }

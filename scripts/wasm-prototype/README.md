@@ -28,8 +28,8 @@ the OMG repository service. Render-local IDs and semantic element IDs remain
 separate; synthetic start/final nodes have no semantic ID.
 
 The current native/WASM source is pinned in [`dependency.json`](dependency.json):
-`5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c` in DavidIngraham/OpenSysML,
-with official upstream base `318c3e02b059fe67f869cfc2dc7a9624e5a39536` and
+`12863d72ccbd54a585b405fd10f9c58cbf0f5585` in DavidIngraham/OpenSysML,
+with official v0.13.0 upstream base `df402e904b2d227aef4718b908adcf3630241706` and
 extension-library commit `38097bbc0198767590c58f89796a436678319924`.
 Blue Dog uses the same source commit and upstream/library baseline.
 The browser-specific compatibility layer remains separately reviewable.
@@ -301,3 +301,37 @@ Native Node tests consistently prefer `SYSPRESENT_NATIVE_ENGINE`, retain
 build. An override must select the same engine for every test file. The default
 735-test run has no skips; a 71-test native run with a conflicting nonexistent
 legacy path verifies canonical-override precedence.
+
+## v0.13.0 review acceptance
+
+The current review pin is based on official v0.13.0
+`df402e904b2d227aef4718b908adcf3630241706`; the exact fork SHA, tree,
+lightweight tag object and verified Go pseudo-version are in `dependency.json`.
+The unchanged extensions pin is
+`38097bbc0198767590c58f89796a436678319924`. This is a personal compatibility
+build; the stock browser module does not serve the required declaration export,
+property, conversion, release and memory interfaces.
+
+The parity harness now checks the `part-effective.sysml` fixture in both native
+and WASM: two effective requirements, the original typing/specialization/
+containment path and native subclassification identity, with no invented direct
+requirement edge. It also retains Flashlight depth one and the authored Gorge
+`challengeOverview` depth zero (four explicit requirement identities and three
+native derivations).
+
+After the normal engine and static builds, run the actual browser checks:
+
+```sh
+node scripts/wasm-prototype/browser-effective-requirements.mjs \
+  --site build/canvas-prototype/site \
+  --output build/browser-effective-requirements.json
+node scripts/wasm-prototype/browser-export-memory.mjs \
+  --site build/canvas-prototype/site --cycles 7 --stress-plateau \
+  --validations-per-cycle 1 --output build/browser-memory-v0130.json
+```
+
+Both accept `--playwright /path/to/playwright/index.mjs` and
+`--chromium /path/to/chromium` for an explicitly provisioned browser. Their
+receipts describe what actually ran; the stock-library architecture experiment
+is not a substitute for this product integration gate. The previous `5578dbc`
+acceptance section and receipts remain historical rollback evidence.

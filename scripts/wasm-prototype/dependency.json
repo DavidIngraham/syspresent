@@ -1,14 +1,14 @@
 {
   "repository": "DavidIngraham/OpenSysML",
-  "commit": "5578dbc8b56b4f892d9cbf3fd137a1a0cb52cf9c",
-  "tree": "06dd5999d5d4b817fd4c88493a23f797923ab633",
-  "upstreamCommit": "318c3e02b059fe67f869cfc2dc7a9624e5a39536",
+  "commit": "12863d72ccbd54a585b405fd10f9c58cbf0f5585",
+  "tree": "cb5716bd2a702651535ccee18803aa4f18ddd769",
+  "upstreamCommit": "df402e904b2d227aef4718b908adcf3630241706",
   "goVersion": "1.27.4",
   "vcsVersionTag": {
     "repository": "Open-MBEE/OpenSysML",
-    "ref": "refs/tags/v0.12.1",
-    "object": "fbea54d6f5340902ad660535f5dde7a1d39d3c59",
-    "commit": "b2f0e9b802a334369da94312c35cefbd8726d3bf"
+    "ref": "refs/tags/v0.13.0",
+    "object": "df402e904b2d227aef4718b908adcf3630241706",
+    "commit": "df402e904b2d227aef4718b908adcf3630241706"
   },
-  "goModuleVersion": "v0.12.2-0.20261122232332-5578dbc8b56b"
+  "goModuleVersion": "v0.13.1-0.20261126212604-12863d72ccbd"
 }

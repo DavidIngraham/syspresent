@@ -431,3 +431,32 @@ No product, model, engine or numerical code changed in this correction; the
 validated browser runtime assets remain identical. The old default af37 build
 is preserved locally at `build/rollback-af37-canvas-prototype/`; the task's
 normal build paths now contain the final engine.
+
+## v0.13.0 review acceptance (26 November 2026)
+
+The review pin is `12863d72ccbd54a585b405fd10f9c58cbf0f5585`, based on official
+v0.13.0 `df402e904b2d227aef4718b908adcf3630241706`. The extension pin remains
+`38097bbc0198767590c58f89796a436678319924`. The full
+[receipt](opensysml-v0130-20261126.json) records the clean source tree, Go 1.27.4,
+matching WASM/runtime hashes and public-ref bootstrap. All four rebuilt assets
+are byte-identical to the exact local-source build.
+
+The 735 JavaScript tests, six publication tests, product specification and static
+build pass. Native/WASM parity retains Flashlight depth one, the authored Gorge
+`challengeOverview` depth zero with four requirement identities and three native
+derivations, and effective requirement typing/specialization/containment paths.
+The actual Chromium check shows exactly the component and its two effective
+requirements, with no invented collapsed-path edges.
+
+Seven uninterrupted same-worker edited-project/ZIP reload cycles pass the
+existing policy. The maximum linear memory is 3,466,788,864 bytes, leaving
+828,178,432 bytes (about 790 MiB) of address-space headroom. Cycles five through
+seven add zero bytes. Every settled project retains one native model. The
+separate two-validation run and final fresh-worker ZIP import also pass;
+authored sources, native identities and the edited value 140 survive the roundtrip.
+
+The compiler's broad WASM suite has one remaining artifact-size failure:
+12,650,679 gzipped bytes exceeds the unchanged 12,600,000-byte budget by 50,679.
+The other 24 top-level checks and runtime/wire cases pass. The application
+memory and source/identity receipts do not substitute for that failed threshold.
+Earlier acceptance sections and their original pins remain rollback evidence.
